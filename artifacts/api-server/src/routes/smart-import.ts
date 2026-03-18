@@ -27,9 +27,10 @@ async function extractText(buffer: Buffer, mimetype: string, filename: string): 
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
 
   if (mimetype === "application/pdf" || ext === "pdf") {
-    // pdf-parse v1 exports a default function: pdfParse(buffer) => { text }
-    const { default: pdfParse } = await import("pdf-parse");
-    const result = await (pdfParse as (buf: Buffer) => Promise<{ text: string }>)(buffer);
+    // Import from the inner lib path to bypass index.js which tries to read
+    // a test file (./test/data/05-versions-space.pdf) relative to process.cwd()
+    const { default: pdfParse } = await import("pdf-parse/lib/pdf-parse.js") as { default: (buf: Buffer) => Promise<{ text: string }> };
+    const result = await pdfParse(buffer);
     return result.text;
   }
 

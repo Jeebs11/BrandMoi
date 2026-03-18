@@ -110,6 +110,11 @@ export default function Settings() {
         </header>
 
         <main className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          {/* Smart Import — top of page so it can auto-fill everything */}
+          <section>
+            <SmartImportButton onApply={handleSmartImport} />
+          </section>
+
           {/* Content Settings */}
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Content Preferences</h2>
@@ -124,12 +129,6 @@ export default function Settings() {
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Voice</h2>
             <div className="space-y-4">
-              <SmartImportButton onApply={handleSmartImport} />
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs font-bold text-gray-300">or edit manually</span>
-                <div className="flex-1 h-px bg-gray-200" />
-              </div>
               <VoiceInput label="Your role" value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..." />
               <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..." />
               <VoiceInput label="Your core belief" value={brandBelief} onChange={setBrandBelief} placeholder="Clarity beats cleverness..." />
