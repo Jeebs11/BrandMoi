@@ -20,8 +20,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, agentApi, type AngleCheckResult, type AgentCoach } from "@/lib/api";
 import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
 import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
-import { downloadAnimatedCard, type CardAnimPreset } from "@/lib/export-animated-card";
-import { downloadAnimatedCarousel } from "@/lib/export-animated-carousel";
+import { downloadAnimatedCard, type CardAnimPreset, CARD_BASE_DURATIONS } from "@/lib/export-animated-card";
+import { downloadAnimatedCarousel, CAROUSEL_BASE_HOLD_MS, CAROUSEL_BASE_SWIPE_MS } from "@/lib/export-animated-carousel";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -117,6 +117,7 @@ export default function Capture() {
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
   const [isAnimatingCarousel, setIsAnimatingCarousel] = useState(false);
+  const [animSpeedMult, setAnimSpeedMult] = useState<1 | 1.5 | 2>(1);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
 
@@ -267,7 +268,14 @@ export default function Capture() {
     if (!state.content?.visual) return;
     setIsAnimatingCard(preset);
     try {
-      await downloadAnimatedCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor, preset);
+      await downloadAnimatedCard(
+        state.content.visual,
+        state.structure?.topic ?? "visual",
+        bgColor,
+        accentColor,
+        preset,
+        Math.round(CARD_BASE_DURATIONS[preset] * animSpeedMult)
+      );
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -279,7 +287,14 @@ export default function Capture() {
     if (!state.content?.carousel?.length) return;
     setIsAnimatingCarousel(true);
     try {
-      await downloadAnimatedCarousel(state.content.carousel, state.structure?.topic ?? "carousel", bgColor, accentColor);
+      await downloadAnimatedCarousel(
+        state.content.carousel,
+        state.structure?.topic ?? "carousel",
+        bgColor,
+        accentColor,
+        Math.round(CAROUSEL_BASE_HOLD_MS * animSpeedMult),
+        Math.round(CAROUSEL_BASE_SWIPE_MS * animSpeedMult)
+      );
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -735,7 +750,25 @@ export default function Capture() {
                           </button>
                         </div>
                         <div className="px-4 pt-3 pb-1">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Download animated</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Download animated</p>
+                            <div className="flex gap-1">
+                              {([1, 1.5, 2] as const).map((mult) => (
+                                <button
+                                  key={mult}
+                                  onClick={() => setAnimSpeedMult(mult)}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded text-[10px] font-bold transition-all",
+                                    animSpeedMult === mult
+                                      ? "bg-primary text-white"
+                                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  )}
+                                >
+                                  {mult === 1 ? "1×" : mult === 1.5 ? "1.5×" : "2×"}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                           <div className="grid grid-cols-3 gap-2">
                             {(["typewriter", "fade", "slide"] as CardAnimPreset[]).map((preset) => (
                               <button
@@ -899,18 +932,39 @@ export default function Capture() {
                       {isExportingPDF ? "Building PDF…" : "Download PDF"}
                     </button>
                   </div>
-                  <button
-                    onClick={handleDownloadAnimatedCarousel}
-                    disabled={isAnimatingCarousel}
-                    className="w-full py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                  >
-                    {isAnimatingCarousel ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Download className="w-3.5 h-3.5" />
-                    )}
-                    {isAnimatingCarousel ? "Building video preview…" : "Download animated preview (.webm)"}
-                  </button>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated preview</p>
+                      <div className="flex gap-1">
+                        {([1, 1.5, 2] as const).map((mult) => (
+                          <button
+                            key={mult}
+                            onClick={() => setAnimSpeedMult(mult)}
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-bold transition-all",
+                              animSpeedMult === mult
+                                ? "bg-primary text-white"
+                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            )}
+                          >
+                            {mult === 1 ? "1×" : mult === 1.5 ? "1.5×" : "2×"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDownloadAnimatedCarousel}
+                      disabled={isAnimatingCarousel}
+                      className="w-full py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                    >
+                      {isAnimatingCarousel ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                      {isAnimatingCarousel ? "Building video preview…" : "Download animated preview (.webm)"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

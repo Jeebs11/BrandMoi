@@ -2,17 +2,24 @@ export type CardAnimPreset = "typewriter" | "fade" | "slide";
 
 const CARD_W = 1080;
 const CARD_H = 1080;
+const PAD_H = 104;
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
 
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-}
+// Base durations callers can scale for speed control
+export const CARD_BASE_DURATIONS: Record<CardAnimPreset, number> = {
+  typewriter: 8000,
+  fade: 5500,
+  slide: 4500,
+};
 
-function rgba(hex: string, alpha: number): string {
-  const [r, g, b] = hexToRgb(hex);
-  return `rgba(${r},${g},${b},${alpha})`;
+interface CardLayout {
+  quoteBL: number;
+  barY: number;
+  textBL: number;
+  lines: string[];
+  lineHeight: number;
+  fontSize: number;
 }
 
 function clamp(v: number, lo = 0, hi = 1): number {
@@ -42,54 +49,113 @@ function fillRoundRect(
   ctx.fill();
 }
 
-function wrapText(
+function measureLines(
   ctx: CanvasRenderingContext2D,
   text: string,
-  x: number,
-  y: number,
   maxWidth: number,
-  lineHeight: number
-): number {
+  font: string
+): string[] {
+  ctx.font = font;
   const words = text.split(" ");
+  const lines: string[] = [];
   let line = "";
-  let currentY = y;
   for (const word of words) {
     const test = line + (line ? " " : "") + word;
     if (ctx.measureText(test).width > maxWidth && line) {
-      ctx.fillText(line, x, currentY);
+      lines.push(line);
       line = word;
-      currentY += lineHeight;
     } else {
       line = test;
     }
   }
-  if (line) ctx.fillText(line, x, currentY);
-  return currentY;
+  if (line) lines.push(line);
+  return lines;
 }
 
-function drawCardContent(
-  ctx: CanvasRenderingContext2D,
-  quoteText: string,
-  accentColor: string
-) {
-  const PH = 104;
-  const TOP = 300;
+function buildLayout(ctx: CanvasRenderingContext2D, quoteText: string): CardLayout {
+  const maxWidth = CARD_W - PAD_H * 2;
+  const QUOTE_CAP_H = 90;
+  const QUOTE_TO_BAR = 22;
+  const BAR_H = 4;
+  const BAR_TO_TEXT = 44;
+  const MIN_PAD = 100;
 
+  const candidates = [
+    { fontSize: 56, lineHeight: 72 },
+    { fontSize: 44, lineHeight: 58 },
+    { fontSize: 36, lineHeight: 48 },
+    { fontSize: 30, lineHeight: 40 },
+  ];
+
+  for (const { fontSize, lineHeight } of candidates) {
+    const font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+    const lines = measureLines(ctx, quoteText, maxWidth, font);
+    const totalH = QUOTE_CAP_H + QUOTE_TO_BAR + BAR_H + BAR_TO_TEXT + lines.length * lineHeight;
+
+    if (totalH <= CARD_H - MIN_PAD * 2 || fontSize === 30) {
+      const blockTop = Math.max(MIN_PAD, (CARD_H - totalH) / 2 - 20);
+      return {
+        quoteBL: blockTop + QUOTE_CAP_H,
+        barY: blockTop + QUOTE_CAP_H + QUOTE_TO_BAR,
+        textBL: blockTop + QUOTE_CAP_H + QUOTE_TO_BAR + BAR_H + BAR_TO_TEXT,
+        lines,
+        lineHeight,
+        fontSize,
+      };
+    }
+  }
+
+  return { quoteBL: 370, barY: 394, textBL: 444, lines: [quoteText.slice(0, 60)], lineHeight: 72, fontSize: 56 };
+}
+
+function drawQuoteMark(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor: string, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = accentColor;
   ctx.font = `800 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-  ctx.fillText("\u201C", PH - 8, TOP);
+  ctx.fillText("\u201C", PAD_H - 8, layout.quoteBL);
+  ctx.restore();
+}
 
+function drawBar(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor: string, progress = 1, alpha = 1) {
+  if (progress <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = accentColor;
-  fillRoundRect(ctx, PH, TOP + 48, 56, 4, 2);
+  fillRoundRect(ctx, PAD_H, layout.barY, 56 * progress, 4, 2);
+  ctx.restore();
+}
 
+function drawText(ctx: CanvasRenderingContext2D, layout: CardLayout, textProgress = 1, alpha = 1) {
+  const { lines, lineHeight, textBL, fontSize } = layout;
+  const totalChars = lines.reduce((s, l) => s + l.length, 0);
+  const revealed = Math.floor(textProgress * totalChars);
+  let remaining = revealed;
+  let y = textBL;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = "#ffffff";
-  ctx.font = `700 56px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-  wrapText(ctx, quoteText, PH, TOP + 145, CARD_W - PH * 2, 72);
+  ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+
+  for (const line of lines) {
+    if (remaining <= 0) break;
+    ctx.fillText(line.slice(0, remaining), PAD_H, y);
+    remaining -= line.length;
+    y += lineHeight;
+  }
+  ctx.restore();
+}
+
+function drawFullContent(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor: string, alpha = 1) {
+  drawQuoteMark(ctx, layout, accentColor, alpha);
+  drawBar(ctx, layout, accentColor, 1, alpha);
+  drawText(ctx, layout, 1, alpha);
 }
 
 function drawFrame(
   ctx: CanvasRenderingContext2D,
-  quoteText: string,
+  layout: CardLayout,
   bgColor: string,
   accentColor: string,
   preset: CardAnimPreset,
@@ -98,61 +164,45 @@ function drawFrame(
   ctx.clearRect(0, 0, CARD_W, CARD_H);
 
   if (preset === "typewriter") {
-    const bgAlpha = easeOut(phase(t, 0, 0.1));
-    const qmAlpha = easeOut(phase(t, 0.1, 0.28));
-    const barProg = easeOut(phase(t, 0.22, 0.42));
-    const textProg = easeOut(phase(t, 0.38, 0.90));
+    const bgAlpha = easeOut(phase(t, 0, 0.08));
+    const qmAlpha = easeOut(phase(t, 0.08, 0.22));
+    const barProg = easeOut(phase(t, 0.18, 0.36));
+    const textProg = phase(t, 0.33, 0.93); // linear so reading speed stays constant
 
     ctx.globalAlpha = bgAlpha;
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, CARD_W, CARD_H);
     ctx.globalAlpha = 1;
 
-    const PH = 104;
-    const TOP = 300;
-
-    ctx.globalAlpha = qmAlpha;
-    ctx.fillStyle = accentColor;
-    ctx.font = `800 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-    ctx.fillText("\u201C", PH - 8, TOP);
-
-    ctx.globalAlpha = clamp(barProg * 2);
-    ctx.fillStyle = accentColor;
-    fillRoundRect(ctx, PH, TOP + 48, 56 * barProg, 4, 2);
-
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `700 56px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-    const chars = Math.floor(textProg * quoteText.length);
-    wrapText(ctx, quoteText.slice(0, chars), PH, TOP + 145, CARD_W - PH * 2, 72);
+    drawQuoteMark(ctx, layout, accentColor, qmAlpha);
+    drawBar(ctx, layout, accentColor, barProg, clamp(barProg * 3));
+    drawText(ctx, layout, textProg);
 
   } else if (preset === "fade") {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, CARD_W, CARD_H);
 
-    const contentAlpha = easeOut(phase(t, 0, 0.75), 2);
-    const scale = 0.95 + 0.05 * easeOut(phase(t, 0, 0.75), 2);
+    const alpha = easeOut(phase(t, 0, 0.68), 2);
+    const scale = 0.95 + 0.05 * easeOut(phase(t, 0, 0.68), 2);
 
     ctx.save();
-    ctx.globalAlpha = contentAlpha;
     ctx.translate(CARD_W / 2, CARD_H / 2);
     ctx.scale(scale, scale);
     ctx.translate(-CARD_W / 2, -CARD_H / 2);
-    drawCardContent(ctx, quoteText, accentColor);
+    drawFullContent(ctx, layout, accentColor, alpha);
     ctx.restore();
 
-  } else {
+  } else { // slide
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, CARD_W, CARD_H);
 
-    const slideP = easeOut(phase(t, 0, 0.55), 4);
-    const alpha = easeOut(phase(t, 0, 0.3), 2);
-    const offsetY = 140 * (1 - slideP);
+    const slideP = easeOut(phase(t, 0, 0.52), 4);
+    const alpha = easeOut(phase(t, 0, 0.28), 2);
+    const offsetY = 130 * (1 - slideP);
 
     ctx.save();
-    ctx.globalAlpha = alpha;
     ctx.translate(0, offsetY);
-    drawCardContent(ctx, quoteText, accentColor);
+    drawFullContent(ctx, layout, accentColor, alpha);
     ctx.restore();
   }
 }
@@ -184,7 +234,7 @@ function record(
         setTimeout(tick, FRAME_MS);
       } else {
         draw(1);
-        setTimeout(() => rec.stop(), 600);
+        setTimeout(() => rec.stop(), 800);
       }
     }
     tick();
@@ -196,20 +246,19 @@ export async function downloadAnimatedCard(
   topic: string,
   bgColor: string,
   accentColor: string,
-  preset: CardAnimPreset
+  preset: CardAnimPreset,
+  durationMs?: number
 ): Promise<void> {
   const canvas = document.createElement("canvas");
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d")!;
 
-  const durationMs =
-    preset === "typewriter" ? 4500 :
-    preset === "fade" ? 3000 :
-    2500;
+  const layout = buildLayout(ctx, quoteText);
+  const dur = durationMs ?? CARD_BASE_DURATIONS[preset];
 
-  const blob = await record(canvas, durationMs, (t) => {
-    drawFrame(ctx, quoteText, bgColor, accentColor, preset, t);
+  const blob = await record(canvas, dur, (t) => {
+    drawFrame(ctx, layout, bgColor, accentColor, preset, t);
   });
 
   const url = URL.createObjectURL(blob);
