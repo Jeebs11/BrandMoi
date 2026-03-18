@@ -1076,7 +1076,7 @@ export default function Capture() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] flex items-end"
+              className="absolute inset-0 z-[60] flex items-end"
             >
               <div className="absolute inset-0 bg-black/50" onClick={() => setCoachModal(null)} />
               <motion.div
