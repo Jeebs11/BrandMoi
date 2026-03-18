@@ -1,0 +1,91 @@
+I am building a mobile-first web app called Brand OS 
+(Brand Operating System).
+
+I will be giving you this project in phases. Each phase 
+prompt will be self-contained and tell you exactly what 
+to build. Do not build anything until I give you Phase 1.
+
+---
+
+WHAT THIS APP IS:
+
+Brand OS helps professionals turn rough, unstructured 
+thoughts into clear, credible LinkedIn content.
+
+The core idea: thinking before writing. The app forces 
+a structured breakdown of an idea before any content 
+is generated. That structure step is the product's 
+main differentiator and must never be skipped.
+
+Core principle: Thinking → Structure → Clarity → Consistency
+
+This is NOT a generic AI writer. It is a structured 
+thinking tool that produces content as an output.
+
+---
+
+WHO IT'S FOR:
+
+Professionals — founders, operators, career builders, 
+technical experts, and salespeople — who want to build 
+a credible LinkedIn presence without resorting to 
+generic AI content or growth hacks.
+
+---
+
+THE CORE WORKFLOW (built in Phase 1):
+
+1. Capture — user inputs a raw, messy thought
+2. Context — user sets objective, persona, and tone
+3. Structure — AI extracts a structured breakdown 
+   (topic, angle, core message, hooks, narrative flow)
+   User must review and confirm before continuing
+4. Create — AI generates LinkedIn post, carousel 
+   outline, and visual concept
+5. Refine — quick actions to sharpen the output
+6. Save — draft saved to library
+
+---
+
+THE FULL APP (built across 4 phases):
+
+Phase 1 — Core 6-step workflow (the heart of the product)
+Phase 2 — Dashboard with smart suggestion engine
+Phase 3 — Content library with filtering and status
+Phase 4 — Onboarding flow and brand voice capture
+
+---
+
+TECH STACK (consistent across all phases):
+
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- Claude API (claude-sonnet-4-20250514) — server-side only, 
+  never expose API keys client-side
+- localStorage for data persistence in early phases
+- Plus Jakarta Sans (Google Fonts) for typography
+
+---
+
+DESIGN PRINCIPLES (consistent across all phases):
+
+- Mobile-first. Max width 430px, centered on desktop
+- Clean, minimal, premium feel — like a serious 
+  professional tool, not a consumer app
+- Background: white | Text: #0F0F0F | Accent: #4F46E5
+- Generous spacing — 24px+ between sections
+- No chatbot UI. No message bubbles. No typing indicators.
+- Smooth transitions between steps
+- Skeleton loaders during AI generation — never spinners
+- One thing per screen. No clutter.
+
+---
+
+WHAT THIS APP NEVER DOES:
+
+- Generate content before the structure step is confirmed
+- Use growth hacks, hashtag stuffing, or engagement bait
+- Post directly to LinkedIn
+- Use a chat interface
+- Feel like a generic AI tool

@@ -1,0 +1,11 @@
+packages:
+  "framer-motion": "Smooth page and step transitions"
+  "clsx": "Class name merging"
+  "tailwind-merge": "Tailwind class name collision resolution"
+
+images: []
+
+notes:
+  - Base URL is configured in Vite and wouter
+  - The API endpoints are strictly typed from the OpenAPI spec
+  - Using generated hooks from @workspace/api-client-react

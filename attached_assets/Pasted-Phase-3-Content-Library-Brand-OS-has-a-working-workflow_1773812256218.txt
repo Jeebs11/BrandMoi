@@ -1,0 +1,162 @@
+Phase 3 — Content Library
+Brand OS has a working workflow and dashboard.
+Now build the Library screen at /library.
+
+---
+
+LIBRARY SCREEN:
+
+HEADER:
+Title: "Library"
+Subtitle: "{n} saved drafts" (count from localStorage)
+
+FILTER BAR (horizontal scroll, below header):
+Filter chips for: All | Clients | Job | Authority | Documenting
+Secondary filter: All | Draft | Ready | Published
+
+DRAFT LIST:
+Each item shows:
+- Topic (from structured_breakdown.topic)
+- Objective tag (colour-coded chip: indigo/green/amber/slate)
+- Status badge: Draft / Ready / Published
+- Date saved
+- A "..." menu with: Edit, Mark as Ready, Mark as Published, Delete
+
+Tapping a draft opens it on the Output screen with all tabs 
+and content restored from localStorage.
+
+EMPTY STATE:
+If no drafts: show a clean empty state with the message 
+"Nothing saved yet" and a button "Capture your first idea".
+
+STATUS UPDATES:
+From the Output screen, add a small status selector 
+(Draft / Ready / Published) in the header. Changing it 
+updates the draft in localStorage immediately.
+
+EDIT FLOW:
+When a draft is opened from the Library, all fields are 
+fully editable. The Refine buttons still work. Re-saving 
+updates the existing draft (matched by timestamp ID) rather 
+than creating a new one.
+
+---
+
+DESIGN:
+Match existing design system.
+Objective chips: 
+- Clients: green (#16A34A)
+- Job: amber (#D97706) 
+- Authority: indigo (#4F46E5)
+- Documenting: slate (#64748B)
+
+Status badges: small, muted. Draft: grey. Ready: blue. 
+Published: green.
+
+---
+
+DO NOT CHANGE:
+The workflow or dashboard. Only add the library screen 
+and the status selector to the Output screen.
+
+Phase 4 — Onboarding + Brand Voice
+Brand OS has a working workflow, dashboard, and library.
+Now add the onboarding flow that runs once on first launch.
+
+---
+
+ONBOARDING TRIGGER:
+Check localStorage for an "onboarded" flag.
+If it doesn't exist, redirect to /onboarding before anything else.
+Once completed, set the flag and never show it again.
+
+---
+
+ONBOARDING FLOW (5 screens, one question each):
+
+Progress bar at top. Back button on screens 2–5.
+
+SCREEN 1 — Objective
+"What's your primary goal on LinkedIn?"
+Four large selectable cards:
+- Attract Clients
+- Find a Job
+- Build Authority
+- Document My Journey
+
+SCREEN 2 — Persona
+"How would you describe your professional lens?"
+Five selectable cards:
+- Operator
+- Founder
+- Career Professional
+- Technical Expert
+- Sales Professional
+
+SCREEN 3 — Tone
+"How do you like to communicate?"
+Four selectable cards:
+- Direct
+- Story-driven
+- Educational
+- Bold
+
+SCREEN 4 — Brand Voice (3 short text inputs, one screen)
+Title: "Help us make your content sound like you"
+Subtitle: "Three quick questions — no right answers"
+
+Inputs:
+- "What do you do in one sentence?" 
+  Placeholder: "e.g. I help SaaS companies reduce churn through 
+  better onboarding"
+- "Who are you trying to reach?"
+  Placeholder: "e.g. Heads of Product at B2B SaaS companies"
+- "What's one strong opinion you hold in your field?"
+  Placeholder: "e.g. Most onboarding failures are a strategy 
+  problem, not a UX problem"
+
+SCREEN 5 — Confirm
+Title: "You're set up"
+Show a brief summary of their selections.
+CTA button: "Start capturing ideas →"
+Navigates to /dashboard.
+
+---
+
+SAVE TO LOCALSTORAGE:
+On completion, save all 6 values under "preferences":
+{
+  "objective": "",
+  "persona": "",
+  "tone": "",
+  "brand_role": "",
+  "brand_audience": "",
+  "brand_belief": "",
+  "onboarded": true
+}
+
+REPLACE HARDCODED DEFAULTS:
+Remove the hardcoded brand context from Phase 1.
+All AI prompts now read from localStorage preferences.
+If any value is missing, fall back to sensible defaults silently.
+
+SETTINGS SCREEN:
+Add a /settings route accessible from the dashboard header 
+(small gear icon, top right).
+Settings shows the same 6 fields from onboarding, all editable.
+Saving updates localStorage immediately.
+No confirmation screen needed — just a brief "Saved" toast.
+
+---
+
+DESIGN:
+Onboarding cards: large, full-width, tappable. 
+Selected state: indigo border + light indigo background fill.
+Clean, calm, one decision at a time. No overwhelm.
+Match the existing design system throughout.
+
+---
+
+DO NOT CHANGE:
+Workflow, dashboard, or library. Only add onboarding, 
+settings, and wire preferences into the AI prompts.

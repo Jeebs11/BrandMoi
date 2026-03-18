@@ -1,15 +1,18 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Brand OS API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: drafts
+    description: Draft content operations
+  - name: ai
+    description: AI generation operations
 paths:
   /healthz:
     get:
@@ -24,6 +27,208 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /ai/structure:
+    post:
+      operationId: structureIdea
+      tags: [ai]
+      summary: Extract structured breakdown from a raw thought
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StructureIdeaBody"
+      responses:
+        "200":
+          description: Structured breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StructuredBreakdown"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: AI error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ai/generate:
+    post:
+      operationId: generateContent
+      tags: [ai]
+      summary: Generate LinkedIn content from confirmed structure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateContentBody"
+      responses:
+        "200":
+          description: Generated content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedContent"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: AI error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ai/refine:
+    post:
+      operationId: refineContent
+      tags: [ai]
+      summary: Refine a single content tab
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefineContentBody"
+      responses:
+        "200":
+          description: Refined content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefinedContent"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: AI error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /drafts:
+    get:
+      operationId: listDrafts
+      tags: [drafts]
+      summary: List all drafts
+      responses:
+        "200":
+          description: List of drafts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Draft"
+
+    post:
+      operationId: createDraft
+      tags: [drafts]
+      summary: Save a new draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDraftBody"
+      responses:
+        "201":
+          description: Draft created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /drafts/{id}:
+    get:
+      operationId: getDraft
+      tags: [drafts]
+      summary: Get a single draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateDraft
+      tags: [drafts]
+      summary: Update a draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDraftBody"
+      responses:
+        "200":
+          description: Updated draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Draft"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteDraft
+      tags: [drafts]
+      summary: Delete a draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +239,214 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    StructureIdeaBody:
+      type: object
+      properties:
+        rawInput:
+          type: string
+        objective:
+          type: string
+        persona:
+          type: string
+        tone:
+          type: string
+      required:
+        - rawInput
+        - objective
+        - persona
+        - tone
+
+    StructuredBreakdown:
+      type: object
+      properties:
+        topic:
+          type: string
+        angle:
+          type: string
+        coreMessage:
+          type: string
+        whyItMatters:
+          type: string
+        hooks:
+          type: array
+          items:
+            type: string
+        narrativeFlow:
+          type: array
+          items:
+            type: string
+      required:
+        - topic
+        - angle
+        - coreMessage
+        - whyItMatters
+        - hooks
+        - narrativeFlow
+
+    CarouselSlide:
+      type: object
+      properties:
+        slide:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+      required:
+        - slide
+        - title
+        - description
+
+    GenerateContentBody:
+      type: object
+      properties:
+        rawInput:
+          type: string
+        objective:
+          type: string
+        persona:
+          type: string
+        tone:
+          type: string
+        structure:
+          $ref: "#/components/schemas/StructuredBreakdown"
+        selectedHook:
+          type: string
+      required:
+        - rawInput
+        - objective
+        - persona
+        - tone
+        - structure
+        - selectedHook
+
+    GeneratedContent:
+      type: object
+      properties:
+        post:
+          type: string
+        carousel:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarouselSlide"
+        visual:
+          type: string
+      required:
+        - post
+        - carousel
+        - visual
+
+    RefineContentBody:
+      type: object
+      properties:
+        content:
+          type: string
+        instruction:
+          type: string
+        tab:
+          type: string
+          enum: [post, carousel, visual]
+      required:
+        - content
+        - instruction
+        - tab
+
+    RefinedContent:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    Draft:
+      type: object
+      properties:
+        id:
+          type: integer
+        rawInput:
+          type: string
+        objective:
+          type: string
+        persona:
+          type: string
+        tone:
+          type: string
+        structuredBreakdown:
+          $ref: "#/components/schemas/StructuredBreakdown"
+        postOutput:
+          type: ["string", "null"]
+        carouselOutput:
+          type: ["string", "null"]
+        visualOutput:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, ready, published]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - rawInput
+        - objective
+        - persona
+        - tone
+        - structuredBreakdown
+        - status
+        - createdAt
+        - updatedAt
+
+    CreateDraftBody:
+      type: object
+      properties:
+        rawInput:
+          type: string
+        objective:
+          type: string
+        persona:
+          type: string
+        tone:
+          type: string
+        structuredBreakdown:
+          $ref: "#/components/schemas/StructuredBreakdown"
+        postOutput:
+          type: ["string", "null"]
+        carouselOutput:
+          type: ["string", "null"]
+        visualOutput:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, ready, published]
+      required:
+        - rawInput
+        - objective
+        - persona
+        - tone
+        - structuredBreakdown
+        - status
+
+    UpdateDraftBody:
+      type: object
+      properties:
+        postOutput:
+          type: ["string", "null"]
+        carouselOutput:
+          type: ["string", "null"]
+        visualOutput:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, ready, published]

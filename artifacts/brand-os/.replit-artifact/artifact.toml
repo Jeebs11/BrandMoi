@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Brand OS"
+version = "1.0.0"
+id = "artifacts/brand-os"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 18565
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/brand-os run dev"
+
+[services.env]
+PORT = "18565"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/brand-os", "run", "build"]
+publicDir = "artifacts/brand-os/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

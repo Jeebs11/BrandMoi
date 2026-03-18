@@ -1,0 +1,74 @@
+Brand OS already has a working 6-step workflow saved in localStorage.
+Now add the Dashboard as the app's home screen (/dashboard).
+
+---
+
+DASHBOARD LAYOUT (3 sections, mobile-first):
+
+1. PRIMARY ACTION
+Large CTA button: "Capture an idea"
+Subtitle: "Turn a thought into a LinkedIn post"
+Tapping navigates to the Capture screen (Step 1 of the workflow).
+
+2. SUGGESTIONS
+Read the last 10 drafts from localStorage.
+Generate 4 suggestions — do NOT call the AI for this. 
+Derive them from the data:
+
+- Post ideas (show 2): 
+  Find the most common objective tag across recent drafts. Suggest 
+  a new angle. Example: "You've written a lot about Authority — try 
+  a post aimed at attracting clients instead."
+  
+  Find the most common persona. Suggest a related topic not yet 
+  covered. Example: "As a Founder, you haven't documented your 
+  journey recently — that builds trust."
+
+- Repurpose suggestion (show 1):
+  Find the most recent draft with a post output but no carousel 
+  content used. Suggest turning it into a carousel. Show the draft 
+  topic in the suggestion. Example: "Your post on systems thinking 
+  could work as a 6-slide carousel."
+
+- Content gap (show 1):
+  Check which objective hasn't appeared in the last 5 drafts. 
+  Surface it. Example: "You haven't created client-focused content 
+  recently — your audience may not know how to hire you."
+
+Each suggestion is a tappable card. Tapping a post idea pre-fills 
+the Capture screen with a suggested prompt. Tapping the repurpose 
+suggestion opens that draft on the Carousel tab.
+
+If fewer than 3 drafts exist: show 3 static suggestions based on 
+the Founder persona. Do not attempt to derive from data.
+
+3. RECENT WORK
+Show the last 5 drafts from localStorage.
+Each shows: topic (from structured breakdown), objective tag, 
+status badge (draft/ready), date.
+Tapping opens the draft on the Output screen (Step 4/5).
+
+---
+
+NAVIGATION:
+Add a simple bottom nav bar with 3 items:
+- Home (dashboard)
+- Capture (Step 1)
+- Library (/library)
+
+Make /dashboard the default route. 
+Update the post-save flow to navigate to /dashboard.
+
+---
+
+DESIGN:
+Match the existing design system exactly.
+Suggestions section: use subtle left-border accent cards, not 
+boxed cards.
+Recent Work: simple list rows, no heavy card styling.
+Bottom nav: clean, icon + label, indigo accent on active item.
+
+---
+
+DO NOT CHANGE:
+The existing 6-step workflow. Only add the dashboard and nav.

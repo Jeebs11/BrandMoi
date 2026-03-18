@@ -1,0 +1,172 @@
+Build a mobile-first web app called Brand OS using Next.js 14 (App Router), 
+TypeScript, and Tailwind CSS.
+
+This phase: build the core 6-step content workflow only. No dashboard, 
+no library, no onboarding. Just the workflow.
+
+---
+
+WHAT THE APP DOES:
+Brand OS helps professionals turn a rough thought into a structured 
+LinkedIn post. The key differentiator: content is never generated until 
+the user reviews and confirms a structured breakdown first.
+
+---
+
+HARDCODED DEFAULTS FOR NOW (no user input needed yet):
+- Objective: Authority
+- Persona: Founder
+- Tone: Direct
+- Brand role: "I help businesses grow through content and systems"
+- Brand audience: "Founders and operators building serious companies"
+- Brand belief: "Clarity beats cleverness every time"
+
+These values are injected silently into every AI prompt.
+
+---
+
+THE 6-STEP WORKFLOW:
+
+STEP 1 — CAPTURE
+- Full-screen text input
+- Placeholder: "Drop a thought, a lesson, an observation — messy is fine"
+- Button: "Structure this idea →"
+
+STEP 2 — CONTEXT (simple selectors, above the input)
+Three dropdowns or toggle groups:
+- Objective: Clients / Job / Authority / Documenting
+- Persona: Operator / Founder / Career / Technical / Sales
+- Tone: Direct / Story / Educational / Bold
+Defaults pre-selected from hardcoded values above.
+
+STEP 3 — STRUCTURE (mandatory, cannot skip)
+Call Claude API server-side. Display the result clearly before any 
+content is generated.
+
+Show:
+- Topic
+- Angle
+- Core Message
+- Why This Matters
+- 3 Hook options (user must tap one to select it)
+- Narrative Flow (e.g. Hook → Tension → Insight → CTA)
+
+CTA button: "Looks good — generate content"
+This button is disabled until a hook is selected.
+Back button returns to Step 1.
+
+STEP 3 API CALL:
+POST to /api/structure
+System prompt:
+"You are a content strategist. Extract strategic structure from a raw 
+thought. Never write finished content. Return only valid JSON, no 
+markdown fences."
+
+User message includes: raw input, objective, persona, tone, and the 
+hardcoded brand context.
+
+Return this exact JSON shape:
+{
+  "topic": "",
+  "angle": "",
+  "core_message": "",
+  "why_it_matters": "",
+  "hooks": ["", "", ""],
+  "narrative_flow": ["", "", "", ""]
+}
+
+STEP 4 — CREATE
+Call Claude API server-side once structure is confirmed.
+Display results in 3 tabs: Post | Carousel | Visual
+
+POST tab:
+- 150–300 words
+- Hook must not open with "I" or a question
+- Max 3 hashtags at the end only
+- No bullet lists unless tone is Educational
+- No words: game-changer, disruptive, passionate, excited to share
+- No generic CTAs: "What do you think?", "Drop a comment below"
+
+CAROUSEL tab:
+- 5–8 slides as a clean visual list
+- Slide 1: hook | Slides 2–6: content | Last slide: CTA
+- Each slide: title + 1–2 sentence description
+
+VISUAL tab:
+- 2–3 sentences describing layout, color mood, focal element
+
+Each tab: editable text area + copy button.
+
+STEP 4 API CALL:
+POST to /api/generate
+System prompt:
+"You are a LinkedIn content writer. Write clear, credible, human content. 
+No growth hacks, no buzzwords, no engagement bait. Return only valid JSON, 
+no markdown fences."
+
+Return this exact JSON shape:
+{
+  "post": "",
+  "carousel": [{"slide": 1, "title": "", "description": ""}],
+  "visual": ""
+}
+
+STEP 5 — REFINE
+Four buttons below the active tab:
+- Sharper → "Tighten language, remove hedging. Keep every idea."
+- More Personal → "Add human detail, reduce abstraction."
+- More Concise → "Cut by ~30%. Keep the core message and hook."
+- More Client-Focused → "Reframe toward client value and problems."
+
+Each button calls /api/refine with the current tab text + instruction.
+Only updates the active tab. Does not regenerate other tabs.
+
+STEP 6 — SAVE
+For now: save to localStorage as a JSON array of drafts.
+Each draft stores: raw_input, objective, persona, tone, structured 
+breakdown, all three outputs, timestamp, status: "draft".
+
+After saving show two options:
+- "Save and go to Library" (navigates to /library — empty page for now 
+  with placeholder text "Your saved drafts will appear here")
+- "Save and capture another idea" (resets to Step 1)
+
+---
+
+LOADING STATES:
+- Step 3 generating: show skeleton loader + label "Structuring your idea..."
+- Step 4 generating: show skeleton loader + label "Writing your post..."
+- Step 5 refining: subtle spinner on the active tab only
+- All API calls: 30 second timeout. On failure show: 
+  "Something went wrong — tap to try again"
+
+---
+
+DESIGN:
+- Mobile-first. Max width 430px, centered on desktop.
+- Background: white. Text: #0F0F0F. Accent: #4F46E5 (indigo).
+- Font: Plus Jakarta Sans (Google Fonts)
+- Generous spacing — 24px+ between sections
+- No card-inside-card nesting
+- Smooth fade or slide transitions between steps
+- No chatbot UI, no message bubbles, no typing indicators
+- Progress indicator at top showing current step (1–6)
+
+---
+
+SEED THE APP:
+On first load, pre-populate localStorage with 2 saved drafts so 
+the app feels live. Use realistic content — a lesson about systems 
+thinking and a story about a client call that revealed a hidden 
+differentiator.
+
+---
+
+DO NOT BUILD YET:
+- Dashboard
+- Suggestion engine
+- Onboarding flow
+- User auth
+- Database
+
+Build only what's described above. Keep it clean and shippable.
