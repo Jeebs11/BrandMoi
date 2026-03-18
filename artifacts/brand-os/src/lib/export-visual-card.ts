@@ -44,6 +44,28 @@ function buildCardEl(
   return el;
 }
 
+function createWrapper(): HTMLDivElement {
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "position:fixed;top:-9999px;left:-9999px;overflow:hidden;width:1080px;height:1080px;";
+  return wrapper;
+}
+
+export async function previewVisualCard(
+  quoteText: string,
+  bgColor: string = DEFAULT_BG,
+  accentColor: string = DEFAULT_ACCENT
+): Promise<string> {
+  const el = buildCardEl(quoteText, bgColor, accentColor);
+  const wrapper = createWrapper();
+  wrapper.appendChild(el);
+  document.body.appendChild(wrapper);
+  try {
+    return await toPng(el, { width: 1080, height: 1080, pixelRatio: 0.28, skipFonts: true });
+  } finally {
+    document.body.removeChild(wrapper);
+  }
+}
+
 export async function downloadVisualCard(
   quoteText: string,
   topic: string,
@@ -51,8 +73,7 @@ export async function downloadVisualCard(
   accentColor: string = DEFAULT_ACCENT
 ): Promise<void> {
   const el = buildCardEl(quoteText, bgColor, accentColor);
-  const wrapper = document.createElement("div");
-  wrapper.style.cssText = "position:fixed;top:-9999px;left:-9999px;overflow:hidden;width:1080px;height:1080px;";
+  const wrapper = createWrapper();
   wrapper.appendChild(el);
   document.body.appendChild(wrapper);
   try {

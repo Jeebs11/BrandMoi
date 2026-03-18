@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, type AngleCheckResult } from "@/lib/api";
 import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
-import { downloadVisualCard } from "@/lib/export-visual-card";
+import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -130,6 +130,11 @@ export default function Capture() {
   const [isPreviewingSlide, setIsPreviewingSlide] = useState(false);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Visual card preview
+  const [cardPreviewUrl, setCardPreviewUrl] = useState<string | null>(null);
+  const [isPreviewingCard, setIsPreviewingCard] = useState(false);
+  const cardPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Image prompt (two-step)
   const [imagePrompt, setImagePrompt] = useState("");
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
@@ -174,6 +179,31 @@ export default function Capture() {
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeTab, carouselLength, firstSlideTitle, bgColor, accentColor]);
+
+  // Auto-generate visual card preview when visual tab is active or text/colors change
+  const visualText = state.content?.visual ?? "";
+  useEffect(() => {
+    if (state.activeTab !== "visual" || !visualText) {
+      setCardPreviewUrl(null);
+      return;
+    }
+    if (cardPreviewTimerRef.current) clearTimeout(cardPreviewTimerRef.current);
+    setIsPreviewingCard(true);
+    cardPreviewTimerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const url = await previewVisualCard(visualText, bgColorRef.current, accentColorRef.current);
+          setCardPreviewUrl(url);
+        } catch {
+          setCardPreviewUrl(null);
+        } finally {
+          setIsPreviewingCard(false);
+        }
+      })();
+    }, 400);
+    return () => { if (cardPreviewTimerRef.current) clearTimeout(cardPreviewTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.activeTab, visualText, bgColor, accentColor]);
 
   const schedulePaletteSave = () => {
     if (paletteTimerRef.current) clearTimeout(paletteTimerRef.current);
@@ -593,18 +623,22 @@ export default function Capture() {
               )}
               {state.activeTab === "visual" && (
                 <div className="space-y-3 pb-4">
+                  {/* 1. Visual Card editable text */}
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Visual Brief</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Visual Card</p>
                     <div className="relative group">
-                      <textarea className="w-full min-h-[140px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
-                        value={state.content.visual} onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, visual: e.target.value } } : s)} />
+                      <textarea
+                        className="w-full min-h-[100px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                        value={state.content.visual}
+                        onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, visual: e.target.value } } : s)}
+                      />
                       <button onClick={() => copyToClipboard(state.content!.visual)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
                         <Copy className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Brand Palette for card */}
+                  {/* 2. Card Palette above preview */}
                   <div className="bg-white rounded-2xl border border-gray-100 p-4">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Card Palette</p>
@@ -614,31 +648,61 @@ export default function Capture() {
                       <label className="flex items-center gap-2 flex-1 cursor-pointer">
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
                           <div className="absolute inset-0" style={{ background: bgColor }} />
-                          <input
-                            type="color"
-                            value={bgColor}
-                            onChange={e => handleBgColorChange(e.target.value)}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          />
+                          <input type="color" value={bgColor} onChange={e => handleBgColorChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                         </div>
                         <span className="text-xs text-gray-500 font-medium">Background</span>
                       </label>
                       <label className="flex items-center gap-2 flex-1 cursor-pointer">
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
                           <div className="absolute inset-0" style={{ background: accentColor }} />
-                          <input
-                            type="color"
-                            value={accentColor}
-                            onChange={e => handleAccentColorChange(e.target.value)}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          />
+                          <input type="color" value={accentColor} onChange={e => handleAccentColorChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                         </div>
                         <span className="text-xs text-gray-500 font-medium">Accent</span>
                       </label>
                     </div>
                   </div>
 
-                  {/* Step 1: Generate DALL-E prompt */}
+                  {/* 3. Card Preview */}
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-4 pt-4 pb-3">Preview</p>
+                    {isPreviewingCard && (
+                      <div className="w-full aspect-square bg-gray-50 flex items-center justify-center pb-4">
+                        <RefreshCw className="w-5 h-5 text-gray-300 animate-spin" />
+                      </div>
+                    )}
+                    {cardPreviewUrl && !isPreviewingCard && (
+                      <div className="relative">
+                        <img src={cardPreviewUrl} alt="Card preview" className="w-full aspect-square object-cover" />
+                        <button
+                          onClick={handleDownloadVisualCard}
+                          disabled={isExportingCard}
+                          className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all disabled:opacity-50"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          {isExportingCard ? "Exporting…" : "Download card"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Feedback loops */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Sharper", instruction: "Tighten language, remove hedging. Keep every idea." },
+                      { label: "More Personal", instruction: "Add human detail, reduce abstraction." },
+                      { label: "More Concise", instruction: "Cut by ~30%. Keep the core message and hook." },
+                      { label: "Client-Focused", instruction: "Reframe toward client value and problems." },
+                    ].map(action => (
+                      <button key={action.label} disabled={isRefining} onClick={() => handleRefine(action.instruction)}
+                        className={cn("py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all",
+                          refiningTab === action.instruction ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40")}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 5. Generate image prompt */}
                   <button
                     onClick={handleGenerateImagePrompt}
                     disabled={isGeneratingPrompt || !state.content?.visual}
@@ -648,7 +712,7 @@ export default function Capture() {
                     {isGeneratingPrompt ? "Crafting prompt…" : "Generate image prompt"}
                   </button>
 
-                  {/* Step 2: Editable prompt + generate */}
+                  {/* 6. Image prompt box */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Image Prompt</p>
@@ -663,24 +727,17 @@ export default function Capture() {
                     />
                   </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleDownloadVisualCard}
-                      disabled={isExportingCard}
-                      className="flex-1 py-3 text-xs font-bold text-gray-600 hover:text-gray-800 bg-white rounded-xl border border-gray-200 hover:border-gray-300 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      {isExportingCard ? "Exporting…" : "Download card"}
-                    </button>
-                    <button
-                      onClick={handleGenerateImage}
-                      disabled={isGeneratingImage || !imagePrompt.trim()}
-                      className="flex-1 py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {isGeneratingImage ? "Generating…" : "Generate image"}
-                    </button>
-                  </div>
+                  {/* 7. Generate Image button */}
+                  <button
+                    onClick={handleGenerateImage}
+                    disabled={isGeneratingImage || !imagePrompt.trim()}
+                    className="w-full py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {isGeneratingImage ? "Generating image…" : "Generate image"}
+                  </button>
+
+                  {/* 8. AI-generated image preview */}
                   {isGeneratingImage && (
                     <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 flex flex-col items-center justify-center gap-3">
                       <RefreshCw className="w-8 h-8 text-primary animate-spin" />
@@ -689,15 +746,8 @@ export default function Capture() {
                   )}
                   {generatedImageBase64 && !isGeneratingImage && (
                     <div className="relative rounded-2xl overflow-hidden border border-gray-100">
-                      <img
-                        src={`data:image/png;base64,${generatedImageBase64}`}
-                        alt="AI-generated visual"
-                        className="w-full aspect-square object-cover"
-                      />
-                      <button
-                        onClick={handleDownloadGeneratedImage}
-                        className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all"
-                      >
+                      <img src={`data:image/png;base64,${generatedImageBase64}`} alt="AI-generated visual" className="w-full aspect-square object-cover" />
+                      <button onClick={handleDownloadGeneratedImage} className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all">
                         <Download className="w-3.5 h-3.5" /> Download PNG
                       </button>
                     </div>
@@ -780,21 +830,23 @@ export default function Capture() {
             </div>
 
             <div className="border-t border-gray-100 pt-4 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Sharper", instruction: "Tighten language, remove hedging. Keep every idea." },
-                  { label: "More Personal", instruction: "Add human detail, reduce abstraction." },
-                  { label: "More Concise", instruction: "Cut by ~30%. Keep the core message and hook." },
-                  { label: "Client-Focused", instruction: "Reframe toward client value and problems." },
-                ].map(action => (
-                  <button key={action.label} disabled={isRefining} onClick={() => handleRefine(action.instruction)}
-                    className={cn("py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all",
-                      refiningTab === action.instruction ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40")}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
+              {state.activeTab !== "visual" && (
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "Sharper", instruction: "Tighten language, remove hedging. Keep every idea." },
+                    { label: "More Personal", instruction: "Add human detail, reduce abstraction." },
+                    { label: "More Concise", instruction: "Cut by ~30%. Keep the core message and hook." },
+                    { label: "Client-Focused", instruction: "Reframe toward client value and problems." },
+                  ].map(action => (
+                    <button key={action.label} disabled={isRefining} onClick={() => handleRefine(action.instruction)}
+                      className={cn("py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all",
+                        refiningTab === action.instruction ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40")}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSaving}>
                 {isSaving ? "Saving..." : draftId ? "Update draft" : "Save draft"}
                 {!isSaving && <Check className="ml-2 w-4 h-4" />}
