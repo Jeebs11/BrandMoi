@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
+const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 
@@ -18,6 +18,8 @@ const OBJECTIVE_DESC: Record<string, string> = {
   Job: "Build visibility and credibility in your field",
   Authority: "Become the go-to voice in your industry",
   Documenting: "Share your journey and lessons in real time",
+  Expert: "Share industry analysis and trend commentary",
+  Hiring: "Attract great people with employer brand content",
 };
 
 const PERSONA_DESC: Record<string, string> = {

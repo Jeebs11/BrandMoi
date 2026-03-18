@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const OBJECTIVES = ["All", "Clients", "Job", "Authority", "Documenting"];
+const OBJECTIVES = ["All", "Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const STATUSES = ["All", "draft", "ready", "published"];
 
 const OBJECTIVE_COLORS: Record<string, string> = {
@@ -23,6 +23,8 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   Job: "bg-sky-50 text-sky-700",
   Authority: "bg-violet-50 text-violet-700",
   Documenting: "bg-emerald-50 text-emerald-700",
+  Expert: "bg-orange-50 text-orange-700",
+  Hiring: "bg-teal-50 text-teal-700",
 };
 
 const STATUS_ICONS: Record<string, typeof FileText> = {

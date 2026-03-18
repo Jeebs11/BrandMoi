@@ -11,7 +11,7 @@ import { voiceApi, type VoiceSummaryResult } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
+const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 

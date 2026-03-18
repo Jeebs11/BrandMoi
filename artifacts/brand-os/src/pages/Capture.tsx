@@ -23,7 +23,7 @@ import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card"
 import { downloadAnimatedCard, type CardAnimPreset, CARD_BASE_DURATIONS } from "@/lib/export-animated-card";
 import { downloadAnimatedCarousel, CAROUSEL_BASE_HOLD_MS, CAROUSEL_BASE_SWIPE_MS } from "@/lib/export-animated-carousel";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
+const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 

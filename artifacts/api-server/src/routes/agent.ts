@@ -57,7 +57,7 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
     for (const d of recentDrafts) {
       if (d.objective) objCounts[d.objective] = (objCounts[d.objective] ?? 0) + 1;
     }
-    const underused = ["Clients", "Job", "Authority", "Documenting"].filter(
+    const underused = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"].filter(
       (o) => (objCounts[o] ?? 0) === 0
     );
 

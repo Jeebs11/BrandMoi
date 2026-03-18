@@ -183,7 +183,7 @@ function buildSuggestions(drafts: DraftRow[]): Array<{ id: string; type: string;
 
   const objCounts = countBy(drafts as { objective: string }[], "objective");
   const topObj = maxKey(objCounts);
-  const allObjectives = ["Clients", "Job", "Authority", "Documenting"];
+  const allObjectives = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
   const otherObjs = allObjectives.filter((o) => o !== topObj);
   if (topObj && otherObjs.length > 0) {
     const suggested = otherObjs[Math.floor(Math.random() * otherObjs.length)];

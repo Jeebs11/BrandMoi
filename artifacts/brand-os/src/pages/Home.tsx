@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
+const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 

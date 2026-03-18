@@ -2,7 +2,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { draftsTable, performanceSignalsTable, dailyActivityTable } from "@workspace/db";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
+const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -44,9 +44,10 @@ export async function computeMomentum(userId: number): Promise<{
     recencyScore = Math.max(0, Math.round(100 - (daysSinceLast / 30) * 100));
   }
 
-  // Variety: unique objectives in last 30 days / 4 total
+  // Variety: unique objectives used in last 30 days. Cap at 4 so using 4 of 6 still scores 100%.
+  // This prevents penalising users who don't use every objective (e.g. Hiring may not be relevant).
   const usedObjectives = new Set(recentDrafts.map((d) => d.objective));
-  const varietyScore = Math.round((usedObjectives.size / OBJECTIVES.length) * 100);
+  const varietyScore = Math.min(100, Math.round((usedObjectives.size / 4) * 100));
 
   // Volume: drafts in last 30 days, cap at 20
   const volumeScore = Math.min(100, Math.round((recentDrafts.length / 20) * 100));

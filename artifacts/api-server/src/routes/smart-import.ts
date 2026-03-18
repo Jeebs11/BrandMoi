@@ -101,14 +101,14 @@ Return this exact JSON (no markdown, no commentary):
   "brandRole": "One sentence describing their professional role and what they do",
   "brandAudience": "Specific description of who they help or who they're targeting",
   "brandBelief": "Their core professional belief, value proposition, or mission statement",
-  "objective": "One of: Clients, Job, Authority, Documenting",
+  "objective": "One of: Clients, Job, Authority, Documenting, Expert, Hiring",
   "persona": "One of: Operator, Founder, Career, Technical, Sales",
   "tone": "One of: Direct, Story, Educational, Bold",
   "summary": "2-3 sentence plain English summary of what this person does and who they are professionally"
 }
 
 Rules:
-- objective: Choose "Job" if this is a CV/resume, "Clients" if it's a business/service document, "Authority" if it's thought leadership
+- objective: Choose "Job" if this is a CV/resume, "Clients" if it's a business/service document, "Expert" if it's thought leadership or industry analysis, "Authority" if it's personal brand/story content, "Hiring" if focused on team building or employer brand
 - persona: Choose the closest match based on their role
 - tone: Infer from the document's writing style
 - Keep brandRole under 120 characters
@@ -133,7 +133,7 @@ Rules:
       return;
     }
 
-    const VALID_OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
+    const VALID_OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
     const VALID_PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
     const VALID_TONES = ["Direct", "Story", "Educational", "Bold"];
 
