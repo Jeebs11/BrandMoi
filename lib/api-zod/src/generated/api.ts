@@ -8,12 +8,96 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Create a new account
+ */
+export const registerBodyPasswordMin = 8;
+
+export const RegisterBody = zod.object({
+  email: zod.string().email(),
+  password: zod.string().min(registerBodyPasswordMin),
+  displayName: zod.string(),
+});
+
+/**
+ * @summary Log in with email and password
+ */
+export const LoginBody = zod.object({
+  email: zod.string(),
+  password: zod.string(),
+});
+
+export const LoginResponse = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  displayName: zod.string(),
+});
+
+/**
+ * @summary Get current authenticated user
+ */
+export const GetMeResponse = zod.object({
+  id: zod.number(),
+  email: zod.string(),
+  displayName: zod.string(),
+});
+
+/**
+ * @summary Get the current user's brand preferences
+ */
+export const GetPreferencesResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  objective: zod.string(),
+  persona: zod.string(),
+  tone: zod.string(),
+  brandRole: zod.string(),
+  brandAudience: zod.string(),
+  brandBelief: zod.string(),
+  onboarded: zod.boolean(),
+});
+
+/**
+ * @summary Update the current user's brand preferences
+ */
+export const UpdatePreferencesBody = zod.object({
+  objective: zod.string().optional(),
+  persona: zod.string().optional(),
+  tone: zod.string().optional(),
+  brandRole: zod.string().optional(),
+  brandAudience: zod.string().optional(),
+  brandBelief: zod.string().optional(),
+  onboarded: zod.boolean().optional(),
+});
+
+export const UpdatePreferencesResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  objective: zod.string(),
+  persona: zod.string(),
+  tone: zod.string(),
+  brandRole: zod.string(),
+  brandAudience: zod.string(),
+  brandBelief: zod.string(),
+  onboarded: zod.boolean(),
+});
+
+/**
+ * @summary Get personalised content suggestions
+ */
+export const GetSuggestionsResponseItem = zod.object({
+  id: zod.string(),
+  type: zod.string(),
+  message: zod.string(),
+  action: zod.string(),
+});
+export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 
 /**
  * @summary Extract structured breakdown from a raw thought
@@ -66,7 +150,7 @@ export const GenerateContentResponse = zod.object({
 });
 
 /**
- * @summary Refine a single content tab
+ * @summary Refine existing content based on an instruction
  */
 export const RefineContentBody = zod.object({
   content: zod.string(),
@@ -79,7 +163,7 @@ export const RefineContentResponse = zod.object({
 });
 
 /**
- * @summary List all drafts
+ * @summary List all drafts for the current user
  */
 export const ListDraftsResponseItem = zod.object({
   id: zod.number(),
@@ -105,7 +189,7 @@ export const ListDraftsResponseItem = zod.object({
 export const ListDraftsResponse = zod.array(ListDraftsResponseItem);
 
 /**
- * @summary Save a new draft
+ * @summary Create a new draft
  */
 export const CreateDraftBody = zod.object({
   rawInput: zod.string(),
@@ -156,7 +240,7 @@ export const GetDraftResponse = zod.object({
 });
 
 /**
- * @summary Update a draft
+ * @summary Update a draft's content or status
  */
 export const UpdateDraftParams = zod.object({
   id: zod.coerce.number(),

@@ -9,6 +9,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: user
+    description: User data operations
   - name: drafts
     description: Draft content operations
   - name: ai
@@ -19,7 +23,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -27,6 +30,135 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Create a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out (clears session cookie)
+      responses:
+        "204":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /user/preferences:
+    get:
+      operationId: getPreferences
+      tags: [user]
+      summary: Get the current user's brand preferences
+      responses:
+        "200":
+          description: Preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesResponse"
+    put:
+      operationId: updatePreferences
+      tags: [user]
+      summary: Update the current user's brand preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreferencesBody"
+      responses:
+        "200":
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesResponse"
+
+  /user/suggestions:
+    get:
+      operationId: getSuggestions
+      tags: [user]
+      summary: Get personalised content suggestions
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SuggestionItem"
 
   /ai/structure:
     post:
@@ -94,7 +226,7 @@ paths:
     post:
       operationId: refineContent
       tags: [ai]
-      summary: Refine a single content tab
+      summary: Refine existing content based on an instruction
       requestBody:
         required: true
         content:
@@ -125,7 +257,7 @@ paths:
     get:
       operationId: listDrafts
       tags: [drafts]
-      summary: List all drafts
+      summary: List all drafts for the current user
       responses:
         "200":
           description: List of drafts
@@ -135,11 +267,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Draft"
-
     post:
       operationId: createDraft
       tags: [drafts]
-      summary: Save a new draft
+      summary: Create a new draft
       requestBody:
         required: true
         content:
@@ -148,17 +279,11 @@ paths:
               $ref: "#/components/schemas/CreateDraftBody"
       responses:
         "201":
-          description: Draft created
+          description: Created draft
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Draft"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
 
   /drafts/{id}:
     get:
@@ -188,7 +313,7 @@ paths:
     patch:
       operationId: updateDraft
       tags: [drafts]
-      summary: Update a draft
+      summary: Update a draft's content or status
       parameters:
         - name: id
           in: path
@@ -246,6 +371,114 @@ components:
           type: string
       required:
         - error
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        displayName:
+          type: string
+      required:
+        - email
+        - password
+        - displayName
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        displayName:
+          type: string
+      required:
+        - id
+        - email
+        - displayName
+
+    PreferencesResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        objective:
+          type: string
+        persona:
+          type: string
+        tone:
+          type: string
+        brandRole:
+          type: string
+        brandAudience:
+          type: string
+        brandBelief:
+          type: string
+        onboarded:
+          type: boolean
+      required:
+        - id
+        - userId
+        - objective
+        - persona
+        - tone
+        - brandRole
+        - brandAudience
+        - brandBelief
+        - onboarded
+
+    UpdatePreferencesBody:
+      type: object
+      properties:
+        objective:
+          type: string
+        persona:
+          type: string
+        tone:
+          type: string
+        brandRole:
+          type: string
+        brandAudience:
+          type: string
+        brandBelief:
+          type: string
+        onboarded:
+          type: boolean
+
+    SuggestionItem:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        message:
+          type: string
+        action:
+          type: string
+      required:
+        - id
+        - type
+        - message
+        - action
 
     StructureIdeaBody:
       type: object

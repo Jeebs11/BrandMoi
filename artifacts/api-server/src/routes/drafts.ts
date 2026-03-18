@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, draftsTable } from "@workspace/db";
+import { eq, and, desc } from "drizzle-orm";
+import { db } from "@workspace/db";
+import { draftsTable } from "@workspace/db";
 import {
   CreateDraftBody,
   UpdateDraftBody,
@@ -11,18 +12,20 @@ import {
   DeleteDraftParams,
   ListDraftsResponse,
 } from "@workspace/api-zod";
+import { requireAuth } from "../middleware/auth.js";
 
 const router: IRouter = Router();
 
-router.get("/drafts", async (_req, res): Promise<void> => {
+router.get("/drafts", requireAuth, async (req, res): Promise<void> => {
   const drafts = await db
     .select()
     .from(draftsTable)
-    .orderBy(draftsTable.createdAt);
+    .where(eq(draftsTable.userId, req.user!.userId))
+    .orderBy(desc(draftsTable.createdAt));
   res.json(ListDraftsResponse.parse(drafts));
 });
 
-router.post("/drafts", async (req, res): Promise<void> => {
+router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
   const parsed = CreateDraftBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -32,6 +35,7 @@ router.post("/drafts", async (req, res): Promise<void> => {
   const [draft] = await db
     .insert(draftsTable)
     .values({
+      userId: req.user!.userId,
       rawInput: parsed.data.rawInput,
       objective: parsed.data.objective,
       persona: parsed.data.persona,
@@ -47,7 +51,7 @@ router.post("/drafts", async (req, res): Promise<void> => {
   res.status(201).json(GetDraftResponse.parse(draft));
 });
 
-router.get("/drafts/:id", async (req, res): Promise<void> => {
+router.get("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   const params = GetDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -57,7 +61,7 @@ router.get("/drafts/:id", async (req, res): Promise<void> => {
   const [draft] = await db
     .select()
     .from(draftsTable)
-    .where(eq(draftsTable.id, params.data.id));
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
 
   if (!draft) {
     res.status(404).json({ error: "Draft not found" });
@@ -67,7 +71,7 @@ router.get("/drafts/:id", async (req, res): Promise<void> => {
   res.json(GetDraftResponse.parse(draft));
 });
 
-router.patch("/drafts/:id", async (req, res): Promise<void> => {
+router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   const params = UpdateDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -89,7 +93,7 @@ router.patch("/drafts/:id", async (req, res): Promise<void> => {
   const [draft] = await db
     .update(draftsTable)
     .set(updateData)
-    .where(eq(draftsTable.id, params.data.id))
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)))
     .returning();
 
   if (!draft) {
@@ -100,14 +104,14 @@ router.patch("/drafts/:id", async (req, res): Promise<void> => {
   res.json(UpdateDraftResponse.parse(draft));
 });
 
-router.delete("/drafts/:id", async (req, res): Promise<void> => {
+router.delete("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   const params = DeleteDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
   }
 
-  await db.delete(draftsTable).where(eq(draftsTable.id, params.data.id));
+  await db.delete(draftsTable).where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
 
   res.sendStatus(204);
 });

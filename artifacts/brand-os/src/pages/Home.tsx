@@ -15,7 +15,7 @@ import type {
   StructuredBreakdown,
   GeneratedContent,
   CarouselSlide,
-} from "@workspace/api-client-react/src/generated/api.schemas";
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";

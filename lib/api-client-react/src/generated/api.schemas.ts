@@ -13,6 +13,53 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface RegisterBody {
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  displayName: string;
+}
+
+export interface LoginBody {
+  email: string;
+  password: string;
+}
+
+export interface UserResponse {
+  id: number;
+  email: string;
+  displayName: string;
+}
+
+export interface PreferencesResponse {
+  id: number;
+  userId: number;
+  objective: string;
+  persona: string;
+  tone: string;
+  brandRole: string;
+  brandAudience: string;
+  brandBelief: string;
+  onboarded: boolean;
+}
+
+export interface UpdatePreferencesBody {
+  objective?: string;
+  persona?: string;
+  tone?: string;
+  brandRole?: string;
+  brandAudience?: string;
+  brandBelief?: string;
+  onboarded?: boolean;
+}
+
+export interface SuggestionItem {
+  id: string;
+  type: string;
+  message: string;
+  action: string;
+}
+
 export interface StructureIdeaBody {
   rawInput: string;
   objective: string;

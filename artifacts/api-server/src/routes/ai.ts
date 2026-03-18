@@ -1,5 +1,8 @@
 import { Router, type IRouter } from "express";
+import { eq } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { db } from "@workspace/db";
+import { preferencesTable } from "@workspace/db";
 import {
   StructureIdeaBody,
   StructureIdeaResponse,
@@ -12,11 +15,24 @@ import {
   buildBrandContext,
   STRUCTURE_SYSTEM_PROMPT,
   GENERATE_SYSTEM_PROMPT,
+  REFINE_SYSTEM_PROMPT,
 } from "../lib/ai-prompts.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router: IRouter = Router();
 
-router.post("/ai/structure", async (req, res): Promise<void> => {
+async function getUserBrandContext(userId: number): Promise<string> {
+  const [prefs] = await db
+    .select()
+    .from(preferencesTable)
+    .where(eq(preferencesTable.userId, userId))
+    .limit(1);
+
+  if (!prefs) return "";
+  return `Brand voice:\n- Role: ${prefs.brandRole}\n- Audience: ${prefs.brandAudience}\n- Belief: ${prefs.brandBelief}`;
+}
+
+router.post("/ai/structure", requireAuth, async (req, res): Promise<void> => {
   const parsed = StructureIdeaBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -25,10 +41,12 @@ router.post("/ai/structure", async (req, res): Promise<void> => {
 
   const { rawInput, objective, persona, tone } = parsed.data;
   const brandContext = buildBrandContext(objective, persona, tone);
+  const voiceContext = await getUserBrandContext(req.user!.userId);
 
   const userMessage = `Raw thought: ${rawInput}
 
 ${brandContext}
+${voiceContext ? `\n${voiceContext}` : ""}
 
 Return this exact JSON shape (no markdown fences):
 {
@@ -70,21 +88,22 @@ Return this exact JSON shape (no markdown fences):
   res.json(validated.data);
 });
 
-router.post("/ai/generate", async (req, res): Promise<void> => {
+router.post("/ai/generate", requireAuth, async (req, res): Promise<void> => {
   const parsed = GenerateContentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook } =
-    parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook } = parsed.data;
   const brandContext = buildBrandContext(objective, persona, tone);
+  const voiceContext = await getUserBrandContext(req.user!.userId);
 
   const userMessage = `Create LinkedIn content based on this structure:
 
 Raw thought: ${rawInput}
 ${brandContext}
+${voiceContext ? `\n${voiceContext}` : ""}
 
 Structure:
 - Topic: ${structure.topic}
@@ -131,7 +150,7 @@ Return this exact JSON shape (no markdown fences):
   res.json(validated.data);
 });
 
-router.post("/ai/refine", async (req, res): Promise<void> => {
+router.post("/ai/refine", requireAuth, async (req, res): Promise<void> => {
   const parsed = RefineContentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -139,8 +158,6 @@ router.post("/ai/refine", async (req, res): Promise<void> => {
   }
 
   const { content, instruction, tab } = parsed.data;
-
-  const systemPrompt = `You are a LinkedIn content editor. Refine the given content according to the instruction. Return only valid JSON, no markdown fences.`;
 
   const userMessage = `Refine this ${tab} content:
 
@@ -154,7 +171,7 @@ Return this exact JSON shape (no markdown fences):
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8192,
-    system: systemPrompt,
+    system: REFINE_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   });
 

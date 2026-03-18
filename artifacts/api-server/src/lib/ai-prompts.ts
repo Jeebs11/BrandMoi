@@ -1,26 +1,20 @@
-export const BRAND_DEFAULTS = {
-  objective: "Authority",
-  persona: "Founder",
-  tone: "Direct",
-  brandRole: "I help businesses grow through content and systems",
-  brandAudience: "Founders and operators building serious companies",
-  brandBelief: "Clarity beats cleverness every time",
-};
-
 export function buildBrandContext(
   objective: string,
   persona: string,
-  tone: string
+  tone: string,
+  brandRole?: string,
+  brandAudience?: string,
+  brandBelief?: string,
 ): string {
-  return `
-Brand context:
-- Objective: ${objective}
-- Persona: ${persona}
-- Tone: ${tone}
-- Brand role: ${BRAND_DEFAULTS.brandRole}
-- Brand audience: ${BRAND_DEFAULTS.brandAudience}
-- Brand belief: ${BRAND_DEFAULTS.brandBelief}
-`.trim();
+  const lines = [
+    `- Objective: ${objective}`,
+    `- Persona: ${persona}`,
+    `- Tone: ${tone}`,
+  ];
+  if (brandRole) lines.push(`- Brand role: ${brandRole}`);
+  if (brandAudience) lines.push(`- Brand audience: ${brandAudience}`);
+  if (brandBelief) lines.push(`- Brand belief: ${brandBelief}`);
+  return `Brand context:\n${lines.join("\n")}`;
 }
 
 export const STRUCTURE_SYSTEM_PROMPT = `You are a content strategist. Extract strategic structure from a raw thought. Never write finished content. Return only valid JSON, no markdown fences.`;
@@ -40,9 +34,4 @@ Rules for the carousel:
 - Slide 1: hook | Middle slides: content | Last slide: CTA
 - Each slide: title + 1–2 sentence description`;
 
-export const REFINE_INSTRUCTIONS: Record<string, string> = {
-  sharper: "Tighten language, remove hedging. Keep every idea.",
-  personal: "Add human detail, reduce abstraction.",
-  concise: "Cut by ~30%. Keep the core message and hook.",
-  client: "Reframe toward client value and problems.",
-};
+export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely. Return only valid JSON, no markdown fences.`;
