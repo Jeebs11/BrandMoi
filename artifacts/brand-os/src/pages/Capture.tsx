@@ -20,6 +20,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, agentApi, type AngleCheckResult, type AgentCoach } from "@/lib/api";
 import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
 import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
+import { downloadAnimatedCard, type CardAnimPreset } from "@/lib/export-animated-card";
+import { downloadAnimatedCarousel } from "@/lib/export-animated-carousel";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -113,6 +115,8 @@ export default function Capture() {
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
+  const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
+  const [isAnimatingCarousel, setIsAnimatingCarousel] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
 
@@ -256,6 +260,30 @@ export default function Capture() {
       toast({ title: "Card export failed. Please try again.", variant: "destructive" });
     } finally {
       setIsExportingCard(false);
+    }
+  };
+
+  const handleDownloadAnimatedCard = async (preset: CardAnimPreset) => {
+    if (!state.content?.visual) return;
+    setIsAnimatingCard(preset);
+    try {
+      await downloadAnimatedCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor, preset);
+    } catch {
+      toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsAnimatingCard(null);
+    }
+  };
+
+  const handleDownloadAnimatedCarousel = async () => {
+    if (!state.content?.carousel?.length) return;
+    setIsAnimatingCarousel(true);
+    try {
+      await downloadAnimatedCarousel(state.content.carousel, state.structure?.topic ?? "carousel", bgColor, accentColor);
+    } catch {
+      toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsAnimatingCarousel(false);
     }
   };
 
@@ -694,16 +722,39 @@ export default function Capture() {
                       </div>
                     )}
                     {cardPreviewUrl && !isPreviewingCard && (
-                      <div className="relative">
-                        <img src={cardPreviewUrl} alt="Card preview" className="w-full aspect-square object-cover" />
-                        <button
-                          onClick={handleDownloadVisualCard}
-                          disabled={isExportingCard}
-                          className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all disabled:opacity-50"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          {isExportingCard ? "Exporting…" : "Download card"}
-                        </button>
+                      <div>
+                        <div className="relative">
+                          <img src={cardPreviewUrl} alt="Card preview" className="w-full aspect-square object-cover" />
+                          <button
+                            onClick={handleDownloadVisualCard}
+                            disabled={isExportingCard}
+                            className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all disabled:opacity-50"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            {isExportingCard ? "Exporting…" : "Download PNG"}
+                          </button>
+                        </div>
+                        <div className="px-4 pt-3 pb-1">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Download animated</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(["typewriter", "fade", "slide"] as CardAnimPreset[]).map((preset) => (
+                              <button
+                                key={preset}
+                                onClick={() => handleDownloadAnimatedCard(preset)}
+                                disabled={!!isAnimatingCard}
+                                className="py-2 text-[11px] font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1 disabled:opacity-50 transition-all capitalize"
+                              >
+                                {isAnimatingCard === preset ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Download className="w-3 h-3" />
+                                )}
+                                {isAnimatingCard === preset ? "…" : preset === "typewriter" ? "Type" : preset === "fade" ? "Fade" : "Slide"}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-1.5">Saves as .webm · upload directly to LinkedIn</p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -848,6 +899,18 @@ export default function Capture() {
                       {isExportingPDF ? "Building PDF…" : "Download PDF"}
                     </button>
                   </div>
+                  <button
+                    onClick={handleDownloadAnimatedCarousel}
+                    disabled={isAnimatingCarousel}
+                    className="w-full py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                  >
+                    {isAnimatingCarousel ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5" />
+                    )}
+                    {isAnimatingCarousel ? "Building video preview…" : "Download animated preview (.webm)"}
+                  </button>
                 </div>
               )}
             </div>
