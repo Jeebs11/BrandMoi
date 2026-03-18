@@ -32,6 +32,14 @@ Rules for the post:
 Rules for the carousel:
 - 5–8 slides
 - Slide 1: hook | Middle slides: content | Last slide: CTA
-- Each slide: title + 1–2 sentence description`;
+- Each slide: title + 1–2 sentence description
+
+Rules for the visual:
+- One punchy standalone quote or insight extracted from the post
+- 15–30 words — must work as a screenshot-worthy card on its own
+- Write as a direct statement, no "I" opener, no hedging
+- Do NOT write a scene description or image caption — this is text for a quote card
+- Example format: "Most founders don't have a sales problem. They have a clarity problem."
+`;
 
 export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely. Return only valid JSON, no markdown fences.`;

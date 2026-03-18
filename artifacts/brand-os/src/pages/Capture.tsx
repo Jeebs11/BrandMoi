@@ -604,6 +604,40 @@ export default function Capture() {
                     </div>
                   </div>
 
+                  {/* Brand Palette for card */}
+                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Card Palette</p>
+                      <p className="text-[10px] text-gray-300">Auto-saved</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                          <div className="absolute inset-0" style={{ background: bgColor }} />
+                          <input
+                            type="color"
+                            value={bgColor}
+                            onChange={e => handleBgColorChange(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Background</span>
+                      </label>
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                          <div className="absolute inset-0" style={{ background: accentColor }} />
+                          <input
+                            type="color"
+                            value={accentColor}
+                            onChange={e => handleAccentColorChange(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Accent</span>
+                      </label>
+                    </div>
+                  </div>
+
                   {/* Step 1: Generate DALL-E prompt */}
                   <button
                     onClick={handleGenerateImagePrompt}
