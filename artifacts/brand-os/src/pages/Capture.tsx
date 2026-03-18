@@ -149,6 +149,9 @@ export default function Capture() {
   const [coachModal, setCoachModal] = useState<{ note: string; type: AgentCoach["type"] } | null>(null);
   const [isCoaching, setIsCoaching] = useState(false);
   const pendingSaveRef = useRef<(() => void) | null>(null);
+  // Track whether the user has hand-edited the post text after AI generation.
+  // The coach only fires when this is true — pure AI output skips it.
+  const [userEditedPost, setUserEditedPost] = useState(false);
 
   // Initialize palette from saved preferences (once)
   useEffect(() => {
@@ -386,6 +389,7 @@ export default function Capture() {
           setState(s => ({ ...s, content: data, activeTab: "post" }));
           setImagePrompt("");
           setGeneratedImageBase64(null);
+          setUserEditedPost(false);
         },
       }
     );
@@ -406,7 +410,10 @@ export default function Capture() {
           setState(s => {
             if (!s.content) return s;
             const nc = { ...s.content };
-            if (s.activeTab === "post") nc.post = data.content;
+            if (s.activeTab === "post") {
+              nc.post = data.content;
+              setUserEditedPost(false);
+            }
             else if (s.activeTab === "visual") nc.visual = data.content;
             else if (s.activeTab === "carousel") {
               try {
@@ -468,7 +475,9 @@ export default function Capture() {
 
   const handleSave = () => {
     const postText = state.content?.post;
-    if (postText && postText.length >= 20) {
+    // Only run the writing coach when the user has hand-edited the post.
+    // Pure AI-generated output skips it and saves directly.
+    if (postText && postText.length >= 20 && userEditedPost) {
       setIsCoaching(true);
       pendingSaveRef.current = executeSave;
       agentApi.coach(postText).then((result) => {
@@ -681,7 +690,7 @@ export default function Capture() {
               {state.activeTab === "post" && (
                 <div className="relative group h-full">
                   <textarea className="w-full h-full min-h-[340px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
-                    value={state.content.post} onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, post: e.target.value } } : s)} />
+                    value={state.content.post} onChange={e => { setState(s => s.content ? { ...s, content: { ...s.content, post: e.target.value } } : s); setUserEditedPost(true); }} />
                   <button onClick={() => copyToClipboard(state.content!.post)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
                     <Copy className="w-4 h-4" />
                   </button>
