@@ -11,6 +11,7 @@ import Dashboard from "@/pages/Dashboard";
 import Capture from "@/pages/Capture";
 import Library from "@/pages/Library";
 import Settings from "@/pages/Settings";
+import Vault from "@/pages/Vault";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -98,6 +99,11 @@ function Router() {
       <Route path="/library">
         <AuthGuard>
           <Library />
+        </AuthGuard>
+      </Route>
+      <Route path="/vault">
+        <AuthGuard>
+          <Vault />
         </AuthGuard>
       </Route>
       <Route path="/">

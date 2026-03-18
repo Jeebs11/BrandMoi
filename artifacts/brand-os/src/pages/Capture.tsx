@@ -4,7 +4,7 @@ import { useSearch, useLocation } from "wouter";
 import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
-  RefreshCw, Copy, AlertTriangle,
+  RefreshCw, Copy, AlertTriangle, X, Lightbulb,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -17,6 +17,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { angleApi, thoughtsApi, type AngleCheckResult } from "@/lib/api";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -42,13 +43,16 @@ export default function Capture() {
   const params = new URLSearchParams(search);
   const draftIdParam = params.get("draftId");
   const draftId = draftIdParam ? parseInt(draftIdParam) : null;
+  const thoughtParam = params.get("thought") ?? "";
+  const thoughtIdParam = params.get("thoughtId");
+  const thoughtId = thoughtIdParam ? parseInt(thoughtIdParam) : null;
 
   const { preferences } = useAuth();
   const { toast } = useToast();
 
   const initialState: WorkflowState = {
     step: 1,
-    rawInput: "",
+    rawInput: thoughtParam ? decodeURIComponent(thoughtParam) : "",
     objective: preferences?.objective ?? "Authority",
     persona: preferences?.persona ?? "Founder",
     tone: preferences?.tone ?? "Direct",
@@ -60,6 +64,9 @@ export default function Capture() {
 
   const [state, setState] = useState<WorkflowState>(initialState);
   const [initialized, setInitialized] = useState(false);
+  const [angleResult, setAngleResult] = useState<AngleCheckResult | null>(null);
+  const [angleChecking, setAngleChecking] = useState(false);
+  const [angleDismissed, setAngleDismissed] = useState(false);
 
   const { data: existingDraft } = useGetDraft(
     draftId!,
@@ -102,13 +109,33 @@ export default function Capture() {
 
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
 
+  const checkAngle = async (topic: string, angle: string) => {
+    setAngleChecking(true);
+    setAngleDismissed(false);
+    try {
+      const result = await angleApi.check(topic, angle);
+      setAngleResult(result);
+    } catch {
+      setAngleResult(null);
+    } finally {
+      setAngleChecking(false);
+    }
+  };
+
   const handleStructure = () => {
     if (!state.rawInput.trim()) return;
     resetStructure();
+    setAngleResult(null);
+    setAngleDismissed(false);
     setState(s => ({ ...s, step: 3, structure: null, selectedHook: null }));
     structureIdea(
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
-      { onSuccess: (data) => setState(s => ({ ...s, structure: data })) }
+      {
+        onSuccess: (data) => {
+          setState(s => ({ ...s, structure: data }));
+          void checkAngle(data.topic, data.angle);
+        }
+      }
     );
   };
 
@@ -176,11 +203,18 @@ export default function Capture() {
       status: "draft" as const,
     };
 
+    const onSuccess = () => {
+      setState(s => ({ ...s, step: 6 }));
+      if (thoughtId) {
+        void thoughtsApi.markDeveloped(thoughtId);
+      }
+    };
+
     if (draftId) {
       updateDraft(
         { id: draftId!, data: { postOutput: draftData.postOutput, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput } },
         {
-          onSuccess: () => setState(s => ({ ...s, step: 6 })),
+          onSuccess,
           onError: () => toast({ title: "Failed to update draft.", variant: "destructive" }),
         }
       );
@@ -188,7 +222,7 @@ export default function Capture() {
       createDraft(
         { data: draftData },
         {
-          onSuccess: () => setState(s => ({ ...s, step: 6 })),
+          onSuccess,
           onError: () => toast({ title: "Failed to save draft.", variant: "destructive" }),
         }
       );
@@ -212,7 +246,9 @@ export default function Capture() {
   const resetFlow = () => {
     resetStructure();
     resetGenerate();
-    setState({ ...initialState, objective: preferences?.objective ?? "Authority", persona: preferences?.persona ?? "Founder", tone: preferences?.tone ?? "Direct" });
+    setAngleResult(null);
+    setAngleDismissed(false);
+    setState({ ...initialState, rawInput: "", objective: preferences?.objective ?? "Authority", persona: preferences?.persona ?? "Founder", tone: preferences?.tone ?? "Direct" });
     setInitialized(false);
     navigate("/capture");
   };
@@ -222,13 +258,19 @@ export default function Capture() {
       case 1:
         return (
           <motion.div key="s1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
+            {thoughtId && (
+              <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+                <Lightbulb className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                <p className="text-xs text-amber-700 font-medium">From your Vault — develop this thought into content</p>
+              </div>
+            )}
             <div className="flex-1 mt-4">
               <textarea
                 className="w-full h-full text-2xl font-medium outline-none placeholder:text-gray-300 bg-transparent resize-none leading-relaxed text-foreground"
                 placeholder="Drop a thought, a lesson, an observation — messy is fine..."
                 value={state.rawInput}
                 onChange={(e) => setState(s => ({ ...s, rawInput: e.target.value }))}
-                autoFocus
+                autoFocus={!thoughtParam}
               />
             </div>
             <div className="sticky bottom-0 pb-6 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent">
@@ -269,6 +311,45 @@ export default function Capture() {
           <motion.div key="s3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto no-scrollbar pb-36 space-y-5">
               <BackBtn onClick={() => setState(s => ({ ...s, step: 2 }))} />
+
+              {/* Angle Freshness Guard */}
+              {!angleDismissed && !angleChecking && angleResult?.similar && (
+                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs font-bold text-amber-800">Angle already in your history ({angleResult.score}% overlap)</p>
+                    </div>
+                    <button onClick={() => setAngleDismissed(true)} className="text-amber-400 hover:text-amber-600 flex-shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-amber-700 mb-1">Similar to: <span className="font-semibold">"{angleResult.match.topic} — {angleResult.match.angle}"</span></p>
+                  {angleResult.freshAngles.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-2">Try a fresh angle:</p>
+                      <div className="space-y-1.5">
+                        {angleResult.freshAngles.map((fa, i) => (
+                          <button key={i} onClick={() => {
+                            setState(s => s.structure ? { ...s, structure: { ...s.structure!, angle: fa } } : s);
+                            setAngleDismissed(true);
+                          }}
+                            className="w-full text-left px-3 py-2 bg-white border border-amber-200 rounded-xl text-xs text-amber-800 hover:border-amber-400 hover:bg-amber-50 transition-all">
+                            {fa}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+              {angleChecking && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
+                  <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+                  <p className="text-xs text-gray-500">Checking angle freshness...</p>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <InfoCard label="Topic" value={state.structure.topic} />
                 <InfoCard label="Angle" value={state.structure.angle} />
@@ -430,6 +511,11 @@ export default function Capture() {
           {draftId && state.step >= 4 && state.step < 6 && (
             <p className="text-xs text-primary font-semibold mt-2">Editing existing draft</p>
           )}
+          {thoughtId && state.step === 1 && (
+            <p className="text-xs text-amber-600 font-semibold mt-2 flex items-center gap-1">
+              <Lightbulb className="w-3 h-3" /> From your Vault
+            </p>
+          )}
         </header>
         <main className="flex-1 px-6 pb-6 overflow-hidden flex flex-col relative">
           <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
@@ -467,9 +553,10 @@ function SelGroup({ label, icon, options, selected, onSelect }: { label: string;
       <div className="flex flex-wrap gap-2">
         {options.map(o => (
           <button key={o} onClick={() => onSelect(o)}
-            className={cn("px-3.5 py-2 rounded-xl text-sm font-semibold transition-all border-2",
-              selected === o ? "bg-primary text-white border-primary shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:border-primary/40")}
-          >{o}</button>
+            className={cn("px-3.5 py-2 rounded-xl text-xs font-bold transition-all border-2", selected === o ? "bg-primary text-white border-primary" : "bg-white text-gray-600 border-gray-200 hover:border-primary/30")}
+          >
+            {o}
+          </button>
         ))}
       </div>
     </div>
@@ -478,9 +565,9 @@ function SelGroup({ label, icon, options, selected, onSelect }: { label: string;
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white p-4 rounded-2xl border border-gray-100">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-sm text-gray-800 leading-relaxed">{value}</p>
+    <div className="bg-white border border-gray-100 rounded-2xl p-4">
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-sm font-semibold text-gray-800 leading-relaxed">{value}</p>
     </div>
   );
 }
@@ -491,10 +578,7 @@ function ErrState({ message, onRetry, onBack }: { message: string; onRetry: () =
       <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
         <AlertTriangle className="w-8 h-8 text-red-400" />
       </div>
-      <div>
-        <p className="font-bold text-gray-900 mb-1">{message}</p>
-        <p className="text-sm text-gray-500">Check your connection and try again.</p>
-      </div>
+      <p className="text-gray-600 font-medium">{message}</p>
       <div className="flex gap-3 w-full px-4">
         <Button variant="outline" className="flex-1 border-2" onClick={onBack}>Go back</Button>
         <Button className="flex-1" onClick={onRetry}>Try again</Button>

@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
+import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { draftsTable } from "@workspace/db";
+import { draftsTable, performanceSignalsTable } from "@workspace/db";
 import {
   CreateDraftBody,
   UpdateDraftBody,
@@ -13,6 +14,7 @@ import {
   ListDraftsResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth.js";
+import { extractVoiceDNA } from "./ai.js";
 
 const router: IRouter = Router();
 
@@ -49,6 +51,10 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
     .returning();
 
   res.status(201).json(GetDraftResponse.parse(draft));
+
+  if ((parsed.data.status === "ready" || parsed.data.status === "published") && draft.postOutput) {
+    void extractVoiceDNA(req.user!.userId, draft.id, draft.postOutput);
+  }
 });
 
 router.get("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
@@ -102,6 +108,10 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   }
 
   res.json(UpdateDraftResponse.parse(draft));
+
+  if ((parsed.data.status === "ready" || parsed.data.status === "published") && draft.postOutput) {
+    void extractVoiceDNA(req.user!.userId, draft.id, draft.postOutput);
+  }
 });
 
 router.delete("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
@@ -114,6 +124,84 @@ router.delete("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   await db.delete(draftsTable).where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
 
   res.sendStatus(204);
+});
+
+const PerformanceBody = z.object({
+  impressions: z.number().int().min(0),
+  reactions: z.number().int().min(0),
+  comments: z.number().int().min(0),
+});
+
+router.post("/drafts/:id/performance", requireAuth, async (req, res): Promise<void> => {
+  const params = GetDraftParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+
+  const parsed = PerformanceBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid performance data" });
+    return;
+  }
+
+  const [draft] = await db
+    .select({ id: draftsTable.id })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+
+  if (!draft) {
+    res.status(404).json({ error: "Draft not found" });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(eq(performanceSignalsTable.draftId, params.data.id));
+
+  let signal;
+  if (existing) {
+    const [updated] = await db
+      .update(performanceSignalsTable)
+      .set({ impressions: parsed.data.impressions, reactions: parsed.data.reactions, comments: parsed.data.comments })
+      .where(eq(performanceSignalsTable.draftId, params.data.id))
+      .returning();
+    signal = updated;
+  } else {
+    const [created] = await db
+      .insert(performanceSignalsTable)
+      .values({ draftId: params.data.id, ...parsed.data })
+      .returning();
+    signal = created;
+  }
+
+  res.json(signal);
+});
+
+router.get("/drafts/:id/performance", requireAuth, async (req, res): Promise<void> => {
+  const params = GetDraftParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+
+  const [draft] = await db
+    .select({ id: draftsTable.id })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+
+  if (!draft) {
+    res.status(404).json({ error: "Draft not found" });
+    return;
+  }
+
+  const [signal] = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(eq(performanceSignalsTable.draftId, params.data.id));
+
+  res.json(signal ?? null);
 });
 
 export default router;

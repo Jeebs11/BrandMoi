@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen } from "lucide-react";
+import { Home, PenSquare, BookOpen, Lightbulb } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/capture", label: "Capture", icon: PenSquare },
+  { href: "/vault", label: "Vault", icon: Lightbulb },
   { href: "/library", label: "Library", icon: BookOpen },
 ];
 
@@ -27,7 +28,7 @@ export function BottomNav() {
                 )}
               >
                 <Icon className={cn("w-5 h-5", active && "fill-current opacity-20")} strokeWidth={active ? 2.5 : 1.5} />
-                <span className={cn("text-[10px] font-bold tracking-wide", active ? "text-primary" : "text-gray-400")}>
+                <span className={cn("text-[9px] font-bold tracking-wide", active ? "text-primary" : "text-gray-400")}>
                   {label}
                 </span>
               </Link>

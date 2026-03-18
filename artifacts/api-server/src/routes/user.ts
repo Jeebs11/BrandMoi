@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable } from "@workspace/db";
+import { preferencesTable, draftsTable, brandVoiceSignalsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -15,10 +16,6 @@ const UpdatePreferencesBody = z.object({
   brandAudience: z.string().optional(),
   brandBelief: z.string().optional(),
   onboarded: z.boolean().optional(),
-});
-
-const ChangePasswordBody = z.object({
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
@@ -75,6 +72,73 @@ router.get("/user/suggestions", requireAuth, async (req, res): Promise<void> => 
 
   const suggestions = buildSuggestions(drafts);
   res.json(suggestions);
+});
+
+router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+
+  const [prefs] = await db
+    .select()
+    .from(preferencesTable)
+    .where(eq(preferencesTable.userId, userId))
+    .limit(1);
+
+  const publishedCount = await db
+    .select({ id: draftsTable.id })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
+
+  const currentCount = publishedCount.length;
+  const lastCount = prefs?.voiceSummaryDraftCount ?? 0;
+  const hasExistingSummary = !!prefs?.brandVoiceSummary;
+  const needsRefresh = currentCount - lastCount >= 5 || (!hasExistingSummary && currentCount > 0);
+
+  if (!needsRefresh && hasExistingSummary) {
+    res.json({ summary: prefs!.brandVoiceSummary, draftCount: currentCount });
+    return;
+  }
+
+  const signals = await db
+    .select()
+    .from(brandVoiceSignalsTable)
+    .where(eq(brandVoiceSignalsTable.userId, userId))
+    .orderBy(desc(brandVoiceSignalsTable.createdAt))
+    .limit(20);
+
+  if (signals.length === 0) {
+    res.json({ summary: null, draftCount: currentCount });
+    return;
+  }
+
+  try {
+    const signalsText = signals
+      .map((s) => JSON.stringify(s.signals))
+      .join("\n");
+
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 512,
+      system: "You are a brand voice analyst. Based on writing pattern signals extracted from a user's LinkedIn posts, write a plain-language voice profile. Return 3-5 bullet points starting with 'You'. Be specific, descriptive, and flattering. Focus on what makes their writing distinctive and effective.",
+      messages: [{ role: "user", content: `Writing signals from ${signals.length} posts:\n${signalsText}\n\nReturn 3-5 bullet points about this person's writing voice.` }],
+    });
+
+    const t = message.content[0];
+    if (t.type !== "text") {
+      res.json({ summary: prefs?.brandVoiceSummary ?? null, draftCount: currentCount });
+      return;
+    }
+
+    const summary = t.text.trim();
+
+    await db
+      .update(preferencesTable)
+      .set({ brandVoiceSummary: summary, voiceSummaryDraftCount: currentCount })
+      .where(eq(preferencesTable.userId, userId));
+
+    res.json({ summary, draftCount: currentCount });
+  } catch {
+    res.json({ summary: prefs?.brandVoiceSummary ?? null, draftCount: currentCount });
+  }
 });
 
 function countBy(items: { objective: string }[], key: "objective"): Record<string, number> {
@@ -151,7 +215,6 @@ function buildSuggestions(drafts: DraftRow[]): Array<{ id: string; type: string;
     });
   }
 
-  const topPersona = maxKey(countBy(drafts as unknown as { objective: string }[], "objective"));
   suggestions.push({
     id: "persona-depth",
     type: "depth",

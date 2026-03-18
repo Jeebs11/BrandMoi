@@ -1,10 +1,12 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Settings, ArrowRight, Lightbulb, Clock } from "lucide-react";
+import { Settings, ArrowRight, Lightbulb, Clock, Flame } from "lucide-react";
 import { useListDrafts, useGetSuggestions } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import { thoughtsApi, type Thought } from "@/lib/api";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -31,6 +33,19 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { data: drafts, isLoading: draftsLoading } = useListDrafts();
   const { data: suggestions, isLoading: suggestionsLoading } = useGetSuggestions();
+  const [ripeThoughts, setRipeThoughts] = useState<Thought[]>([]);
+  const [thoughtsLoading, setThoughtsLoading] = useState(true);
+
+  useEffect(() => {
+    thoughtsApi.list().then((all) => {
+      const ripe = all.filter((t) => {
+        if (t.developed) return false;
+        const daysOld = (Date.now() - new Date(t.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        return daysOld >= 2;
+      }).slice(0, 3);
+      setRipeThoughts(ripe);
+    }).catch(() => {}).finally(() => setThoughtsLoading(false));
+  }, []);
 
   const recentDrafts = drafts?.slice(0, 5) ?? [];
 
@@ -66,6 +81,38 @@ export default function Dashboard() {
               </div>
             </div>
           </Link>
+
+          {/* Ripe Thoughts */}
+          {!thoughtsLoading && ripeThoughts.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-sm font-bold text-gray-700">Ripe for Developing</h3>
+                </div>
+                <Link href="/vault" className="text-xs text-primary font-semibold hover:underline">
+                  View all
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {ripeThoughts.map((thought) => {
+                  const daysOld = Math.floor((Date.now() - new Date(thought.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+                  const encoded = encodeURIComponent(thought.content);
+                  return (
+                    <Link key={thought.id} href={`/capture?thought=${encoded}&thoughtId=${thought.id}`}>
+                      <div className="bg-white border border-amber-100 rounded-2xl p-4 cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all">
+                        <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">{thought.content}</p>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{daysOld}d marinating</span>
+                          <span className="text-xs text-primary font-semibold flex items-center gap-1">Develop <ArrowRight className="w-3 h-3" /></span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Suggestions */}
           <section>

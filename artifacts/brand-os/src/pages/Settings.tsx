@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Eye, EyeOff } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw } from "lucide-react";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { voiceApi, type VoiceSummaryResult } from "@/lib/api";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -23,8 +25,9 @@ export default function Settings() {
   const [brandAudience, setBrandAudience] = useState(preferences?.brandAudience ?? "");
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
 
-  const [newPassword, setNewPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [voiceData, setVoiceData] = useState<VoiceSummaryResult | null>(null);
+  const [voiceLoading, setVoiceLoading] = useState(true);
+  const [voiceRefreshing, setVoiceRefreshing] = useState(false);
 
   useEffect(() => {
     if (preferences) {
@@ -36,6 +39,25 @@ export default function Settings() {
       setBrandBelief(preferences.brandBelief);
     }
   }, [preferences]);
+
+  useEffect(() => {
+    voiceApi.getSummary()
+      .then((data) => setVoiceData(data))
+      .catch(() => {})
+      .finally(() => setVoiceLoading(false));
+  }, []);
+
+  const handleRefreshVoice = async () => {
+    setVoiceRefreshing(true);
+    try {
+      const data = await voiceApi.getSummary();
+      setVoiceData(data);
+    } catch {
+      toast({ title: "Could not refresh voice analysis.", variant: "destructive" });
+    } finally {
+      setVoiceRefreshing(false);
+    }
+  };
 
   const { mutate: updatePreferences, isPending: isSaving } = useUpdatePreferences();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -94,6 +116,55 @@ export default function Settings() {
               <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..." />
               <VoiceInput label="Your core belief" value={brandBelief} onChange={setBrandBelief} placeholder="Clarity beats cleverness..." />
             </div>
+          </section>
+
+          {/* Voice Evolution Timeline */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-violet-500" />
+                <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Voice DNA Analysis</h2>
+              </div>
+              {voiceData && voiceData.draftCount > 0 && (
+                <button
+                  onClick={() => void handleRefreshVoice()}
+                  disabled={voiceRefreshing}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", voiceRefreshing && "animate-spin")} />
+                  Refresh
+                </button>
+              )}
+            </div>
+
+            {voiceLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 rounded-full w-3/4" />
+                <Skeleton className="h-4 rounded-full w-full" />
+                <Skeleton className="h-4 rounded-full w-5/6" />
+              </div>
+            ) : !voiceData || voiceData.draftCount === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-5 text-center">
+                <Brain className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-500 font-medium">No voice data yet</p>
+                <p className="text-xs text-gray-400 mt-1">Publish your first drafts to unlock your voice analysis.</p>
+              </div>
+            ) : voiceData.summary ? (
+              <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black text-violet-400 uppercase tracking-wider">Based on {voiceData.draftCount} published post{voiceData.draftCount !== 1 ? "s" : ""}</p>
+                </div>
+                <div className="space-y-2">
+                  {voiceData.summary.split("\n").filter(Boolean).map((line, i) => (
+                    <p key={i} className="text-sm text-violet-900 leading-relaxed">{line}</p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
+                <p className="text-sm text-gray-500">Voice analysis will appear once you have published posts with enough writing signals.</p>
+              </div>
+            )}
           </section>
 
           {/* Account */}

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -13,6 +13,8 @@ export const preferencesTable = pgTable("preferences", {
   brandAudience: text("brand_audience").notNull().default(""),
   brandBelief: text("brand_belief").notNull().default(""),
   onboarded: boolean("onboarded").notNull().default(false),
+  brandVoiceSummary: text("brand_voice_summary"),
+  voiceSummaryDraftCount: integer("voice_summary_draft_count").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

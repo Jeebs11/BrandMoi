@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
+import { performanceApi, type PerformanceSignal } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,11 +36,18 @@ const STATUS_COLORS: Record<string, string> = {
   published: "text-green-600",
 };
 
+type PerformanceModalState = {
+  draftId: number;
+  topic: string;
+  existing: PerformanceSignal | null;
+};
+
 export default function Library() {
   const [, navigate] = useLocation();
   const [objFilter, setObjFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
 
   const { data: drafts, isLoading, refetch } = useListDrafts();
   const { mutate: deleteDraft, isPending: isDeleting } = useDeleteDraft();
@@ -56,7 +64,7 @@ export default function Library() {
     deleteDraft(
       { id },
       {
-        onSuccess: () => { setDeletingId(null); refetch(); },
+        onSuccess: () => { setDeletingId(null); void refetch(); },
         onError: () => setDeletingId(null),
       }
     );
@@ -65,8 +73,13 @@ export default function Library() {
   const handleStatusChange = (id: number, status: "draft" | "ready" | "published") => {
     updateDraft(
       { id, data: { status } },
-      { onSuccess: () => refetch() }
+      { onSuccess: () => void refetch() }
     );
+  };
+
+  const openPerfModal = async (draftId: number, topic: string) => {
+    const existing = await performanceApi.get(draftId).catch(() => null);
+    setPerfModal({ draftId, topic, existing });
   };
 
   return (
@@ -137,10 +150,15 @@ export default function Library() {
                           <MoreVertical className="w-4 h-4" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-[180px]">
+                      <DropdownMenuContent align="end" className="min-w-[190px]">
                         <DropdownMenuItem onClick={() => navigate(`/capture?draftId=${draft.id}`)}>
                           <Pencil className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
+                        {draft.status === "published" && (
+                          <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic)}>
+                            <BarChart2 className="w-4 h-4 mr-2 text-violet-500" /> Log Performance
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         {draft.status !== "draft" && (
                           <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "draft")}>
@@ -176,7 +194,108 @@ export default function Library() {
         </main>
 
         <BottomNav />
+
+        {perfModal && (
+          <PerformanceModal
+            modal={perfModal}
+            onClose={() => setPerfModal(null)}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; onClose: () => void }) {
+  const [impressions, setImpressions] = useState(modal.existing?.impressions ?? 0);
+  const [reactions, setReactions] = useState(modal.existing?.reactions ?? 0);
+  const [comments, setComments] = useState(modal.existing?.comments ?? 0);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const resonanceScore = impressions > 0
+    ? Math.min(100, Math.round(((reactions * 3 + comments * 5) / impressions) * 1000))
+    : 0;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await performanceApi.log(modal.draftId, { impressions, reactions, comments });
+      setSaved(true);
+      setTimeout(onClose, 1200);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <BarChart2 className="w-4 h-4 text-violet-500" />
+              <h3 className="font-extrabold text-gray-900">Log Performance</h3>
+            </div>
+            <p className="text-xs text-gray-400 ml-6 truncate max-w-[280px]">{modal.topic}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4 mb-5">
+          <NumberInput label="Impressions" value={impressions} onChange={setImpressions} />
+          <NumberInput label="Reactions" value={reactions} onChange={setReactions} />
+          <NumberInput label="Comments" value={comments} onChange={setComments} />
+        </div>
+
+        {impressions > 0 && (
+          <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl mb-4">
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Resonance Score</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-black text-violet-700">{resonanceScore}</span>
+                <span className="text-xs text-violet-400 font-bold">/100</span>
+              </div>
+            </div>
+            <div className="w-16 h-16 relative flex items-center justify-center">
+              <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#ede9fe" strokeWidth="8" />
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#7c3aed" strokeWidth="8"
+                  strokeDasharray={`${(resonanceScore / 100) * 163} 163`} strokeLinecap="round" />
+              </svg>
+              <span className="absolute text-xs font-black text-violet-700">{resonanceScore}</span>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => void handleSave()}
+          disabled={saving || saved}
+          className={cn("w-full h-12 rounded-2xl font-bold text-sm transition-all",
+            saved ? "bg-green-500 text-white" : "bg-primary text-white hover:bg-primary/90 disabled:opacity-60"
+          )}
+        >
+          {saved ? "✓ Saved" : saving ? "Saving..." : "Save performance data"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NumberInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+      <input
+        type="number"
+        min="0"
+        value={value}
+        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors"
+      />
     </div>
   );
 }

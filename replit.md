@@ -36,8 +36,15 @@ A mobile-first web app (max-width 430px) for AI-powered LinkedIn content creatio
 - Dashboard with Capture CTA, Smart Suggestions, Recent Work
 - Library with filter chips (objective + status), draft cards with "..." dropdown (Edit/Status/Delete)
 - Settings page (preferences + brand voice + logout)
-- Bottom navigation (Home, Capture, Library)
+- Bottom navigation (Home, Capture, Vault, Library) — 4 items
 - Auth guards: unauthenticated → /login, not onboarded → /onboarding
+
+**Phase 3: Agentic Intelligence Layer** ✅
+- **Brand Voice DNA**: Automatically extracts voice signals (sentence style, tone markers, vocabulary) from published/ready drafts via Claude. Signals stored in `brand_voice_signals` table and injected into future AI prompts for personalised output.
+- **Angle Freshness Guard**: POST `/api/ai/check-angle` computes Jaccard similarity between new topic+angle and last 20 drafts. If >15% overlap, an amber warning banner shows in step 3 with 2 Claude-generated fresh angle alternatives the user can click to apply.
+- **Thought Vault**: `/vault` page with quick-capture textarea, raw ideas list, "Develop" → pre-fills Capture, "Done" marks developed. Dashboard shows "Ripe for Developing" section for thoughts 2+ days old. `thoughts` table with `developed` flag.
+- **Performance Signal Loop**: "Log Performance" in library dropdown for published drafts. Modal with Impressions/Reactions/Comments inputs + animated Resonance Score gauge. Data stored in `performance_signals` table. POST/GET `/api/drafts/:id/performance`.
+- **Voice Evolution Timeline**: GET `/api/user/voice-summary` generates a Claude voice profile from accumulated signals. Cached in `preferences.brandVoiceSummary`, refreshed when 5+ new published posts since last update. Shown in Settings with Refresh button.
 
 ### Demo User
 - Email: `demo@brandos.app`
@@ -66,15 +73,18 @@ artifacts-monorepo/
 │           ├── hooks/
 │           │   └── use-auth.tsx    # AuthProvider + useAuth context
 │           ├── components/
-│           │   └── BottomNav.tsx   # Bottom navigation (Home/Capture/Library)
+│           │   └── BottomNav.tsx   # Bottom navigation (Home/Capture/Vault/Library)
 │           ├── pages/
 │           │   ├── Login.tsx
 │           │   ├── Signup.tsx
 │           │   ├── Onboarding.tsx  # 5-step brand voice onboarding
-│           │   ├── Dashboard.tsx   # Home: CTA + suggestions + recent work
-│           │   ├── Capture.tsx     # 6-step content creation workflow
-│           │   ├── Library.tsx     # Draft list with filters + management
-│           │   └── Settings.tsx    # Preferences + brand voice + logout
+│           │   ├── Dashboard.tsx   # Home: CTA + ripe thoughts + suggestions + recent work
+│           │   ├── Capture.tsx     # 6-step workflow (angle check in step 3, vault pre-fill)
+│           │   ├── Library.tsx     # Draft list with filters, management, Log Performance
+│           │   ├── Settings.tsx    # Preferences + brand voice + voice DNA + logout
+│           │   └── Vault.tsx       # Thought capture + list + develop flow
+│           ├── lib/
+│           │   └── api.ts          # Direct fetch helpers for Phase 3 endpoints
 │           └── App.tsx             # Routing + AuthGuard + OnboardingGuard
 ├── lib/
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
@@ -118,10 +128,18 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 | POST | /api/ai/generate | Yes | Generate content with Claude |
 | POST | /api/ai/refine | Yes | Refine content with Claude |
 | GET | /api/drafts | Yes | List user's drafts |
-| POST | /api/drafts | Yes | Create draft |
+| POST | /api/drafts | Yes | Create draft (triggers voice DNA extraction if ready/published) |
 | GET | /api/drafts/:id | Yes | Get single draft |
-| PATCH | /api/drafts/:id | Yes | Update draft |
+| PATCH | /api/drafts/:id | Yes | Update draft (triggers voice DNA extraction if ready/published) |
 | DELETE | /api/drafts/:id | Yes | Delete draft |
+| POST | /api/drafts/:id/performance | Yes | Log performance signals (impressions/reactions/comments) |
+| GET | /api/drafts/:id/performance | Yes | Get performance signals for a draft |
+| POST | /api/ai/check-angle | Yes | Check if topic+angle is similar to past drafts (Jaccard) |
+| GET | /api/user/voice-summary | Yes | Get/refresh Claude-generated voice profile |
+| GET | /api/thoughts | Yes | List user's thoughts |
+| POST | /api/thoughts | Yes | Create a thought |
+| PATCH | /api/thoughts/:id | Yes | Update thought (mark developed) |
+| DELETE | /api/thoughts/:id | Yes | Delete thought |
 
 ## Packages
 
