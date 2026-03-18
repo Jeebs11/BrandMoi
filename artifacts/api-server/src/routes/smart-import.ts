@@ -27,8 +27,9 @@ async function extractText(buffer: Buffer, mimetype: string, filename: string): 
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
 
   if (mimetype === "application/pdf" || ext === "pdf") {
-    const pdfParse = (await import("pdf-parse")).default;
-    const result = await pdfParse(buffer);
+    // pdf-parse v1 exports a default function: pdfParse(buffer) => { text }
+    const { default: pdfParse } = await import("pdf-parse");
+    const result = await (pdfParse as (buf: Buffer) => Promise<{ text: string }>)(buffer);
     return result.text;
   }
 
@@ -69,7 +70,8 @@ router.post(
     let rawText: string;
     try {
       rawText = await extractText(req.file.buffer, req.file.mimetype, req.file.originalname);
-    } catch {
+    } catch (err) {
+      console.error("[smart-import] extractText failed:", err);
       res.status(422).json({ error: "Could not read this file. Try a PDF or plain text document." });
       return;
     }
