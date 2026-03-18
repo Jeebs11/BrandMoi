@@ -143,3 +143,31 @@ export const preferencesApi = {
       body: JSON.stringify({ brandBgColor, brandAccentColor }),
     }),
 };
+
+export type AgentBrief = {
+  headline: string;
+  insight: string;
+  angles: string[];
+};
+
+export type AgentCoach = {
+  note: string;
+  type: "hook" | "clarity" | "voice" | "structure" | "cta";
+};
+
+export type AgentTheme = {
+  name: string;
+  pattern: string;
+  seriesIdea: string;
+  postCount: number;
+};
+
+export const agentApi = {
+  brief: () => apiFetch<AgentBrief>("/agent/brief"),
+  coach: (postText: string) =>
+    apiFetch<AgentCoach>("/agent/coach", {
+      method: "POST",
+      body: JSON.stringify({ postText }),
+    }),
+  themes: () => apiFetch<{ themes: AgentTheme[] }>("/agent/themes"),
+};

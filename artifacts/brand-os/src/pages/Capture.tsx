@@ -17,7 +17,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, type AngleCheckResult } from "@/lib/api";
+import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, agentApi, type AngleCheckResult, type AgentCoach } from "@/lib/api";
 import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
 import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
 
@@ -48,13 +48,14 @@ export default function Capture() {
   const thoughtParam = params.get("thought") ?? "";
   const thoughtIdParam = params.get("thoughtId");
   const thoughtId = thoughtIdParam ? parseInt(thoughtIdParam) : null;
+  const rawParam = params.get("raw") ?? "";
 
   const { preferences } = useAuth();
   const { toast } = useToast();
 
   const initialState: WorkflowState = {
     step: 1,
-    rawInput: thoughtParam ? decodeURIComponent(thoughtParam) : "",
+    rawInput: thoughtParam ? decodeURIComponent(thoughtParam) : rawParam ? decodeURIComponent(rawParam) : "",
     objective: preferences?.objective ?? "Authority",
     persona: preferences?.persona ?? "Founder",
     tone: preferences?.tone ?? "Direct",
@@ -138,6 +139,11 @@ export default function Capture() {
   // Image prompt (two-step)
   const [imagePrompt, setImagePrompt] = useState("");
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+
+  // Pre-save coach
+  const [coachModal, setCoachModal] = useState<{ note: string; type: AgentCoach["type"] } | null>(null);
+  const [isCoaching, setIsCoaching] = useState(false);
+  const pendingSaveRef = useRef<(() => void) | null>(null);
 
   // Initialize palette from saved preferences (once)
   useEffect(() => {
@@ -377,7 +383,7 @@ export default function Capture() {
     );
   };
 
-  const handleSave = () => {
+  const executeSave = () => {
     if (!state.structure) return;
     const draftData = {
       rawInput: state.rawInput,
@@ -414,6 +420,23 @@ export default function Capture() {
           onError: () => toast({ title: "Failed to save draft.", variant: "destructive" }),
         }
       );
+    }
+  };
+
+  const handleSave = () => {
+    const postText = state.content?.post;
+    if (postText && postText.length >= 20) {
+      setIsCoaching(true);
+      pendingSaveRef.current = executeSave;
+      agentApi.coach(postText).then((result) => {
+        setCoachModal({ note: result.note, type: result.type });
+      }).catch(() => {
+        executeSave();
+      }).finally(() => {
+        setIsCoaching(false);
+      });
+    } else {
+      executeSave();
     }
   };
 
@@ -847,9 +870,9 @@ export default function Capture() {
                   ))}
                 </div>
               )}
-              <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? "Saving..." : draftId ? "Update draft" : "Save draft"}
-                {!isSaving && <Check className="ml-2 w-4 h-4" />}
+              <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSaving || isCoaching}>
+                {isSaving ? "Saving..." : isCoaching ? "Reviewing draft..." : draftId ? "Update draft" : "Save draft"}
+                {!isSaving && !isCoaching && <Check className="ml-2 w-4 h-4" />}
               </Button>
             </div>
           </motion.div>
@@ -927,6 +950,58 @@ export default function Capture() {
         <main className="flex-1 px-6 pb-6 overflow-hidden flex flex-col relative">
           <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
         </main>
+
+        {/* Pre-save Coach Modal */}
+        <AnimatePresence>
+          {coachModal && (
+            <motion.div
+              key="coach-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 flex items-end"
+            >
+              <div className="absolute inset-0 bg-black/50" onClick={() => setCoachModal(null)} />
+              <motion.div
+                initial={{ y: 80, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 80, opacity: 0 }}
+                transition={{ type: "spring", damping: 28, stiffness: 300 }}
+                className="relative w-full bg-white rounded-t-3xl px-6 pt-5 pb-8 space-y-4 shadow-2xl"
+              >
+                <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-1" />
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Writing Coach</span>
+                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize", {
+                    "bg-orange-50 border-orange-200 text-orange-700": coachModal.type === "hook",
+                    "bg-blue-50 border-blue-200 text-blue-700": coachModal.type === "clarity",
+                    "bg-violet-50 border-violet-200 text-violet-700": coachModal.type === "voice",
+                    "bg-sky-50 border-sky-200 text-sky-700": coachModal.type === "structure",
+                    "bg-emerald-50 border-emerald-200 text-emerald-700": coachModal.type === "cta",
+                  })}>
+                    {coachModal.type}
+                  </span>
+                </div>
+                <p className="text-gray-800 font-semibold text-sm leading-relaxed">{coachModal.note}</p>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    onClick={() => setCoachModal(null)}
+                    className="h-12 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Let me revise
+                  </button>
+                  <button
+                    onClick={() => { setCoachModal(null); pendingSaveRef.current?.(); }}
+                    className="h-12 rounded-2xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    Got it, save
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <BottomNav />
       </div>
     </div>

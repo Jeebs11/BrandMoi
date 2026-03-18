@@ -1,12 +1,37 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
-import { Settings, ArrowRight, Lightbulb, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Settings, ArrowRight, Lightbulb, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw } from "lucide-react";
 import { useListDrafts, useGetSuggestions } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, type Thought, type MomentumData } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme } from "@/lib/api";
+
+const BRIEF_CACHE_KEY = "brand_os_brief";
+const BRIEF_TTL_MS = 60 * 60 * 1000;
+
+function loadCachedBrief(): AgentBrief | null {
+  try {
+    const raw = sessionStorage.getItem(BRIEF_CACHE_KEY);
+    if (!raw) return null;
+    const { brief, ts } = JSON.parse(raw) as { brief: AgentBrief; ts: number };
+    if (Date.now() - ts > BRIEF_TTL_MS) return null;
+    return brief;
+  } catch { return null; }
+}
+
+function saveBriefCache(brief: AgentBrief) {
+  try { sessionStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ brief, ts: Date.now() })); } catch { /* noop */ }
+}
+
+const COACH_TYPE_COLORS: Record<string, string> = {
+  hook: "bg-orange-50 border-orange-200 text-orange-700",
+  clarity: "bg-blue-50 border-blue-200 text-blue-700",
+  voice: "bg-violet-50 border-violet-200 text-violet-700",
+  structure: "bg-sky-50 border-sky-200 text-sky-700",
+  cta: "bg-emerald-50 border-emerald-200 text-emerald-700",
+};
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -99,12 +124,17 @@ function MomentumCard({ data }: { data: MomentumData }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const { data: drafts, isLoading: draftsLoading } = useListDrafts();
   const { data: suggestions, isLoading: suggestionsLoading } = useGetSuggestions();
   const [ripeThoughts, setRipeThoughts] = useState<Thought[]>([]);
   const [thoughtsLoading, setThoughtsLoading] = useState(true);
   const [momentum, setMomentum] = useState<MomentumData | null>(null);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [brief, setBrief] = useState<AgentBrief | null>(loadCachedBrief());
+  const [briefLoading, setBriefLoading] = useState(!loadCachedBrief());
+  const [themes, setThemes] = useState<AgentTheme[]>([]);
+  const [themesLoading, setThemesLoading] = useState(true);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -117,7 +147,28 @@ export default function Dashboard() {
     }).catch(() => {}).finally(() => setThoughtsLoading(false));
 
     momentumApi.get().then(setMomentum).catch(() => {});
+
+    const cached = loadCachedBrief();
+    if (!cached) {
+      agentApi.brief().then((b) => {
+        setBrief(b);
+        saveBriefCache(b);
+      }).catch(() => {}).finally(() => setBriefLoading(false));
+    } else {
+      setBriefLoading(false);
+    }
+
+    agentApi.themes().then((r) => setThemes(r.themes ?? [])).catch(() => {}).finally(() => setThemesLoading(false));
   }, []);
+
+  const refreshBrief = () => {
+    setBriefLoading(true);
+    sessionStorage.removeItem(BRIEF_CACHE_KEY);
+    agentApi.brief().then((b) => {
+      setBrief(b);
+      saveBriefCache(b);
+    }).catch(() => {}).finally(() => setBriefLoading(false));
+  };
 
   const recentDrafts = drafts?.slice(0, 5) ?? [];
   const firstName = user?.displayName ? user.displayName.split(" ")[0] : null;
@@ -153,6 +204,45 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 px-6 py-6 space-y-7">
+          {/* Agent Brief */}
+          {briefLoading ? (
+            <div className="rounded-3xl overflow-hidden bg-gray-900 p-5 space-y-3">
+              <Skeleton className="h-3 w-20 bg-white/10 rounded-full" />
+              <Skeleton className="h-5 w-full bg-white/10 rounded-full" />
+              <Skeleton className="h-4 w-4/5 bg-white/10 rounded-full" />
+              <div className="flex gap-2 pt-1">
+                <Skeleton className="h-7 flex-1 bg-white/10 rounded-full" />
+                <Skeleton className="h-7 flex-1 bg-white/10 rounded-full" />
+                <Skeleton className="h-7 flex-1 bg-white/10 rounded-full" />
+              </div>
+            </div>
+          ) : brief ? (
+            <div className="rounded-3xl overflow-hidden bg-gray-900 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Today's Brief</span>
+                </div>
+                <button onClick={refreshBrief} className="text-white/30 hover:text-white/60 transition-colors">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-white font-extrabold text-base leading-snug mb-2">{brief.headline}</p>
+              <p className="text-white/50 text-xs leading-relaxed mb-4">{brief.insight}</p>
+              <div className="flex flex-wrap gap-2">
+                {brief.angles.map((angle, i) => (
+                  <button
+                    key={i}
+                    onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
+                    className="bg-white/10 hover:bg-white/20 text-white/80 text-xs font-medium px-3 py-1.5 rounded-full transition-colors text-left"
+                  >
+                    {angle} →
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {/* Cadence alerts */}
           {visibleAlerts.length > 0 && (
             <div className="space-y-2">
@@ -252,6 +342,45 @@ export default function Dashboard() {
               </div>
             )}
           </section>
+
+          {/* Theme Radar */}
+          {themesLoading ? (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Layers className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-bold text-gray-700">Content Threads</h3>
+              </div>
+              <div className="space-y-2">
+                {[1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+              </div>
+            </section>
+          ) : themes.length > 0 ? (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Layers className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-bold text-gray-700">Content Threads</h3>
+              </div>
+              <div className="space-y-2">
+                {themes.map((theme, i) => (
+                  <div key={i} className="bg-white rounded-2xl p-4 border border-gray-100">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-sm font-bold text-gray-800">{theme.name}</p>
+                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
+                        {theme.postCount} posts
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-3">{theme.pattern}</p>
+                    <button
+                      onClick={() => navigate(`/capture?raw=${encodeURIComponent(theme.seriesIdea)}`)}
+                      className="text-xs text-primary font-semibold flex items-center gap-1 hover:gap-2 transition-all"
+                    >
+                      Start series: {theme.seriesIdea} <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {/* Recent work */}
           <section>
