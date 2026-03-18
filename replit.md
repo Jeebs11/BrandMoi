@@ -39,6 +39,14 @@ A mobile-first web app (max-width 430px) for AI-powered LinkedIn content creatio
 - Bottom navigation (Home, Capture, Vault, Library) — 4 items
 - Auth guards: unauthenticated → /login, not onboarded → /onboarding
 
+**Phase 4: Momentum Engine + Commercial Polish** ✅
+- **Momentum Score**: Dashboard shows a tappable score card (0-100) with label (Strong/Building/Fading/Silent). Computed server-side from recency (30%), variety of objectives (25%), volume of posts (25%), resonance from performance data (20%). Tap to expand breakdown with per-component bars.
+- **Cadence Intelligence**: Amber alert banners on dashboard when user hasn't created a draft in 5+ days or a specific objective has no content in 14+ days. Dismissable with X button.
+- **Streak Counter**: Flame badge in dashboard header showing consecutive active days (only shown when streak ≥ 2). Tracked via `daily_activity` table upserted on each draft create.
+- **Content Calendar Heatmap**: "Rhythm" toggle in Library header shows a GitHub-contribution-style 14-week grid coloured by draft count per day. `CalendarHeatmap` component.
+- **Export**: On Capture step 6 (save confirmation), "Copy post" copies to clipboard and "Export .txt" downloads the post as a plain text file.
+- **Production hardening**: Rate limiting on AI endpoints (10 req/min per user via in-memory map), React `ErrorBoundary` wrapping the full app, clean 404/error pages.
+
 **Phase 3: Agentic Intelligence Layer** ✅
 - **Brand Voice DNA**: Automatically extracts voice signals (sentence style, tone markers, vocabulary) from published/ready drafts via Claude. Signals stored in `brand_voice_signals` table and injected into future AI prompts for personalised output.
 - **Angle Freshness Guard**: POST `/api/ai/check-angle` computes Jaccard similarity between new topic+angle and last 20 drafts. If >15% overlap, an amber warning banner shows in step 3 with 2 Claude-generated fresh angle alternatives the user can click to apply.

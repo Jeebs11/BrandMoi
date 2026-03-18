@@ -13,6 +13,7 @@ import Library from "@/pages/Library";
 import Settings from "@/pages/Settings";
 import Vault from "@/pages/Vault";
 import NotFound from "@/pages/not-found";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,7 +123,9 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <Router />
+            <ErrorBoundary>
+              <Router />
+            </ErrorBoundary>
           </AuthProvider>
         </WouterRouter>
         <Toaster />

@@ -72,3 +72,15 @@ export const performanceApi = {
 export const voiceApi = {
   getSummary: () => apiFetch<VoiceSummaryResult>("/user/voice-summary"),
 };
+
+export type MomentumData = {
+  score: number;
+  label: string;
+  breakdown: { recency: number; variety: number; volume: number; resonance: number };
+  streak: number;
+  cadenceAlerts: Array<{ type: string; message: string; daysSince: number; objective?: string }>;
+};
+
+export const momentumApi = {
+  get: () => apiFetch<MomentumData>("/momentum"),
+};

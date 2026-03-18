@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
 import { performanceApi, type PerformanceSignal } from "@/lib/api";
+import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +49,7 @@ export default function Library() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const { data: drafts, isLoading, refetch } = useListDrafts();
   const { mutate: deleteDraft, isPending: isDeleting } = useDeleteDraft();
@@ -86,9 +88,19 @@ export default function Library() {
     <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
       <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200 pb-20">
         <header className="px-6 pt-12 pb-4 bg-white border-b border-gray-100 sticky top-0 z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <BookOpen className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-extrabold text-gray-900">Library</h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <BookOpen className="w-5 h-5 text-primary" />
+              <h1 className="text-xl font-extrabold text-gray-900">Library</h1>
+            </div>
+            <button
+              onClick={() => setShowHeatmap((v) => !v)}
+              className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all",
+                showHeatmap ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40")}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              Rhythm
+            </button>
           </div>
           <div className="space-y-2">
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -111,6 +123,11 @@ export default function Library() {
         </header>
 
         <main className="flex-1 px-4 py-4 space-y-3 overflow-y-auto">
+          {showHeatmap && (
+            <CalendarHeatmap
+              dates={(drafts ?? []).map((d) => d.createdAt)}
+            />
+          )}
           {isLoading ? (
             Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)
           ) : filtered.length === 0 ? (

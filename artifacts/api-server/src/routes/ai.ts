@@ -19,6 +19,7 @@ import {
   REFINE_SYSTEM_PROMPT,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
+import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
 
 const router: IRouter = Router();
@@ -46,7 +47,7 @@ async function getUserBrandContext(userId: number): Promise<string> {
   return parts.join("\n\n");
 }
 
-router.post("/ai/structure", requireAuth, async (req, res): Promise<void> => {
+router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = StructureIdeaBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -102,7 +103,7 @@ Return this exact JSON shape (no markdown fences):
   res.json(validated.data);
 });
 
-router.post("/ai/generate", requireAuth, async (req, res): Promise<void> => {
+router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = GenerateContentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -164,7 +165,7 @@ Return this exact JSON shape (no markdown fences):
   res.json(validated.data);
 });
 
-router.post("/ai/refine", requireAuth, async (req, res): Promise<void> => {
+router.post("/ai/refine", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = RefineContentBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

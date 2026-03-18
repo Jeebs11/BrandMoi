@@ -15,6 +15,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth.js";
 import { extractVoiceDNA } from "./ai.js";
+import { upsertDailyActivity } from "../lib/momentum.js";
 
 const router: IRouter = Router();
 
@@ -52,6 +53,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
 
   res.status(201).json(GetDraftResponse.parse(draft));
 
+  void upsertDailyActivity(req.user!.userId);
   if ((parsed.data.status === "ready" || parsed.data.status === "published") && draft.postOutput) {
     void extractVoiceDNA(req.user!.userId, draft.id, draft.postOutput);
   }

@@ -4,7 +4,7 @@ import { useSearch, useLocation } from "wouter";
 import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
-  RefreshCw, Copy, AlertTriangle, X, Lightbulb,
+  RefreshCw, Copy, AlertTriangle, X, Lightbulb, Download,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -483,20 +483,55 @@ export default function Capture() {
           </motion.div>
         );
 
-      case 6:
+      case 6: {
+        const postText = state.content?.post ?? null;
+        const topic = state.structure?.topic ?? "draft";
+        const handleExport = () => {
+          if (!postText) return;
+          const filename = topic.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40);
+          const blob = new Blob([postText], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${filename}.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+        const handleCopy = () => {
+          if (!postText) return;
+          navigator.clipboard.writeText(postText);
+          toast({ title: "Copied to clipboard." });
+        };
         return (
           <motion.div key="s6" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center h-full text-center py-16">
             <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-6">
               <Check className="w-10 h-10" strokeWidth={2.5} />
             </div>
             <h2 className="text-2xl font-extrabold mb-2 text-gray-900">{draftId ? "Draft updated" : "Draft saved"}</h2>
-            <p className="text-gray-500 mb-10 text-sm">Your content is ready for LinkedIn.</p>
+            <p className="text-gray-500 mb-8 text-sm">Your content is ready for LinkedIn.</p>
             <div className="w-full space-y-3 px-4">
+              {postText && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopy}
+                    className="flex-1 h-12 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-sm flex items-center justify-center gap-2 hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    <Copy className="w-4 h-4" /> Copy post
+                  </button>
+                  <button
+                    onClick={handleExport}
+                    className="flex-1 h-12 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-sm flex items-center justify-center gap-2 hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> Export .txt
+                  </button>
+                </div>
+              )}
               <Button className="w-full h-14 text-base font-semibold" onClick={() => navigate("/library")}>Go to Library</Button>
               <Button variant="outline" className="w-full h-14 text-base font-semibold border-2" onClick={resetFlow}>Capture another idea</Button>
             </div>
           </motion.div>
         );
+      }
 
       default:
         return null;
