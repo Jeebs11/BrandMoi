@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Lightbulb, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw } from "lucide-react";
-import { useListDrafts, useGetSuggestions } from "@workspace/api-client-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw } from "lucide-react";
+import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,14 +25,6 @@ function saveBriefCache(brief: AgentBrief) {
   try { sessionStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ brief, ts: Date.now() })); } catch { /* noop */ }
 }
 
-const COACH_TYPE_COLORS: Record<string, string> = {
-  hook: "bg-orange-50 border-orange-200 text-orange-700",
-  clarity: "bg-blue-50 border-blue-200 text-blue-700",
-  voice: "bg-violet-50 border-violet-200 text-violet-700",
-  structure: "bg-sky-50 border-sky-200 text-sky-700",
-  cta: "bg-emerald-50 border-emerald-200 text-emerald-700",
-};
-
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
   ready: "bg-blue-50 text-blue-600",
@@ -46,13 +38,6 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   Documenting: "bg-emerald-50 text-emerald-700",
 };
 
-const SUGGESTION_ACCENT: Record<string, string> = {
-  angle: "border-l-violet-400",
-  repurpose: "border-l-amber-400",
-  gap: "border-l-sky-400",
-  depth: "border-l-emerald-400",
-  prompt: "border-l-primary",
-};
 
 const MOMENTUM_STYLES: Record<string, { bg: string; text: string; label: string; bar: string }> = {
   Strong:   { bg: "bg-emerald-500", text: "text-emerald-600", label: "bg-emerald-50 border-emerald-100", bar: "bg-emerald-500" },
@@ -126,7 +111,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const { data: drafts, isLoading: draftsLoading } = useListDrafts();
-  const { data: suggestions, isLoading: suggestionsLoading } = useGetSuggestions();
   const [ripeThoughts, setRipeThoughts] = useState<Thought[]>([]);
   const [thoughtsLoading, setThoughtsLoading] = useState(true);
   const [momentum, setMomentum] = useState<MomentumData | null>(null);
@@ -204,6 +188,34 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 px-6 py-6 space-y-7">
+          {/* Cadence alerts */}
+          {visibleAlerts.length > 0 && (
+            <div className="space-y-2">
+              {visibleAlerts.map((alert) => {
+                const key = alert.type + (alert.objective ?? "");
+                return (
+                  <div key={key} className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 font-medium flex-1 leading-relaxed">{alert.message}</p>
+                    <button
+                      onClick={() => setDismissedAlerts((s) => new Set([...s, key]))}
+                      className="text-amber-400 hover:text-amber-600 flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Momentum Score Card */}
+          {momentum ? (
+            <MomentumCard data={momentum} />
+          ) : (
+            <Skeleton className="h-20 rounded-3xl" />
+          )}
+
           {/* Agent Brief */}
           {briefLoading ? (
             <div className="rounded-3xl overflow-hidden bg-gray-900 p-5 space-y-3">
@@ -242,34 +254,6 @@ export default function Dashboard() {
               </div>
             </div>
           ) : null}
-
-          {/* Cadence alerts */}
-          {visibleAlerts.length > 0 && (
-            <div className="space-y-2">
-              {visibleAlerts.map((alert) => {
-                const key = alert.type + (alert.objective ?? "");
-                return (
-                  <div key={key} className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-800 font-medium flex-1 leading-relaxed">{alert.message}</p>
-                    <button
-                      onClick={() => setDismissedAlerts((s) => new Set([...s, key]))}
-                      className="text-amber-400 hover:text-amber-600 flex-shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Momentum Score Card */}
-          {momentum ? (
-            <MomentumCard data={momentum} />
-          ) : (
-            <Skeleton className="h-20 rounded-3xl" />
-          )}
 
           {/* Capture CTA */}
           <Link href="/capture">
@@ -316,32 +300,6 @@ export default function Dashboard() {
               </div>
             </section>
           )}
-
-          {/* Suggestions */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-bold text-gray-700">Smart Suggestions</h3>
-            </div>
-            {suggestionsLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {(suggestions ?? []).map((s) => (
-                  <Link key={s.id} href="/capture">
-                    <div className={cn("bg-white rounded-2xl p-4 border-l-4 border border-gray-100 cursor-pointer hover:shadow-sm transition-shadow", SUGGESTION_ACCENT[s.type] ?? "border-l-primary")}>
-                      <p className="text-sm text-gray-700 leading-relaxed">{s.message}</p>
-                      <p className="text-xs text-primary font-semibold mt-1.5 flex items-center gap-1">
-                        {s.action} <ArrowRight className="w-3 h-3" />
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
 
           {/* Theme Radar */}
           {themesLoading ? (
