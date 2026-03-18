@@ -102,6 +102,7 @@ export default function Capture() {
         activeTab: "post",
       });
       setInitialized(true);
+      setUserEditedPost(false);
     }
   }, [existingDraft, initialized]);
 
