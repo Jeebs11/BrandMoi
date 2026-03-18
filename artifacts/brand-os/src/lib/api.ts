@@ -84,3 +84,30 @@ export type MomentumData = {
 export const momentumApi = {
   get: () => apiFetch<MomentumData>("/momentum"),
 };
+
+export type ExtractedBrandVoice = {
+  brandRole: string;
+  brandAudience: string;
+  brandBelief: string;
+  objective: string;
+  persona: string;
+  tone: string;
+  summary: string;
+};
+
+export const smartImportApi = {
+  extract: async (file: File): Promise<ExtractedBrandVoice> => {
+    const form = new FormData();
+    form.append("document", file);
+    const res = await fetch("/api/user/extract-brand-voice", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+      throw new Error(err.error ?? `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<ExtractedBrandVoice>;
+  },
+};

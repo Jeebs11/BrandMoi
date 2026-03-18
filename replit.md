@@ -39,6 +39,12 @@ A mobile-first web app (max-width 430px) for AI-powered LinkedIn content creatio
 - Bottom navigation (Home, Capture, Vault, Library) — 4 items
 - Auth guards: unauthenticated → /login, not onboarded → /onboarding
 
+**Phase 5: Smart Document Import** ✅
+- **SmartImportButton component**: Reusable component (`src/components/SmartImportButton.tsx`) with four states: idle (dashed upload button), loading (spinner + filename), preview (extracted field cards + Apply/Discard), error (message + retry link).
+- **Backend extraction route**: `POST /api/user/extract-brand-voice` accepts multipart PDF/DOCX/TXT up to 5MB, extracts text with `pdf-parse`/`mammoth`, calls Claude to return structured `ExtractedBrandVoice` JSON (`brandRole`, `brandAudience`, `brandBelief`, `objective`, `persona`, `tone`, `summary`).
+- **Onboarding step 4**: SmartImportButton appears above manual brand voice fields with an "or fill in manually" divider. Applying extracted data pre-fills all six voice fields.
+- **Settings Brand Voice section**: Same SmartImportButton above the manual inputs. Applying shows a toast and pre-fills all fields for review before saving.
+
 **Phase 4: Momentum Engine + Commercial Polish** ✅
 - **Momentum Score**: Dashboard shows a tappable score card (0-100) with label (Strong/Building/Fading/Silent). Computed server-side from recency (30%), variety of objectives (25%), volume of posts (25%), resonance from performance data (20%). Tap to expand breakdown with per-component bars.
 - **Cadence Intelligence**: Amber alert banners on dashboard when user hasn't created a draft in 5+ days or a specific objective has no content in 14+ days. Dismissable with X button.

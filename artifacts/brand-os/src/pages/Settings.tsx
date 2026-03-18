@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { voiceApi, type VoiceSummaryResult } from "@/lib/api";
+import { SmartImportButton } from "@/components/SmartImportButton";
+import type { ExtractedBrandVoice } from "@/lib/api";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -46,6 +48,16 @@ export default function Settings() {
       .catch(() => {})
       .finally(() => setVoiceLoading(false));
   }, []);
+
+  const handleSmartImport = (extracted: ExtractedBrandVoice) => {
+    if (extracted.brandRole) setBrandRole(extracted.brandRole);
+    if (extracted.brandAudience) setBrandAudience(extracted.brandAudience);
+    if (extracted.brandBelief) setBrandBelief(extracted.brandBelief);
+    if (extracted.objective) setObjective(extracted.objective);
+    if (extracted.persona) setPersona(extracted.persona);
+    if (extracted.tone) setTone(extracted.tone);
+    toast({ title: "Brand voice imported — review and save when ready." });
+  };
 
   const handleRefreshVoice = async () => {
     setVoiceRefreshing(true);
@@ -112,6 +124,12 @@ export default function Settings() {
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Voice</h2>
             <div className="space-y-4">
+              <SmartImportButton onApply={handleSmartImport} />
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs font-bold text-gray-300">or edit manually</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
               <VoiceInput label="Your role" value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..." />
               <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..." />
               <VoiceInput label="Your core belief" value={brandBelief} onChange={setBrandBelief} placeholder="Clarity beats cleverness..." />

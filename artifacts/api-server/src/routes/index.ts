@@ -6,6 +6,7 @@ import aiRouter from "./ai.js";
 import draftsRouter from "./drafts.js";
 import thoughtsRouter from "./thoughts.js";
 import momentumRouter from "./momentum.js";
+import smartImportRouter from "./smart-import.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(aiRouter);
 router.use(draftsRouter);
 router.use(thoughtsRouter);
 router.use(momentumRouter);
+router.use(smartImportRouter);
 
 export default router;

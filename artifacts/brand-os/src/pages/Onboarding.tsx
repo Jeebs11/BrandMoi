@@ -6,6 +6,8 @@ import { useUpdatePreferences } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { SmartImportButton } from "@/components/SmartImportButton";
+import type { ExtractedBrandVoice } from "@/lib/api";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -59,6 +61,18 @@ export default function Onboarding() {
 
   const set = <K extends keyof OnboardingState>(key: K, value: string) =>
     setData((d) => ({ ...d, [key]: value }));
+
+  const handleSmartImport = (extracted: ExtractedBrandVoice) => {
+    setData((d) => ({
+      ...d,
+      brandRole: extracted.brandRole || d.brandRole,
+      brandAudience: extracted.brandAudience || d.brandAudience,
+      brandBelief: extracted.brandBelief || d.brandBelief,
+      objective: extracted.objective || d.objective,
+      persona: extracted.persona || d.persona,
+      tone: extracted.tone || d.tone,
+    }));
+  };
 
   const handleFinish = () => {
     updatePreferences(
@@ -197,7 +211,17 @@ export default function Onboarding() {
             <BackButton onClick={() => setStep(3)} />
             <div className="flex-1 pt-4 pb-32 overflow-y-auto no-scrollbar">
               <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Define your voice</h2>
-              <p className="text-gray-500 text-sm mb-7">This gives the AI the depth to write content that sounds like you — not anyone else.</p>
+              <p className="text-gray-500 text-sm mb-5">This gives the AI the depth to write content that sounds like you — not anyone else.</p>
+
+              <div className="mb-5">
+                <SmartImportButton onApply={handleSmartImport} />
+              </div>
+
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs font-bold text-gray-300">or fill in manually</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
 
               <div className="space-y-5">
                 <VoiceField
