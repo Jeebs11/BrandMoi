@@ -27,6 +27,10 @@ export default function Settings() {
   const [brandAudience, setBrandAudience] = useState(preferences?.brandAudience ?? "");
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
 
+  const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string });
+  const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
+  const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
+
   const [voiceData, setVoiceData] = useState<VoiceSummaryResult | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(true);
   const [voiceRefreshing, setVoiceRefreshing] = useState(false);
@@ -39,6 +43,9 @@ export default function Settings() {
       setBrandRole(preferences.brandRole);
       setBrandAudience(preferences.brandAudience);
       setBrandBelief(preferences.brandBelief);
+      const p = preferences as Record<string, unknown>;
+      if (typeof p.brandBgColor === "string") setBrandBgColor(p.brandBgColor);
+      if (typeof p.brandAccentColor === "string") setBrandAccentColor(p.brandAccentColor);
     }
   }, [preferences]);
 
@@ -76,7 +83,7 @@ export default function Settings() {
 
   const handleSave = () => {
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor } },
       {
         onSuccess: async () => {
           await invalidate();
@@ -132,6 +139,46 @@ export default function Settings() {
               <VoiceInput label="Your role" value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..." />
               <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..." />
               <VoiceInput label="Your core belief" value={brandBelief} onChange={setBrandBelief} placeholder="Clarity beats cleverness..." />
+            </div>
+          </section>
+
+          {/* Brand Palette */}
+          <section>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Palette</h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
+              <p className="text-xs text-gray-400 leading-relaxed">These colours are used for carousel slides and visual cards.</p>
+              <div className="flex gap-4">
+                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Background</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                      <div className="absolute inset-0" style={{ background: brandBgColor }} />
+                      <input
+                        type="color"
+                        value={brandBgColor}
+                        onChange={e => setBrandBgColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <code className="text-xs text-gray-400 font-mono">{brandBgColor}</code>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Accent</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                      <div className="absolute inset-0" style={{ background: brandAccentColor }} />
+                      <input
+                        type="color"
+                        value={brandAccentColor}
+                        onChange={e => setBrandAccentColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <code className="text-xs text-gray-400 font-mono">{brandAccentColor}</code>
+                  </div>
+                </label>
+              </div>
             </div>
           </section>
 

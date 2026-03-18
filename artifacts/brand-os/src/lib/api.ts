@@ -127,3 +127,19 @@ export const imageGenApi = {
     return res.json() as Promise<{ imageBase64: string }>;
   },
 };
+
+export const imagePromptApi = {
+  generate: (visualDescription: string) =>
+    apiFetch<{ imagePrompt: string }>("/ai/generate-image-prompt", {
+      method: "POST",
+      body: JSON.stringify({ visualDescription }),
+    }),
+};
+
+export const preferencesApi = {
+  updatePalette: (brandBgColor: string, brandAccentColor: string) =>
+    apiFetch<unknown>("/user/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ brandBgColor, brandAccentColor }),
+    }),
+};

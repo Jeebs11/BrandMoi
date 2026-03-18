@@ -51,6 +51,8 @@ export interface UpdatePreferencesBody {
   brandAudience?: string;
   brandBelief?: string;
   onboarded?: boolean;
+  brandBgColor?: string;
+  brandAccentColor?: string;
 }
 
 export interface SuggestionItem {

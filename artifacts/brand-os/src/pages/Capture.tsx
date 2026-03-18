@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearch, useLocation } from "wouter";
 import {
@@ -17,8 +17,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { angleApi, thoughtsApi, imageGenApi, type AngleCheckResult } from "@/lib/api";
-import { downloadCarouselPDF } from "@/lib/export-carousel";
+import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, type AngleCheckResult } from "@/lib/api";
+import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
 import { downloadVisualCard } from "@/lib/export-visual-card";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
@@ -115,13 +115,94 @@ export default function Capture() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
 
+  // Brand palette
+  const [bgColor, setBgColor] = useState("#0f172a");
+  const [accentColor, setAccentColor] = useState("#6366f1");
+  const bgColorRef = useRef(bgColor);
+  const accentColorRef = useRef(accentColor);
+  bgColorRef.current = bgColor;
+  accentColorRef.current = accentColor;
+  const paletteInitializedRef = useRef(false);
+  const paletteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Slide preview
+  const [slidePreviewUrl, setSlidePreviewUrl] = useState<string | null>(null);
+  const [isPreviewingSlide, setIsPreviewingSlide] = useState(false);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Image prompt (two-step)
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+
+  // Initialize palette from saved preferences (once)
+  useEffect(() => {
+    if (preferences && !paletteInitializedRef.current) {
+      const p = preferences as Record<string, unknown>;
+      if (typeof p.brandBgColor === "string") setBgColor(p.brandBgColor);
+      if (typeof p.brandAccentColor === "string") setAccentColor(p.brandAccentColor);
+      paletteInitializedRef.current = true;
+    }
+  }, [preferences]);
+
+  // Auto-generate slide preview when carousel tab is active or colors change
+  const firstSlideTitle = state.content?.carousel?.[0]?.title;
+  const carouselLength = state.content?.carousel?.length ?? 0;
+  useEffect(() => {
+    if (state.activeTab !== "carousel" || carouselLength === 0) {
+      setSlidePreviewUrl(null);
+      return;
+    }
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    setIsPreviewingSlide(true);
+    previewTimerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const url = await previewCarouselSlide(
+            state.content!.carousel[0],
+            carouselLength,
+            bgColorRef.current,
+            accentColorRef.current
+          );
+          setSlidePreviewUrl(url);
+        } catch {
+          setSlidePreviewUrl(null);
+        } finally {
+          setIsPreviewingSlide(false);
+        }
+      })();
+    }, 400);
+    return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.activeTab, carouselLength, firstSlideTitle, bgColor, accentColor]);
+
+  const schedulePaletteSave = () => {
+    if (paletteTimerRef.current) clearTimeout(paletteTimerRef.current);
+    paletteTimerRef.current = setTimeout(() => {
+      void preferencesApi.updatePalette(bgColorRef.current, accentColorRef.current);
+    }, 800);
+  };
+
+  const handleBgColorChange = (value: string) => {
+    setBgColor(value);
+    bgColorRef.current = value;
+    schedulePaletteSave();
+  };
+
+  const handleAccentColorChange = (value: string) => {
+    setAccentColor(value);
+    accentColorRef.current = value;
+    schedulePaletteSave();
+  };
+
   const handleDownloadCarouselPDF = async () => {
     if (!state.content?.carousel?.length) return;
     setIsExportingPDF(true);
     try {
       await downloadCarouselPDF(
         state.content.carousel,
-        state.structure?.topic ?? "carousel"
+        state.structure?.topic ?? "carousel",
+        bgColor,
+        accentColor
       );
     } catch {
       toast({ title: "PDF export failed. Please try again.", variant: "destructive" });
@@ -134,7 +215,7 @@ export default function Capture() {
     if (!state.content?.visual) return;
     setIsExportingCard(true);
     try {
-      await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual");
+      await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor);
     } catch {
       toast({ title: "Card export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -142,12 +223,26 @@ export default function Capture() {
     }
   };
 
-  const handleGenerateImage = async () => {
+  const handleGenerateImagePrompt = async () => {
     if (!state.content?.visual) return;
+    setIsGeneratingPrompt(true);
+    try {
+      const result = await imagePromptApi.generate(state.content.visual);
+      setImagePrompt(result.imagePrompt);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to generate prompt.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!imagePrompt.trim()) return;
     setIsGeneratingImage(true);
     setGeneratedImageBase64(null);
     try {
-      const result = await imageGenApi.generate(state.content.visual);
+      const result = await imageGenApi.generate(imagePrompt);
       setGeneratedImageBase64(result.imageBase64);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Image generation failed.";
@@ -207,7 +302,13 @@ export default function Capture() {
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
         },
       },
-      { onSuccess: (data) => setState(s => ({ ...s, content: data, activeTab: "post" })) }
+      {
+        onSuccess: (data) => {
+          setState(s => ({ ...s, content: data, activeTab: "post" }));
+          setImagePrompt("");
+          setGeneratedImageBase64(null);
+        },
+      }
     );
   };
 
@@ -492,13 +593,42 @@ export default function Capture() {
               )}
               {state.activeTab === "visual" && (
                 <div className="space-y-3 pb-4">
-                  <div className="relative group">
-                    <textarea className="w-full min-h-[180px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
-                      value={state.content.visual} onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, visual: e.target.value } } : s)} />
-                    <button onClick={() => copyToClipboard(state.content!.visual)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                      <Copy className="w-4 h-4" />
-                    </button>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Visual Brief</p>
+                    <div className="relative group">
+                      <textarea className="w-full min-h-[140px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                        value={state.content.visual} onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, visual: e.target.value } } : s)} />
+                      <button onClick={() => copyToClipboard(state.content!.visual)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Step 1: Generate DALL-E prompt */}
+                  <button
+                    onClick={handleGenerateImagePrompt}
+                    disabled={isGeneratingPrompt || !state.content?.visual}
+                    className="w-full py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {isGeneratingPrompt ? "Crafting prompt…" : "Generate image prompt"}
+                  </button>
+
+                  {/* Step 2: Editable prompt + generate */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Image Prompt</p>
+                      <p className="text-[10px] text-gray-300 normal-case font-normal">Edit before generating</p>
+                    </div>
+                    <textarea
+                      value={imagePrompt}
+                      onChange={e => setImagePrompt(e.target.value)}
+                      placeholder="Generate a prompt above, or write your own…"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-white border-2 border-dashed border-gray-200 focus:border-primary rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 transition-colors placeholder:text-gray-300"
+                    />
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       onClick={handleDownloadVisualCard}
@@ -510,7 +640,7 @@ export default function Capture() {
                     </button>
                     <button
                       onClick={handleGenerateImage}
-                      disabled={isGeneratingImage}
+                      disabled={isGeneratingImage || !imagePrompt.trim()}
                       className="flex-1 py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
@@ -549,6 +679,54 @@ export default function Capture() {
                       <textarea className="w-full bg-transparent text-gray-500 text-sm outline-none resize-none leading-relaxed" value={slide.description} placeholder="Description..." rows={2} onChange={e => updateCarouselSlide(idx, "description", e.target.value)} />
                     </div>
                   ))}
+
+                  {/* Brand Palette */}
+                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Brand Palette</p>
+                      <p className="text-[10px] text-gray-300">Auto-saved</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                          <div className="absolute inset-0" style={{ background: bgColor }} />
+                          <input
+                            type="color"
+                            value={bgColor}
+                            onChange={e => handleBgColorChange(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Background</span>
+                      </label>
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                          <div className="absolute inset-0" style={{ background: accentColor }} />
+                          <input
+                            type="color"
+                            value={accentColor}
+                            onChange={e => handleAccentColorChange(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Accent</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Slide 1 Preview */}
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-4 pt-4 pb-3">Preview — Slide 1</p>
+                    {isPreviewingSlide && (
+                      <div className="w-full aspect-square bg-gray-50 flex items-center justify-center pb-4">
+                        <RefreshCw className="w-5 h-5 text-gray-300 animate-spin" />
+                      </div>
+                    )}
+                    {slidePreviewUrl && !isPreviewingSlide && (
+                      <img src={slidePreviewUrl} alt="Slide 1 preview" className="w-full aspect-square object-cover" />
+                    )}
+                  </div>
+
                   <div className="flex gap-2">
                     <button onClick={() => copyToClipboard(state.content!.carousel.map(s => `SLIDE ${s.slide}\n${s.title}\n${s.description}`).join("\n\n"))}
                       className="flex-1 py-3 text-xs font-bold text-gray-500 hover:text-gray-700 bg-white rounded-xl border border-gray-200">
