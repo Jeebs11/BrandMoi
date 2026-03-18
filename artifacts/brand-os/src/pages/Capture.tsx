@@ -17,7 +17,9 @@ import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { angleApi, thoughtsApi, type AngleCheckResult } from "@/lib/api";
+import { angleApi, thoughtsApi, imageGenApi, type AngleCheckResult } from "@/lib/api";
+import { downloadCarouselPDF } from "@/lib/export-carousel";
+import { downloadVisualCard } from "@/lib/export-visual-card";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -108,6 +110,61 @@ export default function Capture() {
   const isSaving = isCreating || isUpdating;
 
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingCard, setIsExportingCard] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
+
+  const handleDownloadCarouselPDF = async () => {
+    if (!state.content?.carousel?.length) return;
+    setIsExportingPDF(true);
+    try {
+      await downloadCarouselPDF(
+        state.content.carousel,
+        state.structure?.topic ?? "carousel"
+      );
+    } catch {
+      toast({ title: "PDF export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const handleDownloadVisualCard = async () => {
+    if (!state.content?.visual) return;
+    setIsExportingCard(true);
+    try {
+      await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual");
+    } catch {
+      toast({ title: "Card export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsExportingCard(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!state.content?.visual) return;
+    setIsGeneratingImage(true);
+    setGeneratedImageBase64(null);
+    try {
+      const result = await imageGenApi.generate(state.content.visual);
+      setGeneratedImageBase64(result.imageBase64);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Image generation failed.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleDownloadGeneratedImage = () => {
+    if (!generatedImageBase64) return;
+    const a = document.createElement("a");
+    const safeName = (state.structure?.topic ?? "visual").replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40);
+    a.download = `${safeName}-generated.png`;
+    a.href = `data:image/png;base64,${generatedImageBase64}`;
+    a.click();
+  };
 
   const checkAngle = async (topic: string, angle: string) => {
     setAngleChecking(true);
@@ -434,12 +491,53 @@ export default function Capture() {
                 </div>
               )}
               {state.activeTab === "visual" && (
-                <div className="relative group h-full">
-                  <textarea className="w-full h-full min-h-[340px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
-                    value={state.content.visual} onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, visual: e.target.value } } : s)} />
-                  <button onClick={() => copyToClipboard(state.content!.visual)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                    <Copy className="w-4 h-4" />
-                  </button>
+                <div className="space-y-3 pb-4">
+                  <div className="relative group">
+                    <textarea className="w-full min-h-[180px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      value={state.content.visual} onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, visual: e.target.value } } : s)} />
+                    <button onClick={() => copyToClipboard(state.content!.visual)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDownloadVisualCard}
+                      disabled={isExportingCard}
+                      className="flex-1 py-3 text-xs font-bold text-gray-600 hover:text-gray-800 bg-white rounded-xl border border-gray-200 hover:border-gray-300 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {isExportingCard ? "Exporting…" : "Download card"}
+                    </button>
+                    <button
+                      onClick={handleGenerateImage}
+                      disabled={isGeneratingImage}
+                      className="flex-1 py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {isGeneratingImage ? "Generating…" : "Generate image"}
+                    </button>
+                  </div>
+                  {isGeneratingImage && (
+                    <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 flex flex-col items-center justify-center gap-3">
+                      <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+                      <p className="text-xs font-semibold text-primary/70">Creating your image with AI…</p>
+                    </div>
+                  )}
+                  {generatedImageBase64 && !isGeneratingImage && (
+                    <div className="relative rounded-2xl overflow-hidden border border-gray-100">
+                      <img
+                        src={`data:image/png;base64,${generatedImageBase64}`}
+                        alt="AI-generated visual"
+                        className="w-full aspect-square object-cover"
+                      />
+                      <button
+                        onClick={handleDownloadGeneratedImage}
+                        className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Save image
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {state.activeTab === "carousel" && (
@@ -451,10 +549,20 @@ export default function Capture() {
                       <textarea className="w-full bg-transparent text-gray-500 text-sm outline-none resize-none leading-relaxed" value={slide.description} placeholder="Description..." rows={2} onChange={e => updateCarouselSlide(idx, "description", e.target.value)} />
                     </div>
                   ))}
-                  <button onClick={() => copyToClipboard(state.content!.carousel.map(s => `SLIDE ${s.slide}\n${s.title}\n${s.description}`).join("\n\n"))}
-                    className="w-full py-3 text-xs font-bold text-gray-500 hover:text-gray-700 bg-white rounded-xl border border-gray-200">
-                    Copy all slides
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => copyToClipboard(state.content!.carousel.map(s => `SLIDE ${s.slide}\n${s.title}\n${s.description}`).join("\n\n"))}
+                      className="flex-1 py-3 text-xs font-bold text-gray-500 hover:text-gray-700 bg-white rounded-xl border border-gray-200">
+                      Copy all slides
+                    </button>
+                    <button
+                      onClick={handleDownloadCarouselPDF}
+                      disabled={isExportingPDF}
+                      className="flex-1 py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {isExportingPDF ? "Building PDF…" : "Download PDF"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

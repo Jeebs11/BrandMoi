@@ -111,3 +111,19 @@ export const smartImportApi = {
     return res.json() as Promise<ExtractedBrandVoice>;
   },
 };
+
+export const imageGenApi = {
+  generate: async (prompt: string): Promise<{ imageBase64: string }> => {
+    const res = await fetch("/api/ai/generate-image", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+      throw new Error(err.error ?? `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<{ imageBase64: string }>;
+  },
+};

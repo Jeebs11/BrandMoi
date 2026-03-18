@@ -60,15 +60,21 @@ export function SmartImportButton({ onApply }: Props) {
       />
 
       {state.phase === "idle" && (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 text-primary font-bold text-sm hover:bg-primary/10 hover:border-primary/50 transition-all"
-        >
-          <Sparkles className="w-4 h-4" />
-          Smart import from document
-          <Upload className="w-3.5 h-3.5 opacity-60" />
-        </button>
+        <div className="space-y-1.5">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 text-primary font-bold text-sm hover:bg-primary/10 hover:border-primary/50 transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            Smart import from document
+            <Upload className="w-3.5 h-3.5 opacity-60" />
+          </button>
+          <p className="text-[10px] text-center text-gray-400 flex items-center justify-center gap-1">
+            <span className="inline-block w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center text-[8px] font-bold">✓</span>
+            Documents are not stored — text is extracted and immediately discarded
+          </p>
+        </div>
       )}
 
       {state.phase === "loading" && (

@@ -7,6 +7,7 @@ import draftsRouter from "./drafts.js";
 import thoughtsRouter from "./thoughts.js";
 import momentumRouter from "./momentum.js";
 import smartImportRouter from "./smart-import.js";
+import aiImageRouter from "./ai-image.js";
 
 const router: IRouter = Router();
 
@@ -14,6 +15,7 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(userRouter);
 router.use(aiRouter);
+router.use(aiImageRouter);
 router.use(draftsRouter);
 router.use(thoughtsRouter);
 router.use(momentumRouter);
