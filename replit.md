@@ -39,6 +39,14 @@ A mobile-first web app (max-width 430px) for AI-powered LinkedIn content creatio
 - Bottom navigation (Home, Capture, Vault, Library) — 4 items
 - Auth guards: unauthenticated → /login, not onboarded → /onboarding
 
+**Phase 5 (Task #5): Carousel PDF, Visual Card & AI Image Generation** ✅
+- **Carousel PDF export**: "Download PDF" button in Carousel tab renders each slide (1080×1080, dark branded) off-screen with `html-to-image` + `jspdf`, assembles into a multi-page PDF named `{topic}-carousel.pdf`.
+- **Visual card PNG**: "Download card" button in Visual tab renders a 1080×1080 branded indigo gradient card from the visual brief description and saves as a PNG.
+- **AI image generation**: "Generate image" button in Visual tab calls `POST /api/ai/generate-image` → DALL-E 3 (1024×1024, b64_json). Image previews inline with a "Save image" overlay button. Returns 503 with clear message if `OPENAI_API_KEY` is not set.
+- **Privacy note**: SmartImportButton now shows "Documents are not stored — text is extracted and immediately discarded" beneath the upload button.
+- **New dependencies**: `html-to-image`, `jspdf` in brand-os frontend; `openai` in api-server.
+- **New secret**: `OPENAI_API_KEY` required for image generation.
+
 **Phase 5: Smart Document Import** ✅
 - **SmartImportButton component**: Reusable component (`src/components/SmartImportButton.tsx`) with four states: idle (dashed upload button), loading (spinner + filename), preview (extracted field cards + Apply/Discard), error (message + retry link).
 - **Backend extraction route**: `POST /api/user/extract-brand-voice` accepts multipart PDF/DOCX/TXT up to 5MB, extracts text with `pdf-parse`/`mammoth`, calls Claude to return structured `ExtractedBrandVoice` JSON (`brandRole`, `brandAudience`, `brandBelief`, `objective`, `persona`, `tone`, `summary`).
