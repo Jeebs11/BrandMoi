@@ -37,7 +37,8 @@ router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Pr
       response_format: "b64_json",
     });
 
-    const b64 = response.data[0]?.b64_json;
+    const imageData = Array.isArray(response.data) ? response.data[0] : undefined;
+    const b64 = imageData?.b64_json;
     if (!b64) {
       res.status(500).json({ error: "No image data returned from generation service." });
       return;

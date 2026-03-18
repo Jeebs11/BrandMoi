@@ -534,7 +534,7 @@ export default function Capture() {
                         onClick={handleDownloadGeneratedImage}
                         className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all"
                       >
-                        <Download className="w-3.5 h-3.5" /> Save image
+                        <Download className="w-3.5 h-3.5" /> Download PNG
                       </button>
                     </div>
                   )}
