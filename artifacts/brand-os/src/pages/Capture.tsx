@@ -555,7 +555,7 @@ export default function Capture() {
         <main className="flex-1 px-6 pb-6 overflow-hidden flex flex-col relative">
           <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
         </main>
-        {state.step >= 4 && state.step < 6 && <BottomNav />}
+        <BottomNav />
       </div>
     </div>
   );
