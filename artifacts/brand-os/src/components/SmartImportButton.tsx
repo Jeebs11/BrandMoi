@@ -72,7 +72,7 @@ export function SmartImportButton({ onApply }: Props) {
           </button>
           <p className="text-[10px] text-center text-gray-400 flex items-center justify-center gap-1">
             <span className="inline-block w-3 h-3 rounded-full border border-gray-300 flex items-center justify-center text-[8px] font-bold">✓</span>
-            Documents are not stored — text is extracted and immediately discarded
+            Documents are not stored after extraction
           </p>
         </div>
       )}

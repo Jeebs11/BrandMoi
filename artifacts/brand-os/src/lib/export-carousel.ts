@@ -67,5 +67,9 @@ export async function downloadCarouselPDF(
   }
 
   const safeName = topic.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "carousel";
-  pdf.save(`${safeName}-carousel.pdf`);
+  const dataUri = pdf.output("datauristring");
+  const a = document.createElement("a");
+  a.href = dataUri;
+  a.download = `${safeName}-carousel.pdf`;
+  a.click();
 }

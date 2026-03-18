@@ -37,13 +37,6 @@ function buildCardEl(visualText: string): HTMLDivElement {
     "color:#ffffff;font-size:50px;font-weight:800;line-height:1.15;margin-bottom:32px;word-break:break-word";
   h.textContent = headline;
 
-  const el2 = document.createElement("div");
-  el2.style.cssText = [
-    "display:flex",
-    "flex-direction:column",
-    "flex:1",
-  ].join(";");
-
   el.appendChild(label);
   el.appendChild(accent);
   el.appendChild(h);
