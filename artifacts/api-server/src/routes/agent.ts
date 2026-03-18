@@ -8,6 +8,14 @@ import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA } from "../lib/voice-dna.js";
 
+function parseJson(text: string): unknown {
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  return JSON.parse(cleaned);
+}
+
 const router: IRouter = Router();
 
 async function getUserAgentContext(userId: number) {
@@ -89,7 +97,7 @@ Rules:
     const block = msg.content[0];
     if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
     try {
-      res.json(JSON.parse(block.text));
+      res.json(parseJson(block.text));
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
@@ -135,7 +143,7 @@ Rules:
     const block = msg.content[0];
     if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
     try {
-      res.json(JSON.parse(block.text));
+      res.json(parseJson(block.text));
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
@@ -193,7 +201,7 @@ Rules:
     const block = msg.content[0];
     if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
     try {
-      res.json(JSON.parse(block.text));
+      res.json(parseJson(block.text));
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
