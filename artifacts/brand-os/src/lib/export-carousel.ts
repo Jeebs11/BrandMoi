@@ -19,6 +19,7 @@ function buildSlideEl(
   accentColor: string = DEFAULT_ACCENT
 ): HTMLDivElement {
   const el = document.createElement("div");
+  // IMPORTANT: no position/top/left here — those go on the wrapper so html-to-image captures correctly
   el.style.cssText = [
     "width:1080px",
     "height:1080px",
@@ -29,9 +30,6 @@ function buildSlideEl(
     "padding:96px",
     "box-sizing:border-box",
     "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
-    "position:fixed",
-    "top:-9999px",
-    "left:-9999px",
   ].join(";");
 
   const slideNum = document.createElement("div");
@@ -56,6 +54,12 @@ function buildSlideEl(
   return el;
 }
 
+function createWrapper(): HTMLDivElement {
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "position:fixed;top:-9999px;left:-9999px;overflow:hidden;width:1080px;height:1080px;";
+  return wrapper;
+}
+
 export async function previewCarouselSlide(
   slide: CarouselSlide,
   total: number,
@@ -63,11 +67,13 @@ export async function previewCarouselSlide(
   accentColor: string = DEFAULT_ACCENT
 ): Promise<string> {
   const el = buildSlideEl(slide, total, bgColor, accentColor);
-  document.body.appendChild(el);
+  const wrapper = createWrapper();
+  wrapper.appendChild(el);
+  document.body.appendChild(wrapper);
   try {
-    return await toPng(el, { width: 1080, height: 1080, pixelRatio: 0.28 });
+    return await toPng(el, { width: 1080, height: 1080, pixelRatio: 0.28, skipFonts: true });
   } finally {
-    document.body.removeChild(el);
+    document.body.removeChild(wrapper);
   }
 }
 
@@ -83,13 +89,15 @@ export async function downloadCarouselPDF(
   for (let i = 0; i < slides.length; i++) {
     onProgress?.(i + 1, slides.length);
     const el = buildSlideEl(slides[i], slides.length, bgColor, accentColor);
-    document.body.appendChild(el);
+    const wrapper = createWrapper();
+    wrapper.appendChild(el);
+    document.body.appendChild(wrapper);
     try {
-      const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 1 });
+      const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 1, skipFonts: true });
       if (i > 0) pdf.addPage([1080, 1080], "p");
       pdf.addImage(dataUrl, "PNG", 0, 0, 1080, 1080);
     } finally {
-      document.body.removeChild(el);
+      document.body.removeChild(wrapper);
     }
   }
 
