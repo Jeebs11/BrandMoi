@@ -1076,7 +1076,7 @@ export default function Capture() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 z-50 flex items-end"
+              className="fixed inset-0 z-[60] flex items-end"
             >
               <div className="absolute inset-0 bg-black/50" onClick={() => setCoachModal(null)} />
               <motion.div
@@ -1084,7 +1084,7 @@ export default function Capture() {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 80, opacity: 0 }}
                 transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                className="relative w-full bg-white rounded-t-3xl px-6 pt-5 pb-8 space-y-4 shadow-2xl"
+                className="relative w-full bg-white rounded-t-3xl px-6 pt-5 pb-24 space-y-4 shadow-2xl"
               >
                 <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-1" />
                 <div className="flex items-center gap-2">
