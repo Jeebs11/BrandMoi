@@ -162,6 +162,14 @@ export type AgentTheme = {
   postCount: number;
 };
 
+export const accountApi = {
+  update: (data: { displayName?: string; currentPassword?: string; newPassword?: string }) =>
+    apiFetch<{ id: number; email: string; displayName: string }>("/user/account", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+};
+
 export const agentApi = {
   brief: () => apiFetch<AgentBrief>("/agent/brief"),
   coach: (postText: string) =>

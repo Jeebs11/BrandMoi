@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound } from "lucide-react";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { voiceApi, type VoiceSummaryResult } from "@/lib/api";
+import { voiceApi, accountApi, type VoiceSummaryResult } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
@@ -35,6 +35,16 @@ export default function Settings() {
   const [voiceLoading, setVoiceLoading] = useState(true);
   const [voiceRefreshing, setVoiceRefreshing] = useState(false);
 
+  // Account editing
+  const [displayName, setDisplayName] = useState(user?.displayName ?? "");
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
+
   useEffect(() => {
     if (preferences) {
       setObjective(preferences.objective);
@@ -48,6 +58,10 @@ export default function Settings() {
       if (typeof p.brandAccentColor === "string") setBrandAccentColor(p.brandAccentColor);
     }
   }, [preferences]);
+
+  useEffect(() => {
+    if (user?.displayName) setDisplayName(user.displayName);
+  }, [user?.displayName]);
 
   useEffect(() => {
     voiceApi.getSummary()
@@ -80,6 +94,48 @@ export default function Settings() {
 
   const { mutate: updatePreferences, isPending: isSaving } = useUpdatePreferences();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  const handleSaveAccount = async () => {
+    if (showPasswordSection) {
+      if (!currentPassword) {
+        toast({ title: "Enter your current password.", variant: "destructive" });
+        return;
+      }
+      if (newPassword.length < 8) {
+        toast({ title: "New password must be at least 8 characters.", variant: "destructive" });
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        toast({ title: "New passwords don't match.", variant: "destructive" });
+        return;
+      }
+    }
+
+    setIsSavingAccount(true);
+    try {
+      const payload: { displayName?: string; currentPassword?: string; newPassword?: string } = {};
+      if (displayName.trim() && displayName.trim() !== user?.displayName) {
+        payload.displayName = displayName.trim();
+      }
+      if (showPasswordSection && newPassword) {
+        payload.currentPassword = currentPassword;
+        payload.newPassword = newPassword;
+      }
+      const changedPassword = !!(showPasswordSection && newPassword);
+      await accountApi.update(payload);
+      await invalidate();
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPasswordSection(false);
+      toast({ title: changedPassword ? "Password updated." : "Display name updated." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not update account.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setIsSavingAccount(false);
+    }
+  };
 
   const handleSave = () => {
     updatePreferences(
@@ -237,12 +293,75 @@ export default function Settings() {
             <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Display name</p>
-                <p className="text-sm text-gray-800">{user?.displayName}</p>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  maxLength={80}
+                  className="w-full text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                />
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
-                <p className="text-sm text-gray-800">{user?.email}</p>
+                <p className="text-sm text-gray-500">{user?.email}</p>
               </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordSection(v => !v)}
+                  className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  {showPasswordSection ? "Cancel password change" : "Change password"}
+                </button>
+                {showPasswordSection && (
+                  <div className="mt-3 space-y-3">
+                    <div className="relative">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Current password</p>
+                      <input
+                        type={showCurrentPw ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      />
+                      <button type="button" onClick={() => setShowCurrentPw(v => !v)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
+                        {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">New password</p>
+                      <input
+                        type={showNewPw ? "text" : "password"}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Min. 8 characters"
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      />
+                      <button type="button" onClick={() => setShowNewPw(v => !v)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
+                        {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Confirm new password</p>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        placeholder="Repeat new password"
+                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Button
+                className="w-full h-11 text-sm font-semibold"
+                onClick={handleSaveAccount}
+                disabled={isSavingAccount}
+              >
+                {isSavingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save account changes"}
+              </Button>
             </div>
           </section>
 

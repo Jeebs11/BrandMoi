@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { eq, desc, and } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable, brandVoiceSignalsTable } from "@workspace/db";
+import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 
 const router: IRouter = Router();
@@ -228,5 +229,63 @@ function buildSuggestions(drafts: DraftRow[]): Array<{ id: string; type: string;
 
   return suggestions.slice(0, 4);
 }
+
+const UpdateAccountBody = z.object({
+  displayName: z.string().min(1).max(80).optional(),
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(8, "New password must be at least 8 characters").optional(),
+}).refine(
+  (d) => !d.newPassword || !!d.currentPassword,
+  { message: "Current password is required to set a new password", path: ["currentPassword"] }
+);
+
+router.put("/user/account", requireAuth, async (req, res): Promise<void> => {
+  const parsed = UpdateAccountBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
+    return;
+  }
+
+  const { displayName, currentPassword, newPassword } = parsed.data;
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user!.userId))
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const updates: Record<string, unknown> = {};
+
+  if (displayName !== undefined) {
+    updates.displayName = displayName.trim();
+  }
+
+  if (newPassword) {
+    const valid = await bcrypt.compare(currentPassword!, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Current password is incorrect" });
+      return;
+    }
+    updates.passwordHash = await bcrypt.hash(newPassword, 12);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.json({ message: "Nothing to update" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set(updates)
+    .where(eq(usersTable.id, req.user!.userId))
+    .returning();
+
+  res.json({ id: updated.id, email: updated.email, displayName: updated.displayName });
+});
 
 export default router;
