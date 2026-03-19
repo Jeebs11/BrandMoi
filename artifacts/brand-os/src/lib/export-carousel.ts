@@ -125,30 +125,22 @@ export async function downloadCarouselPDF(
   onProgress?: (current: number, total: number) => void
 ): Promise<void> {
   const QUALITY_STEPS = [0.90, 0.85, 0.75, 0.65, 0.55];
-  const MIN_QUALITY = 0.50;
 
+  // Keep the last candidate so we never need an extra render pass after exhausting steps
   let pdf: jsPDF | null = null;
 
   for (const quality of QUALITY_STEPS) {
     const dataUrls = await renderSlidesAsJpeg(slides, quality, bgColor, accentColor, textColor, onProgress);
-    const candidate = buildPdf(dataUrls);
-    const sizeBytes = candidate.output("arraybuffer").byteLength;
-
-    if (sizeBytes <= SIZE_LIMIT_BYTES || quality <= MIN_QUALITY) {
-      pdf = candidate;
-      break;
-    }
-    // Too large — try lower quality on next iteration
-  }
-
-  if (!pdf) {
-    // Fallback: use minimum quality floor and accept result
-    const dataUrls = await renderSlidesAsJpeg(slides, MIN_QUALITY, bgColor, accentColor, textColor, onProgress);
     pdf = buildPdf(dataUrls);
+    const sizeBytes = pdf.output("arraybuffer").byteLength;
+
+    if (sizeBytes <= SIZE_LIMIT_BYTES) break;
+    // Still too large — try lower quality, but keep this pdf as the fallback candidate
   }
 
+  // pdf is always non-null here — QUALITY_STEPS is non-empty so the loop runs at least once
   const safeName = topic.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "carousel";
-  const dataUri = pdf.output("datauristring");
+  const dataUri = pdf!.output("datauristring");
   const a = document.createElement("a");
   a.href = dataUri;
   a.download = `${safeName}-carousel.pdf`;
