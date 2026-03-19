@@ -535,6 +535,22 @@ export default function Capture() {
     });
   };
 
+  const addCarouselSlide = () => {
+    setState(s => {
+      if (!s.content?.carousel) return s;
+      const nc = [...s.content.carousel, { slide: s.content.carousel.length + 1, title: "", description: "" }];
+      return { ...s, content: { ...s.content, carousel: nc } };
+    });
+  };
+
+  const deleteCarouselSlide = (idx: number) => {
+    setState(s => {
+      if (!s.content?.carousel || s.content.carousel.length <= 1) return s;
+      const nc = s.content.carousel.filter((_, i) => i !== idx).map((sl, i) => ({ ...sl, slide: i + 1 }));
+      return { ...s, content: { ...s.content, carousel: nc } };
+    });
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied to clipboard." });
@@ -928,11 +944,29 @@ export default function Capture() {
                 <div className="space-y-3 pb-6">
                   {state.content.carousel.map((slide, idx) => (
                     <div key={idx} className="bg-white p-4 rounded-2xl border border-gray-100">
-                      <div className="text-xs font-black text-primary/50 tracking-widest mb-2 uppercase">Slide {slide.slide}</div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-black text-primary/50 tracking-widest uppercase">Slide {slide.slide}</div>
+                        {state.content!.carousel.length > 1 && (
+                          <button
+                            onClick={() => deleteCarouselSlide(idx)}
+                            className="w-5 h-5 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all"
+                            title="Delete slide"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                       <input className="w-full bg-transparent font-bold text-sm mb-1.5 outline-none placeholder:text-gray-300" value={slide.title} placeholder="Title" onChange={e => updateCarouselSlide(idx, "title", e.target.value)} />
                       <textarea className="w-full bg-transparent text-gray-500 text-sm outline-none resize-none leading-relaxed" value={slide.description} placeholder="Description..." rows={2} onChange={e => updateCarouselSlide(idx, "description", e.target.value)} />
                     </div>
                   ))}
+
+                  <button
+                    onClick={addCarouselSlide}
+                    className="w-full py-2.5 rounded-2xl border border-dashed border-primary/30 text-primary/60 text-xs font-bold hover:border-primary/60 hover:text-primary hover:bg-primary/5 transition-all"
+                  >
+                    + Add slide
+                  </button>
 
                   {/* Brand Palette */}
                   <div className="bg-white rounded-2xl border border-gray-100 p-4">
