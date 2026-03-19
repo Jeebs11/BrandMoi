@@ -6,6 +6,86 @@ const PAD = 96;
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
 
+async function recordMp4(
+  canvas: HTMLCanvasElement,
+  durationMs: number,
+  draw: (t: number) => void
+): Promise<Blob> {
+  const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
+  const totalFrames = Math.round((durationMs / 1000) * FPS);
+  const frameUsec = Math.round(1_000_000 / FPS);
+
+  const target = new ArrayBufferTarget();
+  const muxer = new Muxer({
+    target,
+    video: { codec: "avc", width: canvas.width, height: canvas.height, frameRate: FPS },
+    fastStart: false,
+  });
+
+  const videoEncoder = new VideoEncoder({
+    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta!),
+    error: (e) => console.error("VideoEncoder error:", e),
+  });
+
+  videoEncoder.configure({
+    codec: "avc1.4d0028",
+    width: canvas.width,
+    height: canvas.height,
+    bitrate: 6_000_000,
+    framerate: FPS,
+  });
+
+  for (let i = 0; i <= totalFrames; i++) {
+    const t = Math.min(1, i / totalFrames);
+    draw(t);
+    const frame = new VideoFrame(canvas, { timestamp: i * frameUsec });
+    videoEncoder.encode(frame, { keyFrame: i === 0 || i % FPS === 0 });
+    frame.close();
+  }
+
+  await videoEncoder.flush();
+  muxer.finalize();
+  return new Blob([target.buffer], { type: "video/mp4" });
+}
+
+async function recordWebM(
+  canvas: HTMLCanvasElement,
+  durationMs: number,
+  draw: (t: number) => void
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+      ? "video/webm;codecs=vp9"
+      : "video/webm";
+    const stream = canvas.captureStream(FPS);
+    const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+    const chunks: BlobPart[] = [];
+    rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    rec.onstop = () => resolve(new Blob(chunks, { type: mimeType.split(";")[0] }));
+    rec.onerror = (e) => reject(e);
+    rec.start(200);
+    const startMs = performance.now();
+    function tick() {
+      const elapsed = performance.now() - startMs;
+      const t = Math.min(1, elapsed / durationMs);
+      draw(t);
+      if (t < 1) { setTimeout(tick, FRAME_MS); } else { draw(1); setTimeout(() => rec.stop(), 800); }
+    }
+    tick();
+  });
+}
+
+async function record(
+  canvas: HTMLCanvasElement,
+  durationMs: number,
+  draw: (t: number) => void
+): Promise<Blob> {
+  if (typeof VideoEncoder !== "undefined") {
+    return recordMp4(canvas, durationMs, draw);
+  }
+  return recordWebM(canvas, durationMs, draw);
+}
+
 // Exported so Capture.tsx can scale with a speed multiplier
 export const CAROUSEL_BASE_HOLD_MS = 3000;
 export const CAROUSEL_BASE_SWIPE_MS = 600;
@@ -191,40 +271,6 @@ function drawSlide(
   ctx.restore();
 }
 
-function record(
-  canvas: HTMLCanvasElement,
-  durationMs: number,
-  draw: (t: number) => void
-): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-      ? "video/webm;codecs=vp9"
-      : "video/webm";
-    const stream = canvas.captureStream(FPS);
-    const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
-    const chunks: BlobPart[] = [];
-    rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    rec.onstop = () => resolve(new Blob(chunks, { type: mimeType.split(";")[0] }));
-    rec.onerror = (e) => reject(e);
-    rec.start(200);
-
-    const startMs = performance.now();
-
-    function tick() {
-      const elapsed = performance.now() - startMs;
-      const t = Math.min(1, elapsed / durationMs);
-      draw(t);
-      if (t < 1) {
-        setTimeout(tick, FRAME_MS);
-      } else {
-        draw(1);
-        setTimeout(() => rec.stop(), 800);
-      }
-    }
-    tick();
-  });
-}
-
 export async function downloadAnimatedCarousel(
   slides: CarouselSlide[],
   topic: string,
@@ -277,7 +323,8 @@ export async function downloadAnimatedCarousel(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const safeName = topic.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "carousel";
-  a.download = `${safeName}-carousel.webm`;
+  const ext = blob.type === "video/mp4" ? "mp4" : "webm";
+  a.download = `${safeName}-carousel.${ext}`;
   a.href = url;
   a.click();
   URL.revokeObjectURL(url);

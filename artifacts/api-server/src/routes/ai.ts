@@ -165,6 +165,12 @@ Return this exact JSON shape (no markdown fences):
   res.json(validated.data);
 });
 
+const CarouselSlideSchema = z.array(z.object({
+  slide: z.number(),
+  title: z.string(),
+  description: z.string(),
+}));
+
 router.post("/ai/refine", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = RefineContentBody.safeParse(req.body);
   if (!parsed.success) {
@@ -174,6 +180,52 @@ router.post("/ai/refine", requireAuth, aiRateLimit, async (req, res): Promise<vo
 
   const { content, instruction, tab } = parsed.data;
 
+  // Carousel: Claude returns a JSON array of slides, not a plain string.
+  // Handle separately so the response shape matches what the frontend expects.
+  if (tab === "carousel") {
+    const carouselMessage = `You are refining a LinkedIn carousel. Here are the current slides as JSON:
+
+${content}
+
+Instruction: ${instruction}
+
+Return ONLY the updated slides as a JSON array — no markdown fences, no extra text:
+[{"slide": 1, "title": "...", "description": "..."}, ...]`;
+
+    const carouselResp = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8192,
+      system: "You are a LinkedIn carousel editor. Apply the instruction precisely to the slides. Return only a valid JSON array of slides — no markdown fences, no preamble.",
+      messages: [{ role: "user", content: carouselMessage }],
+    });
+
+    const carouselText = carouselResp.content[0];
+    if (carouselText.type !== "text") {
+      res.status(500).json({ error: "Unexpected AI response type" });
+      return;
+    }
+
+    const rawCarousel = carouselText.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    let parsedSlides: unknown;
+    try {
+      parsedSlides = JSON.parse(rawCarousel);
+    } catch {
+      res.status(500).json({ error: "AI returned invalid JSON for carousel" });
+      return;
+    }
+
+    const validatedSlides = CarouselSlideSchema.safeParse(parsedSlides);
+    if (!validatedSlides.success) {
+      res.status(500).json({ error: "AI carousel response did not match expected shape" });
+      return;
+    }
+
+    // Wrap as a string so the frontend can JSON.parse it from data.content
+    res.json({ content: JSON.stringify(validatedSlides.data) });
+    return;
+  }
+
+  // Post and visual: standard string-content refinement
   const userMessage = `Refine this ${tab} content:
 
 ${content}
