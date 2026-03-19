@@ -1,10 +1,12 @@
-import { toPng } from "html-to-image";
+import { toPng, toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import type { CarouselSlide } from "@workspace/api-client-react";
 
 const DEFAULT_BG = "#0f172a";
 const DEFAULT_ACCENT = "#6366f1";
 const DEFAULT_TEXT = "#ffffff";
+
+const SIZE_LIMIT_BYTES = 95 * 1024 * 1024;
 
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -62,6 +64,40 @@ function createWrapper(): HTMLDivElement {
   return wrapper;
 }
 
+async function renderSlidesAsJpeg(
+  slides: CarouselSlide[],
+  quality: number,
+  bgColor: string,
+  accentColor: string,
+  textColor: string,
+  onProgress?: (current: number, total: number) => void
+): Promise<string[]> {
+  const dataUrls: string[] = [];
+  for (let i = 0; i < slides.length; i++) {
+    onProgress?.(i + 1, slides.length);
+    const el = buildSlideEl(slides[i], slides.length, bgColor, accentColor, textColor);
+    const wrapper = createWrapper();
+    wrapper.appendChild(el);
+    document.body.appendChild(wrapper);
+    try {
+      const dataUrl = await toJpeg(el, { width: 1080, height: 1080, pixelRatio: 2, skipFonts: true, quality });
+      dataUrls.push(dataUrl);
+    } finally {
+      document.body.removeChild(wrapper);
+    }
+  }
+  return dataUrls;
+}
+
+function buildPdf(dataUrls: string[]): jsPDF {
+  const pdf = new jsPDF({ orientation: "p", unit: "px", format: [1080, 1080] });
+  for (let i = 0; i < dataUrls.length; i++) {
+    if (i > 0) pdf.addPage([1080, 1080], "p");
+    pdf.addImage(dataUrls[i], "JPEG", 0, 0, 1080, 1080);
+  }
+  return pdf;
+}
+
 export async function previewCarouselSlide(
   slide: CarouselSlide,
   total: number,
@@ -88,21 +124,27 @@ export async function downloadCarouselPDF(
   textColor: string = DEFAULT_TEXT,
   onProgress?: (current: number, total: number) => void
 ): Promise<void> {
-  const pdf = new jsPDF({ orientation: "p", unit: "px", format: [1080, 1080] });
+  const QUALITY_STEPS = [0.90, 0.85, 0.75, 0.65, 0.55];
+  const MIN_QUALITY = 0.50;
 
-  for (let i = 0; i < slides.length; i++) {
-    onProgress?.(i + 1, slides.length);
-    const el = buildSlideEl(slides[i], slides.length, bgColor, accentColor, textColor);
-    const wrapper = createWrapper();
-    wrapper.appendChild(el);
-    document.body.appendChild(wrapper);
-    try {
-      const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 2, skipFonts: true });
-      if (i > 0) pdf.addPage([1080, 1080], "p");
-      pdf.addImage(dataUrl, "PNG", 0, 0, 1080, 1080);
-    } finally {
-      document.body.removeChild(wrapper);
+  let pdf: jsPDF | null = null;
+
+  for (const quality of QUALITY_STEPS) {
+    const dataUrls = await renderSlidesAsJpeg(slides, quality, bgColor, accentColor, textColor, onProgress);
+    const candidate = buildPdf(dataUrls);
+    const sizeBytes = candidate.output("arraybuffer").byteLength;
+
+    if (sizeBytes <= SIZE_LIMIT_BYTES || quality <= MIN_QUALITY) {
+      pdf = candidate;
+      break;
     }
+    // Too large — try lower quality on next iteration
+  }
+
+  if (!pdf) {
+    // Fallback: use minimum quality floor and accept result
+    const dataUrls = await renderSlidesAsJpeg(slides, MIN_QUALITY, bgColor, accentColor, textColor, onProgress);
+    pdf = buildPdf(dataUrls);
   }
 
   const safeName = topic.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "carousel";
