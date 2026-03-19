@@ -43,7 +43,7 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
-  const [isSavingAccount, setIsSavingAccount] = useState(false);
+  const [isSavingAccount, setIsSavingAccount] = useState(false); // kept for loading state during combined save
 
   useEffect(() => {
     if (preferences) {
@@ -92,10 +92,10 @@ export default function Settings() {
     }
   };
 
-  const { mutate: updatePreferences, isPending: isSaving } = useUpdatePreferences();
+  const { mutateAsync: updatePreferencesAsync, isPending: isSaving } = useUpdatePreferences();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
 
-  const handleSaveAccount = async () => {
+  const handleSave = async () => {
     if (showPasswordSection) {
       if (!currentPassword) {
         toast({ title: "Enter your current password.", variant: "destructive" });
@@ -111,43 +111,33 @@ export default function Settings() {
       }
     }
 
+    const accountPayload: { displayName?: string; currentPassword?: string; newPassword?: string } = {};
+    if (displayName.trim() && displayName.trim() !== user?.displayName) {
+      accountPayload.displayName = displayName.trim();
+    }
+    if (showPasswordSection && newPassword) {
+      accountPayload.currentPassword = currentPassword;
+      accountPayload.newPassword = newPassword;
+    }
+
     setIsSavingAccount(true);
     try {
-      const payload: { displayName?: string; currentPassword?: string; newPassword?: string } = {};
-      if (displayName.trim() && displayName.trim() !== user?.displayName) {
-        payload.displayName = displayName.trim();
+      await updatePreferencesAsync({ data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor } });
+      if (Object.keys(accountPayload).length > 0) {
+        await accountApi.update(accountPayload);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setShowPasswordSection(false);
       }
-      if (showPasswordSection && newPassword) {
-        payload.currentPassword = currentPassword;
-        payload.newPassword = newPassword;
-      }
-      const changedPassword = !!(showPasswordSection && newPassword);
-      await accountApi.update(payload);
       await invalidate();
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowPasswordSection(false);
-      toast({ title: changedPassword ? "Password updated." : "Display name updated." });
+      toast({ title: "Settings saved." });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Could not update account.";
+      const msg = err instanceof Error ? err.message : "Failed to save settings.";
       toast({ title: msg, variant: "destructive" });
     } finally {
       setIsSavingAccount(false);
     }
-  };
-
-  const handleSave = () => {
-    updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor } },
-      {
-        onSuccess: async () => {
-          await invalidate();
-          toast({ title: "Settings saved." });
-        },
-        onError: () => toast({ title: "Failed to save settings.", variant: "destructive" }),
-      }
-    );
   };
 
   const handleLogout = () => {
@@ -355,19 +345,12 @@ export default function Settings() {
                   </div>
                 )}
               </div>
-              <Button
-                className="w-full h-11 text-sm font-semibold"
-                onClick={handleSaveAccount}
-                disabled={isSavingAccount}
-              >
-                {isSavingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save account changes"}
-              </Button>
             </div>
           </section>
 
           {/* Save Button */}
-          <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Save changes</>}
+          <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSavingAccount || isSaving}>
+            {(isSavingAccount || isSaving) ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Save changes</>}
           </Button>
 
           {/* Logout */}
