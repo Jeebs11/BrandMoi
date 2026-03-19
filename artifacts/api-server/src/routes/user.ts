@@ -6,6 +6,14 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
+import { signToken } from "../lib/jwt.js";
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  path: "/",
+};
 
 const router: IRouter = Router();
 
@@ -284,6 +292,10 @@ router.put("/user/account", requireAuth, async (req, res): Promise<void> => {
     .set(updates)
     .where(eq(usersTable.id, req.user!.userId))
     .returning();
+
+  // Reissue the JWT so /auth/me immediately reflects any updated displayName
+  const newToken = signToken({ userId: updated.id, email: updated.email, displayName: updated.displayName });
+  res.cookie("brandos_token", newToken, COOKIE_OPTIONS);
 
   res.json({ id: updated.id, email: updated.email, displayName: updated.displayName });
 });
