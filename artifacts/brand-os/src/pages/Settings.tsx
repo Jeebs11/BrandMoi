@@ -92,10 +92,10 @@ export default function Settings() {
     }
   };
 
-  const { mutateAsync: updatePreferencesAsync, isPending: isSaving } = useUpdatePreferences();
+  const { mutate: updatePreferences, isPending: isSaving } = useUpdatePreferences();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (showPasswordSection) {
       if (!currentPassword) {
         toast({ title: "Enter your current password.", variant: "destructive" });
@@ -119,25 +119,36 @@ export default function Settings() {
       accountPayload.currentPassword = currentPassword;
       accountPayload.newPassword = newPassword;
     }
+    const hasAccountChanges = Object.keys(accountPayload).length > 0;
 
     setIsSavingAccount(true);
-    try {
-      await updatePreferencesAsync({ data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor } });
-      if (Object.keys(accountPayload).length > 0) {
-        await accountApi.update(accountPayload);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-        setShowPasswordSection(false);
+    updatePreferences(
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor } },
+      {
+        onSuccess: async () => {
+          try {
+            if (hasAccountChanges) {
+              await accountApi.update(accountPayload);
+              setCurrentPassword("");
+              setNewPassword("");
+              setConfirmPassword("");
+              setShowPasswordSection(false);
+            }
+            await invalidate();
+            toast({ title: "Settings saved." });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Could not update account.";
+            toast({ title: msg, variant: "destructive" });
+          } finally {
+            setIsSavingAccount(false);
+          }
+        },
+        onError: () => {
+          toast({ title: "Failed to save settings.", variant: "destructive" });
+          setIsSavingAccount(false);
+        },
       }
-      await invalidate();
-      toast({ title: "Settings saved." });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to save settings.";
-      toast({ title: msg, variant: "destructive" });
-    } finally {
-      setIsSavingAccount(false);
-    }
+    );
   };
 
   const handleLogout = () => {
