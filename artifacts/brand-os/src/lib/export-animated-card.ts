@@ -197,13 +197,15 @@ function drawQuoteMark(ctx: CanvasRenderingContext2D, layout: CardLayout, accent
   ctx.restore();
 }
 
-function drawClosingQuoteMark(ctx: CanvasRenderingContext2D, accentColor: string, alpha = 1) {
+function drawClosingQuoteMark(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor: string, alpha = 1) {
+  // Position just below the last text line so gap is consistent regardless of text length
+  const closingY = layout.textBL + layout.lines.length * layout.lineHeight + 48;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = accentColor;
   ctx.font = `800 120px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
   ctx.textAlign = "right";
-  ctx.fillText("\u201D", CARD_W - PAD_H + 8, CARD_H - 80);
+  ctx.fillText("\u201D", CARD_W - PAD_H + 8, closingY);
   ctx.textAlign = "left";
   ctx.restore();
 }
@@ -242,7 +244,7 @@ function drawFullContent(ctx: CanvasRenderingContext2D, layout: CardLayout, acce
   drawQuoteMark(ctx, layout, accentColor, alpha);
   drawBar(ctx, layout, accentColor, 1, alpha);
   drawText(ctx, layout, 1, alpha, textColor);
-  drawClosingQuoteMark(ctx, accentColor, alpha);
+  drawClosingQuoteMark(ctx, layout, accentColor, alpha);
 }
 
 function drawFrame(
@@ -271,7 +273,7 @@ function drawFrame(
     drawQuoteMark(ctx, layout, accentColor, qmAlpha);
     drawBar(ctx, layout, accentColor, barProg, clamp(barProg * 3));
     drawText(ctx, layout, textProg, 1, textColor);
-    drawClosingQuoteMark(ctx, accentColor, closeAlpha);
+    drawClosingQuoteMark(ctx, layout, accentColor, closeAlpha);
 
   } else if (preset === "fade") {
     ctx.fillStyle = bgColor;
