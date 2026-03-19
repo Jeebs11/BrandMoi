@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearch, useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
@@ -10,7 +11,7 @@ import {
   useStructureIdea, useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
 } from "@workspace/api-client-react";
-import type { StructuredBreakdown, GeneratedContent, CarouselSlide } from "@workspace/api-client-react";
+import type { StructuredBreakdown, GeneratedContent, CarouselSlide, Draft } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
@@ -109,6 +110,7 @@ export default function Capture() {
   const { mutate: structureIdea, isPending: isStructuring, error: structureError, reset: resetStructure } = useStructureIdea();
   const { mutate: generateContent, isPending: isGenerating, error: generateError, reset: resetGenerate } = useGenerateContent();
   const { mutate: refineContent, isPending: isRefining } = useRefineContent();
+  const queryClient = useQueryClient();
   const { mutate: createDraft, isPending: isCreating } = useCreateDraft();
   const { mutate: updateDraft, isPending: isUpdating } = useUpdateDraft();
   const isSaving = isCreating || isUpdating;
@@ -448,7 +450,7 @@ export default function Capture() {
       status: "draft" as const,
     };
 
-    const onSuccess = () => {
+    const afterSave = () => {
       setState(s => ({ ...s, step: 6 }));
       if (thoughtId) {
         void thoughtsApi.markDeveloped(thoughtId);
@@ -459,7 +461,11 @@ export default function Capture() {
       updateDraft(
         { id: draftId!, data: { postOutput: draftData.postOutput, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput } },
         {
-          onSuccess,
+          onSuccess: (saved: Draft) => {
+            // Populate the cache so Library → "Edit and continue" always sees the latest content
+            queryClient.setQueryData(getGetDraftQueryKey(draftId!), saved);
+            afterSave();
+          },
           onError: () => toast({ title: "Failed to update draft.", variant: "destructive" }),
         }
       );
@@ -467,7 +473,11 @@ export default function Capture() {
       createDraft(
         { data: draftData },
         {
-          onSuccess,
+          onSuccess: (saved: Draft) => {
+            // Pre-populate the new draft's cache entry so the first load is instant and correct
+            queryClient.setQueryData(getGetDraftQueryKey(saved.id), saved);
+            afterSave();
+          },
           onError: () => toast({ title: "Failed to save draft.", variant: "destructive" }),
         }
       );
