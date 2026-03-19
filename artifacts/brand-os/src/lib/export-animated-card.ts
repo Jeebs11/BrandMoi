@@ -126,7 +126,7 @@ function drawBar(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor:
   ctx.restore();
 }
 
-function drawText(ctx: CanvasRenderingContext2D, layout: CardLayout, textProgress = 1, alpha = 1) {
+function drawText(ctx: CanvasRenderingContext2D, layout: CardLayout, textProgress = 1, alpha = 1, textColor = "#ffffff") {
   const { lines, lineHeight, textBL, fontSize } = layout;
   const totalChars = lines.reduce((s, l) => s + l.length, 0);
   const revealed = Math.floor(textProgress * totalChars);
@@ -135,7 +135,7 @@ function drawText(ctx: CanvasRenderingContext2D, layout: CardLayout, textProgres
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = textColor;
   ctx.font = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
 
   for (const line of lines) {
@@ -147,10 +147,10 @@ function drawText(ctx: CanvasRenderingContext2D, layout: CardLayout, textProgres
   ctx.restore();
 }
 
-function drawFullContent(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor: string, alpha = 1) {
+function drawFullContent(ctx: CanvasRenderingContext2D, layout: CardLayout, accentColor: string, alpha = 1, textColor = "#ffffff") {
   drawQuoteMark(ctx, layout, accentColor, alpha);
   drawBar(ctx, layout, accentColor, 1, alpha);
-  drawText(ctx, layout, 1, alpha);
+  drawText(ctx, layout, 1, alpha, textColor);
 }
 
 function drawFrame(
@@ -159,7 +159,8 @@ function drawFrame(
   bgColor: string,
   accentColor: string,
   preset: CardAnimPreset,
-  t: number
+  t: number,
+  textColor = "#ffffff"
 ) {
   ctx.clearRect(0, 0, CARD_W, CARD_H);
 
@@ -176,7 +177,7 @@ function drawFrame(
 
     drawQuoteMark(ctx, layout, accentColor, qmAlpha);
     drawBar(ctx, layout, accentColor, barProg, clamp(barProg * 3));
-    drawText(ctx, layout, textProg);
+    drawText(ctx, layout, textProg, 1, textColor);
 
   } else if (preset === "fade") {
     ctx.fillStyle = bgColor;
@@ -189,7 +190,7 @@ function drawFrame(
     ctx.translate(CARD_W / 2, CARD_H / 2);
     ctx.scale(scale, scale);
     ctx.translate(-CARD_W / 2, -CARD_H / 2);
-    drawFullContent(ctx, layout, accentColor, alpha);
+    drawFullContent(ctx, layout, accentColor, alpha, textColor);
     ctx.restore();
 
   } else { // slide
@@ -202,7 +203,7 @@ function drawFrame(
 
     ctx.save();
     ctx.translate(0, offsetY);
-    drawFullContent(ctx, layout, accentColor, alpha);
+    drawFullContent(ctx, layout, accentColor, alpha, textColor);
     ctx.restore();
   }
 }
@@ -247,6 +248,7 @@ export async function downloadAnimatedCard(
   bgColor: string,
   accentColor: string,
   preset: CardAnimPreset,
+  textColor = "#ffffff",
   durationMs?: number
 ): Promise<void> {
   const canvas = document.createElement("canvas");
@@ -258,7 +260,7 @@ export async function downloadAnimatedCard(
   const dur = durationMs ?? CARD_BASE_DURATIONS[preset];
 
   const blob = await record(canvas, dur, (t) => {
-    drawFrame(ctx, layout, bgColor, accentColor, preset, t);
+    drawFrame(ctx, layout, bgColor, accentColor, preset, t, textColor);
   });
 
   const url = URL.createObjectURL(blob);

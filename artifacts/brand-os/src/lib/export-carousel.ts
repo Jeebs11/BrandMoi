@@ -4,6 +4,7 @@ import type { CarouselSlide } from "@workspace/api-client-react";
 
 const DEFAULT_BG = "#0f172a";
 const DEFAULT_ACCENT = "#6366f1";
+const DEFAULT_TEXT = "#ffffff";
 
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -16,7 +17,8 @@ function buildSlideEl(
   slide: CarouselSlide,
   total: number,
   bgColor: string = DEFAULT_BG,
-  accentColor: string = DEFAULT_ACCENT
+  accentColor: string = DEFAULT_ACCENT,
+  textColor: string = DEFAULT_TEXT
 ): HTMLDivElement {
   const el = document.createElement("div");
   // IMPORTANT: no position/top/left here — those go on the wrapper so html-to-image captures correctly
@@ -40,11 +42,11 @@ function buildSlideEl(
   accent.style.cssText = `width:56px;height:4px;background:${accentColor};border-radius:2px;margin-bottom:44px`;
 
   const title = document.createElement("div");
-  title.style.cssText = "color:#ffffff;font-size:52px;font-weight:800;line-height:1.12;margin-bottom:32px;word-break:break-word";
+  title.style.cssText = `color:${textColor};font-size:52px;font-weight:800;line-height:1.12;margin-bottom:32px;word-break:break-word`;
   title.textContent = slide.title;
 
   const desc = document.createElement("div");
-  desc.style.cssText = "color:rgba(255,255,255,0.6);font-size:24px;line-height:1.65;word-break:break-word";
+  desc.style.cssText = `color:${hexToRgba(textColor, 0.6)};font-size:24px;line-height:1.65;word-break:break-word`;
   desc.textContent = slide.description;
 
   el.appendChild(slideNum);
@@ -64,9 +66,10 @@ export async function previewCarouselSlide(
   slide: CarouselSlide,
   total: number,
   bgColor: string = DEFAULT_BG,
-  accentColor: string = DEFAULT_ACCENT
+  accentColor: string = DEFAULT_ACCENT,
+  textColor: string = DEFAULT_TEXT
 ): Promise<string> {
-  const el = buildSlideEl(slide, total, bgColor, accentColor);
+  const el = buildSlideEl(slide, total, bgColor, accentColor, textColor);
   const wrapper = createWrapper();
   wrapper.appendChild(el);
   document.body.appendChild(wrapper);
@@ -82,13 +85,14 @@ export async function downloadCarouselPDF(
   topic: string,
   bgColor: string = DEFAULT_BG,
   accentColor: string = DEFAULT_ACCENT,
+  textColor: string = DEFAULT_TEXT,
   onProgress?: (current: number, total: number) => void
 ): Promise<void> {
   const pdf = new jsPDF({ orientation: "p", unit: "px", format: [1080, 1080] });
 
   for (let i = 0; i < slides.length; i++) {
     onProgress?.(i + 1, slides.length);
-    const el = buildSlideEl(slides[i], slides.length, bgColor, accentColor);
+    const el = buildSlideEl(slides[i], slides.length, bgColor, accentColor, textColor);
     const wrapper = createWrapper();
     wrapper.appendChild(el);
     document.body.appendChild(wrapper);

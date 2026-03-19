@@ -27,9 +27,10 @@ export default function Settings() {
   const [brandAudience, setBrandAudience] = useState(preferences?.brandAudience ?? "");
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
 
-  const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string });
+  const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string; brandTextColor?: string });
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
   const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
+  const [brandTextColor, setBrandTextColor] = useState(prefs?.brandTextColor ?? "#ffffff");
 
   const [voiceData, setVoiceData] = useState<VoiceSummaryResult | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(true);
@@ -56,6 +57,7 @@ export default function Settings() {
       const p = preferences as Record<string, unknown>;
       if (typeof p.brandBgColor === "string") setBrandBgColor(p.brandBgColor);
       if (typeof p.brandAccentColor === "string") setBrandAccentColor(p.brandAccentColor);
+      if (typeof p.brandTextColor === "string") setBrandTextColor(p.brandTextColor);
     }
   }, [preferences]);
 
@@ -123,7 +125,7 @@ export default function Settings() {
 
     setIsSavingAccount(true);
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor, brandTextColor } },
       {
         onSuccess: async () => {
           try {
@@ -233,6 +235,21 @@ export default function Settings() {
                       />
                     </div>
                     <code className="text-xs text-gray-400 font-mono">{brandAccentColor}</code>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Text</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                      <div className="absolute inset-0" style={{ background: brandTextColor }} />
+                      <input
+                        type="color"
+                        value={brandTextColor}
+                        onChange={e => setBrandTextColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <code className="text-xs text-gray-400 font-mono">{brandTextColor}</code>
                   </div>
                 </label>
               </div>

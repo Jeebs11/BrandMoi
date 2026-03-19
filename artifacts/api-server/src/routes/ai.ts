@@ -196,9 +196,11 @@ Return this exact JSON shape (no markdown fences):
     return;
   }
 
+  // Strip markdown fences Claude sometimes adds despite being told not to
+  const raw = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
   let parsed2: unknown;
   try {
-    parsed2 = JSON.parse(text.text);
+    parsed2 = JSON.parse(raw);
   } catch {
     res.status(500).json({ error: "AI returned invalid JSON" });
     return;

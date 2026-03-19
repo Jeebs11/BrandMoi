@@ -143,7 +143,8 @@ function drawSlide(
   bgColor: string,
   accentColor: string,
   offsetX = 0,
-  contentAlpha = 1
+  contentAlpha = 1,
+  textColor = "#ffffff"
 ) {
   ctx.save();
   ctx.translate(offsetX, 0);
@@ -169,7 +170,7 @@ function drawSlide(
   fillRoundRect(ctx, PAD, layout.barY, 56, 4, 2);
 
   // Title
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = textColor;
   ctx.font = `800 ${layout.titleFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
   let y = layout.titleBL;
   for (const line of layout.titleLines) {
@@ -178,7 +179,7 @@ function drawSlide(
   }
 
   // Description
-  ctx.fillStyle = rgba("#ffffff", 0.6);
+  ctx.fillStyle = rgba(textColor, 0.6);
   ctx.font = `400 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
   y = layout.descBL;
   for (const line of layout.descLines) {
@@ -229,6 +230,7 @@ export async function downloadAnimatedCarousel(
   topic: string,
   bgColor: string,
   accentColor: string,
+  textColor = "#ffffff",
   holdMs = CAROUSEL_BASE_HOLD_MS,
   swipeMs = CAROUSEL_BASE_SWIPE_MS
 ): Promise<void> {
@@ -257,19 +259,19 @@ export async function downloadAnimatedCarousel(
       if (elapsed >= segStart && elapsed < holdEnd) {
         const holdT = clamp((elapsed - segStart) / holdMs);
         const fadeIn = i === 0 ? easeOut(clamp(holdT * 5)) : 1;
-        drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, 0, fadeIn);
+        drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, 0, fadeIn, textColor);
         return;
       }
 
       if (elapsed >= holdEnd && elapsed < swipeEnd && i < n - 1) {
         const swipeT = easeOut(clamp((elapsed - holdEnd) / swipeMs), 4);
-        drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, -CARD_W * swipeT, 1);
-        drawSlide(ctx, slides[i + 1], n, layouts[i + 1], bgColor, accentColor, CARD_W * (1 - swipeT), 1);
+        drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, -CARD_W * swipeT, 1, textColor);
+        drawSlide(ctx, slides[i + 1], n, layouts[i + 1], bgColor, accentColor, CARD_W * (1 - swipeT), 1, textColor);
         return;
       }
     }
 
-    drawSlide(ctx, slides[n - 1], n, layouts[n - 1], bgColor, accentColor, 0, 1);
+    drawSlide(ctx, slides[n - 1], n, layouts[n - 1], bgColor, accentColor, 0, 1, textColor);
   });
 
   const url = URL.createObjectURL(blob);

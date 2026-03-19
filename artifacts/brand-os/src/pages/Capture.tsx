@@ -127,10 +127,13 @@ export default function Capture() {
   // Brand palette
   const [bgColor, setBgColor] = useState("#0f172a");
   const [accentColor, setAccentColor] = useState("#6366f1");
+  const [textColor, setTextColor] = useState("#ffffff");
   const bgColorRef = useRef(bgColor);
   const accentColorRef = useRef(accentColor);
+  const textColorRef = useRef(textColor);
   bgColorRef.current = bgColor;
   accentColorRef.current = accentColor;
+  textColorRef.current = textColor;
   const paletteInitializedRef = useRef(false);
   const paletteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -162,6 +165,7 @@ export default function Capture() {
       const p = preferences as Record<string, unknown>;
       if (typeof p.brandBgColor === "string") setBgColor(p.brandBgColor);
       if (typeof p.brandAccentColor === "string") setAccentColor(p.brandAccentColor);
+      if (typeof p.brandTextColor === "string") setTextColor(p.brandTextColor);
       paletteInitializedRef.current = true;
     }
   }, [preferences]);
@@ -183,7 +187,8 @@ export default function Capture() {
             state.content!.carousel[0],
             carouselLength,
             bgColorRef.current,
-            accentColorRef.current
+            accentColorRef.current,
+            textColorRef.current
           );
           setSlidePreviewUrl(url);
         } catch {
@@ -195,7 +200,7 @@ export default function Capture() {
     }, 400);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.activeTab, carouselLength, firstSlideTitle, bgColor, accentColor]);
+  }, [state.activeTab, carouselLength, firstSlideTitle, bgColor, accentColor, textColor]);
 
   // Auto-generate visual card preview when visual tab is active or text/colors change
   const visualText = state.content?.visual ?? "";
@@ -209,7 +214,7 @@ export default function Capture() {
     cardPreviewTimerRef.current = setTimeout(() => {
       void (async () => {
         try {
-          const url = await previewVisualCard(visualText, bgColorRef.current, accentColorRef.current);
+          const url = await previewVisualCard(visualText, bgColorRef.current, accentColorRef.current, textColorRef.current);
           setCardPreviewUrl(url);
         } catch {
           setCardPreviewUrl(null);
@@ -220,12 +225,12 @@ export default function Capture() {
     }, 400);
     return () => { if (cardPreviewTimerRef.current) clearTimeout(cardPreviewTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.activeTab, visualText, bgColor, accentColor]);
+  }, [state.activeTab, visualText, bgColor, accentColor, textColor]);
 
   const schedulePaletteSave = () => {
     if (paletteTimerRef.current) clearTimeout(paletteTimerRef.current);
     paletteTimerRef.current = setTimeout(() => {
-      void preferencesApi.updatePalette(bgColorRef.current, accentColorRef.current);
+      void preferencesApi.updatePalette(bgColorRef.current, accentColorRef.current, textColorRef.current);
     }, 800);
   };
 
@@ -241,6 +246,12 @@ export default function Capture() {
     schedulePaletteSave();
   };
 
+  const handleTextColorChange = (value: string) => {
+    setTextColor(value);
+    textColorRef.current = value;
+    schedulePaletteSave();
+  };
+
   const handleDownloadCarouselPDF = async () => {
     if (!state.content?.carousel?.length) return;
     setIsExportingPDF(true);
@@ -249,7 +260,8 @@ export default function Capture() {
         state.content.carousel,
         state.structure?.topic ?? "carousel",
         bgColor,
-        accentColor
+        accentColor,
+        textColor
       );
     } catch {
       toast({ title: "PDF export failed. Please try again.", variant: "destructive" });
@@ -262,7 +274,7 @@ export default function Capture() {
     if (!state.content?.visual) return;
     setIsExportingCard(true);
     try {
-      await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor);
+      await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor, textColor);
     } catch {
       toast({ title: "Card export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -280,6 +292,7 @@ export default function Capture() {
         bgColor,
         accentColor,
         preset,
+        textColor,
         Math.round(CARD_BASE_DURATIONS[preset] * animSpeedMult)
       );
     } catch {
@@ -298,6 +311,7 @@ export default function Capture() {
         state.structure?.topic ?? "carousel",
         bgColor,
         accentColor,
+        textColor,
         Math.round(CAROUSEL_BASE_HOLD_MS * animSpeedMult),
         Math.round(CAROUSEL_BASE_SWIPE_MS * animSpeedMult)
       );
@@ -752,6 +766,13 @@ export default function Capture() {
                         </div>
                         <span className="text-xs text-gray-500 font-medium">Accent</span>
                       </label>
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                          <div className="absolute inset-0" style={{ background: textColor }} />
+                          <input type="color" value={textColor} onChange={e => handleTextColorChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Text</span>
+                      </label>
                     </div>
                   </div>
 
@@ -941,6 +962,18 @@ export default function Capture() {
                           />
                         </div>
                         <span className="text-xs text-gray-500 font-medium">Accent</span>
+                      </label>
+                      <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                          <div className="absolute inset-0" style={{ background: textColor }} />
+                          <input
+                            type="color"
+                            value={textColor}
+                            onChange={e => handleTextColorChange(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 font-medium">Text</span>
                       </label>
                     </div>
                   </div>

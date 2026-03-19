@@ -2,11 +2,13 @@ import { toPng } from "html-to-image";
 
 const DEFAULT_BG = "#0f172a";
 const DEFAULT_ACCENT = "#6366f1";
+const DEFAULT_TEXT = "#ffffff";
 
 function buildCardEl(
   quoteText: string,
   bgColor: string = DEFAULT_BG,
-  accentColor: string = DEFAULT_ACCENT
+  accentColor: string = DEFAULT_ACCENT,
+  textColor: string = DEFAULT_TEXT
 ): HTMLDivElement {
   const el = document.createElement("div");
   // IMPORTANT: no position/top/left here — those go on the wrapper so html-to-image captures correctly
@@ -34,7 +36,7 @@ function buildCardEl(
 
   // Quote text
   const body = document.createElement("div");
-  body.style.cssText = "color:#ffffff;font-size:56px;font-weight:700;line-height:1.18;word-break:break-word;letter-spacing:-0.5px";
+  body.style.cssText = `color:${textColor};font-size:56px;font-weight:700;line-height:1.18;word-break:break-word;letter-spacing:-0.5px`;
   body.textContent = quoteText;
 
   el.appendChild(quote);
@@ -53,9 +55,10 @@ function createWrapper(): HTMLDivElement {
 export async function previewVisualCard(
   quoteText: string,
   bgColor: string = DEFAULT_BG,
-  accentColor: string = DEFAULT_ACCENT
+  accentColor: string = DEFAULT_ACCENT,
+  textColor: string = DEFAULT_TEXT
 ): Promise<string> {
-  const el = buildCardEl(quoteText, bgColor, accentColor);
+  const el = buildCardEl(quoteText, bgColor, accentColor, textColor);
   const wrapper = createWrapper();
   wrapper.appendChild(el);
   document.body.appendChild(wrapper);
@@ -70,9 +73,10 @@ export async function downloadVisualCard(
   quoteText: string,
   topic: string,
   bgColor: string = DEFAULT_BG,
-  accentColor: string = DEFAULT_ACCENT
+  accentColor: string = DEFAULT_ACCENT,
+  textColor: string = DEFAULT_TEXT
 ): Promise<void> {
-  const el = buildCardEl(quoteText, bgColor, accentColor);
+  const el = buildCardEl(quoteText, bgColor, accentColor, textColor);
   const wrapper = createWrapper();
   wrapper.appendChild(el);
   document.body.appendChild(wrapper);

@@ -137,10 +137,10 @@ export const imagePromptApi = {
 };
 
 export const preferencesApi = {
-  updatePalette: (brandBgColor: string, brandAccentColor: string) =>
+  updatePalette: (brandBgColor: string, brandAccentColor: string, brandTextColor: string) =>
     apiFetch<unknown>("/user/preferences", {
       method: "PUT",
-      body: JSON.stringify({ brandBgColor, brandAccentColor }),
+      body: JSON.stringify({ brandBgColor, brandAccentColor, brandTextColor }),
     }),
 };
 

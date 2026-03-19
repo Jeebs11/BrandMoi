@@ -53,6 +53,7 @@ export interface UpdatePreferencesBody {
   onboarded?: boolean;
   brandBgColor?: string;
   brandAccentColor?: string;
+  brandTextColor?: string;
 }
 
 export interface SuggestionItem {
