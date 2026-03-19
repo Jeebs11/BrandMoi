@@ -147,7 +147,7 @@ export default function Capture() {
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
 
   // Pre-save coach
-  const [coachModal, setCoachModal] = useState<{ note: string; type: AgentCoach["type"] } | null>(null);
+  const [coachModal, setCoachModal] = useState<{ note: string; type: AgentCoach["type"]; rewrite: string } | null>(null);
   const [isCoaching, setIsCoaching] = useState(false);
   const pendingSaveRef = useRef<(() => void) | null>(null);
   // Track whether the user has hand-edited the post text after AI generation.
@@ -482,7 +482,7 @@ export default function Capture() {
       setIsCoaching(true);
       pendingSaveRef.current = executeSave;
       agentApi.coach(postText).then((result) => {
-        setCoachModal({ note: result.note, type: result.type });
+        setCoachModal({ note: result.note, type: result.type, rewrite: (result as { note: string; type: AgentCoach["type"]; rewrite: string }).rewrite ?? "" });
       }).catch(() => {
         executeSave();
       }).finally(() => {
@@ -1088,16 +1088,18 @@ export default function Capture() {
               exit={{ opacity: 0 }}
               className="absolute inset-0 z-[60] flex items-end"
             >
-              <div className="absolute inset-0 bg-black/50" onClick={() => setCoachModal(null)} />
+              <div className="absolute inset-0 bg-black/60" />
               <motion.div
-                initial={{ y: 80, opacity: 0 }}
+                initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 80, opacity: 0 }}
+                exit={{ y: 100, opacity: 0 }}
                 transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                className="relative w-full bg-white rounded-t-3xl px-6 pt-5 pb-24 space-y-4 shadow-2xl"
+                className="relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-24 shadow-2xl flex flex-col gap-4 max-h-[82vh] overflow-y-auto"
               >
-                <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-1" />
-                <div className="flex items-center gap-2">
+                <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto -mb-1 shrink-0" />
+
+                {/* Header */}
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Writing Coach</span>
                   <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize", {
                     "bg-orange-50 border-orange-200 text-orange-700": coachModal.type === "hook",
@@ -1109,20 +1111,54 @@ export default function Capture() {
                     {coachModal.type}
                   </span>
                 </div>
-                <p className="text-gray-800 font-semibold text-sm leading-relaxed">{coachModal.note}</p>
-                <div className="grid grid-cols-2 gap-3 pt-1">
+
+                {/* Coaching note */}
+                <p className="text-gray-700 text-sm leading-relaxed shrink-0">{coachModal.note}</p>
+
+                {/* Suggested rewrite */}
+                {coachModal.rewrite && (
+                  <div className="shrink-0">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">✦ Suggested rewrite</span>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 max-h-52 overflow-y-auto">
+                      <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap">{coachModal.rewrite}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex flex-col gap-2.5 shrink-0 pt-1">
+                  {/* Primary: use the rewrite */}
                   <button
-                    onClick={() => setCoachModal(null)}
-                    className="h-12 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      if (coachModal.rewrite) {
+                        setState(s => s.content ? { ...s, content: { ...s.content, post: coachModal.rewrite } } : s);
+                        setUserEditedPost(false);
+                      }
+                      setCoachModal(null);
+                      pendingSaveRef.current?.();
+                    }}
+                    className="w-full h-12 rounded-2xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
                   >
-                    Let me revise
+                    Use this rewrite
                   </button>
-                  <button
-                    onClick={() => { setCoachModal(null); pendingSaveRef.current?.(); }}
-                    className="h-12 rounded-2xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
-                  >
-                    Got it, save
-                  </button>
+
+                  {/* Secondary row */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      onClick={() => setCoachModal(null)}
+                      className="h-12 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Edit manually
+                    </button>
+                    <button
+                      onClick={() => { setCoachModal(null); pendingSaveRef.current?.(); }}
+                      className="h-12 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+                    >
+                      Save as-is
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>

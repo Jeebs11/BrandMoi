@@ -127,16 +127,14 @@ router.post("/agent/coach", requireAuth, aiRateLimit, async (req, res): Promise<
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 150,
-      system: `You are a personal writing coach reviewing a LinkedIn draft. Give ONE specific, actionable coaching note.
+      max_tokens: 800,
+      system: `You are a personal writing coach reviewing a LinkedIn draft. Identify the single highest-impact improvement and deliver a smart, creative rewrite of the entire post that applies it.
 
 Rules:
-- Reference the actual draft text
-- Compare to their Voice DNA if available
-- Identify ONE concrete thing that could make it 20% stronger
-- Max 35 words
-- Tone: direct, like a trusted editor — no praise, no hedging
-- Return JSON only: { "note": "...", "type": "hook|clarity|voice|structure|cta" }`,
+- note: ONE specific coaching observation (max 35 words, direct like a trusted editor — no praise, no hedging)
+- type: the category of the fix
+- rewrite: a full, complete rewrite of the post applying the coaching note. Match the author's voice and style. Keep roughly the same length. Do NOT add commentary — just the improved post text ready to publish.
+- Return JSON only: { "note": "...", "type": "hook|clarity|voice|structure|cta", "rewrite": "..." }`,
       messages: [{ role: "user", content: userMessage }],
     });
 
