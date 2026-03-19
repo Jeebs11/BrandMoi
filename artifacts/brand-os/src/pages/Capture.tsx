@@ -406,8 +406,15 @@ export default function Capture() {
     else if (state.activeTab === "visual") contentToRefine = state.content.visual;
     else if (state.activeTab === "carousel") contentToRefine = JSON.stringify(state.content.carousel);
 
+    // When refining carousel or visual, always inject the current post as context
+    // so the AI can naturally align the content with any edits/rewrites made to the post.
+    let fullInstruction = instruction;
+    if (state.activeTab !== "post" && state.content.post?.trim()) {
+      fullInstruction = `${instruction}\n\nFor context, the current post reads:\n${state.content.post}`;
+    }
+
     refineContent(
-      { data: { content: contentToRefine, instruction, tab: state.activeTab } },
+      { data: { content: contentToRefine, instruction: fullInstruction, tab: state.activeTab } },
       {
         onSuccess: (data) => {
           setState(s => {
@@ -829,6 +836,19 @@ export default function Capture() {
                     ))}
                   </div>
 
+                  {/* Sync to post */}
+                  {state.content?.post && (
+                    <button
+                      disabled={isRefining}
+                      onClick={() => handleRefine("Rewrite this visual card text so it captures the core message, tone, and theme of the updated post. Keep it punchy and visual-friendly.")}
+                      className={cn("w-full py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2",
+                        refiningTab?.startsWith("Rewrite this visual") ? "bg-primary text-white border-primary" : "bg-primary/5 text-primary border-primary/20 hover:bg-primary/10 disabled:opacity-40")}
+                    >
+                      <RefreshCw className={cn("w-3.5 h-3.5", refiningTab?.startsWith("Rewrite this visual") && "animate-spin")} />
+                      {refiningTab?.startsWith("Rewrite this visual") ? "Syncing…" : "Sync to current post"}
+                    </button>
+                  )}
+
                   {/* 5. Generate image prompt */}
                   <button
                     onClick={handleGenerateImagePrompt}
@@ -1006,6 +1026,17 @@ export default function Capture() {
                     </button>
                   ))}
                 </div>
+              )}
+              {state.activeTab === "carousel" && state.content?.post && (
+                <button
+                  disabled={isRefining}
+                  onClick={() => handleRefine("Rewrite every slide so the titles and descriptions directly reflect the key points and narrative of the updated post. Keep the same number of slides.")}
+                  className={cn("w-full py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2",
+                    refiningTab?.startsWith("Rewrite every slide") ? "bg-primary text-white border-primary" : "bg-primary/5 text-primary border-primary/20 hover:bg-primary/10 disabled:opacity-40")}
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", refiningTab?.startsWith("Rewrite every slide") && "animate-spin")} />
+                  {refiningTab?.startsWith("Rewrite every slide") ? "Syncing…" : "Sync to current post"}
+                </button>
               )}
               <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSaving || isCoaching}>
                 {isSaving ? "Saving..." : isCoaching ? "Reviewing draft..." : draftId ? "Update draft" : "Save draft"}
