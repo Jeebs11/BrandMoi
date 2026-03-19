@@ -120,7 +120,7 @@ export default function Capture() {
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
   const [isAnimatingCarousel, setIsAnimatingCarousel] = useState<CarouselAnimPreset | null>(null);
-  const [animSpeedMult, setAnimSpeedMult] = useState<1 | 1.5 | 2>(1);
+  const [animSpeedMult, setAnimSpeedMult] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
 
@@ -803,7 +803,7 @@ export default function Capture() {
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Download animated</p>
                             <div className="flex gap-1">
-                              {([1, 1.5, 2] as const).map((mult) => (
+                              {([1, 2, 3, 4, 5] as const).map((mult) => (
                                 <button
                                   key={mult}
                                   onClick={() => setAnimSpeedMult(mult)}
@@ -814,7 +814,7 @@ export default function Capture() {
                                       : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                                   )}
                                 >
-                                  {mult === 1 ? "1×" : mult === 1.5 ? "1.5×" : "2×"}
+                                  {mult}×
                                 </button>
                               ))}
                             </div>
@@ -1011,7 +1011,7 @@ export default function Capture() {
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
                       <div className="flex gap-1">
-                        {([1, 1.5, 2] as const).map((mult) => (
+                        {([1, 2, 3, 4, 5] as const).map((mult) => (
                           <button
                             key={mult}
                             onClick={() => setAnimSpeedMult(mult)}
@@ -1022,7 +1022,7 @@ export default function Capture() {
                                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                             )}
                           >
-                            {mult === 1 ? "1×" : mult === 1.5 ? "1.5×" : "2×"}
+                            {mult}×
                           </button>
                         ))}
                       </div>
