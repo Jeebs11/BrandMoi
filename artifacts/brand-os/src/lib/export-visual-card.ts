@@ -25,7 +25,7 @@ function buildCardEl(
     "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif",
   ].join(";");
 
-  // Large opening quote mark
+  // Large opening quote mark (top-left)
   const quote = document.createElement("div");
   quote.style.cssText = `color:${accentColor};font-size:120px;line-height:1;font-weight:800;margin-bottom:8px;margin-left:-8px`;
   quote.textContent = "\u201C";
@@ -39,9 +39,15 @@ function buildCardEl(
   body.style.cssText = `color:${textColor};font-size:56px;font-weight:700;line-height:1.18;word-break:break-word;letter-spacing:-0.5px`;
   body.textContent = quoteText;
 
+  // Closing quote mark (bottom-right)
+  const closeQuote = document.createElement("div");
+  closeQuote.style.cssText = `color:${accentColor};font-size:120px;line-height:1;font-weight:800;align-self:flex-end;margin-top:auto;padding-top:40px;margin-right:-8px`;
+  closeQuote.textContent = "\u201D";
+
   el.appendChild(quote);
   el.appendChild(bar);
   el.appendChild(body);
+  el.appendChild(closeQuote);
 
   return el;
 }
@@ -81,7 +87,7 @@ export async function downloadVisualCard(
   wrapper.appendChild(el);
   document.body.appendChild(wrapper);
   try {
-    const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 1, skipFonts: true });
+    const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 2, skipFonts: true });
     const a = document.createElement("a");
     const safeName = topic.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 40) || "quote-card";
     a.download = `${safeName}-quote-card.png`;

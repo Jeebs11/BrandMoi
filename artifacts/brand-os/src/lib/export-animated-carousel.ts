@@ -86,7 +86,15 @@ async function record(
   return recordWebM(canvas, durationMs, draw);
 }
 
-// Exported so Capture.tsx can scale with a speed multiplier
+export type CarouselAnimPreset = "swipe" | "fade" | "zoom";
+
+export const CAROUSEL_PRESET_DURATIONS: Record<CarouselAnimPreset, { holdMs: number; transMs: number }> = {
+  swipe: { holdMs: 3000, transMs: 600 },
+  fade:  { holdMs: 3000, transMs: 800 },
+  zoom:  { holdMs: 3500, transMs: 500 },
+};
+
+// Kept for backward-compat callers
 export const CAROUSEL_BASE_HOLD_MS = 3000;
 export const CAROUSEL_BASE_SWIPE_MS = 600;
 
@@ -224,13 +232,16 @@ function drawSlide(
   accentColor: string,
   offsetX = 0,
   contentAlpha = 1,
-  textColor = "#ffffff"
+  textColor = "#ffffff",
+  drawBg = true
 ) {
   ctx.save();
   ctx.translate(offsetX, 0);
 
-  ctx.fillStyle = bgColor;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  if (drawBg) {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+  }
 
   ctx.globalAlpha = contentAlpha;
 
@@ -277,42 +288,68 @@ export async function downloadAnimatedCarousel(
   bgColor: string,
   accentColor: string,
   textColor = "#ffffff",
-  holdMs = CAROUSEL_BASE_HOLD_MS,
-  swipeMs = CAROUSEL_BASE_SWIPE_MS
+  preset: CarouselAnimPreset = "swipe",
+  holdMs?: number,
+  transMs?: number
 ): Promise<void> {
   if (!slides.length) return;
+
+  const durations = CAROUSEL_PRESET_DURATIONS[preset];
+  const _holdMs = holdMs ?? durations.holdMs;
+  const _transMs = transMs ?? durations.transMs;
 
   const canvas = document.createElement("canvas");
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d")!;
 
-  // Pre-build all layouts (needs canvas context for text measurement)
   const layouts = slides.map((s) => buildSlideLayout(ctx, s));
 
   const n = slides.length;
-  const segmentMs = holdMs + swipeMs;
-  const totalMs = n * holdMs + (n - 1) * swipeMs + 800;
+  const segmentMs = _holdMs + _transMs;
+  const totalMs = n * _holdMs + (n - 1) * _transMs + 800;
 
   const blob = await record(canvas, totalMs, (t) => {
     const elapsed = t * totalMs;
 
     for (let i = 0; i < n; i++) {
       const segStart = i * segmentMs;
-      const holdEnd = segStart + holdMs;
-      const swipeEnd = holdEnd + swipeMs;
+      const holdEnd = segStart + _holdMs;
+      const transEnd = holdEnd + _transMs;
 
       if (elapsed >= segStart && elapsed < holdEnd) {
-        const holdT = clamp((elapsed - segStart) / holdMs);
-        const fadeIn = i === 0 ? easeOut(clamp(holdT * 5)) : 1;
-        drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, 0, fadeIn, textColor);
+        const holdT = clamp((elapsed - segStart) / _holdMs);
+
+        if (preset === "zoom") {
+          // Slow zoom-in (Ken Burns): scale from 1.0 → 1.06 over the hold
+          const zoom = 1 + 0.06 * easeOut(holdT, 2);
+          const fadeIn = i === 0 ? easeOut(clamp(holdT * 5)) : 1;
+          ctx.save();
+          ctx.translate(CARD_W / 2, CARD_H / 2);
+          ctx.scale(zoom, zoom);
+          ctx.translate(-CARD_W / 2, -CARD_H / 2);
+          drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, 0, fadeIn, textColor);
+          ctx.restore();
+        } else {
+          const fadeIn = i === 0 ? easeOut(clamp(holdT * 5)) : 1;
+          drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, 0, fadeIn, textColor);
+        }
         return;
       }
 
-      if (elapsed >= holdEnd && elapsed < swipeEnd && i < n - 1) {
-        const swipeT = easeOut(clamp((elapsed - holdEnd) / swipeMs), 4);
-        drawSlide(ctx, slides[i], n, layouts[i], bgColor, accentColor, -CARD_W * swipeT, 1, textColor);
-        drawSlide(ctx, slides[i + 1], n, layouts[i + 1], bgColor, accentColor, CARD_W * (1 - swipeT), 1, textColor);
+      if (elapsed >= holdEnd && elapsed < transEnd && i < n - 1) {
+        const transT = easeOut(clamp((elapsed - holdEnd) / _transMs), 4);
+
+        if (preset === "swipe") {
+          drawSlide(ctx, slides[i],     n, layouts[i],     bgColor, accentColor, -CARD_W * transT,       1, textColor);
+          drawSlide(ctx, slides[i + 1], n, layouts[i + 1], bgColor, accentColor,  CARD_W * (1 - transT), 1, textColor);
+        } else {
+          // Fade and Zoom: cross-fade — draw shared background once, then layer content
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(0, 0, CARD_W, CARD_H);
+          drawSlide(ctx, slides[i],     n, layouts[i],     bgColor, accentColor, 0, 1 - transT, textColor, false);
+          drawSlide(ctx, slides[i + 1], n, layouts[i + 1], bgColor, accentColor, 0, transT,     textColor, false);
+        }
         return;
       }
     }

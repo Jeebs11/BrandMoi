@@ -22,7 +22,7 @@ import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, age
 import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
 import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
 import { downloadAnimatedCard, type CardAnimPreset, CARD_BASE_DURATIONS } from "@/lib/export-animated-card";
-import { downloadAnimatedCarousel, CAROUSEL_BASE_HOLD_MS, CAROUSEL_BASE_SWIPE_MS } from "@/lib/export-animated-carousel";
+import { downloadAnimatedCarousel, type CarouselAnimPreset, CAROUSEL_PRESET_DURATIONS } from "@/lib/export-animated-carousel";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -119,7 +119,7 @@ export default function Capture() {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
-  const [isAnimatingCarousel, setIsAnimatingCarousel] = useState(false);
+  const [isAnimatingCarousel, setIsAnimatingCarousel] = useState<CarouselAnimPreset | null>(null);
   const [animSpeedMult, setAnimSpeedMult] = useState<1 | 1.5 | 2>(1);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
@@ -302,23 +302,25 @@ export default function Capture() {
     }
   };
 
-  const handleDownloadAnimatedCarousel = async () => {
+  const handleDownloadAnimatedCarousel = async (preset: CarouselAnimPreset) => {
     if (!state.content?.carousel?.length) return;
-    setIsAnimatingCarousel(true);
+    setIsAnimatingCarousel(preset);
     try {
+      const { holdMs, transMs } = CAROUSEL_PRESET_DURATIONS[preset];
       await downloadAnimatedCarousel(
         state.content.carousel,
         state.structure?.topic ?? "carousel",
         bgColor,
         accentColor,
         textColor,
-        Math.round(CAROUSEL_BASE_HOLD_MS * animSpeedMult),
-        Math.round(CAROUSEL_BASE_SWIPE_MS * animSpeedMult)
+        preset,
+        Math.round(holdMs * animSpeedMult),
+        Math.round(transMs * animSpeedMult)
       );
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
-      setIsAnimatingCarousel(false);
+      setIsAnimatingCarousel(null);
     }
   };
 
@@ -1007,7 +1009,7 @@ export default function Capture() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated preview</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
                       <div className="flex gap-1">
                         {([1, 1.5, 2] as const).map((mult) => (
                           <button
@@ -1025,18 +1027,28 @@ export default function Capture() {
                         ))}
                       </div>
                     </div>
-                    <button
-                      onClick={handleDownloadAnimatedCarousel}
-                      disabled={isAnimatingCarousel}
-                      className="w-full py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                    >
-                      {isAnimatingCarousel ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Download className="w-3.5 h-3.5" />
-                      )}
-                      {isAnimatingCarousel ? "Building video preview…" : "Download animated preview (.mp4)"}
-                    </button>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["swipe", "fade", "zoom"] as CarouselAnimPreset[]).map((preset) => (
+                        <button
+                          key={preset}
+                          disabled={!!isAnimatingCarousel}
+                          onClick={() => handleDownloadAnimatedCarousel(preset)}
+                          className={cn(
+                            "py-3 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-1",
+                            isAnimatingCarousel === preset
+                              ? "bg-primary text-white border-primary"
+                              : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40"
+                          )}
+                        >
+                          {isAnimatingCarousel === preset ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Download className="w-3 h-3" />
+                          )}
+                          {isAnimatingCarousel === preset ? "…" : preset === "swipe" ? "Swipe" : preset === "fade" ? "Fade" : "Zoom"}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

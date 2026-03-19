@@ -97,7 +97,7 @@ export async function downloadCarouselPDF(
     wrapper.appendChild(el);
     document.body.appendChild(wrapper);
     try {
-      const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 1, skipFonts: true });
+      const dataUrl = await toPng(el, { width: 1080, height: 1080, pixelRatio: 2, skipFonts: true });
       if (i > 0) pdf.addPage([1080, 1080], "p");
       pdf.addImage(dataUrl, "PNG", 0, 0, 1080, 1080);
     } finally {
