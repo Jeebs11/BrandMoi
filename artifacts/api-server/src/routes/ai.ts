@@ -88,7 +88,8 @@ Return this exact JSON shape (no markdown fences):
 
   let parsed2: unknown;
   try {
-    parsed2 = JSON.parse(text.text);
+    const stripped = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    parsed2 = JSON.parse(stripped);
   } catch {
     res.status(500).json({ error: "AI returned invalid JSON" });
     return;
@@ -150,7 +151,8 @@ Return this exact JSON shape (no markdown fences):
 
   let parsed2: unknown;
   try {
-    parsed2 = JSON.parse(text.text);
+    const stripped = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    parsed2 = JSON.parse(stripped);
   } catch {
     res.status(500).json({ error: "AI returned invalid JSON" });
     return;
@@ -166,7 +168,7 @@ Return this exact JSON shape (no markdown fences):
 });
 
 const CarouselSlideSchema = z.array(z.object({
-  slide: z.number(),
+  slide: z.coerce.number(),
   title: z.string(),
   description: z.string(),
 }));

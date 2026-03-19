@@ -1035,7 +1035,7 @@ export default function Capture() {
                       ) : (
                         <Download className="w-3.5 h-3.5" />
                       )}
-                      {isAnimatingCarousel ? "Building video preview…" : "Download animated preview (.webm)"}
+                      {isAnimatingCarousel ? "Building video preview…" : "Download animated preview (.mp4)"}
                     </button>
                   </div>
                 </div>
