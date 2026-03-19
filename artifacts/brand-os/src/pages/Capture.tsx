@@ -149,7 +149,7 @@ export default function Capture() {
   // Pre-save coach
   const [coachModal, setCoachModal] = useState<{ note: string; type: AgentCoach["type"]; rewrite: string } | null>(null);
   const [isCoaching, setIsCoaching] = useState(false);
-  const pendingSaveRef = useRef<(() => void) | null>(null);
+  const pendingSaveRef = useRef<((postOverride?: string) => void) | null>(null);
   // Track whether the user has hand-edited the post text after AI generation.
   // The coach only fires when this is true — pure AI output skips it.
   const [userEditedPost, setUserEditedPost] = useState(false);
@@ -434,7 +434,7 @@ export default function Capture() {
     );
   };
 
-  const executeSave = () => {
+  const executeSave = (postOverride?: string) => {
     if (!state.structure) return;
     const draftData = {
       rawInput: state.rawInput,
@@ -442,7 +442,7 @@ export default function Capture() {
       persona: state.persona,
       tone: state.tone,
       structuredBreakdown: state.structure,
-      postOutput: state.content?.post ?? null,
+      postOutput: postOverride ?? state.content?.post ?? null,
       carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
       visualOutput: state.content?.visual ?? null,
       status: "draft" as const,
@@ -1132,12 +1132,15 @@ export default function Capture() {
                   {/* Primary: use the rewrite */}
                   <button
                     onClick={() => {
-                      if (coachModal.rewrite) {
-                        setState(s => s.content ? { ...s, content: { ...s.content, post: coachModal.rewrite } } : s);
+                      const rewrite = coachModal.rewrite;
+                      // Update the post textarea so the user sees the rewrite if they navigate back
+                      if (rewrite) {
+                        setState(s => s.content ? { ...s, content: { ...s.content, post: rewrite } } : s);
                         setUserEditedPost(false);
                       }
                       setCoachModal(null);
-                      pendingSaveRef.current?.();
+                      // Pass rewrite directly — avoids the stale state closure in pendingSaveRef
+                      pendingSaveRef.current?.(rewrite || undefined);
                     }}
                     className="w-full h-12 rounded-2xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
                   >
