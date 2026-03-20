@@ -553,6 +553,8 @@ components:
           $ref: "#/components/schemas/StructuredBreakdown"
         selectedHook:
           type: string
+        includeCta:
+          type: boolean
       required:
         - rawInput
         - objective

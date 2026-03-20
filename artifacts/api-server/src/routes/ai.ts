@@ -111,9 +111,13 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook } = parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta } = parsed.data;
   const brandContext = buildBrandContext(objective, persona, tone);
   const voiceContext = await getUserBrandContext(req.user!.userId);
+
+  const ctaInstruction = includeCta
+    ? `\nCTA requirement: End the LinkedIn post with a specific, natural call-to-action that fits the topic (e.g. "Follow for more on [topic]", "Save this if you want to remember [key point]", or "Tag someone who needs to hear this"). Avoid generic CTAs like "What do you think?" or "Drop a comment". For the carousel, make the final slide a strong CTA slide that prompts a specific action.`
+    : "";
 
   const userMessage = `Create LinkedIn content based on this structure:
 
@@ -128,7 +132,7 @@ Structure:
 - Why It Matters: ${structure.whyItMatters}
 - Selected Hook: ${selectedHook}
 - Narrative Flow: ${structure.narrativeFlow.join(" → ")}
-
+${ctaInstruction}
 Return this exact JSON shape (no markdown fences):
 {
   "post": "",

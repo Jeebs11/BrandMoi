@@ -92,6 +92,7 @@ export interface GenerateContentBody {
   tone: string;
   structure: StructuredBreakdown;
   selectedHook: string;
+  includeCta?: boolean;
 }
 
 export interface GeneratedContent {

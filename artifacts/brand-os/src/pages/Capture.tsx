@@ -121,6 +121,7 @@ export default function Capture() {
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
   const [isAnimatingCarousel, setIsAnimatingCarousel] = useState<CarouselAnimPreset | null>(null);
   const [animSpeedMult, setAnimSpeedMult] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [includeCta, setIncludeCta] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
 
@@ -401,6 +402,7 @@ export default function Capture() {
         data: {
           rawInput: state.rawInput, objective: state.objective, persona: state.persona,
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
+          includeCta,
         },
       },
       {
@@ -705,6 +707,16 @@ export default function Capture() {
             </div>
             <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
               {!state.selectedHook && <p className="text-center text-xs text-gray-400 font-medium mb-3">← Tap a hook above to continue</p>}
+              <label className="flex items-center gap-2.5 mb-3 cursor-pointer group">
+                <div className={cn(
+                  "w-5 h-5 rounded flex items-center justify-center border-2 flex-shrink-0 transition-all duration-150",
+                  includeCta ? "bg-primary border-primary" : "border-gray-300 bg-white group-hover:border-primary/50"
+                )}>
+                  {includeCta && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                </div>
+                <input type="checkbox" className="sr-only" checked={includeCta} onChange={e => setIncludeCta(e.target.checked)} />
+                <span className="text-sm font-medium text-gray-700 select-none">Include a CTA</span>
+              </label>
               <Button className="w-full h-14 text-base font-semibold group" onClick={handleGenerate} disabled={!state.selectedHook}>
                 Looks good — generate content <Sparkles className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />
               </Button>

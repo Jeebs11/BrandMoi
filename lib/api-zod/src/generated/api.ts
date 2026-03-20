@@ -135,6 +135,7 @@ export const GenerateContentBody = zod.object({
     narrativeFlow: zod.array(zod.string()),
   }),
   selectedHook: zod.string(),
+  includeCta: zod.boolean().optional(),
 });
 
 export const GenerateContentResponse = zod.object({
