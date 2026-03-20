@@ -563,6 +563,7 @@ export default function Capture() {
     resetGenerate();
     setAngleResult(null);
     setAngleDismissed(false);
+    setIncludeCta(false);
     setState({ ...initialState, rawInput: "", objective: preferences?.objective ?? "Authority", persona: preferences?.persona ?? "Founder", tone: preferences?.tone ?? "Direct" });
     setInitialized(false);
     navigate("/capture");
