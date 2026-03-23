@@ -172,8 +172,9 @@ export default function Capture() {
   }, [preferences]);
 
   // Auto-generate slide preview when carousel tab is active or colors change
-  const firstSlideTitle = state.content?.carousel?.[0]?.title;
   const carouselLength = state.content?.carousel?.length ?? 0;
+  // Stringify the full carousel so ANY edit or refinement (title, description, slide count) triggers a preview refresh
+  const carouselFingerprint = JSON.stringify(state.content?.carousel ?? []);
   useEffect(() => {
     if (state.activeTab !== "carousel" || carouselLength === 0) {
       setSlidePreviewUrl(null);
@@ -201,7 +202,7 @@ export default function Capture() {
     }, 400);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.activeTab, carouselLength, firstSlideTitle, bgColor, accentColor, textColor]);
+  }, [state.activeTab, carouselFingerprint, bgColor, accentColor, textColor]);
 
   // Auto-generate visual card preview when visual tab is active or text/colors change
   const visualText = state.content?.visual ?? "";
@@ -865,7 +866,7 @@ export default function Capture() {
                               </button>
                             ))}
                           </div>
-                          <p className="text-[10px] text-gray-400 mt-1.5">Saves as .webm · upload directly to LinkedIn</p>
+                          <p className="text-[10px] text-gray-400 mt-1.5">Saves as .mp4 · upload directly to LinkedIn</p>
                         </div>
                       </div>
                     )}
