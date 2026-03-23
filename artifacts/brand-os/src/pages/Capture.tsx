@@ -156,6 +156,50 @@ export default function Capture() {
   const [coachModal, setCoachModal] = useState<{ note: string; type: AgentCoach["type"]; rewrite: string } | null>(null);
   const [isCoaching, setIsCoaching] = useState(false);
   const pendingSaveRef = useRef<((postOverride?: string) => void) | null>(null);
+  const postTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // LinkedIn-compatible Unicode text formatters (LinkedIn ignores markdown but renders Unicode math chars)
+  const applyUnicode = (text: string, mode: "bold" | "italic" | "bolditalic"): string =>
+    text.split("").map(ch => {
+      const c = ch.charCodeAt(0);
+      if (mode === "bolditalic") {
+        if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D63C + c - 65);
+        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D656 + c - 97);
+        return ch;
+      }
+      if (mode === "bold") {
+        if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D5D4 + c - 65);
+        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D5EE + c - 97);
+        if (c >= 48 && c <= 57) return String.fromCodePoint(0x1D7EC + c - 48);
+        return ch;
+      }
+      if (mode === "italic") {
+        if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D608 + c - 65);
+        if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D622 + c - 97);
+        return ch;
+      }
+      return ch;
+    }).join("");
+  const toLiBold = (t: string) => applyUnicode(t, "bold");
+  const toLiItalic = (t: string) => applyUnicode(t, "italic");
+  const toLiBoldItalic = (t: string) => applyUnicode(t, "bolditalic");
+
+  const applyPostFormat = (formatter: (t: string) => string) => {
+    const el = postTextareaRef.current;
+    if (!el || !state.content) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    if (start === end) return;
+    const post = state.content.post;
+    const formatted = formatter(post.substring(start, end));
+    const newPost = post.substring(0, start) + formatted + post.substring(end);
+    setState(s => s.content ? { ...s, content: { ...s.content, post: newPost } } : s);
+    setUserEditedPost(true);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start, start + formatted.length);
+    });
+  };
   // Track whether the user has hand-edited the post text after AI generation.
   // The coach only fires when this is true — pure AI output skips it.
   const [userEditedPost, setUserEditedPost] = useState(false);
@@ -752,12 +796,39 @@ export default function Capture() {
                 </div>
               )}
               {state.activeTab === "post" && (
-                <div className="relative group h-full">
-                  <textarea className="w-full h-full min-h-[340px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
-                    value={state.content.post} onChange={e => { setState(s => s.content ? { ...s, content: { ...s.content, post: e.target.value } } : s); setUserEditedPost(true); }} />
-                  <button onClick={() => copyToClipboard(state.content!.post)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
-                    <Copy className="w-4 h-4" />
-                  </button>
+                <div className="flex flex-col h-full gap-2">
+                  {/* LinkedIn text formatter toolbar */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider mr-1">Format</span>
+                    <button
+                      onMouseDown={e => { e.preventDefault(); applyPostFormat(toLiBold); }}
+                      className="w-8 h-8 flex items-center justify-center font-black text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 active:scale-95 transition-all select-none"
+                      title="Bold (renders on LinkedIn)"
+                    >B</button>
+                    <button
+                      onMouseDown={e => { e.preventDefault(); applyPostFormat(toLiItalic); }}
+                      className="w-8 h-8 flex items-center justify-center italic font-semibold text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 active:scale-95 transition-all select-none"
+                      title="Italic (renders on LinkedIn)"
+                    >I</button>
+                    <button
+                      onMouseDown={e => { e.preventDefault(); applyPostFormat(toLiBoldItalic); }}
+                      className="w-8 h-8 flex items-center justify-center italic font-black text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 active:scale-95 transition-all select-none"
+                      title="Bold Italic (renders on LinkedIn)"
+                    >BI</button>
+                    <span className="text-[9px] text-gray-300 ml-1">Select text, then tap</span>
+                  </div>
+                  {/* Post textarea with copy button */}
+                  <div className="relative group flex-1">
+                    <textarea
+                      ref={postTextareaRef}
+                      className="w-full h-full min-h-[300px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      value={state.content.post}
+                      onChange={e => { setState(s => s.content ? { ...s, content: { ...s.content, post: e.target.value } } : s); setUserEditedPost(true); }}
+                    />
+                    <button onClick={() => copyToClipboard(state.content!.post)} className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
               {state.activeTab === "visual" && (
