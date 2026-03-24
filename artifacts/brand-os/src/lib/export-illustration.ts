@@ -163,18 +163,72 @@ function drawFrame(
   ctx.fillRect(0, 0, CARD_W, CARD_H);
 
   if (preset === "draw") {
-    const wipeP = easeOut(phase(t, 0, 0.60), 2);
-    const clipW = CARD_W * wipeP;
+    const drawP = easeOut(phase(t, 0, 0.62), 2);
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, clipW, ILLUS_H);
-    ctx.clip();
-    drawImageCover(ctx, img, 0, 0, CARD_W, ILLUS_H);
-    ctx.restore();
+    // Row-by-row strip reveal: reveal `revealedH` rows of the illustration
+    const revealedH = Math.floor(ILLUS_H * drawP);
 
-    const divAlpha = easeOut(phase(t, 0.58, 0.66), 2);
-    const charProg = phase(t, 0.65, 0.97);
+    // Draw the revealed portion of the illustration
+    if (revealedH > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, CARD_W, revealedH);
+      ctx.clip();
+      drawImageCover(ctx, img, 0, 0, CARD_W, ILLUS_H);
+      ctx.restore();
+    }
+
+    // Pen-nib cursor at the leading edge
+    if (drawP > 0 && drawP < 1) {
+      const NIB_W = 48;
+      const NIB_H = 32;
+      const SLANT = 14; // horizontal slant of the parallelogram
+      const nibX = CARD_W - NIB_W - SLANT - 8; // right-aligned, slightly inset
+      const nibY = revealedH - NIB_H / 2;
+
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+
+      // Body of the pen nib (dark parallelogram)
+      ctx.fillStyle = "#1a1a1a";
+      ctx.beginPath();
+      ctx.moveTo(nibX + SLANT, nibY);
+      ctx.lineTo(nibX + SLANT + NIB_W, nibY);
+      ctx.lineTo(nibX + NIB_W, nibY + NIB_H);
+      ctx.lineTo(nibX, nibY + NIB_H);
+      ctx.closePath();
+      ctx.fill();
+
+      // Highlight stripe on the nib
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.beginPath();
+      ctx.moveTo(nibX + SLANT + 6, nibY + 3);
+      ctx.lineTo(nibX + SLANT + NIB_W - 10, nibY + 3);
+      ctx.lineTo(nibX + NIB_W - 10, nibY + NIB_H - 6);
+      ctx.lineTo(nibX + 6, nibY + NIB_H - 6);
+      ctx.closePath();
+      ctx.fill();
+
+      // Sharp tip pointing down-left
+      ctx.fillStyle = "#1a1a1a";
+      ctx.beginPath();
+      ctx.moveTo(nibX, nibY + NIB_H);
+      ctx.lineTo(nibX + NIB_W, nibY + NIB_H);
+      ctx.lineTo(nibX - 18, nibY + NIB_H + 22);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tiny ink dot at the very tip
+      ctx.fillStyle = "#2563eb";
+      ctx.beginPath();
+      ctx.arc(nibX - 10, nibY + NIB_H + 18, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    const divAlpha = easeOut(phase(t, 0.60, 0.68), 2);
+    const charProg = phase(t, 0.67, 0.97);
     const textAlpha = charProg > 0 ? 1 : 0;
     drawCaptionBlock(ctx, layout, divAlpha, textAlpha, charProg);
 
@@ -331,7 +385,8 @@ export async function downloadAnimatedIllustration(
   imageBase64: string,
   caption: string,
   preset: IllustrationAnimPreset,
-  filename = "illustration"
+  filename = "illustration",
+  durationMs?: number
 ): Promise<void> {
   const canvas = document.createElement("canvas");
   canvas.width = CARD_W;
@@ -339,7 +394,7 @@ export async function downloadAnimatedIllustration(
   const ctx = canvas.getContext("2d")!;
   const img = await loadImage(imageBase64);
   const layout = buildCaptionLayout(ctx, caption);
-  const dur = ILLUS_BASE_DURATIONS[preset];
+  const dur = durationMs ?? ILLUS_BASE_DURATIONS[preset];
 
   const blob = await record(canvas, dur, (t) => {
     drawFrame(ctx, img, layout, preset, t);

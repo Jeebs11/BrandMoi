@@ -15,6 +15,8 @@ const GenerateImagePromptBody = z.object({
 const STYLE_WRAPPERS: Record<string, string> = {
   cartoon:
     "Single-panel editorial cartoon, clean black ink line art on white background, New Yorker magazine pen-and-ink style, no text or lettering in the image, detailed cross-hatching",
+  "new-yorker":
+    "Classic New Yorker magazine single-panel cartoon, pure black-and-white pen-and-ink illustration, expressive fine-line cross-hatching, white paper background, no colour, no grey tones, no text or lettering anywhere in the image, witty editorial scene composition",
   isometric:
     "3D isometric illustration, flat vibrant colours, clean geometric shapes, modern professional style, light background, no text in the image",
   sketch:
@@ -53,7 +55,7 @@ router.post("/ai/generate-illustration-concept", requireAuth, aiRateLimit, async
 
   const styleInstruction =
     style === "surprise"
-      ? "Choose the most creative and impactful illustration style for this post. You may pick from Editorial Cartoon, Isometric, Whiteboard Sketch, Blueprint, Vintage Poster — or invent a completely different style if it better suits the content."
+      ? "Choose the most creative and impactful illustration style for this post. You may pick from: New Yorker (classic black-and-white pen-and-ink), Editorial Cartoon, Isometric, Whiteboard Sketch, Blueprint, Vintage Poster — or invent a completely different style if it better suits the content."
       : `Use this illustration style: ${style}. Match the scenePrompt description to that style.`;
 
   try {

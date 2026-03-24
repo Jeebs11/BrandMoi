@@ -24,7 +24,7 @@ import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card"
 import { downloadAnimatedCard, type CardAnimPreset, CARD_BASE_DURATIONS } from "@/lib/export-animated-card";
 import { downloadAnimatedCarousel, type CarouselAnimPreset, CAROUSEL_PRESET_DURATIONS } from "@/lib/export-animated-carousel";
 import { previewInfographic, downloadInfographic, downloadAnimatedInfographic, type InfographicAnimPreset, INFOGRAPHIC_BASE_DURATIONS } from "@/lib/export-infographic";
-import { previewIllustrationCard, downloadIllustrationCard, downloadAnimatedIllustration, type IllustrationAnimPreset } from "@/lib/export-illustration";
+import { previewIllustrationCard, downloadIllustrationCard, downloadAnimatedIllustration, type IllustrationAnimPreset, ILLUS_BASE_DURATIONS } from "@/lib/export-illustration";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
@@ -647,7 +647,13 @@ export default function Capture() {
     if (!illustImageBase64 || !illustCaption) return;
     setIsAnimatingIllust(preset);
     try {
-      await downloadAnimatedIllustration(illustImageBase64, illustCaption, preset, `illustration-${illustStyle}`);
+      await downloadAnimatedIllustration(
+        illustImageBase64,
+        illustCaption,
+        preset,
+        `illustration-${illustStyle}`,
+        Math.round(ILLUS_BASE_DURATIONS[preset] * animSpeedMult)
+      );
     } finally {
       setIsAnimatingIllust(null);
     }
@@ -1609,6 +1615,7 @@ export default function Capture() {
                       {[
                         { id: "surprise", label: "✨ Surprise Me" },
                         { id: "cartoon", label: "Cartoon" },
+                        { id: "new-yorker", label: "New Yorker" },
                         { id: "isometric", label: "Isometric" },
                         { id: "sketch", label: "Sketch" },
                         { id: "blueprint", label: "Blueprint" },
@@ -1749,7 +1756,17 @@ export default function Capture() {
                           </div>
 
                           <div className="space-y-2">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
+                              <div className="flex gap-1">
+                                {([1, 2, 3, 4, 5] as const).map((mult) => (
+                                  <button key={mult} onClick={() => setAnimSpeedMult(mult)}
+                                    className={cn("px-2 py-0.5 rounded text-[10px] font-bold transition-all",
+                                      animSpeedMult === mult ? "bg-primary text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200")}
+                                  >{mult}×</button>
+                                ))}
+                              </div>
+                            </div>
                             <div className="grid grid-cols-3 gap-2">
                               {(["draw", "reveal", "pop"] as IllustrationAnimPreset[]).map(preset => (
                                 <button key={preset} disabled={!!isAnimatingIllust || isExportingIllust}
