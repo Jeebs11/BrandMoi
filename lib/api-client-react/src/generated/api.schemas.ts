@@ -85,6 +85,11 @@ export interface CarouselSlide {
   description: string;
 }
 
+export interface InfographicData {
+  headline: string;
+  bullets: string[];
+}
+
 export interface GenerateContentBody {
   rawInput: string;
   objective: string;
@@ -99,6 +104,7 @@ export interface GeneratedContent {
   post: string;
   carousel: CarouselSlide[];
   visual: string;
+  infographic?: InfographicData;
 }
 
 export type RefineContentBodyTab =
@@ -108,6 +114,7 @@ export const RefineContentBodyTab = {
   post: "post",
   carousel: "carousel",
   visual: "visual",
+  infographic: "infographic",
 } as const;
 
 export interface RefineContentBody {

@@ -138,6 +138,11 @@ export const GenerateContentBody = zod.object({
   includeCta: zod.boolean().optional(),
 });
 
+export const InfographicDataSchema = zod.object({
+  headline: zod.string(),
+  bullets: zod.array(zod.string()),
+});
+
 export const GenerateContentResponse = zod.object({
   post: zod.string(),
   carousel: zod.array(
@@ -148,6 +153,7 @@ export const GenerateContentResponse = zod.object({
     }),
   ),
   visual: zod.string(),
+  infographic: InfographicDataSchema.optional().catch(undefined),
 });
 
 /**
@@ -156,7 +162,7 @@ export const GenerateContentResponse = zod.object({
 export const RefineContentBody = zod.object({
   content: zod.string(),
   instruction: zod.string(),
-  tab: zod.enum(["post", "carousel", "visual"]),
+  tab: zod.enum(["post", "carousel", "visual", "infographic"]),
 });
 
 export const RefineContentResponse = zod.object({

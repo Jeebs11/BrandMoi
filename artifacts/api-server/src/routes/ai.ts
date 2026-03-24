@@ -11,6 +11,7 @@ import {
   GenerateContentResponse,
   RefineContentBody,
   RefineContentResponse,
+  InfographicDataSchema,
 } from "@workspace/api-zod";
 import {
   buildBrandContext,
@@ -137,7 +138,11 @@ Return this exact JSON shape (no markdown fences):
 {
   "post": "",
   "carousel": [{"slide": 1, "title": "", "description": ""}],
-  "visual": ""
+  "visual": "",
+  "infographic": {
+    "headline": "Bold 6-10 word statement capturing the core message",
+    "bullets": ["Key insight 1", "Key insight 2", "Key insight 3", "Key insight 4"]
+  }
 }`;
 
   const message = await anthropic.messages.create({
@@ -228,6 +233,49 @@ Return ONLY the updated slides as a JSON array — no markdown fences, no extra 
 
     // Wrap as a string so the frontend can JSON.parse it from data.content
     res.json({ content: JSON.stringify(validatedSlides.data) });
+    return;
+  }
+
+  // Infographic: Claude returns { headline, bullets } JSON, not a plain string
+  if (tab === "infographic") {
+    const infoMessage = `You are refining a LinkedIn infographic card. Current data as JSON:
+
+${content}
+
+Instruction: ${instruction}
+
+Return ONLY the updated infographic as JSON — no markdown fences, no extra text:
+{"headline": "...", "bullets": ["...", "...", "..."]}`;
+
+    const infoResp = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      system: "You are a LinkedIn content editor specialising in infographic cards. Apply the instruction precisely. Return only a valid JSON object with 'headline' (string) and 'bullets' (array of 3-5 strings). No markdown, no preamble.",
+      messages: [{ role: "user", content: infoMessage }],
+    });
+
+    const infoText = infoResp.content[0];
+    if (infoText.type !== "text") {
+      res.status(500).json({ error: "Unexpected AI response type" });
+      return;
+    }
+
+    const rawInfo = infoText.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    let parsedInfo: unknown;
+    try {
+      parsedInfo = JSON.parse(rawInfo);
+    } catch {
+      res.status(500).json({ error: "AI returned invalid JSON for infographic" });
+      return;
+    }
+
+    const validatedInfo = InfographicDataSchema.safeParse(parsedInfo);
+    if (!validatedInfo.success) {
+      res.status(500).json({ error: "AI infographic response did not match expected shape" });
+      return;
+    }
+
+    res.json({ content: JSON.stringify(validatedInfo.data) });
     return;
   }
 

@@ -11,7 +11,7 @@ import {
   useStructureIdea, useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
 } from "@workspace/api-client-react";
-import type { StructuredBreakdown, GeneratedContent, CarouselSlide, Draft } from "@workspace/api-client-react";
+import type { StructuredBreakdown, GeneratedContent, CarouselSlide, Draft, InfographicData } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
@@ -23,12 +23,13 @@ import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel
 import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
 import { downloadAnimatedCard, type CardAnimPreset, CARD_BASE_DURATIONS } from "@/lib/export-animated-card";
 import { downloadAnimatedCarousel, type CarouselAnimPreset, CAROUSEL_PRESET_DURATIONS } from "@/lib/export-animated-carousel";
+import { previewInfographic, downloadInfographic, downloadAnimatedInfographic, type InfographicAnimPreset, INFOGRAPHIC_BASE_DURATIONS } from "@/lib/export-infographic";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 
-type TabType = "post" | "carousel" | "visual";
+type TabType = "post" | "carousel" | "visual" | "infographic";
 
 type WorkflowState = {
   step: number;
@@ -147,6 +148,13 @@ export default function Capture() {
   const [cardPreviewUrl, setCardPreviewUrl] = useState<string | null>(null);
   const [isPreviewingCard, setIsPreviewingCard] = useState(false);
   const cardPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Infographic preview + export
+  const [infographicPreviewUrl, setInfographicPreviewUrl] = useState<string | null>(null);
+  const [isPreviewingInfographic, setIsPreviewingInfographic] = useState(false);
+  const [isExportingInfographic, setIsExportingInfographic] = useState(false);
+  const [isAnimatingInfographic, setIsAnimatingInfographic] = useState<InfographicAnimPreset | null>(null);
+  const infographicPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Image prompt (two-step)
   const [imagePrompt, setImagePrompt] = useState("");
@@ -273,6 +281,32 @@ export default function Capture() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeTab, visualText, bgColor, accentColor, textColor]);
 
+  // Auto-generate infographic preview when infographic tab is active or data/colors change
+  const infographicFingerprint = JSON.stringify(state.content?.infographic ?? {});
+  useEffect(() => {
+    const info = state.content?.infographic;
+    if (state.activeTab !== "infographic" || !info?.headline) {
+      setInfographicPreviewUrl(null);
+      return;
+    }
+    if (infographicPreviewTimerRef.current) clearTimeout(infographicPreviewTimerRef.current);
+    setIsPreviewingInfographic(true);
+    infographicPreviewTimerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const url = await previewInfographic(info.headline, info.bullets, bgColorRef.current, accentColorRef.current, textColorRef.current);
+          setInfographicPreviewUrl(url);
+        } catch {
+          setInfographicPreviewUrl(null);
+        } finally {
+          setIsPreviewingInfographic(false);
+        }
+      })();
+    }, 400);
+    return () => { if (infographicPreviewTimerRef.current) clearTimeout(infographicPreviewTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.activeTab, infographicFingerprint, bgColor, accentColor, textColor]);
+
   const schedulePaletteSave = () => {
     if (paletteTimerRef.current) clearTimeout(paletteTimerRef.current);
     paletteTimerRef.current = setTimeout(() => {
@@ -368,6 +402,100 @@ export default function Capture() {
     } finally {
       setIsAnimatingCarousel(null);
     }
+  };
+
+  const handleDownloadInfographic = async () => {
+    const info = state.content?.infographic;
+    if (!info) return;
+    setIsExportingInfographic(true);
+    try {
+      await downloadInfographic(info.headline, info.bullets, state.structure?.topic ?? "infographic", bgColor, accentColor, textColor);
+    } catch {
+      toast({ title: "Infographic export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsExportingInfographic(false);
+    }
+  };
+
+  const handleDownloadAnimatedInfographic = async (preset: InfographicAnimPreset) => {
+    const info = state.content?.infographic;
+    if (!info) return;
+    setIsAnimatingInfographic(preset);
+    try {
+      await downloadAnimatedInfographic(
+        info.headline,
+        info.bullets,
+        state.structure?.topic ?? "infographic",
+        bgColor,
+        accentColor,
+        textColor,
+        preset,
+        Math.round(INFOGRAPHIC_BASE_DURATIONS[preset] * animSpeedMult)
+      );
+    } catch {
+      toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsAnimatingInfographic(null);
+    }
+  };
+
+  const updateInfographicHeadline = (value: string) => {
+    setState(s => {
+      if (!s.content?.infographic) return s;
+      return { ...s, content: { ...s.content, infographic: { ...s.content.infographic, headline: value } } };
+    });
+  };
+
+  const updateInfographicBullet = (idx: number, value: string) => {
+    setState(s => {
+      if (!s.content?.infographic) return s;
+      const bullets = [...s.content.infographic.bullets];
+      bullets[idx] = value;
+      return { ...s, content: { ...s.content, infographic: { ...s.content.infographic, bullets } } };
+    });
+  };
+
+  const addInfographicBullet = () => {
+    setState(s => {
+      if (!s.content?.infographic) return s;
+      const bullets = [...s.content.infographic.bullets, "New point"];
+      return { ...s, content: { ...s.content, infographic: { ...s.content.infographic, bullets } } };
+    });
+  };
+
+  const deleteInfographicBullet = (idx: number) => {
+    setState(s => {
+      if (!s.content?.infographic || s.content.infographic.bullets.length <= 2) return s;
+      const bullets = s.content.infographic.bullets.filter((_, i) => i !== idx);
+      return { ...s, content: { ...s.content, infographic: { ...s.content.infographic, bullets } } };
+    });
+  };
+
+  const handleGenerateInfographic = () => {
+    if (!state.content?.post) return;
+    setRefiningTab("__infographic_generate__");
+    refineContent(
+      {
+        data: {
+          content: state.content.post,
+          instruction: "Extract the core message and key insights from this post. Create a punchy headline (6-10 words) and 3-5 bullet points that capture the main takeaways someone would want to screenshot and save.",
+          tab: "infographic",
+        },
+      },
+      {
+        onSuccess: (data) => {
+          try {
+            const cleaned = data.content.replace(/```json/g, "").replace(/```/g, "");
+            const parsed = JSON.parse(cleaned) as InfographicData;
+            setState(s => s.content ? { ...s, content: { ...s.content, infographic: parsed } } : s);
+          } catch {
+            toast({ title: "Could not generate infographic.", variant: "destructive" });
+          }
+        },
+        onError: () => toast({ title: "Generation failed.", variant: "destructive" }),
+        onSettled: () => setRefiningTab(null),
+      }
+    );
   };
 
   const handleGenerateImagePrompt = async () => {
@@ -468,9 +596,9 @@ export default function Capture() {
     if (state.activeTab === "post") contentToRefine = state.content.post;
     else if (state.activeTab === "visual") contentToRefine = state.content.visual;
     else if (state.activeTab === "carousel") contentToRefine = JSON.stringify(state.content.carousel);
+    else if (state.activeTab === "infographic") contentToRefine = JSON.stringify(state.content.infographic ?? { headline: "", bullets: [] });
 
-    // When refining carousel or visual, always inject the current post as context
-    // so the AI can naturally align the content with any edits/rewrites made to the post.
+    // When refining non-post tabs, always inject the current post as context
     let fullInstruction = instruction;
     if (state.activeTab !== "post" && state.content.post?.trim()) {
       fullInstruction = `${instruction}\n\nFor context, the current post reads:\n${state.content.post}`;
@@ -494,6 +622,14 @@ export default function Capture() {
                 nc.carousel = JSON.parse(cleaned) as CarouselSlide[];
               } catch {
                 toast({ title: "Could not parse refined carousel.", variant: "destructive" });
+              }
+            }
+            else if (s.activeTab === "infographic") {
+              try {
+                const cleaned = data.content.replace(/```json/g, "").replace(/```/g, "");
+                nc.infographic = JSON.parse(cleaned) as InfographicData;
+              } catch {
+                toast({ title: "Could not parse refined infographic.", variant: "destructive" });
               }
             }
             return { ...s, content: nc };
@@ -778,9 +914,14 @@ export default function Capture() {
         return (
           <motion.div key="s45" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full">
             <div className="flex p-1 bg-gray-100 rounded-xl mb-5 gap-1">
-              {([["post", "Post", <PenTool className="w-3.5 h-3.5" />], ["carousel", "Carousel", <Layout className="w-3.5 h-3.5" />], ["visual", "Visual", <ImageIcon className="w-3.5 h-3.5" />]] as const).map(([id, label, icon]) => (
+              {([
+                ["post", "Post", <PenTool className="w-3 h-3" />],
+                ["carousel", "Slides", <Layout className="w-3 h-3" />],
+                ["visual", "Card", <ImageIcon className="w-3 h-3" />],
+                ["infographic", "Info", <Sparkles className="w-3 h-3" />],
+              ] as const).map(([id, label, icon]) => (
                 <button key={id} onClick={() => setState(s => ({ ...s, activeTab: id as TabType }))}
-                  className={cn("flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all duration-200",
+                  className={cn("flex-1 flex items-center justify-center gap-1 py-2.5 rounded-lg text-[11px] font-bold transition-all duration-200",
                     state.activeTab === id ? "bg-white shadow text-primary" : "text-gray-500 hover:text-gray-700")}
                 >
                   {icon} {label}
@@ -1171,10 +1312,170 @@ export default function Capture() {
                   </div>
                 </div>
               )}
+
+              {/* ── INFOGRAPHIC TAB ─────────────────────────────── */}
+              {state.activeTab === "infographic" && (
+                <div className="space-y-3 pb-6">
+                  {!state.content.infographic ? (
+                    /* Empty state — draft loaded without infographic data */
+                    <div className="bg-white rounded-2xl border border-gray-100 p-8 flex flex-col items-center gap-4 text-center">
+                      <Sparkles className="w-8 h-8 text-primary/40" />
+                      <div>
+                        <p className="text-sm font-bold text-gray-700 mb-1">Generate your infographic</p>
+                        <p className="text-xs text-gray-400">We'll extract the key takeaways from your post</p>
+                      </div>
+                      <button
+                        disabled={isRefining}
+                        onClick={handleGenerateInfographic}
+                        className="px-5 py-2.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center gap-2"
+                      >
+                        {isRefining ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {isRefining ? "Generating…" : "Generate Infographic"}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* 1. Headline */}
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Headline</p>
+                        <div className="relative group">
+                          <input
+                            className="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                            value={state.content.infographic.headline}
+                            onChange={e => updateInfographicHeadline(e.target.value)}
+                            placeholder="Infographic headline…"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 2. Bullets */}
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Key Points</p>
+                        <div className="space-y-2">
+                          {state.content.infographic.bullets.map((bullet, idx) => (
+                            <div key={idx} className="flex items-start gap-2">
+                              <div className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-3">
+                                {idx + 1}
+                              </div>
+                              <textarea
+                                className="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-700 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                                value={bullet}
+                                rows={2}
+                                onChange={e => updateInfographicBullet(idx, e.target.value)}
+                              />
+                              {state.content!.infographic!.bullets.length > 2 && (
+                                <button
+                                  onClick={() => deleteInfographicBullet(idx)}
+                                  className="w-5 h-5 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all mt-3 flex-shrink-0"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {state.content.infographic.bullets.length < 6 && (
+                          <button
+                            onClick={addInfographicBullet}
+                            className="w-full mt-2 py-2.5 rounded-2xl border border-dashed border-primary/30 text-primary/60 text-xs font-bold hover:border-primary/60 hover:text-primary hover:bg-primary/5 transition-all"
+                          >
+                            + Add point
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 3. Preview */}
+                      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-4 pt-4 pb-3">Preview</p>
+                        {isPreviewingInfographic && (
+                          <div className="w-full aspect-square bg-gray-50 flex items-center justify-center pb-4">
+                            <RefreshCw className="w-5 h-5 text-gray-300 animate-spin" />
+                          </div>
+                        )}
+                        {infographicPreviewUrl && !isPreviewingInfographic && (
+                          <div>
+                            <div className="relative">
+                              <img src={infographicPreviewUrl} alt="Infographic preview" className="w-full aspect-square object-cover" />
+                              <button
+                                onClick={handleDownloadInfographic}
+                                disabled={isExportingInfographic}
+                                className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-2 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-xl backdrop-blur-sm transition-all disabled:opacity-50"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                {isExportingInfographic ? "Exporting…" : "Download PNG"}
+                              </button>
+                            </div>
+
+                            {/* Animated export */}
+                            <div className="px-4 pt-3 pb-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
+                                <div className="flex gap-1">
+                                  {([1, 2, 3, 4, 5] as const).map((mult) => (
+                                    <button
+                                      key={mult}
+                                      onClick={() => setAnimSpeedMult(mult)}
+                                      className={cn("px-2 py-0.5 rounded text-[10px] font-bold transition-all", animSpeedMult === mult ? "bg-primary text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200")}
+                                    >{mult}×</button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(["reveal", "fade"] as InfographicAnimPreset[]).map((preset) => (
+                                  <button
+                                    key={preset}
+                                    onClick={() => handleDownloadAnimatedInfographic(preset)}
+                                    disabled={!!isAnimatingInfographic}
+                                    className="py-2 text-[11px] font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1 disabled:opacity-50 transition-all capitalize"
+                                  >
+                                    {isAnimatingInfographic === preset ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                    {isAnimatingInfographic === preset ? "…" : preset === "reveal" ? "Reveal" : "Fade"}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-1.5">Saves as .mp4 · upload directly to LinkedIn</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4. Refine buttons */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { label: "Sharper", instruction: "Tighten the headline and each bullet. Make them punchier and more concrete." },
+                          { label: "More Specific", instruction: "Replace abstract bullets with specific examples, numbers, or data points." },
+                          { label: "More Personal", instruction: "Rewrite bullets to include personal perspective and first-person insight." },
+                          { label: "Client-Focused", instruction: "Reframe the headline and bullets toward client outcomes and results they care about." },
+                        ].map(action => (
+                          <button key={action.label} disabled={isRefining} onClick={() => handleRefine(action.instruction)}
+                            className={cn("py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all",
+                              refiningTab === action.instruction ? "bg-primary text-white border-primary" : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40")}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Sync to post */}
+                      {state.content?.post && (
+                        <button
+                          disabled={isRefining}
+                          onClick={() => handleRefine("Rewrite the headline and bullets to directly reflect the key insights and core message of the current post. Keep the same bullet count.")}
+                          className={cn("w-full py-3 px-3 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-2",
+                            refiningTab?.startsWith("Rewrite the headline and bullets") ? "bg-primary text-white border-primary" : "bg-primary/5 text-primary border-primary/20 hover:bg-primary/10 disabled:opacity-40")}
+                        >
+                          <RefreshCw className={cn("w-3.5 h-3.5", refiningTab?.startsWith("Rewrite the headline and bullets") && "animate-spin")} />
+                          {refiningTab?.startsWith("Rewrite the headline and bullets") ? "Syncing…" : "Sync to current post"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-100 pt-4 space-y-3">
-              {state.activeTab !== "visual" && (
+              {state.activeTab !== "visual" && state.activeTab !== "infographic" && (
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Sharper", instruction: "Tighten language, remove hedging. Keep every idea." },
