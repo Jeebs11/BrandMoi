@@ -157,12 +157,26 @@ export const GenerateContentResponse = zod.object({
 });
 
 /**
+ * @summary Generate an illustration concept (scene + caption) for a LinkedIn post
+ */
+export const GenerateIllustrationConceptBody = zod.object({
+  postContent: zod.string().min(10).max(5000),
+  style: zod.string().min(1).max(50),
+});
+
+export const GenerateIllustrationConceptResponse = zod.object({
+  scenePrompt: zod.string(),
+  caption: zod.string(),
+  chosenStyle: zod.string(),
+});
+
+/**
  * @summary Refine existing content based on an instruction
  */
 export const RefineContentBody = zod.object({
   content: zod.string(),
   instruction: zod.string(),
-  tab: zod.enum(["post", "carousel", "visual", "infographic"]),
+  tab: zod.enum(["post", "carousel", "visual", "infographic", "illustration"]),
 });
 
 export const RefineContentResponse = zod.object({

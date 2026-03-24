@@ -113,12 +113,16 @@ export const smartImportApi = {
 };
 
 export const imageGenApi = {
-  generate: async (prompt: string): Promise<{ imageBase64: string }> => {
+  generate: async (
+    prompt: string,
+    mode: "photo" | "illustration" = "photo",
+    illustrationStyle?: string
+  ): Promise<{ imageBase64: string }> => {
     const res = await fetch("/api/ai/generate-image", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, mode, illustrationStyle }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
@@ -126,6 +130,14 @@ export const imageGenApi = {
     }
     return res.json() as Promise<{ imageBase64: string }>;
   },
+};
+
+export const illustrationConceptApi = {
+  generate: (postContent: string, style: string) =>
+    apiFetch<{ scenePrompt: string; caption: string; chosenStyle: string }>("/ai/generate-illustration-concept", {
+      method: "POST",
+      body: JSON.stringify({ postContent, style }),
+    }),
 };
 
 export const imagePromptApi = {

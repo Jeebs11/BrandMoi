@@ -107,6 +107,17 @@ export interface GeneratedContent {
   infographic?: InfographicData;
 }
 
+export interface GenerateIllustrationConceptBody {
+  postContent: string;
+  style: string;
+}
+
+export interface GenerateIllustrationConceptResponse {
+  scenePrompt: string;
+  caption: string;
+  chosenStyle: string;
+}
+
 export type RefineContentBodyTab =
   (typeof RefineContentBodyTab)[keyof typeof RefineContentBodyTab];
 
@@ -115,6 +126,7 @@ export const RefineContentBodyTab = {
   carousel: "carousel",
   visual: "visual",
   infographic: "infographic",
+  illustration: "illustration",
 } as const;
 
 export interface RefineContentBody {
