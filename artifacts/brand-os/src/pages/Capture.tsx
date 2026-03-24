@@ -155,6 +155,7 @@ export default function Capture() {
   const [isExportingInfographic, setIsExportingInfographic] = useState(false);
   const [isAnimatingInfographic, setIsAnimatingInfographic] = useState<InfographicAnimPreset | null>(null);
   const infographicPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const infographicRenderKey = useRef<string>("");
 
   // Image prompt (two-step)
   const [imagePrompt, setImagePrompt] = useState("");
@@ -281,14 +282,29 @@ export default function Capture() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.activeTab, visualText, bgColor, accentColor, textColor]);
 
-  // Auto-generate infographic preview when infographic tab is active or data/colors change
+  // Auto-generate infographic preview when data/colors change.
+  // The preview URL is KEPT when switching tabs — only regenerated when content actually changes.
   const infographicFingerprint = JSON.stringify(state.content?.infographic ?? {});
   useEffect(() => {
     const info = state.content?.infographic;
-    if (state.activeTab !== "infographic" || !info?.headline) {
+
+    // If there's no data at all, clear everything and reset the key
+    if (!info?.headline) {
       setInfographicPreviewUrl(null);
+      infographicRenderKey.current = "";
       return;
     }
+
+    // Build a signature that captures everything that affects the rendered output
+    const sig = `${infographicFingerprint}|${bgColor}|${accentColor}|${textColor}`;
+
+    // Preview is already up-to-date — nothing to do (preserves it across tab switches)
+    if (infographicRenderKey.current === sig) return;
+
+    // Only actually generate while on the infographic tab; if the user is on another
+    // tab the stale preview stays visible and re-renders once they come back.
+    if (state.activeTab !== "infographic") return;
+
     if (infographicPreviewTimerRef.current) clearTimeout(infographicPreviewTimerRef.current);
     setIsPreviewingInfographic(true);
     infographicPreviewTimerRef.current = setTimeout(() => {
@@ -296,8 +312,10 @@ export default function Capture() {
         try {
           const url = await previewInfographic(info.headline, info.bullets, bgColorRef.current, accentColorRef.current, textColorRef.current);
           setInfographicPreviewUrl(url);
+          infographicRenderKey.current = sig;
         } catch {
           setInfographicPreviewUrl(null);
+          infographicRenderKey.current = "";
         } finally {
           setIsPreviewingInfographic(false);
         }
