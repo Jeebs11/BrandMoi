@@ -1036,7 +1036,7 @@ export default function Capture() {
                 ["carousel", "Slides", <Layout className="w-3 h-3" />],
                 ["visual", "Card", <ImageIcon className="w-3 h-3" />],
                 ["infographic", "Info", <Sparkles className="w-3 h-3" />],
-                ["illustration", "Illus", <Sparkles className="w-3 h-3" />],
+                ["illustration", "Art", <Sparkles className="w-3 h-3" />],
               ] as const).map(([id, label, icon]) => (
                 <button key={id} onClick={() => setState(s => ({ ...s, activeTab: id as TabType }))}
                   className={cn("flex-1 flex items-center justify-center gap-0.5 py-2.5 rounded-lg text-[10px] font-bold transition-all duration-200",
@@ -1631,14 +1631,14 @@ export default function Capture() {
                     <>
                       <Button className="w-full h-12 font-semibold group" onClick={handleCraftIllustConcept}>
                         <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                        Craft Concept
+                        Generate Concept
                       </Button>
                       <div className="flex flex-col items-center justify-center py-8 gap-3">
                         <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
                           <Sparkles className="w-6 h-6 text-gray-300" />
                         </div>
                         <p className="text-sm text-gray-400 text-center leading-relaxed">
-                          Pick a style, craft a concept,<br />edit the scene, then generate
+                          Pick a style, generate a concept,<br />edit the scene, then render
                         </p>
                       </div>
                     </>
@@ -1649,7 +1649,7 @@ export default function Capture() {
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <Sparkles className="w-5 h-5 text-primary animate-pulse" />
                       </div>
-                      <p className="text-sm font-semibold text-gray-700 text-center">Crafting concept & caption...</p>
+                      <p className="text-sm font-semibold text-gray-700 text-center">Generating concept & caption...</p>
                     </div>
                   )}
 

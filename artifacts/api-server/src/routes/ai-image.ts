@@ -133,7 +133,18 @@ router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Pr
   const { prompt, mode, illustrationStyle } = parsed.data;
   let imagePrompt: string;
   if (mode === "illustration") {
-    const styleKey = (illustrationStyle ?? "").toLowerCase().split(" ")[0];
+    const resolveStyleKey = (style: string): string => {
+      const lower = style.toLowerCase().trim();
+      if (STYLE_WRAPPERS[lower]) return lower;
+      for (const word of lower.split(/[\s_-]+/)) {
+        if (STYLE_WRAPPERS[word]) return word;
+      }
+      for (const key of Object.keys(STYLE_WRAPPERS)) {
+        if (lower.includes(key)) return key;
+      }
+      return "";
+    };
+    const styleKey = resolveStyleKey(illustrationStyle ?? "");
     const stylePrefix = STYLE_WRAPPERS[styleKey]
       ?? "Creative editorial illustration, professional quality, white background, no text in the image";
     imagePrompt = `${stylePrefix}. Scene: ${prompt}. Absolutely no text, words, or letters visible in the image.`;
