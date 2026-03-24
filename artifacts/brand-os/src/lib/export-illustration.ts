@@ -165,63 +165,63 @@ function drawFrame(
   if (preset === "draw") {
     const drawP = easeOut(phase(t, 0, 0.62), 2);
 
-    // Row-by-row strip reveal: reveal `revealedH` rows of the illustration
-    const revealedH = Math.floor(ILLUS_H * drawP);
+    // Horizontal stroke-by-stroke reveal:
+    // The illustration is "drawn" left-to-right across each stroke (row),
+    // then the pen drops to the next row and sweeps again.
+    const STROKE_H = 6; // px height per stroke
+    const totalStrokes = Math.ceil(ILLUS_H / STROKE_H);
+    const totalProgress = drawP * totalStrokes; // fractional stroke count
+    const completedStrokes = Math.floor(totalProgress);
+    const strokeFraction = totalProgress - completedStrokes; // 0→1 within current stroke
 
-    // Draw the revealed portion of the illustration
-    if (revealedH > 0) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, CARD_W, revealedH);
-      ctx.clip();
-      drawImageCover(ctx, img, 0, 0, CARD_W, ILLUS_H);
-      ctx.restore();
+    const completedY = completedStrokes * STROKE_H; // fully drawn height
+    const currentRowX = strokeFraction * CARD_W;    // leading x in current stroke
+
+    // Clip to revealed region and draw image
+    ctx.save();
+    ctx.beginPath();
+    if (completedY > 0) {
+      ctx.rect(0, 0, CARD_W, completedY); // all completed strokes (full width)
     }
+    if (strokeFraction > 0.001 && completedY < ILLUS_H) {
+      ctx.rect(0, completedY, currentRowX, STROKE_H); // partial current stroke
+    }
+    ctx.clip();
+    drawImageCover(ctx, img, 0, 0, CARD_W, ILLUS_H);
+    ctx.restore();
 
-    // Pen-nib cursor at the leading edge
-    if (drawP > 0 && drawP < 1) {
-      const NIB_W = 48;
-      const NIB_H = 32;
-      const SLANT = 14; // horizontal slant of the parallelogram
-      const nibX = CARD_W - NIB_W - SLANT - 8; // right-aligned, slightly inset
-      const nibY = revealedH - NIB_H / 2;
+    // Pen-nib cursor tracking the leading edge of the current stroke
+    if (drawP > 0.005 && drawP < 0.995 && completedY < ILLUS_H) {
+      const NIB_L = 44; // nib length (horizontal, pointing right)
+      const NIB_H_nib = 22; // nib body height
+      const tipX = Math.min(currentRowX, CARD_W - 2);
+      const tipY = completedY + STROKE_H / 2; // vertical centre of current stroke
 
       ctx.save();
       ctx.globalAlpha = 0.92;
 
-      // Body of the pen nib (dark parallelogram)
+      // Nib body: triangle tapering to tip on the right
+      ctx.fillStyle = "#2a2a2a";
+      ctx.beginPath();
+      ctx.moveTo(tipX - NIB_L, tipY - NIB_H_nib / 2); // top-left
+      ctx.lineTo(tipX - NIB_L, tipY + NIB_H_nib / 2); // bottom-left
+      ctx.lineTo(tipX, tipY);                           // right tip
+      ctx.closePath();
+      ctx.fill();
+
+      // Highlight stripe (upper half of nib body)
+      ctx.fillStyle = "rgba(255,255,255,0.20)";
+      ctx.beginPath();
+      ctx.moveTo(tipX - NIB_L + 5, tipY - NIB_H_nib / 2 + 3);
+      ctx.lineTo(tipX - NIB_L + 5, tipY - 2);
+      ctx.lineTo(tipX - 8, tipY - 2);
+      ctx.closePath();
+      ctx.fill();
+
+      // Small ink dot at the very tip (dark grey, consistent with the nib)
       ctx.fillStyle = "#1a1a1a";
       ctx.beginPath();
-      ctx.moveTo(nibX + SLANT, nibY);
-      ctx.lineTo(nibX + SLANT + NIB_W, nibY);
-      ctx.lineTo(nibX + NIB_W, nibY + NIB_H);
-      ctx.lineTo(nibX, nibY + NIB_H);
-      ctx.closePath();
-      ctx.fill();
-
-      // Highlight stripe on the nib
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
-      ctx.beginPath();
-      ctx.moveTo(nibX + SLANT + 6, nibY + 3);
-      ctx.lineTo(nibX + SLANT + NIB_W - 10, nibY + 3);
-      ctx.lineTo(nibX + NIB_W - 10, nibY + NIB_H - 6);
-      ctx.lineTo(nibX + 6, nibY + NIB_H - 6);
-      ctx.closePath();
-      ctx.fill();
-
-      // Sharp tip pointing down-left
-      ctx.fillStyle = "#1a1a1a";
-      ctx.beginPath();
-      ctx.moveTo(nibX, nibY + NIB_H);
-      ctx.lineTo(nibX + NIB_W, nibY + NIB_H);
-      ctx.lineTo(nibX - 18, nibY + NIB_H + 22);
-      ctx.closePath();
-      ctx.fill();
-
-      // Tiny ink dot at the very tip
-      ctx.fillStyle = "#2563eb";
-      ctx.beginPath();
-      ctx.arc(nibX - 10, nibY + NIB_H + 18, 4, 0, Math.PI * 2);
+      ctx.arc(tipX + 2, tipY, 3.5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
