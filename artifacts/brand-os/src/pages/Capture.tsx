@@ -1420,18 +1420,26 @@ export default function Capture() {
                                   ))}
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                {(["reveal", "fade"] as InfographicAnimPreset[]).map((preset) => (
-                                  <button
-                                    key={preset}
-                                    onClick={() => handleDownloadAnimatedInfographic(preset)}
-                                    disabled={!!isAnimatingInfographic}
-                                    className="py-2 text-[11px] font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1 disabled:opacity-50 transition-all capitalize"
-                                  >
-                                    {isAnimatingInfographic === preset ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                                    {isAnimatingInfographic === preset ? "…" : preset === "reveal" ? "Reveal" : "Fade"}
-                                  </button>
-                                ))}
+                              <div className="grid grid-cols-3 gap-2">
+                                {(["reveal", "fade", "typewriter", "rise", "pop", "wipe"] as InfographicAnimPreset[]).map((preset) => {
+                                  const labels: Record<InfographicAnimPreset, string> = { reveal: "Reveal", fade: "Fade", typewriter: "Type", rise: "Rise", pop: "Pop", wipe: "Wipe" };
+                                  return (
+                                    <button
+                                      key={preset}
+                                      onClick={() => handleDownloadAnimatedInfographic(preset)}
+                                      disabled={!!isAnimatingInfographic}
+                                      className={cn(
+                                        "py-2.5 rounded-xl text-[11px] font-bold border-2 transition-all flex items-center justify-center gap-1",
+                                        isAnimatingInfographic === preset
+                                          ? "bg-primary text-white border-primary"
+                                          : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40"
+                                      )}
+                                    >
+                                      {isAnimatingInfographic === preset ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                      {isAnimatingInfographic === preset ? "…" : labels[preset]}
+                                    </button>
+                                  );
+                                })}
                               </div>
                               <p className="text-[10px] text-gray-400 mt-1.5">Saves as .mp4 · upload directly to LinkedIn</p>
                             </div>

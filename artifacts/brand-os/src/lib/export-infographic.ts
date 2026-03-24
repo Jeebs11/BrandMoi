@@ -6,11 +6,15 @@ const PAD_X = 96;
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
 
-export type InfographicAnimPreset = "reveal" | "fade";
+export type InfographicAnimPreset = "reveal" | "fade" | "typewriter" | "rise" | "pop" | "wipe";
 
 export const INFOGRAPHIC_BASE_DURATIONS: Record<InfographicAnimPreset, number> = {
   reveal: 7000,
   fade: 4500,
+  typewriter: 9000,
+  rise: 6500,
+  pop: 7000,
+  wipe: 5000,
 };
 
 const DEFAULT_BG = "#0f172a";
@@ -146,6 +150,24 @@ function phase(t: number, start: number, end: number): number {
 }
 function easeOut(t: number, exp = 3): number {
   return 1 - Math.pow(1 - t, exp);
+}
+function easeOutBack(t: number, overshoot = 1.7): number {
+  // Cubic with overshoot — dot springs past target then settles
+  const c3 = overshoot + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + overshoot * Math.pow(t - 1, 2);
+}
+
+// Progressively reveal wrapped lines character-by-character.
+// progress 0→1 maps to revealing all chars across all lines sequentially.
+function typewriterLines(lines: string[], progress: number): string[] {
+  const total = lines.reduce((s, l) => s + l.length, 0);
+  let remaining = Math.round(total * progress);
+  return lines.map(line => {
+    if (remaining <= 0) return "";
+    const take = Math.min(line.length, remaining);
+    remaining -= take;
+    return line.slice(0, take);
+  });
 }
 
 function fillRoundRect(
@@ -318,7 +340,9 @@ function drawBullet(
   accentColor: string,
   textColor: string,
   alpha = 1,
-  offsetX = 0
+  offsetX = 0,
+  offsetY = 0,
+  overrideLines?: string[]
 ) {
   const bl = layout.bullets[idx];
   ctx.save();
@@ -327,16 +351,54 @@ function drawBullet(
   // Dot
   ctx.fillStyle = accentColor;
   ctx.beginPath();
-  ctx.arc(PAD_X + DOT_R + offsetX, bl.dotCY, DOT_R, 0, Math.PI * 2);
+  ctx.arc(PAD_X + DOT_R + offsetX, bl.dotCY + offsetY, DOT_R, 0, Math.PI * 2);
   ctx.fill();
 
   // Text lines
   ctx.fillStyle = textColor;
   ctx.globalAlpha = alpha * 0.88;
   ctx.font = `500 ${layout.bulletFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+  let y = bl.lineY + offsetY;
+  for (const line of (overrideLines ?? bl.lines)) {
+    ctx.fillText(line, PAD_X + DOT_EFFECTIVE_W + offsetX, y);
+    y += bl.lineH;
+  }
+  ctx.restore();
+}
+
+// Pop preset: dot scales in with overshoot, text fades in alongside
+function drawBulletPop(
+  ctx: CanvasRenderingContext2D,
+  layout: InfoLayout,
+  idx: number,
+  accentColor: string,
+  textColor: string,
+  dotScale: number,
+  textAlpha: number
+) {
+  const bl = layout.bullets[idx];
+  ctx.save();
+
+  // Dot with scale transform around its center
+  const cx = PAD_X + DOT_R;
+  const cy = bl.dotCY;
+  ctx.fillStyle = accentColor;
+  ctx.beginPath();
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(dotScale, dotScale);
+  ctx.translate(-cx, -cy);
+  ctx.arc(cx, cy, DOT_R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Text fades in
+  ctx.globalAlpha = textAlpha * 0.88;
+  ctx.fillStyle = textColor;
+  ctx.font = `500 ${layout.bulletFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
   let y = bl.lineY;
   for (const line of bl.lines) {
-    ctx.fillText(line, PAD_X + DOT_EFFECTIVE_W + offsetX, y);
+    ctx.fillText(line, PAD_X + DOT_EFFECTIVE_W, y);
     y += bl.lineH;
   }
   ctx.restore();
@@ -354,6 +416,7 @@ function drawFrame(
   ctx.clearRect(0, 0, CARD_W, CARD_H);
   const n = layout.bullets.length;
 
+  // ── Fade ────────────────────────────────────────────────────────────────────
   if (preset === "fade") {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, CARD_W, CARD_H);
@@ -363,8 +426,9 @@ function drawFrame(
     for (let i = 0; i < n; i++) {
       drawBullet(ctx, layout, i, accentColor, textColor, alpha);
     }
-  } else {
-    // reveal: bg fades, bar expands, headline slides up, bullets stagger in from left
+
+  // ── Reveal ──────────────────────────────────────────────────────────────────
+  } else if (preset === "reveal") {
     const bgAlpha = easeOut(phase(t, 0, 0.08));
     ctx.globalAlpha = bgAlpha;
     ctx.fillStyle = bgColor;
@@ -384,6 +448,172 @@ function drawFrame(
       const bAlpha = easeOut(phase(t, start, end), 2);
       const bOffX = -60 * (1 - easeOut(phase(t, start, end + 0.06), 3));
       drawBullet(ctx, layout, i, accentColor, textColor, bAlpha, bOffX);
+    }
+
+  // ── Typewriter ──────────────────────────────────────────────────────────────
+  // bg appears → headline types char-by-char → each bullet types in staggered
+  } else if (preset === "typewriter") {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+
+    // Bar draws in quickly
+    const barProg = easeOut(phase(t, 0, 0.06));
+    drawBar(ctx, layout, accentColor, barProg, clamp(barProg * 5));
+
+    // Headline types between t=0.06 and t=0.32
+    const hTypeProg = phase(t, 0.06, 0.32);
+    if (hTypeProg > 0) {
+      const typedLines = typewriterLines(layout.headlineLines, hTypeProg);
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = textColor;
+      ctx.font = `800 ${layout.headlineFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+      let hy = layout.headlineY;
+      for (const line of typedLines) {
+        ctx.fillText(line, PAD_X, hy);
+        // Blinking cursor on the active typing line
+        if (line.length > 0 && hTypeProg < 1) {
+          const w = ctx.measureText(line).width;
+          const cursorVisible = Math.floor(t * 8) % 2 === 0;
+          if (cursorVisible) {
+            ctx.fillRect(PAD_X + w + 4, hy - layout.headlineFontSize * 0.85, 3, layout.headlineFontSize * 0.9);
+          }
+        }
+        hy += layout.headlineLineH;
+      }
+      ctx.restore();
+    }
+
+    // Bullets type in staggered from t=0.36
+    const bulletRange = 0.94 - 0.36;
+    const perBullet = bulletRange / n;
+    for (let i = 0; i < n; i++) {
+      const start = 0.36 + i * perBullet;
+      const end = start + perBullet * 0.85;
+      const bProg = phase(t, start, end);
+      if (bProg > 0) {
+        const typedBulletLines = typewriterLines(layout.bullets[i].lines, bProg);
+        const showCursor = bProg < 1 && Math.floor(t * 8) % 2 === 0;
+        const dotAlpha = clamp(bProg * 8);
+        drawBullet(ctx, layout, i, accentColor, textColor, dotAlpha, 0, 0, typedBulletLines);
+        // Cursor after last typed char of this bullet
+        if (showCursor) {
+          const lastLine = typedBulletLines[typedBulletLines.length - 1] ?? "";
+          const lineIdx = typedBulletLines.findLastIndex(l => l.length > 0);
+          if (lineIdx >= 0) {
+            ctx.save();
+            ctx.fillStyle = textColor;
+            ctx.globalAlpha = 0.7;
+            ctx.font = `500 ${layout.bulletFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+            const lineY = layout.bullets[i].lineY + lineIdx * layout.bullets[i].lineH;
+            const w = ctx.measureText(lastLine).width;
+            ctx.fillRect(PAD_X + DOT_EFFECTIVE_W + w + 3, lineY - layout.bulletFontSize * 0.82, 2, layout.bulletFontSize * 0.85);
+            ctx.restore();
+          }
+        }
+      }
+    }
+
+  // ── Rise ────────────────────────────────────────────────────────────────────
+  // All elements slide upward from 60px below into final position, staggered
+  } else if (preset === "rise") {
+    const RISE_DIST = 60;
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+
+    // Bar rises t=0.04→0.18
+    const barP = easeOut(phase(t, 0.04, 0.18), 3);
+    const barAlpha = clamp(barP * 3);
+    if (barP > 0) {
+      const offY = RISE_DIST * (1 - barP);
+      ctx.save();
+      ctx.globalAlpha = barAlpha;
+      ctx.fillStyle = accentColor;
+      fillRoundRect(ctx, PAD_X, layout.barY + offY, 56, 4, 2);
+      ctx.restore();
+    }
+
+    // Headline rises t=0.14→0.38
+    const hP = easeOut(phase(t, 0.14, 0.38), 3);
+    const hAlpha = clamp(hP * 3);
+    if (hP > 0) {
+      drawHeadline(ctx, layout, textColor, hAlpha, RISE_DIST * (1 - hP));
+    }
+
+    // Bullets rise staggered t=0.36→0.90
+    for (let i = 0; i < n; i++) {
+      const start = 0.36 + i * (0.48 / n);
+      const end = start + 0.18;
+      const bP = easeOut(phase(t, start, end), 3);
+      const bAlpha = clamp(bP * 3);
+      if (bP > 0) {
+        drawBullet(ctx, layout, i, accentColor, textColor, bAlpha, 0, RISE_DIST * (1 - bP));
+      }
+    }
+
+  // ── Pop ─────────────────────────────────────────────────────────────────────
+  // Headline fades; each bullet's dot pops in with spring overshoot, text fades alongside
+  } else if (preset === "pop") {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+
+    // Bar expands t=0→0.10
+    const barP = easeOut(phase(t, 0, 0.10));
+    drawBar(ctx, layout, accentColor, barP, clamp(barP * 5));
+
+    // Headline fades in t=0.08→0.30
+    const hAlpha = easeOut(phase(t, 0.08, 0.30), 2);
+    drawHeadline(ctx, layout, textColor, hAlpha);
+
+    // Bullets pop in staggered t=0.28→0.90
+    for (let i = 0; i < n; i++) {
+      const start = 0.28 + i * (0.58 / n);
+      const end = start + 0.16;
+      const p = phase(t, start, end);
+      if (p <= 0) continue;
+      const dotScale = clamp(easeOutBack(Math.min(p, 1)), 0, 2.5);
+      const textAlpha = easeOut(phase(t, start, end + 0.08), 2);
+      drawBulletPop(ctx, layout, i, accentColor, textColor, dotScale, textAlpha);
+    }
+
+  // ── Wipe ────────────────────────────────────────────────────────────────────
+  // A clip rectangle sweeps left-to-right revealing all content at once
+  } else if (preset === "wipe") {
+    // Full bg first
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+
+    // Sweep progress: t=0.02→0.80 with easeOutCubic
+    const sweepP = easeOut(phase(t, 0.02, 0.80), 3);
+    const sweepX = CARD_W * sweepP;
+
+    if (sweepX > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, sweepX, CARD_H);
+      ctx.clip();
+
+      // Draw fully-settled content inside the clip
+      drawBar(ctx, layout, accentColor);
+      drawHeadline(ctx, layout, textColor);
+      for (let i = 0; i < n; i++) {
+        drawBullet(ctx, layout, i, accentColor, textColor);
+      }
+
+      ctx.restore();
+
+      // Bright wipe edge line
+      if (sweepP < 1) {
+        ctx.save();
+        const edgeAlpha = clamp(1 - Math.abs(sweepP - 0.5) * 2.5) * 0.55;
+        ctx.globalAlpha = edgeAlpha;
+        const grad = ctx.createLinearGradient(sweepX - 20, 0, sweepX + 4, 0);
+        grad.addColorStop(0, "transparent");
+        grad.addColorStop(1, "#ffffff");
+        ctx.fillStyle = grad;
+        ctx.fillRect(sweepX - 20, 0, 24, CARD_H);
+        ctx.restore();
+      }
     }
   }
 }
