@@ -295,8 +295,10 @@ export default function Capture() {
       return;
     }
 
-    // Build a signature that captures everything that affects the rendered output
-    const sig = `${infographicFingerprint}|${bgColor}|${accentColor}|${textColor}`;
+    // Build a signature that captures everything that affects the rendered output.
+    // RENDERER_V bumps when the HTML/canvas renderer code changes, invalidating old previews.
+    const RENDERER_V = "v2";
+    const sig = `${RENDERER_V}|${infographicFingerprint}|${bgColor}|${accentColor}|${textColor}`;
 
     // Preview is already up-to-date — nothing to do (preserves it across tab switches)
     if (infographicRenderKey.current === sig) return;

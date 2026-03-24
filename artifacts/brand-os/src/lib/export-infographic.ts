@@ -71,7 +71,10 @@ function buildEl(
     row.style.cssText = "display:flex;align-items:flex-start;gap:22px";
 
     const dot = document.createElement("div");
-    dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${accentColor};flex-shrink:0;margin-top:16px`;
+    // margin-top positions dot center at the visual cap-height midpoint of the first text line.
+    // With font-size:38px, line-height:1.35: half-leading≈6.65px, cap-height center≈23px from top.
+    // dot-radius=5px → margin-top = 23-5 = 18px.
+    dot.style.cssText = `width:10px;height:10px;border-radius:50%;background:${accentColor};flex-shrink:0;margin-top:18px`;
 
     const txt = document.createElement("div");
     txt.style.cssText = [
@@ -294,7 +297,9 @@ function buildInfoLayout(
   for (let i = 0; i < bulletLineGroups.length; i++) {
     const lines = bulletLineGroups[i];
     const lineY = curY + bulletSize.lineH;
-    const dotCY = curY + bulletSize.lineH / 2;
+    // Align dot with visual midpoint of first text line's cap-height,
+    // not the midpoint of the line-height slot (which floats too high)
+    const dotCY = lineY - bulletSize.size * 0.35;
     const h = lines.length * bulletSize.lineH;
     bulletLayouts.push({ lines, lineY, dotCY, lineH: bulletSize.lineH });
     curY += h + (i < bulletLineGroups.length - 1 ? BULLET_GAP : 0);
