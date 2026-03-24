@@ -161,6 +161,7 @@ export default function Capture() {
   // Illustration tab
   const [illustStyle, setIllustStyle] = useState("surprise");
   const [illustConcept, setIllustConcept] = useState<{ scenePrompt: string; caption: string; chosenStyle: string } | null>(null);
+  const [illustScenePrompt, setIllustScenePrompt] = useState("");
   const [illustImageBase64, setIllustImageBase64] = useState<string | null>(null);
   const [illustCaption, setIllustCaption] = useState("");
   const [illustPreviewUrl, setIllustPreviewUrl] = useState<string | null>(null);
@@ -572,33 +573,44 @@ export default function Capture() {
 
   // ── Illustration handlers ──────────────────────────────────────────────────
 
-  const handleGenerateIllustration = async () => {
+  const handleCraftIllustConcept = async () => {
     if (!state.content?.post) return;
     setIsGeneratingIllustConcept(true);
-    setIsGeneratingIllustImage(false);
-    setIsPreviewingIllustration(false);
     setIllustConcept(null);
+    setIllustScenePrompt("");
+    setIllustCaption("");
     setIllustImageBase64(null);
     setIllustPreviewUrl(null);
     try {
       const concept = await illustrationConceptApi.generate(state.content.post, illustStyle);
       setIllustConcept(concept);
+      setIllustScenePrompt(concept.scenePrompt);
       setIllustCaption(concept.caption);
-      setIsGeneratingIllustConcept(false);
-
-      setIsGeneratingIllustImage(true);
-      const { imageBase64 } = await imageGenApi.generate(concept.scenePrompt, "illustration", concept.chosenStyle);
-      setIllustImageBase64(imageBase64);
-      setIsGeneratingIllustImage(false);
-
-      setIsPreviewingIllustration(true);
-      const previewUrl = await previewIllustrationCard(imageBase64, concept.caption);
-      setIllustPreviewUrl(previewUrl);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Illustration generation failed.";
+      const msg = err instanceof Error ? err.message : "Concept generation failed.";
       toast({ title: msg, variant: "destructive" });
     } finally {
       setIsGeneratingIllustConcept(false);
+    }
+  };
+
+  const handleGenerateIllustImage = async () => {
+    if (!illustScenePrompt.trim()) return;
+    setIsGeneratingIllustImage(true);
+    setIllustImageBase64(null);
+    setIllustPreviewUrl(null);
+    try {
+      const style = illustConcept?.chosenStyle ?? illustStyle;
+      const { imageBase64 } = await imageGenApi.generate(illustScenePrompt, "illustration", style);
+      setIllustImageBase64(imageBase64);
+
+      setIsPreviewingIllustration(true);
+      const previewUrl = await previewIllustrationCard(imageBase64, illustCaption);
+      setIllustPreviewUrl(previewUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Image generation failed.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
       setIsGeneratingIllustImage(false);
       setIsPreviewingIllustration(false);
     }
@@ -1024,7 +1036,7 @@ export default function Capture() {
                 ["carousel", "Slides", <Layout className="w-3 h-3" />],
                 ["visual", "Card", <ImageIcon className="w-3 h-3" />],
                 ["infographic", "Info", <Sparkles className="w-3 h-3" />],
-                ["illustration", "Art", <Sparkles className="w-3 h-3" />],
+                ["illustration", "Illus", <Sparkles className="w-3 h-3" />],
               ] as const).map(([id, label, icon]) => (
                 <button key={id} onClick={() => setState(s => ({ ...s, activeTab: id as TabType }))}
                   className={cn("flex-1 flex items-center justify-center gap-0.5 py-2.5 rounded-lg text-[10px] font-bold transition-all duration-200",
@@ -1614,68 +1626,35 @@ export default function Capture() {
                     </div>
                   </div>
 
-                  {/* Generate / loading */}
-                  {!isGeneratingIllustConcept && !isGeneratingIllustImage && !isPreviewingIllustration && (
-                    <Button className="w-full h-12 font-semibold group" onClick={handleGenerateIllustration}>
-                      <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                      {illustPreviewUrl ? "Regenerate" : "Generate Illustration"}
-                    </Button>
+                  {/* ── STEP 1: Craft concept ── */}
+                  {!illustConcept && !isGeneratingIllustConcept && (
+                    <>
+                      <Button className="w-full h-12 font-semibold group" onClick={handleCraftIllustConcept}>
+                        <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                        Craft Concept
+                      </Button>
+                      <div className="flex flex-col items-center justify-center py-8 gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                          <Sparkles className="w-6 h-6 text-gray-300" />
+                        </div>
+                        <p className="text-sm text-gray-400 text-center leading-relaxed">
+                          Pick a style, craft a concept,<br />edit the scene, then generate
+                        </p>
+                      </div>
+                    </>
                   )}
 
-                  {(isGeneratingIllustConcept || isGeneratingIllustImage || isPreviewingIllustration) && (
+                  {isGeneratingIllustConcept && (
                     <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <Sparkles className="w-5 h-5 text-primary animate-pulse" />
                       </div>
-                      <p className="text-sm font-semibold text-gray-700 text-center">
-                        {isGeneratingIllustConcept
-                          ? "Crafting concept & caption..."
-                          : isGeneratingIllustImage
-                            ? "Rendering illustration..."
-                            : "Building preview..."}
-                      </p>
-                      {isGeneratingIllustImage && (
-                        <p className="text-xs text-gray-400 text-center">This takes ~30 s — worth the wait!</p>
-                      )}
+                      <p className="text-sm font-semibold text-gray-700 text-center">Crafting concept & caption...</p>
                     </div>
                   )}
 
-                  {/* Empty state */}
-                  {!illustPreviewUrl && !isGeneratingIllustConcept && !isGeneratingIllustImage && !isPreviewingIllustration && (
-                    <div className="flex flex-col items-center justify-center py-8 gap-3">
-                      <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Sparkles className="w-6 h-6 text-gray-300" />
-                      </div>
-                      <p className="text-sm text-gray-400 text-center leading-relaxed">
-                        Pick a style above, then<br />generate your editorial illustration
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Preview card */}
-                  {(illustPreviewUrl || isPreviewingIllustration) && (
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-4 pt-4 pb-3">Preview</p>
-                      {isPreviewingIllustration && !illustPreviewUrl && (
-                        <div className="w-full bg-gray-50 flex items-center justify-center pb-6" style={{ aspectRatio: "4/5" }}>
-                          <RefreshCw className="w-5 h-5 text-gray-300 animate-spin" />
-                        </div>
-                      )}
-                      {illustPreviewUrl && (
-                        <div className="relative">
-                          <img src={illustPreviewUrl} alt="Illustration preview" className="w-full" style={{ aspectRatio: "4/5", objectFit: "cover" }} />
-                          {isPreviewingIllustration && (
-                            <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-                              <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Chosen style tag + caption editor */}
-                  {illustPreviewUrl && !isGeneratingIllustConcept && !isGeneratingIllustImage && (
+                  {/* ── STEP 2: Edit concept + generate image ── */}
+                  {illustConcept && !isGeneratingIllustConcept && (
                     <>
                       {illustConcept && (
                         <div className="flex items-center gap-2 px-1">
@@ -1683,64 +1662,115 @@ export default function Capture() {
                           <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
                             {illustConcept.chosenStyle}
                           </span>
+                          <button onClick={handleCraftIllustConcept} disabled={isGeneratingIllustImage}
+                            className="ml-auto text-[10px] font-bold text-gray-400 hover:text-primary transition-colors disabled:opacity-40 flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" /> New concept
+                          </button>
                         </div>
                       )}
+
+                      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Scene</p>
+                        <textarea
+                          value={illustScenePrompt}
+                          onChange={e => setIllustScenePrompt(e.target.value)}
+                          rows={3}
+                          className="w-full text-sm text-gray-800 bg-transparent outline-none resize-none leading-relaxed placeholder:text-gray-300"
+                          placeholder="Describe the scene to illustrate..."
+                        />
+                      </div>
 
                       <div className="bg-white rounded-2xl border border-gray-100 p-4">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Caption</p>
                         <textarea
                           value={illustCaption}
                           onChange={e => setIllustCaption(e.target.value)}
-                          rows={3}
+                          rows={2}
                           className="w-full text-sm text-gray-800 bg-transparent outline-none resize-none leading-relaxed placeholder:text-gray-300"
                           placeholder="Edit caption..."
                         />
                       </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleDownloadIllustrationCard}
-                          disabled={isExportingIllust || isAnimatingIllust !== null}
-                          className="flex-1 py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          {isExportingIllust ? "Saving…" : "Download PNG"}
-                        </button>
-                        <button
-                          onClick={handleGenerateIllustration}
-                          disabled={isGeneratingIllustConcept || isGeneratingIllustImage || isPreviewingIllustration}
-                          className="flex-1 py-3 text-xs font-bold text-gray-500 hover:text-gray-700 bg-white rounded-xl border border-gray-200 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                          Regenerate
-                        </button>
-                      </div>
+                      {!isGeneratingIllustImage && !isPreviewingIllustration && (
+                        <Button className="w-full h-12 font-semibold group" onClick={handleGenerateIllustImage}
+                          disabled={!illustScenePrompt.trim()}>
+                          <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                          {illustPreviewUrl ? "Re-render Image" : "Generate Image"}
+                        </Button>
+                      )}
 
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(["draw", "reveal", "pop"] as IllustrationAnimPreset[]).map(preset => (
-                            <button
-                              key={preset}
-                              disabled={!!isAnimatingIllust || isExportingIllust}
-                              onClick={() => handleDownloadAnimatedIllustration(preset)}
-                              className={cn(
-                                "py-3 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-1",
-                                isAnimatingIllust === preset
-                                  ? "bg-primary text-white border-primary"
-                                  : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40"
-                              )}
-                            >
-                              {isAnimatingIllust === preset ? (
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Download className="w-3 h-3" />
-                              )}
-                              {isAnimatingIllust === preset ? "…" : preset === "draw" ? "Draw" : preset === "reveal" ? "Reveal" : "Pop"}
-                            </button>
-                          ))}
+                      {(isGeneratingIllustImage || isPreviewingIllustration) && (
+                        <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                          </div>
+                          <p className="text-sm font-semibold text-gray-700 text-center">
+                            {isGeneratingIllustImage ? "Rendering illustration..." : "Building preview..."}
+                          </p>
+                          {isGeneratingIllustImage && (
+                            <p className="text-xs text-gray-400 text-center">This takes ~30 s — worth the wait!</p>
+                          )}
                         </div>
-                      </div>
+                      )}
+
+                      {/* Preview */}
+                      {(illustPreviewUrl || isPreviewingIllustration) && (
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-4 pt-4 pb-3">Preview</p>
+                          {isPreviewingIllustration && !illustPreviewUrl && (
+                            <div className="w-full bg-gray-50 flex items-center justify-center pb-6" style={{ aspectRatio: "4/5" }}>
+                              <RefreshCw className="w-5 h-5 text-gray-300 animate-spin" />
+                            </div>
+                          )}
+                          {illustPreviewUrl && (
+                            <div className="relative">
+                              <img src={illustPreviewUrl} alt="Illustration preview" className="w-full" style={{ aspectRatio: "4/5", objectFit: "cover" }} />
+                              {isPreviewingIllustration && (
+                                <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                                  <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Download + animate (only after image exists) */}
+                      {illustPreviewUrl && !isGeneratingIllustImage && !isPreviewingIllustration && (
+                        <>
+                          <div className="flex gap-2">
+                            <button onClick={handleDownloadIllustrationCard}
+                              disabled={isExportingIllust || isAnimatingIllust !== null}
+                              className="flex-1 py-3 text-xs font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 rounded-xl border border-primary/20 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              {isExportingIllust ? "Saving…" : "Download PNG"}
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Animated (.mp4)</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {(["draw", "reveal", "pop"] as IllustrationAnimPreset[]).map(preset => (
+                                <button key={preset} disabled={!!isAnimatingIllust || isExportingIllust}
+                                  onClick={() => handleDownloadAnimatedIllustration(preset)}
+                                  className={cn(
+                                    "py-3 rounded-xl text-xs font-bold border-2 transition-all flex items-center justify-center gap-1",
+                                    isAnimatingIllust === preset
+                                      ? "bg-primary text-white border-primary"
+                                      : "bg-white text-gray-700 border-gray-200 hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40"
+                                  )}
+                                >
+                                  {isAnimatingIllust === preset
+                                    ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                    : <Download className="w-3 h-3" />}
+                                  {isAnimatingIllust === preset ? "…" : preset === "draw" ? "Draw" : preset === "reveal" ? "Reveal" : "Pop"}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>

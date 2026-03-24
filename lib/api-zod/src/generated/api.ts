@@ -157,6 +157,15 @@ export const GenerateContentResponse = zod.object({
 });
 
 /**
+ * @summary Generate an image (DALL-E 3)
+ */
+export const GenerateImageBody = zod.object({
+  prompt: zod.string().min(10).max(2000),
+  mode: zod.enum(["photo", "illustration"]).optional(),
+  illustrationStyle: zod.string().optional(),
+});
+
+/**
  * @summary Generate an illustration concept (scene + caption) for a LinkedIn post
  */
 export const GenerateIllustrationConceptBody = zod.object({

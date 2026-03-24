@@ -107,6 +107,12 @@ export interface GeneratedContent {
   infographic?: InfographicData;
 }
 
+export interface GenerateImageBody {
+  prompt: string;
+  mode?: "photo" | "illustration";
+  illustrationStyle?: string;
+}
+
 export interface GenerateIllustrationConceptBody {
   postContent: string;
   style: string;
