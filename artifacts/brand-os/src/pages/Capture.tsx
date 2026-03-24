@@ -1615,7 +1615,7 @@ export default function Capture() {
                       {[
                         { id: "surprise", label: "✨ Surprise Me" },
                         { id: "cartoon", label: "Cartoon" },
-                        { id: "new-yorker", label: "New Yorker" },
+                        { id: "new-yorker", label: "B&W Ink" },
                         { id: "isometric", label: "Isometric" },
                         { id: "sketch", label: "Sketch" },
                         { id: "blueprint", label: "Blueprint" },
@@ -1781,7 +1781,7 @@ export default function Capture() {
                                   {isAnimatingIllust === preset
                                     ? <RefreshCw className="w-3 h-3 animate-spin" />
                                     : <Download className="w-3 h-3" />}
-                                  {isAnimatingIllust === preset ? "…" : preset === "draw" ? "Draw" : preset === "reveal" ? "Reveal" : "Pop"}
+                                  {isAnimatingIllust === preset ? "…" : preset === "draw" ? "Ink" : preset === "reveal" ? "Reveal" : "Pop"}
                                 </button>
                               ))}
                             </div>

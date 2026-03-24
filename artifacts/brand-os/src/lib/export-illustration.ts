@@ -163,72 +163,67 @@ function drawFrame(
   ctx.fillRect(0, 0, CARD_W, CARD_H);
 
   if (preset === "draw") {
-    const drawP = easeOut(phase(t, 0, 0.62), 2);
+    // ── Ink Bleed: radial reveal from a single point, like wet ink spreading ──
+    // The illustration is revealed by an expanding ellipse centred in the upper
+    // third of the image. Multiple overlapping ellipses with slight offsets give
+    // an organic, irregular edge rather than a perfect circle.
+    const bleedP = easeOut(phase(t, 0, 0.65), 1.6);
 
-    // Horizontal stroke-by-stroke reveal:
-    // The illustration is "drawn" left-to-right across each stroke (row),
-    // then the pen drops to the next row and sweeps again.
-    const STROKE_H = 6; // px height per stroke
-    const totalStrokes = Math.ceil(ILLUS_H / STROKE_H);
-    const totalProgress = drawP * totalStrokes; // fractional stroke count
-    const completedStrokes = Math.floor(totalProgress);
-    const strokeFraction = totalProgress - completedStrokes; // 0→1 within current stroke
+    // Centre of the ink bleed origin (upper-centre of illustration area)
+    const originX = CARD_W * 0.50;
+    const originY = ILLUS_H * 0.28;
 
-    const completedY = completedStrokes * STROKE_H; // fully drawn height
-    const currentRowX = strokeFraction * CARD_W;    // leading x in current stroke
+    // Maximum radius needed to cover the farthest corner of the illustration
+    const maxRX = Math.max(originX, CARD_W - originX) * 1.15;
+    const maxRY = Math.max(originY, ILLUS_H - originY) * 1.15;
 
-    // Clip to revealed region and draw image
-    ctx.save();
-    ctx.beginPath();
-    if (completedY > 0) {
-      ctx.rect(0, 0, CARD_W, completedY); // all completed strokes (full width)
-    }
-    if (strokeFraction > 0.001 && completedY < ILLUS_H) {
-      ctx.rect(0, completedY, currentRowX, STROKE_H); // partial current stroke
-    }
-    ctx.clip();
-    drawImageCover(ctx, img, 0, 0, CARD_W, ILLUS_H);
-    ctx.restore();
+    const rX = maxRX * bleedP;
+    const rY = maxRY * bleedP;
 
-    // Pen-nib cursor tracking the leading edge of the current stroke
-    if (drawP > 0.005 && drawP < 0.995 && completedY < ILLUS_H) {
-      const NIB_L = 44; // nib length (horizontal, pointing right)
-      const NIB_H_nib = 22; // nib body height
-      const tipX = Math.min(currentRowX, CARD_W - 2);
-      const tipY = completedY + STROKE_H / 2; // vertical centre of current stroke
-
+    if (bleedP > 0.002) {
       ctx.save();
-      ctx.globalAlpha = 0.92;
-
-      // Nib body: triangle tapering to tip on the right
-      ctx.fillStyle = "#2a2a2a";
       ctx.beginPath();
-      ctx.moveTo(tipX - NIB_L, tipY - NIB_H_nib / 2); // top-left
-      ctx.lineTo(tipX - NIB_L, tipY + NIB_H_nib / 2); // bottom-left
-      ctx.lineTo(tipX, tipY);                           // right tip
-      ctx.closePath();
-      ctx.fill();
 
-      // Highlight stripe (upper half of nib body)
-      ctx.fillStyle = "rgba(255,255,255,0.20)";
-      ctx.beginPath();
-      ctx.moveTo(tipX - NIB_L + 5, tipY - NIB_H_nib / 2 + 3);
-      ctx.lineTo(tipX - NIB_L + 5, tipY - 2);
-      ctx.lineTo(tipX - 8, tipY - 2);
-      ctx.closePath();
-      ctx.fill();
+      // Primary ellipse — the main bleed shape
+      ctx.ellipse(originX, originY, rX, rY, 0, 0, Math.PI * 2);
 
-      // Small ink dot at the very tip (dark grey, consistent with the nib)
-      ctx.fillStyle = "#1a1a1a";
-      ctx.beginPath();
-      ctx.arc(tipX + 2, tipY, 3.5, 0, Math.PI * 2);
-      ctx.fill();
+      // Three secondary "bleed tendrils" offset slightly for an organic edge
+      if (bleedP > 0.08) {
+        const t2 = Math.max(0, bleedP - 0.08);
+        ctx.ellipse(originX - rX * 0.18, originY + rY * 0.22, rX * 0.82 * t2 / bleedP, rY * 0.78 * t2 / bleedP, Math.PI * 0.12, 0, Math.PI * 2);
+      }
+      if (bleedP > 0.12) {
+        const t3 = Math.max(0, bleedP - 0.12);
+        ctx.ellipse(originX + rX * 0.14, originY + rY * 0.30, rX * 0.75 * t3 / bleedP, rY * 0.72 * t3 / bleedP, -Math.PI * 0.08, 0, Math.PI * 2);
+      }
+      if (bleedP > 0.20) {
+        const t4 = Math.max(0, bleedP - 0.20);
+        ctx.ellipse(originX - rX * 0.08, originY - rY * 0.15, rX * 0.65 * t4 / bleedP, rY * 0.60 * t4 / bleedP, Math.PI * 0.05, 0, Math.PI * 2);
+      }
 
+      ctx.clip();
+      drawImageCover(ctx, img, 0, 0, CARD_W, ILLUS_H);
       ctx.restore();
+
+      // Soft ink-bleed edge glow — a subtle dark halo just inside the clip boundary
+      if (bleedP > 0.04 && bleedP < 0.96) {
+        const glowAlpha = Math.min(bleedP * 3, 1) * 0.18;
+        const grad = ctx.createRadialGradient(
+          originX, originY, rX * 0.72,
+          originX, originY, rX * 1.02
+        );
+        grad.addColorStop(0, "rgba(0,0,0,0)");
+        grad.addColorStop(1, `rgba(0,0,0,${glowAlpha})`);
+        ctx.save();
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, CARD_W, ILLUS_H);
+        ctx.restore();
+      }
     }
 
-    const divAlpha = easeOut(phase(t, 0.60, 0.68), 2);
-    const charProg = phase(t, 0.67, 0.97);
+    const divAlpha = easeOut(phase(t, 0.63, 0.72), 2);
+    const charProg = phase(t, 0.70, 0.97);
     const textAlpha = charProg > 0 ? 1 : 0;
     drawCaptionBlock(ctx, layout, divAlpha, textAlpha, charProg);
 

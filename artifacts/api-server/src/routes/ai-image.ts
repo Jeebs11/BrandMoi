@@ -14,7 +14,7 @@ const GenerateImagePromptBody = z.object({
 
 const STYLE_WRAPPERS: Record<string, string> = {
   cartoon:
-    "Single-panel editorial cartoon, clean black ink line art on white background, New Yorker magazine pen-and-ink style, no text or lettering in the image, detailed cross-hatching",
+    "Traditional Saturday-morning cartoon illustration, bold thick black outlines, vibrant saturated flat colours (bright reds, blues, yellows, greens), classic comic-strip energy, cheerful and expressive characters, colourful background, no text or lettering in the image",
   "new-yorker":
     "Classic New Yorker magazine single-panel cartoon, pure black-and-white pen-and-ink illustration, expressive fine-line cross-hatching, white paper background, no colour, no grey tones, no text or lettering anywhere in the image, witty editorial scene composition",
   isometric:
@@ -31,6 +31,11 @@ const ILLUSTRATION_CONCEPT_SYSTEM = `You are a creative director specialising in
 1. Devise a strong visual metaphor or scene that captures the post's core insight — think New Yorker cartoon energy.
 2. Write a witty 1–2 line caption (can be dialogue between two characters, or a single sharp observation).
 3. Follow the style instruction provided.
+
+CRITICAL SCENE RULES — follow these strictly:
+- NEVER illustrate business or leadership metaphors literally. If the post mentions "building a team", "foundations", "pillars", "scaffolding", "structure", "construction", or "architecture" as METAPHORS for business concepts, DO NOT draw builders, scaffolding, cranes, blueprints, or construction sites. Instead, depict the underlying human situation: a meeting room, a kitchen, a sports team, a garden, an office, vehicles, animals, or any everyday scene that conveys the idea without literal bricks and mortar.
+- Use HUMAN CHARACTERS in relatable settings whenever possible (offices, homes, cafes, nature, transport).
+- Prefer surprising, witty visual analogies over the obvious literal interpretation.
 
 Return ONLY valid JSON, no markdown fences, no explanation:
 {
