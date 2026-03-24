@@ -1615,7 +1615,7 @@ export default function Capture() {
                       {[
                         { id: "surprise", label: "✨ Surprise Me" },
                         { id: "cartoon", label: "Cartoon" },
-                        { id: "new-yorker", label: "B&W Ink" },
+                        { id: "new-yorker", label: "Black & White Ink" },
                         { id: "isometric", label: "Isometric" },
                         { id: "sketch", label: "Sketch" },
                         { id: "blueprint", label: "Blueprint" },
