@@ -498,15 +498,19 @@ function drawFrame(
         drawBullet(ctx, layout, i, accentColor, textColor, dotAlpha, 0, 0, typedBulletLines);
         // Cursor after last typed char of this bullet
         if (showCursor) {
-          const lastLine = typedBulletLines[typedBulletLines.length - 1] ?? "";
-          const lineIdx = typedBulletLines.findLastIndex(l => l.length > 0);
+          // Find the last non-empty line index without findLastIndex (better compat)
+          let lineIdx = -1;
+          for (let li = typedBulletLines.length - 1; li >= 0; li--) {
+            if (typedBulletLines[li].length > 0) { lineIdx = li; break; }
+          }
           if (lineIdx >= 0) {
+            const cursorLine = typedBulletLines[lineIdx];
             ctx.save();
             ctx.fillStyle = textColor;
             ctx.globalAlpha = 0.7;
             ctx.font = `500 ${layout.bulletFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
             const lineY = layout.bullets[i].lineY + lineIdx * layout.bullets[i].lineH;
-            const w = ctx.measureText(lastLine).width;
+            const w = ctx.measureText(cursorLine).width;
             ctx.fillRect(PAD_X + DOT_EFFECTIVE_W + w + 3, lineY - layout.bulletFontSize * 0.82, 2, layout.bulletFontSize * 0.85);
             ctx.restore();
           }
