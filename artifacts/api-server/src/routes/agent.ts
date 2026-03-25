@@ -65,6 +65,7 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
     let newsContext = "";
     let newsHeadline = "";
     let newsSourceLine = "";
+    let newsUrl = "";
     try {
       const { default: OpenAI } = await import("openai");
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -76,6 +77,21 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
         max_tokens: 250,
       });
       newsContext = searchResp.choices[0]?.message?.content ?? "";
+      // Extract the first cited URL from search annotations
+      const annotations = (searchResp.choices[0]?.message as Record<string, unknown>)?.annotations;
+      if (Array.isArray(annotations)) {
+        for (const ann of annotations) {
+          const a = ann as Record<string, unknown>;
+          if (a.type === "url_citation") {
+            const citation = a.url_citation as Record<string, unknown> | undefined;
+            const url = citation?.url ?? a.url;
+            if (typeof url === "string" && url.startsWith("http")) {
+              newsUrl = url;
+              break;
+            }
+          }
+        }
+      }
     } catch {
       newsContext = "";
     }
@@ -128,7 +144,7 @@ Rules:
         headline: parsed.headline,
         insight: parsed.insight,
         angles: parsed.angles,
-        ...(newsHeadline ? { newsHeadline, newsSourceLine } : {}),
+        ...(newsHeadline ? { newsHeadline, newsSourceLine, ...(newsUrl ? { newsUrl } : {}) } : {}),
       });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });

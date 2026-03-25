@@ -162,6 +162,7 @@ export type AgentBrief = {
   angles: string[];
   newsHeadline?: string;
   newsSourceLine?: string;
+  newsUrl?: string;
 };
 
 export type AgentCoach = {

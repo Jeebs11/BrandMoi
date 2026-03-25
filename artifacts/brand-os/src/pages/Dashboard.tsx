@@ -244,11 +244,22 @@ export default function Dashboard() {
               {brief.newsHeadline && (
                 <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-3 py-2.5 mb-3">
                   <Newspaper className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">In the news</p>
                     <p className="text-white/80 text-xs font-medium leading-snug">{brief.newsHeadline}</p>
                     {brief.newsSourceLine && (
                       <p className="text-white/40 text-[11px] leading-snug mt-1 italic">{brief.newsSourceLine}</p>
+                    )}
+                    {brief.newsUrl && (
+                      <a
+                        href={brief.newsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-2 text-[11px] text-emerald-400/70 hover:text-emerald-300 transition-colors underline underline-offset-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        View source →
+                      </a>
                     )}
                   </div>
                 </div>
