@@ -11,6 +11,7 @@ export const draftsTable = pgTable("drafts", {
   persona: text("persona").notNull(),
   tone: text("tone").notNull(),
   structuredBreakdown: jsonb("structured_breakdown").notNull(),
+  selectedHook: text("selected_hook"),
   postOutput: text("post_output"),
   carouselOutput: text("carousel_output"),
   visualOutput: text("visual_output"),

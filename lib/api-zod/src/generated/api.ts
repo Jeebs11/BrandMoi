@@ -99,7 +99,12 @@ export const GetSuggestionsResponseItem = zod.object({
 });
 export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 
-const HookItemSchema = zod.object({ text: zod.string(), type: zod.string().optional() });
+const HookItemSchema = zod.object({
+  text: zod.string(),
+  type: zod.string().optional(),
+  sourceLine: zod.string().optional(),
+  usedBefore: zod.boolean().optional(),
+});
 
 const StructuredBreakdownSchema = zod.object({
   topic: zod.string(),
@@ -228,6 +233,7 @@ export const CreateDraftBody = zod.object({
   persona: zod.string(),
   tone: zod.string(),
   structuredBreakdown: StructuredBreakdownSchema,
+  selectedHook: zod.string().nullish(),
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),

@@ -93,7 +93,23 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
     // non-critical — continue without usage data
   }
 
-  // 2. Web search for trending context (graceful fallback)
+  // 2. Compute usedBefore for each hook via Jaccard similarity against last 50 selectedHooks
+  const recentSelectedHooks: string[] = [];
+  try {
+    const recentWithHooks = await db
+      .select({ selectedHook: draftsTable.selectedHook })
+      .from(draftsTable)
+      .where(eq(draftsTable.userId, userId))
+      .orderBy(desc(draftsTable.createdAt))
+      .limit(50);
+    for (const d of recentWithHooks) {
+      if (d.selectedHook) recentSelectedHooks.push(d.selectedHook);
+    }
+  } catch {
+    // non-critical
+  }
+
+  // 3. Web search for trending context (graceful fallback)
   let trendingContext = "";
   try {
     const { default: OpenAI } = await import("openai");
@@ -110,7 +126,7 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
 
   // 3. Single Claude call — generates both evergreen and (if trending context) trending lanes
   const trendingInstruction = trendingContext
-    ? `\nTrending context from the web right now:\n${trendingContext}\n\nGenerate BOTH an "evergreen" breakdown (timeless angle) AND a "trending" breakdown (tied to the current conversation above).`
+    ? `\nTrending context from the web right now:\n${trendingContext}\n\nGenerate BOTH an "evergreen" breakdown (timeless angle) AND a "trending" breakdown (tied to the current conversation above). For each trending hook include a "sourceLine" field (one sentence, ≤20 words, naming the specific news/study/discussion it references). If no real news is available, sourceLine should read "Based on recent discussions in your field."`
     : `\nGenerate only the "evergreen" breakdown (timeless angle). Set "trending" to null.`;
 
   const userMessage = `Raw thought: ${rawInput}
@@ -135,7 +151,10 @@ Return this exact JSON shape (no markdown fences):
     "narrativeFlow": ["", "", "", ""]
   },
   "trending": null
-}`;
+}
+
+When generating trending hooks, each hook object MUST include a "sourceLine" field — one concise sentence (max 20 words) describing the specific news event, study, or recent development the hook references. For evergreen hooks, omit "sourceLine".
+If no trending lane is generated, "trending" must be null.`;
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -167,7 +186,21 @@ Return this exact JSON shape (no markdown fences):
     return;
   }
 
-  res.json(validated.data);
+  // Inject usedBefore flags via Jaccard similarity against recently selected hook texts
+  const JACCARD_THRESHOLD = 0.6;
+  const tagUsedBefore = <T extends { text: string; usedBefore?: boolean }>(hooks: T[]): T[] =>
+    hooks.map(h => ({
+      ...h,
+      usedBefore: recentSelectedHooks.some(prev => computeJaccard(h.text, prev) >= JACCARD_THRESHOLD),
+    }));
+
+  const result = { ...validated.data };
+  result.evergreen = { ...result.evergreen, hooks: tagUsedBefore(result.evergreen.hooks) };
+  if (result.trending) {
+    result.trending = { ...result.trending, hooks: tagUsedBefore(result.trending.hooks) };
+  }
+
+  res.json(result);
 });
 
 router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<void> => {

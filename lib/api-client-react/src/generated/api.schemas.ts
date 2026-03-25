@@ -73,6 +73,8 @@ export interface StructureIdeaBody {
 export interface HookItem {
   text: string;
   type?: string;
+  sourceLine?: string;
+  usedBefore?: boolean;
 }
 
 export interface StructureIdeaResponse {
@@ -198,6 +200,8 @@ export interface CreateDraftBody {
   persona: string;
   tone: string;
   structuredBreakdown: StructuredBreakdown;
+  /** @nullable */
+  selectedHook?: string | null;
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */

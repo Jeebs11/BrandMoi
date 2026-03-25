@@ -315,7 +315,12 @@ export default function Home() {
 
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-sm text-gray-900">Choose a hook</h3>
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-900">Choose a hook</h3>
+                    {state.selectedLane === "trending" && (
+                      <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Based on what's happening now</p>
+                    )}
+                  </div>
                   <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required to continue</span>
                 </div>
                 <div className="space-y-3">
@@ -330,6 +335,7 @@ export default function Home() {
                     const hookMeta = hook.type ? HOOK_TYPE_LABELS[hook.type] : null;
                     const usageCount = hook.type ? (state.structureResult?.hookUsage?.[hook.type] ?? 0) : 0;
                     const isOverused = usageCount >= 2;
+                    const isTrending = state.selectedLane === "trending";
                     return (
                     <button
                       key={idx}
@@ -347,9 +353,19 @@ export default function Home() {
                         </div>
                       )}
                       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                        {isTrending && (
+                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                            Trending
+                          </span>
+                        )}
                         {hookMeta && (
                           <span className={cn("inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", hookMeta.color)}>
                             {hookMeta.label}
+                          </span>
+                        )}
+                        {hook.usedBefore && (
+                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                            Used before
                           </span>
                         )}
                         {isOverused && (
@@ -361,6 +377,9 @@ export default function Home() {
                       <p className={cn("text-sm leading-relaxed pr-7", state.selectedHook === hook.text ? "text-primary font-semibold" : "text-gray-700")}>
                         {hook.text}
                       </p>
+                      {hook.sourceLine && (
+                        <p className="mt-2 text-[11px] italic text-gray-400 leading-snug">{hook.sourceLine}</p>
+                      )}
                     </button>
                     );
                   })}

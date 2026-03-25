@@ -44,6 +44,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       persona: parsed.data.persona,
       tone: parsed.data.tone,
       structuredBreakdown: parsed.data.structuredBreakdown as object,
+      selectedHook: parsed.data.selectedHook ?? null,
       postOutput: parsed.data.postOutput ?? null,
       carouselOutput: parsed.data.carouselOutput ?? null,
       visualOutput: parsed.data.visualOutput ?? null,

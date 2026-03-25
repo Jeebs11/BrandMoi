@@ -19,4 +19,6 @@ export const HookItemType = {
 export interface HookItem {
   text: string;
   type?: HookItemType;
+  sourceLine?: string;
+  usedBefore?: boolean;
 }

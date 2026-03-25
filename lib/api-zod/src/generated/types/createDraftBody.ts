@@ -15,6 +15,8 @@ export interface CreateDraftBody {
   tone: string;
   structuredBreakdown: StructuredBreakdown;
   /** @nullable */
+  selectedHook?: string | null;
+  /** @nullable */
   postOutput?: string | null;
   /** @nullable */
   carouselOutput?: string | null;
