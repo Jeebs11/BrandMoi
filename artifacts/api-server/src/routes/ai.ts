@@ -194,6 +194,9 @@ Evergreen hooks must NOT have a "sourceLine" field.`;
   const rawParsed = parsed2 as Record<string, unknown>;
   if (!rawParsed.trending || typeof rawParsed.trending !== "object") {
     const evergreen = rawParsed.evergreen as Record<string, unknown> | undefined;
+    const evergreenHooks = evergreen && Array.isArray((evergreen as Record<string, unknown>).hooks)
+      ? (evergreen as Record<string, unknown[]>).hooks as Array<{ text: string; type?: string }>
+      : [];
     rawParsed.trending = {
       topic: evergreen?.topic ?? "",
       angle: "Timely perspective tied to recent conversations",
@@ -201,17 +204,32 @@ Evergreen hooks must NOT have a "sourceLine" field.`;
       whyItMatters: evergreen?.whyItMatters ?? "",
       archetype: evergreen?.archetype ?? "lesson-learned",
       hooks: [
-        { text: evergreen && Array.isArray((evergreen as Record<string, unknown>).hooks) ? ((evergreen as Record<string, unknown[]>).hooks as Array<{text: string}>)[0]?.text ?? "" : "", type: "how-i", sourceLine: "Based on recent discussions in your field." },
+        { text: evergreenHooks[0]?.text ?? "What the latest conversations in your field reveal", type: evergreenHooks[0]?.type ?? "how-i", sourceLine: "Based on recent discussions in your field." },
+        { text: evergreenHooks[1]?.text ?? "The emerging shift that most professionals are ignoring", type: "contrarian", sourceLine: "Based on recent discussions in your field." },
       ],
       narrativeFlow: evergreen?.narrativeFlow ?? [],
     };
   }
-  // Ensure all trending hooks have a sourceLine
+  // Ensure all trending hooks have a sourceLine, and pad to at least 2 hooks
   if (Array.isArray((rawParsed.trending as Record<string, unknown>).hooks)) {
-    (rawParsed.trending as Record<string, unknown[]>).hooks = ((rawParsed.trending as Record<string, unknown[]>).hooks as Array<Record<string, unknown>>).map(h => ({
+    const trendingHooks = ((rawParsed.trending as Record<string, unknown[]>).hooks as Array<Record<string, unknown>>).map(h => ({
       ...h,
       sourceLine: h.sourceLine && String(h.sourceLine).trim() ? h.sourceLine : "Based on recent discussions in your field.",
     }));
+    if (trendingHooks.length < 2) {
+      const evergreenHooks = Array.isArray((rawParsed.evergreen as Record<string, unknown[]>)?.hooks)
+        ? (rawParsed.evergreen as Record<string, unknown[]>).hooks as Array<Record<string, unknown>>
+        : [];
+      while (trendingHooks.length < 2) {
+        const fallbackIdx = trendingHooks.length;
+        trendingHooks.push({
+          text: (evergreenHooks[fallbackIdx] as Record<string, unknown>)?.text ?? "The emerging shift most professionals are ignoring",
+          type: fallbackIdx === 0 ? "how-i" : "contrarian",
+          sourceLine: "Based on recent discussions in your field.",
+        });
+      }
+    }
+    (rawParsed.trending as Record<string, unknown[]>).hooks = trendingHooks;
   }
   const payload = { ...rawParsed, hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined };
   const validated = StrictStructureIdeaResponse.safeParse(payload);

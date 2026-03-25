@@ -117,7 +117,7 @@ const StructuredBreakdownSchema = zod.object({
       if (!Array.isArray(val)) return val;
       return val.map((item) => (typeof item === "string" ? { text: item } : item));
     },
-    zod.array(HookItemSchema)
+    zod.array(HookItemSchema).min(1)
   ),
   narrativeFlow: zod.array(zod.string()),
 });
@@ -132,19 +132,25 @@ export const StructureIdeaBody = zod.object({
   tone: zod.string(),
 });
 
-export const StructureIdeaResponse = zod.object({
-  evergreen: StructuredBreakdownSchema,
-  trending: StructuredBreakdownSchema.nullable().optional(),
-  hookUsage: zod.record(zod.string(), zod.number()).optional(),
-});
+const TrendingHookSchema = HookItemSchema.extend({ sourceLine: zod.string() });
 
 const TrendingBreakdownSchema = StructuredBreakdownSchema.extend({
-  hooks: zod.array(
-    HookItemSchema.extend({ sourceLine: zod.string() })
+  hooks: zod.preprocess(
+    (val) => {
+      if (!Array.isArray(val)) return val;
+      return val.map((item) => (typeof item === "string" ? { text: item } : item));
+    },
+    zod.array(TrendingHookSchema).min(2)
   ),
 });
 
 export const StrictStructureIdeaResponse = zod.object({
+  evergreen: StructuredBreakdownSchema,
+  trending: TrendingBreakdownSchema,
+  hookUsage: zod.record(zod.string(), zod.number()).optional(),
+});
+
+export const StructureIdeaResponse = zod.object({
   evergreen: StructuredBreakdownSchema,
   trending: TrendingBreakdownSchema,
   hookUsage: zod.record(zod.string(), zod.number()).optional(),

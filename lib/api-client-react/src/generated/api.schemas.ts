@@ -79,7 +79,7 @@ export interface HookItem {
 
 export interface StructureIdeaResponse {
   evergreen: StructuredBreakdown;
-  trending?: StructuredBreakdown | null;
+  trending: StructuredBreakdown;
   hookUsage?: Record<string, number>;
 }
 
