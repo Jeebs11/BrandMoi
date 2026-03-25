@@ -138,6 +138,12 @@ export const StructureIdeaResponse = zod.object({
   hookUsage: zod.record(zod.string(), zod.number()).optional(),
 });
 
+export const StrictStructureIdeaResponse = zod.object({
+  evergreen: StructuredBreakdownSchema,
+  trending: StructuredBreakdownSchema,
+  hookUsage: zod.record(zod.string(), zod.number()).optional(),
+});
+
 /**
  * @summary Generate LinkedIn content from confirmed structure
  */

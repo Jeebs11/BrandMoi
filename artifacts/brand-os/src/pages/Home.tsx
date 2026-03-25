@@ -156,6 +156,7 @@ export default function Home() {
           persona: state.persona,
           tone: state.tone,
           structuredBreakdown: state.structure,
+          selectedHook: state.selectedHook ?? null,
           postOutput: state.content?.post ?? null,
           carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
           visualOutput: state.content?.visual ?? null,

@@ -7,6 +7,7 @@ import { preferencesTable, draftsTable, brandVoiceSignalsTable } from "@workspac
 import {
   StructureIdeaBody,
   StructureIdeaResponse,
+  StrictStructureIdeaResponse,
   GenerateContentBody,
   GenerateContentResponse,
   RefineContentBody,
@@ -109,14 +110,15 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
     // non-critical
   }
 
-  // 3. Web search for trending context (graceful fallback)
+  // 3. Web search for trending context — targeted on persona + objective + topic
   let trendingContext = "";
   try {
     const { default: OpenAI } = await import("openai");
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const searchQuery = `Recent news, studies, or developments relevant to "${rawInput}" for a ${persona} focused on ${objective}. Extract 1-2 specific headline + brief snippet (date if known).`;
     const searchResponse = await openai.chat.completions.create({
       model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
-      messages: [{ role: "user" as const, content: `What are people discussing on LinkedIn right now about: "${rawInput}"? Give me 2-3 concise bullet points about current conversations, news, or trending angles that a LinkedIn creator could reference. Be specific and brief.` }],
+      messages: [{ role: "user" as const, content: searchQuery }],
       max_tokens: 300,
     });
     trendingContext = searchResponse.choices[0]?.message?.content ?? "";
@@ -124,10 +126,10 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
     trendingContext = "";
   }
 
-  // 3. Single Claude call — generates both evergreen and (if trending context) trending lanes
+  // 4. Single Claude call — ALWAYS generates both lanes; trending is synthesized if no real news
   const trendingInstruction = trendingContext
-    ? `\nTrending context from the web right now:\n${trendingContext}\n\nGenerate BOTH an "evergreen" breakdown (timeless angle) AND a "trending" breakdown (tied to the current conversation above). For each trending hook include a "sourceLine" field (one sentence, ≤20 words, naming the specific news/study/discussion it references). If no real news is available, sourceLine should read "Based on recent discussions in your field."`
-    : `\nGenerate only the "evergreen" breakdown (timeless angle). Set "trending" to null.`;
+    ? `\nRecent context from the web:\n${trendingContext}\n\nGenerate BOTH an "evergreen" breakdown (timeless angle) AND a "trending" breakdown tied to the recent context above. For each trending hook include a "sourceLine" field (≤20 words naming the specific news/study). Trending sourceLine should reference the actual event/study from the web context.`
+    : `\nNo real-time news was found. Generate BOTH an "evergreen" breakdown AND a "trending" breakdown based on a plausible emerging discussion or recent development in the user's field (synthesized — not invented facts). For each trending hook, set "sourceLine" to "Based on recent discussions in your field."`;
 
   const userMessage = `Raw thought: ${rawInput}
 
@@ -150,11 +152,22 @@ Return this exact JSON shape (no markdown fences):
     ],
     "narrativeFlow": ["", "", "", ""]
   },
-  "trending": null
+  "trending": {
+    "topic": "",
+    "angle": "",
+    "coreMessage": "",
+    "whyItMatters": "",
+    "archetype": "storytelling|lesson-learned|contrarian|data-insight|framework",
+    "hooks": [
+      { "text": "hook under 140 chars", "type": "how-i", "sourceLine": "One sentence ≤20 words naming the news/discussion." },
+      { "text": "hook under 140 chars", "type": "contrarian", "sourceLine": "One sentence ≤20 words naming the news/discussion." }
+    ],
+    "narrativeFlow": ["", "", "", ""]
+  }
 }
 
-When generating trending hooks, each hook object MUST include a "sourceLine" field — one concise sentence (max 20 words) describing the specific news event, study, or recent development the hook references. For evergreen hooks, omit "sourceLine".
-If no trending lane is generated, "trending" must be null.`;
+IMPORTANT: "trending" must NEVER be null. Always generate the trending lane. If no real news exists, synthesise a plausible emerging discussion and set each trending hook's "sourceLine" to "Based on recent discussions in your field."
+Evergreen hooks must NOT have a "sourceLine" field.`;
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -178,9 +191,10 @@ If no trending lane is generated, "trending" must be null.`;
     return;
   }
 
-  // Validate the two-lane response
-  const laneSchema = StructureIdeaResponse;
-  const validated = laneSchema.safeParse({ ...(parsed2 as object), hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined });
+  // Try strict schema first (both lanes always present), then fall back to loose (trending nullable)
+  const payload = { ...(parsed2 as object), hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined };
+  const strictResult = StrictStructureIdeaResponse.safeParse(payload);
+  const validated = strictResult.success ? strictResult : StructureIdeaResponse.safeParse(payload);
   if (!validated.success) {
     res.status(500).json({ error: "AI response did not match expected shape" });
     return;

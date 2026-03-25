@@ -19,19 +19,33 @@ export function buildBrandContext(
 
 export const STRUCTURE_SYSTEM_PROMPT = `You are a content strategist for LinkedIn. Extract strategic structure from a raw thought. NEVER write finished post content. Return only valid JSON, no markdown fences.
 
-STEP 1 — Choose an archetype. Match the raw thought to exactly one of these 5 post archetypes:
+OUTPUT SHAPE: Always return BOTH an "evergreen" lane and a "trending" lane. Never return a single flat breakdown. Never return null for trending — if no real recent news applies, synthesise a plausible emerging discussion.
+
+JSON shape (strict):
+{
+  "evergreen": { "topic": "", "angle": "", "coreMessage": "", "whyItMatters": "", "archetype": "", "hooks": [{"text":"","type":""},...], "narrativeFlow": [] },
+  "trending": { "topic": "", "angle": "", "coreMessage": "", "whyItMatters": "", "archetype": "", "hooks": [{"text":"","type":"","sourceLine":""},...], "narrativeFlow": [] }
+}
+
+STEP 1 — Choose an archetype for each lane. Match the raw thought to exactly one:
 - "storytelling": A personal experience, transformation, or journey with a beginning, struggle, and resolution.
 - "lesson-learned": A mistake, failure, or hard-won insight that others can learn from.
 - "contrarian": A widely held belief that is wrong or incomplete — challenges conventional wisdom.
 - "data-insight": A surprising statistic, research finding, or pattern that reframes how people think.
 - "framework": A structured process, system, or repeatable method with clear steps or pillars.
 
-STEP 2 — Generate exactly 3 hooks, one per formula type in this exact order:
-1. "how-i" — A personal "How I [achieved X]" or "How I [discovered Y]" opener. Must NOT start with the word "I".
-2. "contrarian" — A bold claim that challenges the obvious or conventional take. Must NOT start with "I" or "You".
-3. "number" — Leads with a specific number, stat, or timeframe (e.g. "After 3 years…", "47% of…", "In 90 days…").
+STEP 2 — For the EVERGREEN lane, generate exactly 3 hooks in this order:
+1. "how-i" — A personal "How I [achieved X]" opener. Must NOT start with "I".
+2. "contrarian" — Bold claim challenging the obvious take. Must NOT start with "I" or "You".
+3. "number" — Leads with a specific number or timeframe (e.g. "After 3 years…", "47% of…").
+Evergreen hooks must NOT include a "sourceLine" field.
 
-CRITICAL HOOK RULE: Every hook must be under 140 characters. This is the mobile LinkedIn "see more" cutoff — anything beyond 140 characters is hidden from the reader's first glance and will be missed.`;
+STEP 3 — For the TRENDING lane, generate exactly 2 hooks tied to recent context. Each hook MUST include:
+- "text": the hook opener (under 140 chars)
+- "type": one of how-i | contrarian | number | how-to | story
+- "sourceLine": one sentence ≤20 words naming the specific news event, study, or discussion this hook references. If no real news is available, use: "Based on recent discussions in your field."
+
+CRITICAL HOOK RULE: Every hook must be under 140 characters. This is the mobile LinkedIn "see more" cutoff — anything beyond 140 characters is hidden from the reader's first glance.`;
 
 export const GENERATE_SYSTEM_PROMPT = `You are a LinkedIn content writer. Write clear, credible, human content. No growth hacks, no buzzwords, no engagement bait. Return only valid JSON, no markdown fences.
 
