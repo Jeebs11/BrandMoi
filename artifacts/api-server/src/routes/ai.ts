@@ -6,7 +6,6 @@ import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, brandVoiceSignalsTable } from "@workspace/db";
 import {
   StructureIdeaBody,
-  StructureIdeaResponse,
   StrictStructureIdeaResponse,
   GenerateContentBody,
   GenerateContentResponse,
@@ -191,10 +190,31 @@ Evergreen hooks must NOT have a "sourceLine" field.`;
     return;
   }
 
-  // Try strict schema first (both lanes always present), then fall back to loose (trending nullable)
-  const payload = { ...(parsed2 as object), hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined };
-  const strictResult = StrictStructureIdeaResponse.safeParse(payload);
-  const validated = strictResult.success ? strictResult : StructureIdeaResponse.safeParse(payload);
+  // Enforce strict two-lane schema. If trending is missing/null, synthesize a fallback lane.
+  const rawParsed = parsed2 as Record<string, unknown>;
+  if (!rawParsed.trending || typeof rawParsed.trending !== "object") {
+    const evergreen = rawParsed.evergreen as Record<string, unknown> | undefined;
+    rawParsed.trending = {
+      topic: evergreen?.topic ?? "",
+      angle: "Timely perspective tied to recent conversations",
+      coreMessage: evergreen?.coreMessage ?? "",
+      whyItMatters: evergreen?.whyItMatters ?? "",
+      archetype: evergreen?.archetype ?? "lesson-learned",
+      hooks: [
+        { text: evergreen && Array.isArray((evergreen as Record<string, unknown>).hooks) ? ((evergreen as Record<string, unknown[]>).hooks as Array<{text: string}>)[0]?.text ?? "" : "", type: "how-i", sourceLine: "Based on recent discussions in your field." },
+      ],
+      narrativeFlow: evergreen?.narrativeFlow ?? [],
+    };
+  }
+  // Ensure all trending hooks have a sourceLine
+  if (Array.isArray((rawParsed.trending as Record<string, unknown>).hooks)) {
+    (rawParsed.trending as Record<string, unknown[]>).hooks = ((rawParsed.trending as Record<string, unknown[]>).hooks as Array<Record<string, unknown>>).map(h => ({
+      ...h,
+      sourceLine: h.sourceLine && String(h.sourceLine).trim() ? h.sourceLine : "Based on recent discussions in your field.",
+    }));
+  }
+  const payload = { ...rawParsed, hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined };
+  const validated = StrictStructureIdeaResponse.safeParse(payload);
   if (!validated.success) {
     res.status(500).json({ error: "AI response did not match expected shape" });
     return;

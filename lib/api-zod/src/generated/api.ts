@@ -138,9 +138,15 @@ export const StructureIdeaResponse = zod.object({
   hookUsage: zod.record(zod.string(), zod.number()).optional(),
 });
 
+const TrendingBreakdownSchema = StructuredBreakdownSchema.extend({
+  hooks: zod.array(
+    HookItemSchema.extend({ sourceLine: zod.string() })
+  ),
+});
+
 export const StrictStructureIdeaResponse = zod.object({
   evergreen: StructuredBreakdownSchema,
-  trending: StructuredBreakdownSchema,
+  trending: TrendingBreakdownSchema,
   hookUsage: zod.record(zod.string(), zod.number()).optional(),
 });
 

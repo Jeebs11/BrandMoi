@@ -984,100 +984,107 @@ export default function Capture() {
                 </div>
               )}
 
-              {/* Lane tabs — only show if trending lane is available */}
-              {state.structureResult?.trending && (
-                <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl">
-                  {(["evergreen", "trending"] as const).map((lane) => (
-                    <button
-                      key={lane}
-                      onClick={() => handleLaneSelect(lane)}
-                      className={cn(
-                        "flex-1 py-2 rounded-xl text-xs font-bold transition-all",
-                        state.selectedLane === lane
-                          ? lane === "trending"
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "bg-white text-primary shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                      )}
-                    >
-                      {lane === "evergreen" ? "Timeless" : "Trending"}
-                      {lane === "trending" && (
-                        <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse align-middle" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
+              {/* Info cards — show the selected lane's data (default: evergreen) */}
               <div className="space-y-3">
                 <InfoCard label="Topic" value={state.structure.topic} />
                 <InfoCard label="Angle" value={state.structure.angle} />
                 <InfoCard label="Core Message" value={state.structure.coreMessage} />
                 <InfoCard label="Why This Matters" value={state.structure.whyItMatters} />
               </div>
+
+              {/* Hook selection — two visible sections */}
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="font-bold text-sm text-gray-900">Choose a hook</h3>
-                    {state.selectedLane === "trending" && (
-                      <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Based on what's happening now</p>
-                    )}
-                  </div>
+                  <h3 className="font-bold text-sm text-gray-900">Choose a hook</h3>
                   <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required to continue</span>
                 </div>
-                <div className="space-y-3">
-                  {state.structure.hooks.map((hook: HookItem, idx: number) => {
-                    const HOOK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-                      "how-i":      { label: "How I",       color: "bg-violet-100 text-violet-700" },
-                      "contrarian": { label: "Contrarian",  color: "bg-rose-100 text-rose-700" },
-                      "number":     { label: "By the Numbers", color: "bg-amber-100 text-amber-700" },
-                      "how-to":     { label: "How To",      color: "bg-sky-100 text-sky-700" },
-                      "story":      { label: "Story",       color: "bg-emerald-100 text-emerald-700" },
-                    };
+                {(() => {
+                  const HOOK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+                    "how-i":      { label: "How I",          color: "bg-violet-100 text-violet-700" },
+                    "contrarian": { label: "Contrarian",     color: "bg-rose-100 text-rose-700" },
+                    "number":     { label: "By the Numbers", color: "bg-amber-100 text-amber-700" },
+                    "how-to":     { label: "How To",         color: "bg-sky-100 text-sky-700" },
+                    "story":      { label: "Story",          color: "bg-emerald-100 text-emerald-700" },
+                  };
+                  const renderHook = (hook: HookItem, idx: number, lane: "evergreen" | "trending") => {
                     const hookMeta = hook.type ? HOOK_TYPE_LABELS[hook.type] : null;
                     const usageCount = hook.type ? (state.structureResult?.hookUsage?.[hook.type] ?? 0) : 0;
                     const isOverused = usageCount >= 2;
-                    const isTrending = state.selectedLane === "trending";
+                    const isSelected = state.selectedHook === hook.text;
+                    const isTrending = lane === "trending";
                     return (
-                    <button key={idx} onClick={() => setState(s => ({ ...s, selectedHook: hook.text }))}
-                      className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", state.selectedHook === hook.text ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
-                    >
-                      {state.selectedHook === hook.text && (
-                        <div className="absolute top-3 right-3 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                      <button key={idx}
+                        onClick={() => setState(s => ({
+                          ...s,
+                          selectedHook: hook.text,
+                          selectedLane: lane,
+                          structure: s.structureResult?.[lane] ?? s.structure,
+                        }))}
+                        className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", isSelected ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-3 right-3 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                          {isTrending && (
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                              Trending
+                            </span>
+                          )}
+                          {hookMeta && (
+                            <span className={cn("inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", hookMeta.color)}>
+                              {hookMeta.label}
+                            </span>
+                          )}
+                          {hook.usedBefore && (
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                              Used before
+                            </span>
+                          )}
+                          {isOverused && (
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">
+                              Used {usageCount}×
+                            </span>
+                          )}
+                        </div>
+                        <p className={cn("text-sm leading-relaxed pr-7", isSelected ? "text-primary font-semibold" : "text-gray-700")}>{hook.text}</p>
+                        {hook.sourceLine && (
+                          <p className="mt-2 text-[11px] italic text-gray-400 leading-snug">{hook.sourceLine}</p>
+                        )}
+                      </button>
+                    );
+                  };
+
+                  return (
+                    <div className="space-y-5">
+                      {/* Evergreen section */}
+                      <div>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Timeless</p>
+                        <div className="space-y-3">
+                          {state.structureResult!.evergreen.hooks.map((hook, idx) => renderHook(hook, idx, "evergreen"))}
+                        </div>
+                      </div>
+                      {/* Trending section */}
+                      {state.structureResult?.trending && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Based on what's happening now</p>
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          </div>
+                          <div className="space-y-3">
+                            {state.structureResult.trending.hooks.map((hook, idx) =>
+                              renderHook(hook as HookItem, idx, "trending")
+                            )}
+                          </div>
                         </div>
                       )}
-                      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                        {isTrending && (
-                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                            Trending
-                          </span>
-                        )}
-                        {hookMeta && (
-                          <span className={cn("inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", hookMeta.color)}>
-                            {hookMeta.label}
-                          </span>
-                        )}
-                        {hook.usedBefore && (
-                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                            Used before
-                          </span>
-                        )}
-                        {isOverused && (
-                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">
-                            Used {usageCount}×
-                          </span>
-                        )}
-                      </div>
-                      <p className={cn("text-sm leading-relaxed pr-7", state.selectedHook === hook.text ? "text-primary font-semibold" : "text-gray-700")}>{hook.text}</p>
-                      {hook.sourceLine && (
-                        <p className="mt-2 text-[11px] italic text-gray-400 leading-snug">{hook.sourceLine}</p>
-                      )}
-                    </button>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })()}
               </div>
+
               <div className="p-4 bg-white border border-gray-100 rounded-2xl">
                 <h3 className="font-bold text-xs text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <Layout className="w-3.5 h-3.5" /> Narrative Flow
