@@ -99,6 +99,17 @@ export const GetSuggestionsResponseItem = zod.object({
 });
 export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 
+const StructuredBreakdownSchema = zod.object({
+  topic: zod.string(),
+  angle: zod.string(),
+  coreMessage: zod.string(),
+  whyItMatters: zod.string(),
+  archetype: zod.string().optional(),
+  hooks: zod.array(zod.string()),
+  hookTypes: zod.array(zod.string()).optional(),
+  narrativeFlow: zod.array(zod.string()),
+});
+
 /**
  * @summary Extract structured breakdown from a raw thought
  */
@@ -110,12 +121,9 @@ export const StructureIdeaBody = zod.object({
 });
 
 export const StructureIdeaResponse = zod.object({
-  topic: zod.string(),
-  angle: zod.string(),
-  coreMessage: zod.string(),
-  whyItMatters: zod.string(),
-  hooks: zod.array(zod.string()),
-  narrativeFlow: zod.array(zod.string()),
+  evergreen: StructuredBreakdownSchema,
+  trending: StructuredBreakdownSchema.optional(),
+  hookUsage: zod.record(zod.string(), zod.number()).optional(),
 });
 
 /**
@@ -126,14 +134,7 @@ export const GenerateContentBody = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structure: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    hooks: zod.array(zod.string()),
-    narrativeFlow: zod.array(zod.string()),
-  }),
+  structure: StructuredBreakdownSchema,
   selectedHook: zod.string(),
   includeCta: zod.boolean().optional(),
 });
@@ -201,14 +202,7 @@ export const ListDraftsResponseItem = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    hooks: zod.array(zod.string()),
-    narrativeFlow: zod.array(zod.string()),
-  }),
+  structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
@@ -226,14 +220,7 @@ export const CreateDraftBody = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    hooks: zod.array(zod.string()),
-    narrativeFlow: zod.array(zod.string()),
-  }),
+  structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
@@ -253,14 +240,7 @@ export const GetDraftResponse = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    hooks: zod.array(zod.string()),
-    narrativeFlow: zod.array(zod.string()),
-  }),
+  structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
@@ -289,14 +269,7 @@ export const UpdateDraftResponse = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    hooks: zod.array(zod.string()),
-    narrativeFlow: zod.array(zod.string()),
-  }),
+  structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),

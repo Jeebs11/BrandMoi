@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import type {
   StructuredBreakdown,
+  StructureIdeaResponse,
   GeneratedContent,
   CarouselSlide,
 } from "@workspace/api-client-react";
@@ -34,6 +35,8 @@ type WorkflowState = {
   objective: string;
   persona: string;
   tone: string;
+  structureResult: StructureIdeaResponse | null;
+  selectedLane: "evergreen" | "trending";
   structure: StructuredBreakdown | null;
   selectedHook: string | null;
   content: GeneratedContent | null;
@@ -46,6 +49,8 @@ const initialState: WorkflowState = {
   objective: "Authority",
   persona: "Founder",
   tone: "Direct",
+  structureResult: null,
+  selectedLane: "evergreen",
   structure: null,
   selectedHook: null,
   content: null,
@@ -67,13 +72,19 @@ export default function Home() {
   const handleStructure = () => {
     if (!state.rawInput.trim()) return;
     resetStructure();
-    setState(s => ({ ...s, step: 3, structure: null, selectedHook: null }));
+    setState(s => ({ ...s, step: 3, structureResult: null, selectedLane: "evergreen", structure: null, selectedHook: null }));
     structureIdea(
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
-        onSuccess: (data) => setState(s => ({ ...s, structure: data })),
+        onSuccess: (data) => setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen })),
       }
     );
+  };
+
+  const handleLaneSelect = (lane: "evergreen" | "trending") => {
+    const newStructure = state.structureResult?.[lane] ?? null;
+    if (!newStructure) return;
+    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null }));
   };
 
   // FIXED: immediately advance to step 4 so the loader shows during the API call
@@ -269,6 +280,31 @@ export default function Home() {
                 <ChevronLeft className="w-4 h-4 mr-1" /> Back
               </button>
 
+              {/* Lane tabs — only show if trending lane is available */}
+              {state.structureResult?.trending && (
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl">
+                  {(["evergreen", "trending"] as const).map((lane) => (
+                    <button
+                      key={lane}
+                      onClick={() => handleLaneSelect(lane)}
+                      className={cn(
+                        "flex-1 py-2 rounded-xl text-xs font-bold transition-all",
+                        state.selectedLane === lane
+                          ? lane === "trending"
+                            ? "bg-emerald-500 text-white shadow-sm"
+                            : "bg-white text-primary shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      )}
+                    >
+                      {lane === "evergreen" ? "Timeless" : "Trending"}
+                      {lane === "trending" && (
+                        <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse align-middle" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="space-y-3">
                 <InfoCard label="Topic" value={state.structure.topic} />
                 <InfoCard label="Angle" value={state.structure.angle} />
@@ -282,7 +318,19 @@ export default function Home() {
                   <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required to continue</span>
                 </div>
                 <div className="space-y-3">
-                  {state.structure.hooks.map((hook, idx) => (
+                  {state.structure.hooks.map((hook, idx) => {
+                    const hookTypeKey = state.structure?.hookTypes?.[idx];
+                    const HOOK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+                      "how-i":      { label: "How I",          color: "bg-violet-100 text-violet-700" },
+                      "contrarian": { label: "Contrarian",     color: "bg-rose-100 text-rose-700" },
+                      "number":     { label: "By the Numbers", color: "bg-amber-100 text-amber-700" },
+                      "how-to":     { label: "How To",         color: "bg-sky-100 text-sky-700" },
+                      "story":      { label: "Story",          color: "bg-emerald-100 text-emerald-700" },
+                    };
+                    const hookMeta = hookTypeKey ? HOOK_TYPE_LABELS[hookTypeKey] : null;
+                    const usageCount = hookTypeKey ? (state.structureResult?.hookUsage?.[hookTypeKey] ?? 0) : 0;
+                    const isOverused = usageCount >= 2;
+                    return (
                     <button
                       key={idx}
                       onClick={() => setState(s => ({ ...s, selectedHook: hook }))}
@@ -298,11 +346,24 @@ export default function Home() {
                           <Check className="w-3 h-3 text-white" strokeWidth={3} />
                         </div>
                       )}
+                      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                        {hookMeta && (
+                          <span className={cn("inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", hookMeta.color)}>
+                            {hookMeta.label}
+                          </span>
+                        )}
+                        {isOverused && (
+                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">
+                            Used {usageCount}×
+                          </span>
+                        )}
+                      </div>
                       <p className={cn("text-sm leading-relaxed pr-7", state.selectedHook === hook ? "text-primary font-semibold" : "text-gray-700")}>
                         {hook}
                       </p>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

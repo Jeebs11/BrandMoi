@@ -56,22 +56,71 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
   }
 
   const { rawInput, objective, persona, tone } = parsed.data;
+  const userId = req.user!.userId;
   const brandContext = buildBrandContext(objective, persona, tone);
-  const voiceContext = await getUserBrandContext(req.user!.userId);
+  const voiceContext = await getUserBrandContext(userId);
+
+  // 1. Compute hook usage from last 10 drafts
+  const hookUsage: Record<string, number> = {};
+  try {
+    const recentForHooks = await db
+      .select()
+      .from(draftsTable)
+      .where(eq(draftsTable.userId, userId))
+      .orderBy(desc(draftsTable.createdAt))
+      .limit(10);
+    for (const draft of recentForHooks) {
+      const bd = draft.structuredBreakdown as { hookTypes?: string[] } | null;
+      if (bd?.hookTypes) {
+        for (const ht of bd.hookTypes) {
+          hookUsage[ht] = (hookUsage[ht] ?? 0) + 1;
+        }
+      }
+    }
+  } catch {
+    // non-critical — continue without usage data
+  }
+
+  // 2. Web search for trending context (graceful fallback)
+  let trendingContext = "";
+  try {
+    const { default: OpenAI } = await import("openai");
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const searchResponse = await openai.chat.completions.create({
+      model: "gpt-4o-search-preview",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: [{ role: "user", content: `What are people discussing on LinkedIn right now about: "${rawInput}"? Give me 2-3 concise bullet points about current conversations, news, or trending angles that a LinkedIn creator could reference. Be specific and brief.` }] as any,
+      max_tokens: 300,
+    });
+    trendingContext = searchResponse.choices[0]?.message?.content ?? "";
+  } catch {
+    trendingContext = "";
+  }
+
+  // 3. Single Claude call — generates both evergreen and (if trending context) trending lanes
+  const trendingInstruction = trendingContext
+    ? `\nTrending context from the web right now:\n${trendingContext}\n\nGenerate BOTH an "evergreen" breakdown (timeless angle) AND a "trending" breakdown (tied to the current conversation above).`
+    : `\nGenerate only the "evergreen" breakdown (timeless angle). Set "trending" to null.`;
 
   const userMessage = `Raw thought: ${rawInput}
 
 ${brandContext}
 ${voiceContext ? `\n${voiceContext}` : ""}
+${trendingInstruction}
 
 Return this exact JSON shape (no markdown fences):
 {
-  "topic": "",
-  "angle": "",
-  "coreMessage": "",
-  "whyItMatters": "",
-  "hooks": ["", "", ""],
-  "narrativeFlow": ["", "", "", ""]
+  "evergreen": {
+    "topic": "",
+    "angle": "",
+    "coreMessage": "",
+    "whyItMatters": "",
+    "archetype": "storytelling|lesson-learned|contrarian|data-insight|framework",
+    "hooks": ["how-i hook under 140 chars", "contrarian hook under 140 chars", "number hook under 140 chars"],
+    "hookTypes": ["how-i", "contrarian", "number"],
+    "narrativeFlow": ["", "", "", ""]
+  },
+  "trending": null
 }`;
 
   const message = await anthropic.messages.create({
@@ -96,7 +145,9 @@ Return this exact JSON shape (no markdown fences):
     return;
   }
 
-  const validated = StructureIdeaResponse.safeParse(parsed2);
+  // Validate the two-lane response
+  const laneSchema = StructureIdeaResponse;
+  const validated = laneSchema.safeParse({ ...(parsed2 as object), hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined });
   if (!validated.success) {
     res.status(500).json({ error: "AI response did not match expected shape" });
     return;
@@ -341,7 +392,7 @@ router.post("/ai/check-angle", requireAuth, async (req, res): Promise<void> => {
     .from(draftsTable)
     .where(eq(draftsTable.userId, req.user!.userId))
     .orderBy(desc(draftsTable.createdAt))
-    .limit(20);
+    .limit(50);
 
   let mostSimilar: { draftId: number; topic: string; angle: string; score: number } | null = null;
 

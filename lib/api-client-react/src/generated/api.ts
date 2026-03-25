@@ -29,6 +29,7 @@ import type {
   RefinedContent,
   RegisterBody,
   StructureIdeaBody,
+  StructureIdeaResponse,
   StructuredBreakdown,
   SuggestionItem,
   UpdateDraftBody,
@@ -680,8 +681,8 @@ export const getStructureIdeaUrl = () => {
 export const structureIdea = async (
   structureIdeaBody: StructureIdeaBody,
   options?: RequestInit,
-): Promise<StructuredBreakdown> => {
-  return customFetch<StructuredBreakdown>(getStructureIdeaUrl(), {
+): Promise<StructureIdeaResponse> => {
+  return customFetch<StructureIdeaResponse>(getStructureIdeaUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },

@@ -70,12 +70,20 @@ export interface StructureIdeaBody {
   tone: string;
 }
 
+export interface StructureIdeaResponse {
+  evergreen: StructuredBreakdown;
+  trending?: StructuredBreakdown;
+  hookUsage?: Record<string, number>;
+}
+
 export interface StructuredBreakdown {
   topic: string;
   angle: string;
   coreMessage: string;
   whyItMatters: string;
+  archetype?: string;
   hooks: string[];
+  hookTypes?: string[];
   narrativeFlow: string[];
 }
 
