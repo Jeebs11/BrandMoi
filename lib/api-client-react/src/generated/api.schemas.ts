@@ -70,9 +70,14 @@ export interface StructureIdeaBody {
   tone: string;
 }
 
+export interface HookItem {
+  text: string;
+  type?: string;
+}
+
 export interface StructureIdeaResponse {
   evergreen: StructuredBreakdown;
-  trending?: StructuredBreakdown;
+  trending?: StructuredBreakdown | null;
   hookUsage?: Record<string, number>;
 }
 
@@ -82,15 +87,14 @@ export interface StructuredBreakdown {
   coreMessage: string;
   whyItMatters: string;
   archetype?: string;
-  hooks: string[];
-  hookTypes?: string[];
+  hooks: HookItem[];
   narrativeFlow: string[];
 }
 
 export interface CarouselSlide {
   slide: number;
   title: string;
-  description: string;
+  description?: string;
 }
 
 export interface InfographicData {

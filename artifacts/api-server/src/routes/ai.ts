@@ -87,9 +87,8 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
     const { default: OpenAI } = await import("openai");
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const searchResponse = await openai.chat.completions.create({
-      model: "gpt-4o-search-preview",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messages: [{ role: "user", content: `What are people discussing on LinkedIn right now about: "${rawInput}"? Give me 2-3 concise bullet points about current conversations, news, or trending angles that a LinkedIn creator could reference. Be specific and brief.` }] as any,
+      model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
+      messages: [{ role: "user" as const, content: `What are people discussing on LinkedIn right now about: "${rawInput}"? Give me 2-3 concise bullet points about current conversations, news, or trending angles that a LinkedIn creator could reference. Be specific and brief.` }],
       max_tokens: 300,
     });
     trendingContext = searchResponse.choices[0]?.message?.content ?? "";
@@ -116,8 +115,11 @@ Return this exact JSON shape (no markdown fences):
     "coreMessage": "",
     "whyItMatters": "",
     "archetype": "storytelling|lesson-learned|contrarian|data-insight|framework",
-    "hooks": ["how-i hook under 140 chars", "contrarian hook under 140 chars", "number hook under 140 chars"],
-    "hookTypes": ["how-i", "contrarian", "number"],
+    "hooks": [
+      { "text": "how-i hook under 140 chars", "type": "how-i" },
+      { "text": "contrarian hook under 140 chars", "type": "contrarian" },
+      { "text": "number hook under 140 chars", "type": "number" }
+    ],
     "narrativeFlow": ["", "", "", ""]
   },
   "trending": null

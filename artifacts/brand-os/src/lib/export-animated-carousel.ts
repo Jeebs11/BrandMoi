@@ -178,7 +178,7 @@ function buildSlideLayout(ctx: CanvasRenderingContext2D, slide: CarouselSlide): 
 
   const DESC_FONT = `400 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
   const DESC_LINE_H = 42;
-  const descLines = measureLines(ctx, slide.description, maxWidth, DESC_FONT);
+  const descLines = measureLines(ctx, slide.description ?? "", maxWidth, DESC_FONT);
 
   const SLIDE_NUM_H = 12;   // visual cap height at 13px
   const NUM_TO_BAR = 14;
@@ -219,7 +219,7 @@ function buildSlideLayout(ctx: CanvasRenderingContext2D, slide: CarouselSlide): 
   return {
     slideNumBL: 280, barY: 306, titleBL: 354,
     titleLines: [slide.title.slice(0, 40)], titleLineHeight: 64, titleFontSize: 52,
-    descBL: 500, descLines: [slide.description.slice(0, 80)], descLineHeight: 42,
+    descBL: 500, descLines: [(slide.description ?? "").slice(0, 80)], descLineHeight: 42,
   };
 }
 

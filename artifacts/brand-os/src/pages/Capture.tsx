@@ -11,7 +11,7 @@ import {
   useStructureIdea, useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
 } from "@workspace/api-client-react";
-import type { StructuredBreakdown, StructureIdeaResponse, GeneratedContent, CarouselSlide, Draft, InfographicData } from "@workspace/api-client-react";
+import type { HookItem, StructuredBreakdown, StructureIdeaResponse, GeneratedContent, CarouselSlide, Draft, InfographicData } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
@@ -106,7 +106,7 @@ export default function Capture() {
         structureResult: null,
         selectedLane: "evergreen",
         structure,
-        selectedHook: structure?.hooks?.[0] ?? null,
+        selectedHook: structure?.hooks?.[0]?.text ?? null,
         content,
         activeTab: "post",
       });
@@ -1020,8 +1020,7 @@ export default function Capture() {
                   <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required to continue</span>
                 </div>
                 <div className="space-y-3">
-                  {state.structure.hooks.map((hook, idx) => {
-                    const hookTypeKey = state.structure?.hookTypes?.[idx];
+                  {state.structure.hooks.map((hook: HookItem, idx: number) => {
                     const HOOK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
                       "how-i":      { label: "How I",       color: "bg-violet-100 text-violet-700" },
                       "contrarian": { label: "Contrarian",  color: "bg-rose-100 text-rose-700" },
@@ -1029,14 +1028,14 @@ export default function Capture() {
                       "how-to":     { label: "How To",      color: "bg-sky-100 text-sky-700" },
                       "story":      { label: "Story",       color: "bg-emerald-100 text-emerald-700" },
                     };
-                    const hookMeta = hookTypeKey ? HOOK_TYPE_LABELS[hookTypeKey] : null;
-                    const usageCount = hookTypeKey ? (state.structureResult?.hookUsage?.[hookTypeKey] ?? 0) : 0;
+                    const hookMeta = hook.type ? HOOK_TYPE_LABELS[hook.type] : null;
+                    const usageCount = hook.type ? (state.structureResult?.hookUsage?.[hook.type] ?? 0) : 0;
                     const isOverused = usageCount >= 2;
                     return (
-                    <button key={idx} onClick={() => setState(s => ({ ...s, selectedHook: hook }))}
-                      className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", state.selectedHook === hook ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
+                    <button key={idx} onClick={() => setState(s => ({ ...s, selectedHook: hook.text }))}
+                      className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", state.selectedHook === hook.text ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
                     >
-                      {state.selectedHook === hook && (
+                      {state.selectedHook === hook.text && (
                         <div className="absolute top-3 right-3 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
                           <Check className="w-3 h-3 text-white" strokeWidth={3} />
                         </div>
@@ -1053,7 +1052,7 @@ export default function Capture() {
                           </span>
                         )}
                       </div>
-                      <p className={cn("text-sm leading-relaxed pr-7", state.selectedHook === hook ? "text-primary font-semibold" : "text-gray-700")}>{hook}</p>
+                      <p className={cn("text-sm leading-relaxed pr-7", state.selectedHook === hook.text ? "text-primary font-semibold" : "text-gray-700")}>{hook.text}</p>
                     </button>
                     );
                   })}

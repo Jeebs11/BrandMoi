@@ -99,14 +99,21 @@ export const GetSuggestionsResponseItem = zod.object({
 });
 export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 
+const HookItemSchema = zod.object({ text: zod.string(), type: zod.string().optional() });
+
 const StructuredBreakdownSchema = zod.object({
   topic: zod.string(),
   angle: zod.string(),
   coreMessage: zod.string(),
   whyItMatters: zod.string(),
   archetype: zod.string().optional(),
-  hooks: zod.array(zod.string()),
-  hookTypes: zod.array(zod.string()).optional(),
+  hooks: zod.preprocess(
+    (val) => {
+      if (!Array.isArray(val)) return val;
+      return val.map((item) => (typeof item === "string" ? { text: item } : item));
+    },
+    zod.array(HookItemSchema)
+  ),
   narrativeFlow: zod.array(zod.string()),
 });
 
@@ -122,7 +129,7 @@ export const StructureIdeaBody = zod.object({
 
 export const StructureIdeaResponse = zod.object({
   evergreen: StructuredBreakdownSchema,
-  trending: StructuredBreakdownSchema.optional(),
+  trending: StructuredBreakdownSchema.nullable().optional(),
   hookUsage: zod.record(zod.string(), zod.number()).optional(),
 });
 
@@ -150,7 +157,7 @@ export const GenerateContentResponse = zod.object({
     zod.object({
       slide: zod.number(),
       title: zod.string(),
-      description: zod.string(),
+      description: zod.string().optional().default(""),
     }),
   ),
   visual: zod.string(),

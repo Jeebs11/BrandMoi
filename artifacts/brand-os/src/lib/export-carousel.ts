@@ -49,7 +49,7 @@ function buildSlideEl(
 
   const desc = document.createElement("div");
   desc.style.cssText = `color:${hexToRgba(textColor, 0.6)};font-size:24px;line-height:1.65;word-break:break-word`;
-  desc.textContent = slide.description;
+  desc.textContent = slide.description ?? "";
 
   el.appendChild(slideNum);
   el.appendChild(accent);
