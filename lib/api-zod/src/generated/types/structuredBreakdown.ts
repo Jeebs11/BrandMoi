@@ -5,6 +5,7 @@
  * Brand OS API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { HookItem } from './hookItem';
 
 export interface StructuredBreakdown {
   topic: string;
@@ -12,7 +13,6 @@ export interface StructuredBreakdown {
   coreMessage: string;
   whyItMatters: string;
   archetype?: string;
-  hooks: string[];
-  hookTypes?: string[];
+  hooks: HookItem[];
   narrativeFlow: string[];
 }

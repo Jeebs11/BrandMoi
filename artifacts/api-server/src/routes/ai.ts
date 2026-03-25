@@ -70,10 +70,22 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
       .orderBy(desc(draftsTable.createdAt))
       .limit(10);
     for (const draft of recentForHooks) {
-      const bd = draft.structuredBreakdown as { hookTypes?: string[] } | null;
+      const bd = draft.structuredBreakdown as {
+        hookTypes?: string[];
+        hooks?: (string | { text: string; type?: string })[];
+      } | null;
+      // Legacy format: flat hookTypes array
       if (bd?.hookTypes) {
         for (const ht of bd.hookTypes) {
           hookUsage[ht] = (hookUsage[ht] ?? 0) + 1;
+        }
+      }
+      // New format: hooks[].type
+      if (bd?.hooks) {
+        for (const h of bd.hooks) {
+          if (typeof h === "object" && h.type) {
+            hookUsage[h.type] = (hookUsage[h.type] ?? 0) + 1;
+          }
         }
       }
     }

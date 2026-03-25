@@ -53,7 +53,7 @@ RULES FOR THE POST:
 RULES FOR THE CAROUSEL:
 - 5–8 slides total.
 - Slide 1 (hook slide): title field only — a single punchy headline readable in under 3 seconds. Set description to empty string "". No subtext on slide 1.
-- Slides 2 to N-1 (content slides): title + 1–2 sentence description. One idea per slide. Use numbered titles where natural (e.g. "Step 3: The hardest part").
+- Slides 2 to N-1 (content slides): title + 1–2 sentence description. One idea per slide. Titles MUST be numbered (e.g. "1: The problem", "2: Why it happens", "3: The fix").
 - Last slide (CTA slide): title = the call to action; description must include a save prompt such as "Save this so you can come back to it."
 
 RULES FOR THE VISUAL:

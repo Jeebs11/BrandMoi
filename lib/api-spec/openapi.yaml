@@ -173,11 +173,11 @@ paths:
               $ref: "#/components/schemas/StructureIdeaBody"
       responses:
         "200":
-          description: Structured breakdown
+          description: Structured breakdown (evergreen + optional trending lane)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StructuredBreakdown"
+                $ref: "#/components/schemas/StructureIdeaResponse"
         "400":
           description: Bad request
           content:
@@ -497,6 +497,17 @@ components:
         - persona
         - tone
 
+    HookItem:
+      type: object
+      properties:
+        text:
+          type: string
+        type:
+          type: string
+          enum: [how-i, contrarian, number, how-to, story]
+      required:
+        - text
+
     StructuredBreakdown:
       type: object
       properties:
@@ -508,10 +519,12 @@ components:
           type: string
         whyItMatters:
           type: string
+        archetype:
+          type: string
         hooks:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/HookItem"
         narrativeFlow:
           type: array
           items:
@@ -523,6 +536,22 @@ components:
         - whyItMatters
         - hooks
         - narrativeFlow
+
+    StructureIdeaResponse:
+      type: object
+      properties:
+        evergreen:
+          $ref: "#/components/schemas/StructuredBreakdown"
+        trending:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/StructuredBreakdown"
+        hookUsage:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - evergreen
 
     CarouselSlide:
       type: object
@@ -536,7 +565,6 @@ components:
       required:
         - slide
         - title
-        - description
 
     GenerateContentBody:
       type: object
