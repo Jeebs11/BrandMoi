@@ -61,6 +61,25 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       (o) => (objCounts[o] ?? 0) === 0
     );
 
+    // Web search for current news relevant to the user's role and audience
+    let newsContext = "";
+    let newsHeadline = "";
+    let newsSourceLine = "";
+    try {
+      const { default: OpenAI } = await import("openai");
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const roleContext = [prefs?.brandRole, prefs?.brandAudience].filter(Boolean).join(" working with ");
+      const searchQuery = `What is the most relevant recent news, study, or development for a ${roleContext || "LinkedIn professional"}? Give me 1-2 specific headlines with a short summary (include date if known).`;
+      const searchResp = await openai.chat.completions.create({
+        model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
+        messages: [{ role: "user" as const, content: searchQuery }],
+        max_tokens: 250,
+      });
+      newsContext = searchResp.choices[0]?.message?.content ?? "";
+    } catch {
+      newsContext = "";
+    }
+
     const userMessage = [
       prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
       prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
@@ -70,34 +89,47 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       daysSinceLast !== null ? `Days since last draft: ${daysSinceLast}` : "No drafts yet",
       underused.length > 0 ? `Underused objectives: ${underused.join(", ")}` : "",
       `Total drafts: ${recentDrafts.length}`,
+      newsContext ? `\nToday's news context (use this to make angles timely):\n${newsContext}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 350,
+      max_tokens: 450,
       system: `You are an AI creative director for a LinkedIn creator. Generate a personalized daily brief — like a smart chief-of-staff, not a motivational poster.
 
 Return JSON only (no markdown):
 {
   "headline": "One sharp directive about what to focus on today (max 12 words)",
   "insight": "One specific observation about their content gap or momentum (max 25 words)",
-  "angles": ["specific post angle 1 (max 10 words)", "angle 2 (max 10 words)", "angle 3 (max 10 words)"]
+  "angles": ["specific post angle 1 (max 10 words)", "angle 2 (max 10 words)", "angle 3 (max 10 words)"],
+  "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
+  "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string."
 }
 
 Rules:
 - headline must be specific to their actual brand or gap, not generic
 - insight must reference something concrete from their history or underused objectives
+- if news context is available, at least one angle should reference or be inspired by it
 - angles are real post ideas they could write today
-- tone: direct, peer-level, no fluff, no "great job"`,
+- tone: direct, peer-level, no fluff, no "great job"
+- newsHeadline and newsSourceLine must only be set when real news context was provided — not invented`,
       messages: [{ role: "user", content: userMessage }],
     });
 
     const block = msg.content[0];
     if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
     try {
-      res.json(parseJson(block.text));
+      const parsed = parseJson(block.text) as Record<string, unknown>;
+      newsHeadline = typeof parsed.newsHeadline === "string" ? parsed.newsHeadline.trim() : "";
+      newsSourceLine = typeof parsed.newsSourceLine === "string" ? parsed.newsSourceLine.trim() : "";
+      res.json({
+        headline: parsed.headline,
+        insight: parsed.insight,
+        angles: parsed.angles,
+        ...(newsHeadline ? { newsHeadline, newsSourceLine } : {}),
+      });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
