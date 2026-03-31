@@ -15,4 +15,5 @@ export interface StructuredBreakdown {
   archetype?: string;
   hooks: HookItem[];
   narrativeFlow: string[];
+  storyMode?: boolean;
 }

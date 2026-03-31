@@ -120,6 +120,7 @@ const StructuredBreakdownSchema = zod.object({
     zod.array(HookItemSchema).min(1)
   ),
   narrativeFlow: zod.array(zod.string()),
+  storyMode: zod.boolean().optional(),
 });
 
 /**

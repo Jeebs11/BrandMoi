@@ -342,12 +342,16 @@ export default function Home() {
                     const isTrending = lane === "trending";
                     return (
                       <button key={idx}
-                        onClick={() => setState(s => ({
-                          ...s,
-                          selectedHook: hook.text,
-                          selectedLane: lane,
-                          structure: s.structureResult?.[lane] ?? s.structure,
-                        }))}
+                        onClick={() => setState(s => {
+                          const newStructure = s.structureResult?.[lane] ?? s.structure;
+                          return {
+                            ...s,
+                            selectedHook: hook.text,
+                            selectedLane: lane,
+                            structure: newStructure,
+                            storyMode: newStructure?.archetype === "storytelling",
+                          };
+                        })}
                         className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", isSelected ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
                       >
                         {isSelected && (

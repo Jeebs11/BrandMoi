@@ -112,7 +112,7 @@ export default function Capture() {
         selectedHook: structure?.hooks?.[0]?.text ?? null,
         content,
         activeTab: "post",
-        storyMode: structure?.archetype === "storytelling",
+        storyMode: structure?.storyMode ?? (structure?.archetype === "storytelling"),
       });
       setInitialized(true);
       setUserEditedPost(false);
@@ -792,7 +792,7 @@ export default function Capture() {
       objective: state.objective,
       persona: state.persona,
       tone: state.tone,
-      structuredBreakdown: state.structure,
+      structuredBreakdown: { ...state.structure, storyMode: state.storyMode },
       selectedHook: state.selectedHook ?? null,
       postOutput: postOverride ?? state.content?.post ?? null,
       carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
@@ -1055,12 +1055,16 @@ export default function Capture() {
                     const isTrending = lane === "trending";
                     return (
                       <button key={idx}
-                        onClick={() => setState(s => ({
-                          ...s,
-                          selectedHook: hook.text,
-                          selectedLane: lane,
-                          structure: s.structureResult?.[lane] ?? s.structure,
-                        }))}
+                        onClick={() => setState(s => {
+                          const newStructure = s.structureResult?.[lane] ?? s.structure;
+                          return {
+                            ...s,
+                            selectedHook: hook.text,
+                            selectedLane: lane,
+                            structure: newStructure,
+                            storyMode: newStructure?.archetype === "storytelling",
+                          };
+                        })}
                         className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", isSelected ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
                       >
                         {isSelected && (

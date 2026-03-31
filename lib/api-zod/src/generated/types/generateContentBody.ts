@@ -15,4 +15,5 @@ export interface GenerateContentBody {
   structure: StructuredBreakdown;
   selectedHook: string;
   includeCta?: boolean;
+  storyMode?: boolean;
 }
