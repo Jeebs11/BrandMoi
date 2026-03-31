@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
-  RefreshCw, Copy, AlertTriangle, BookOpen,
+  RefreshCw, Copy, AlertTriangle, BookOpen, ChevronDown,
 } from "lucide-react";
 import {
   useStructureIdea,
@@ -70,6 +70,7 @@ export default function Home() {
   const { mutate: createDraft, isPending: isSaving } = useCreateDraft();
 
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
+  const [storyArcOpen, setStoryArcOpen] = useState(false);
 
   // FIXED: immediately advance to step 3 so the loader shows during the API call
   const handleStructure = () => {
@@ -80,8 +81,13 @@ export default function Home() {
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
         onSuccess: (data) => {
-          const isStory = data.evergreen.archetype === "storytelling";
-          setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen, storyMode: isStory }));
+          setState(s => ({
+            ...s,
+            structureResult: data,
+            selectedLane: "evergreen",
+            structure: data.evergreen,
+            storyMode: s.storyMode || data.evergreen.archetype === "storytelling",
+          }));
         },
       }
     );
@@ -90,8 +96,13 @@ export default function Home() {
   const handleLaneSelect = (lane: "evergreen" | "trending") => {
     const newStructure = state.structureResult?.[lane] ?? null;
     if (!newStructure) return;
-    const isStory = newStructure.archetype === "storytelling";
-    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null, storyMode: isStory }));
+    setState(s => ({
+      ...s,
+      selectedLane: lane,
+      structure: newStructure,
+      selectedHook: null,
+      storyMode: s.storyMode || newStructure.archetype === "storytelling",
+    }));
   };
 
   // FIXED: immediately advance to step 4 so the loader shows during the API call
@@ -162,7 +173,7 @@ export default function Home() {
           objective: state.objective,
           persona: state.persona,
           tone: state.tone,
-          structuredBreakdown: state.structure,
+          structuredBreakdown: { ...state.structure, storyMode: state.storyMode },
           selectedHook: state.selectedHook ?? null,
           postOutput: state.content?.post ?? null,
           carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
@@ -349,7 +360,7 @@ export default function Home() {
                             selectedHook: hook.text,
                             selectedLane: lane,
                             structure: newStructure,
-                            storyMode: newStructure?.archetype === "storytelling",
+                            storyMode: s.storyMode || newStructure?.archetype === "storytelling",
                           };
                         })}
                         className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", isSelected ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
@@ -505,18 +516,53 @@ export default function Home() {
               )}
 
               {state.activeTab === "post" && (
-                <div className="relative group h-full">
-                  <textarea
-                    className="w-full h-full min-h-[340px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
-                    value={state.content.post}
-                    onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, post: e.target.value } } : s)}
-                  />
-                  <button
-                    onClick={() => copyToClipboard(state.content!.post)}
-                    className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
+                <div className="flex flex-col gap-2 h-full">
+                  <div className="relative group flex-1">
+                    <textarea
+                      className="w-full h-full min-h-[280px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                      value={state.content.post}
+                      onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, post: e.target.value } } : s)}
+                    />
+                    <button
+                      onClick={() => copyToClipboard(state.content!.post)}
+                      className="absolute top-3 right-3 p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {state.storyMode && (
+                    <div className="bg-violet-50 border border-violet-100 rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => setStoryArcOpen(o => !o)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-3.5 h-3.5 text-violet-500" />
+                          <span className="text-xs font-bold text-violet-700">Story arc applied</span>
+                        </div>
+                        <ChevronDown className={cn("w-4 h-4 text-violet-400 transition-transform duration-200", storyArcOpen ? "rotate-180" : "")} />
+                      </button>
+                      {storyArcOpen && (
+                        <div className="px-4 pb-4 space-y-2">
+                          {[
+                            { beat: "Scene", desc: "Hook — drops the reader into the exact moment" },
+                            { beat: "Tension", desc: "The conflict, struggle, or thing that went wrong" },
+                            { beat: "Turn", desc: "The insight, realization, or pivot point" },
+                            { beat: "Lesson", desc: "The transferable takeaway for the reader" },
+                            { beat: "CTA", desc: "One clear call-to-action that fits the story" },
+                          ].map(({ beat, desc }, i) => (
+                            <div key={beat} className="flex items-start gap-2">
+                              <span className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                              <div>
+                                <span className="text-xs font-bold text-violet-700">{beat}</span>
+                                <span className="text-xs text-violet-500"> — {desc}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

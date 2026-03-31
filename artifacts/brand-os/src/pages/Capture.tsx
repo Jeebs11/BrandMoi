@@ -693,8 +693,13 @@ export default function Capture() {
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
         onSuccess: (data) => {
-          const isStory = data.evergreen.archetype === "storytelling";
-          setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen, storyMode: isStory }));
+          setState(s => ({
+            ...s,
+            structureResult: data,
+            selectedLane: "evergreen",
+            structure: data.evergreen,
+            storyMode: s.storyMode || data.evergreen.archetype === "storytelling",
+          }));
           void checkAngle(data.evergreen.topic, data.evergreen.angle);
         }
       }
@@ -704,8 +709,13 @@ export default function Capture() {
   const handleLaneSelect = (lane: "evergreen" | "trending") => {
     const newStructure = state.structureResult?.[lane] ?? null;
     if (!newStructure) return;
-    const isStory = newStructure.archetype === "storytelling";
-    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null, storyMode: isStory }));
+    setState(s => ({
+      ...s,
+      selectedLane: lane,
+      structure: newStructure,
+      selectedHook: null,
+      storyMode: s.storyMode || newStructure.archetype === "storytelling",
+    }));
     void checkAngle(newStructure.topic, newStructure.angle);
   };
 
@@ -1062,7 +1072,7 @@ export default function Capture() {
                             selectedHook: hook.text,
                             selectedLane: lane,
                             structure: newStructure,
-                            storyMode: newStructure?.archetype === "storytelling",
+                            storyMode: s.storyMode || newStructure?.archetype === "storytelling",
                           };
                         })}
                         className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", isSelected ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
