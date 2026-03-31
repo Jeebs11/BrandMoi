@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
-  RefreshCw, Copy, AlertTriangle,
+  RefreshCw, Copy, AlertTriangle, BookOpen,
 } from "lucide-react";
 import {
   useStructureIdea,
@@ -42,6 +42,7 @@ type WorkflowState = {
   selectedHook: string | null;
   content: GeneratedContent | null;
   activeTab: TabType;
+  storyMode: boolean;
 };
 
 const initialState: WorkflowState = {
@@ -56,6 +57,7 @@ const initialState: WorkflowState = {
   selectedHook: null,
   content: null,
   activeTab: "post",
+  storyMode: false,
 };
 
 export default function Home() {
@@ -77,7 +79,10 @@ export default function Home() {
     structureIdea(
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
-        onSuccess: (data) => setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen })),
+        onSuccess: (data) => {
+          const isStory = data.evergreen.archetype === "storytelling";
+          setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen, storyMode: isStory }));
+        },
       }
     );
   };
@@ -85,7 +90,8 @@ export default function Home() {
   const handleLaneSelect = (lane: "evergreen" | "trending") => {
     const newStructure = state.structureResult?.[lane] ?? null;
     if (!newStructure) return;
-    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null }));
+    const isStory = newStructure.archetype === "storytelling";
+    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null, storyMode: isStory }));
   };
 
   // FIXED: immediately advance to step 4 so the loader shows during the API call
@@ -102,6 +108,7 @@ export default function Home() {
           tone: state.tone,
           structure: state.structure,
           selectedHook: state.selectedHook,
+          storyMode: state.storyMode,
         },
       },
       {
@@ -238,6 +245,29 @@ export default function Home() {
                 <SelectionGroup label="Objective" icon={<Target className="w-4 h-4" />} options={OBJECTIVES} selected={state.objective} onSelect={v => setState(s => ({ ...s, objective: v }))} />
                 <SelectionGroup label="Persona" icon={<Briefcase className="w-4 h-4" />} options={PERSONAS} selected={state.persona} onSelect={v => setState(s => ({ ...s, persona: v }))} />
                 <SelectionGroup label="Tone" icon={<Zap className="w-4 h-4" />} options={TONES} selected={state.tone} onSelect={v => setState(s => ({ ...s, tone: v }))} />
+                <div className="flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-violet-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">This is a story</p>
+                      <p className="text-[11px] text-gray-400 leading-tight">Uses 5-beat narrative arc: Scene → Tension → Turn → Lesson → CTA</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setState(s => ({ ...s, storyMode: !s.storyMode }))}
+                    className={cn(
+                      "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
+                      state.storyMode ? "bg-violet-500" : "bg-gray-200"
+                    )}
+                    role="switch"
+                    aria-checked={state.storyMode}
+                  >
+                    <span className={cn(
+                      "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200",
+                      state.storyMode ? "translate-x-5" : "translate-x-0"
+                    )} />
+                  </button>
+                </div>
               </div>
             </div>
 

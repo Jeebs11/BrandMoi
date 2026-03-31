@@ -6,6 +6,7 @@ import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
   RefreshCw, Copy, AlertTriangle, X, Lightbulb, Download,
+  ChevronDown, BookOpen,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -44,6 +45,7 @@ type WorkflowState = {
   selectedHook: string | null;
   content: GeneratedContent | null;
   activeTab: TabType;
+  storyMode: boolean;
 };
 
 export default function Capture() {
@@ -72,6 +74,7 @@ export default function Capture() {
     selectedHook: null,
     content: null,
     activeTab: "post",
+    storyMode: false,
   };
 
   const [state, setState] = useState<WorkflowState>(initialState);
@@ -109,6 +112,7 @@ export default function Capture() {
         selectedHook: structure?.hooks?.[0]?.text ?? null,
         content,
         activeTab: "post",
+        storyMode: structure?.archetype === "storytelling",
       });
       setInitialized(true);
       setUserEditedPost(false);
@@ -124,6 +128,7 @@ export default function Capture() {
   const isSaving = isCreating || isUpdating;
 
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
+  const [storyArcOpen, setStoryArcOpen] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
@@ -688,7 +693,8 @@ export default function Capture() {
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
         onSuccess: (data) => {
-          setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen }));
+          const isStory = data.evergreen.archetype === "storytelling";
+          setState(s => ({ ...s, structureResult: data, selectedLane: "evergreen", structure: data.evergreen, storyMode: isStory }));
           void checkAngle(data.evergreen.topic, data.evergreen.angle);
         }
       }
@@ -698,7 +704,8 @@ export default function Capture() {
   const handleLaneSelect = (lane: "evergreen" | "trending") => {
     const newStructure = state.structureResult?.[lane] ?? null;
     if (!newStructure) return;
-    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null }));
+    const isStory = newStructure.archetype === "storytelling";
+    setState(s => ({ ...s, selectedLane: lane, structure: newStructure, selectedHook: null, storyMode: isStory }));
     void checkAngle(newStructure.topic, newStructure.angle);
   };
 
@@ -711,7 +718,7 @@ export default function Capture() {
         data: {
           rawInput: state.rawInput, objective: state.objective, persona: state.persona,
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
-          includeCta,
+          includeCta, storyMode: state.storyMode,
         },
       },
       {
@@ -927,6 +934,29 @@ export default function Capture() {
                 <SelGroup label="Objective" icon={<Target className="w-4 h-4" />} options={OBJECTIVES} selected={state.objective} onSelect={v => setState(s => ({ ...s, objective: v }))} />
                 <SelGroup label="Persona" icon={<Briefcase className="w-4 h-4" />} options={PERSONAS} selected={state.persona} onSelect={v => setState(s => ({ ...s, persona: v }))} />
                 <SelGroup label="Tone" icon={<Zap className="w-4 h-4" />} options={TONES} selected={state.tone} onSelect={v => setState(s => ({ ...s, tone: v }))} />
+                <div className="flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-violet-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">This is a story</p>
+                      <p className="text-[11px] text-gray-400 leading-tight">Uses 5-beat narrative arc: Scene → Tension → Turn → Lesson → CTA</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setState(s => ({ ...s, storyMode: !s.storyMode }))}
+                    className={cn(
+                      "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
+                      state.storyMode ? "bg-violet-500" : "bg-gray-200"
+                    )}
+                    role="switch"
+                    aria-checked={state.storyMode}
+                  >
+                    <span className={cn(
+                      "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200",
+                      state.storyMode ? "translate-x-5" : "translate-x-0"
+                    )} />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
@@ -981,6 +1011,17 @@ export default function Capture() {
                 <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
                   <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin" />
                   <p className="text-xs text-gray-500">Checking angle freshness...</p>
+                </div>
+              )}
+
+              {/* Story Mode indicator */}
+              {state.storyMode && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-100 rounded-xl">
+                  <BookOpen className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                  <p className="text-xs font-semibold text-violet-700">Story Mode — 5-beat arc will be used</p>
+                  <button onClick={() => setState(s => ({ ...s, storyMode: false }))} className="ml-auto text-violet-300 hover:text-violet-500">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )}
 
@@ -1183,6 +1224,40 @@ export default function Capture() {
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
+                  {/* Story Arc guide (visible when Story Mode is active) */}
+                  {state.storyMode && (
+                    <div className="bg-violet-50 border border-violet-100 rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => setStoryArcOpen(o => !o)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-3.5 h-3.5 text-violet-500" />
+                          <span className="text-xs font-bold text-violet-700">Story arc applied</span>
+                        </div>
+                        <ChevronDown className={cn("w-4 h-4 text-violet-400 transition-transform duration-200", storyArcOpen ? "rotate-180" : "")} />
+                      </button>
+                      {storyArcOpen && (
+                        <div className="px-4 pb-4 space-y-2">
+                          {[
+                            { beat: "Scene", desc: "Hook — drops the reader into the exact moment" },
+                            { beat: "Tension", desc: "The conflict, struggle, or thing that went wrong" },
+                            { beat: "Turn", desc: "The insight, realization, or pivot point" },
+                            { beat: "Lesson", desc: "The transferable takeaway for the reader" },
+                            { beat: "CTA", desc: "One clear call-to-action that fits the story" },
+                          ].map(({ beat, desc }, i) => (
+                            <div key={beat} className="flex items-start gap-2">
+                              <span className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                              <div>
+                                <span className="text-xs font-bold text-violet-700">{beat}</span>
+                                <span className="text-xs text-violet-500"> — {desc}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {state.activeTab === "visual" && (

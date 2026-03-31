@@ -64,11 +64,31 @@ RULES FOR THE POST:
   • "Tag someone who needs to hear this." — motivational or mindset posts
   Do NOT use: "What do you think?", "Drop a comment below", "Follow me for more", or any vague variation.
 
+STORY MODE POST RULES (apply ONLY when storyMode is true — overrides standard post rules):
+- Structure the post as exactly 5 beats, each beat in its own paragraph group separated by a blank line:
+  Beat 1 (Scene): Drop the reader into the specific moment. Concrete sensory detail. Under 140 chars for the first line.
+  Beat 2 (Tension): The struggle, conflict, or thing that went wrong. Show don't tell.
+  Beat 3 (Turn): The insight, realization, or change in perspective. The pivot point.
+  Beat 4 (Lesson): What this means for the reader — the transferable takeaway.
+  Beat 5 (CTA): One approved CTA from the list above that fits the story.
+- Do NOT use explicit beat labels like "Beat 1" or "Scene:" in the post text.
+- Keep each beat tight: 1–3 sentences. Total post 150–280 words.
+- Write in first person past tense for beats 1–3, then shift to second person or universal truth for beat 4.
+
 RULES FOR THE CAROUSEL:
 - 5–8 slides total.
 - Slide 1 (hook slide): title field only — a single punchy headline readable in under 3 seconds. Set description to empty string "". No subtext on slide 1.
 - Slides 2 to N-1 (content slides): title + 1–2 sentence description. One idea per slide. Titles MUST be numbered (e.g. "1: The problem", "2: Why it happens", "3: The fix").
 - Last slide (CTA slide): title = the call to action; description must include a save prompt such as "Save this so you can come back to it."
+
+STORY MODE CAROUSEL RULES (apply ONLY when storyMode is true — overrides standard carousel rules):
+- Exactly 6 slides. Do NOT number them. Use chapter-style titles.
+- Slide 1 (Opening): Hook title only. Set description to "". Something that makes the reader stop scrolling.
+- Slide 2 (The moment): Title + 1-2 sentences describing the exact scene where the story begins.
+- Slide 3 (The struggle): Title + 1-2 sentences on the conflict, failure, or tension.
+- Slide 4 (The turn): Title + 1-2 sentences on the insight or change that happened.
+- Slide 5 (The lesson): Title + 1-2 sentences on the transferable takeaway for the reader.
+- Slide 6 (CTA): Title = the call to action. Description must include "Save this to remember it next time you're in this situation."
 
 RULES FOR THE VISUAL:
 - One punchy standalone quote or insight extracted from the post.

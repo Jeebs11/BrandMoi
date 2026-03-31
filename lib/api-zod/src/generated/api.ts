@@ -167,6 +167,7 @@ export const GenerateContentBody = zod.object({
   structure: StructuredBreakdownSchema,
   selectedHook: zod.string(),
   includeCta: zod.boolean().optional(),
+  storyMode: zod.boolean().optional(),
 });
 
 export const InfographicDataSchema = zod.object({
