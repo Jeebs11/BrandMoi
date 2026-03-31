@@ -294,6 +294,7 @@ export const UpdateDraftBody = zod.object({
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
+  structuredBreakdown: StructuredBreakdownSchema.optional(),
 });
 
 export const UpdateDraftResponse = zod.object({

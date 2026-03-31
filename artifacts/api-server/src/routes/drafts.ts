@@ -98,6 +98,7 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.carouselOutput !== undefined) updateData.carouselOutput = parsed.data.carouselOutput;
   if (parsed.data.visualOutput !== undefined) updateData.visualOutput = parsed.data.visualOutput;
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;
+  if (parsed.data.structuredBreakdown !== undefined) updateData.structuredBreakdown = JSON.stringify(parsed.data.structuredBreakdown);
 
   const [draft] = await db
     .update(draftsTable)

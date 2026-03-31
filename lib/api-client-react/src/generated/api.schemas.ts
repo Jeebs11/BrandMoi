@@ -230,4 +230,5 @@ export interface UpdateDraftBody {
   /** @nullable */
   visualOutput?: string | null;
   status?: UpdateDraftBodyStatus;
+  structuredBreakdown?: StructuredBreakdown;
 }

@@ -819,7 +819,7 @@ export default function Capture() {
 
     if (draftId) {
       updateDraft(
-        { id: draftId!, data: { postOutput: draftData.postOutput, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput } },
+        { id: draftId!, data: { postOutput: draftData.postOutput, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown } },
         {
           onSuccess: (saved: Draft) => {
             // Populate the cache so Library → "Edit and continue" always sees the latest content
