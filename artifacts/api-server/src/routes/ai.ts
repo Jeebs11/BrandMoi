@@ -271,7 +271,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     : "";
 
   const storyModeInstruction = storyMode
-    ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use 6 chapter-format slides. Do not use numbered slide titles.`
+    ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use exactly 5 chapter-format slides (Opening scene → Struggle → Turn → Lesson → CTA). Do not use numbered slide titles.`
     : "";
 
   const userMessage = `Create LinkedIn content based on this structure:
