@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { UpdateDraftBodyStatus } from "./updateDraftBodyStatus";
+import type { StructuredBreakdown } from "./structuredBreakdown";
 
 export interface UpdateDraftBody {
   /** @nullable */
@@ -15,4 +16,5 @@ export interface UpdateDraftBody {
   /** @nullable */
   visualOutput?: string | null;
   status?: UpdateDraftBodyStatus;
+  structuredBreakdown?: StructuredBreakdown;
 }
