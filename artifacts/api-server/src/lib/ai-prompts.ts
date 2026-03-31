@@ -82,13 +82,12 @@ RULES FOR THE CAROUSEL:
 - Last slide (CTA slide): title = the call to action; description must include a save prompt such as "Save this so you can come back to it."
 
 STORY MODE CAROUSEL RULES (apply ONLY when storyMode is true — overrides standard carousel rules):
-- Exactly 6 slides. Do NOT number them. Use chapter-style titles.
-- Slide 1 (Opening): Hook title only. Set description to "". Something that makes the reader stop scrolling.
-- Slide 2 (The moment): Title + 1-2 sentences describing the exact scene where the story begins.
-- Slide 3 (The struggle): Title + 1-2 sentences on the conflict, failure, or tension.
-- Slide 4 (The turn): Title + 1-2 sentences on the insight or change that happened.
-- Slide 5 (The lesson): Title + 1-2 sentences on the transferable takeaway for the reader.
-- Slide 6 (CTA): Title = the call to action. Description must include "Save this to remember it next time you're in this situation."
+- Exactly 5 slides. Do NOT number them. Use chapter-style titles.
+- Slide 1 (Opening scene): Hook title only. Set description to "". Something that makes the reader stop scrolling.
+- Slide 2 (The struggle): Title + 1-2 sentences on the conflict, failure, or tension.
+- Slide 3 (The turn): Title + 1-2 sentences on the insight or change that happened.
+- Slide 4 (The lesson): Title + 1-2 sentences on the transferable takeaway for the reader.
+- Slide 5 (CTA): Title = the call to action. Description must include "Save this to remember it next time you're in this situation."
 
 RULES FOR THE VISUAL:
 - One punchy standalone quote or insight extracted from the post.

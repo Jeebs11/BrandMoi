@@ -86,7 +86,7 @@ export default function Home() {
             structureResult: data,
             selectedLane: "evergreen",
             structure: data.evergreen,
-            storyMode: s.storyMode || data.evergreen.archetype === "storytelling",
+            storyMode: s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling",
           }));
         },
       }
