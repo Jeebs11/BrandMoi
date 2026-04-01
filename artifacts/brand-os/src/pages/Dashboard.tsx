@@ -308,9 +308,10 @@ export default function Dashboard() {
                         ))}
                         <button
                           onClick={() => setNewsAngles(null)}
-                          className="text-[10px] text-emerald-400/40 hover:text-emerald-400/70 transition-colors text-right pt-0.5"
+                          className="w-full flex items-center justify-center gap-1.5 mt-1 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300 text-xs font-semibold transition-colors"
                         >
-                          Regenerate
+                          <RefreshCw className="w-3 h-3" />
+                          Regenerate angles
                         </button>
                       </div>
                     </div>
