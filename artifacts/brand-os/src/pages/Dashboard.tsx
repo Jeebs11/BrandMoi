@@ -364,14 +364,7 @@ export default function Dashboard() {
                       {isOpen && (
                         <div className="px-3 pb-3 pt-2.5 bg-white/5 border-t border-white/10">
                           <button
-                            onClick={() => {
-                              const enriched = [
-                                angle,
-                                "",
-                                `Context: ${brief.insight}`,
-                              ].join("\n");
-                              navigate(`/capture?raw=${encodeURIComponent(enriched)}`);
-                            }}
+                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
                             className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors"
                           >
                             Write this post →
