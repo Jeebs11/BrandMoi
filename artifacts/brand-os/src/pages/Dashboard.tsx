@@ -297,15 +297,24 @@ export default function Dashboard() {
                     <div className="mt-3 pt-3 border-t border-emerald-500/15">
                       <p className="text-[10px] font-bold text-emerald-400/70 uppercase tracking-wider mb-2">Post angles from this news</p>
                       <div className="flex flex-col gap-1.5">
-                        {newsAngles.map((angle, i) => (
-                          <button
-                            key={i}
-                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
-                            className="w-full text-left bg-emerald-500/10 hover:bg-emerald-500/20 text-white/80 text-xs font-medium px-3 py-2 rounded-xl transition-colors border border-emerald-500/10"
-                          >
-                            {angle} →
-                          </button>
-                        ))}
+                        {newsAngles.map((angle, i) => {
+                          const enrichedRaw = [
+                            angle,
+                            "",
+                            `News reference: ${brief.newsHeadline}`,
+                            brief.newsSourceLine ?? "",
+                          ].filter(Boolean).join("\n");
+                          const newsUrlParam = brief.newsUrl ? `&newsUrl=${encodeURIComponent(brief.newsUrl)}` : "";
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}`)}
+                              className="w-full text-left bg-emerald-500/10 hover:bg-emerald-500/20 text-white/80 text-xs font-medium px-3 py-2 rounded-xl transition-colors border border-emerald-500/10"
+                            >
+                              {angle} →
+                            </button>
+                          );
+                        })}
                         <button
                           onClick={() => setNewsAngles(null)}
                           className="w-full flex items-center justify-center gap-1.5 mt-1 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300 text-xs font-semibold transition-colors"

@@ -6,7 +6,7 @@ import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
   RefreshCw, Copy, AlertTriangle, X, Lightbulb, Download,
-  ChevronDown, BookOpen,
+  ChevronDown, BookOpen, Newspaper,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -58,6 +58,7 @@ export default function Capture() {
   const thoughtIdParam = params.get("thoughtId");
   const thoughtId = thoughtIdParam ? parseInt(thoughtIdParam) : null;
   const rawParam = params.get("raw") ?? "";
+  const newsUrlParam = params.get("newsUrl") ?? "";
 
   const { preferences } = useAuth();
   const { toast } = useToast();
@@ -913,6 +914,22 @@ export default function Capture() {
               <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
                 <Lightbulb className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
                 <p className="text-xs text-amber-700 font-medium">From your Vault — develop this thought into content</p>
+              </div>
+            )}
+            {newsUrlParam && (
+              <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Newspaper className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <p className="text-xs text-emerald-700 font-medium">Based on a news article</p>
+                </div>
+                <a
+                  href={newsUrlParam}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-emerald-600 hover:text-emerald-800 font-semibold underline underline-offset-2 flex-shrink-0 transition-colors"
+                >
+                  View source →
+                </a>
               </div>
             )}
             <div className="flex-1 mt-4">
