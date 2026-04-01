@@ -193,4 +193,9 @@ export const agentApi = {
       body: JSON.stringify({ postText }),
     }),
   themes: () => apiFetch<{ themes: AgentTheme[] }>("/agent/themes"),
+  newsAngles: (payload: { newsHeadline: string; newsSourceLine?: string; newsUrl?: string }) =>
+    apiFetch<{ angles: string[] }>("/agent/news-angles", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

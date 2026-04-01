@@ -199,6 +199,61 @@ Rules:
   }
 });
 
+const NewsAnglesBody = z.object({
+  newsHeadline: z.string().min(5).max(300),
+  newsSourceLine: z.string().max(300).optional(),
+  newsUrl: z.string().url().optional(),
+});
+
+router.post("/agent/news-angles", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = NewsAnglesBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "newsHeadline is required." }); return; }
+
+  try {
+    const { prefs, dna } = await getUserAgentContext(req.user!.userId);
+
+    const userMessage = [
+      `News headline: "${parsed.data.newsHeadline}"`,
+      parsed.data.newsSourceLine ? `What it means: "${parsed.data.newsSourceLine}"` : "",
+      parsed.data.newsUrl ? `Source: ${parsed.data.newsUrl}` : "",
+      prefs?.brandRole ? `\nRole: ${prefs.brandRole}` : "",
+      prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
+      prefs?.brandBelief ? `Core belief: ${prefs.brandBelief}` : "",
+      dna ? `\nWriting DNA:\n${dna}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 300,
+      system: `You are a LinkedIn content strategist. Given a news headline and a creator's brand context, generate exactly 3 post angles that:
+- Are directly inspired by the news headline
+- Align with the creator's role, audience, and core belief
+- Are specific and concrete (not generic takes)
+- Are different from each other — vary the framing (personal story, contrarian take, tactical advice, etc.)
+- Max 10 words each — punchy and post-ready
+
+Return JSON only (no markdown):
+{ "angles": ["angle 1", "angle 2", "angle 3"] }`,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    try {
+      const data = parseJson(block.text) as { angles?: unknown };
+      if (!Array.isArray(data.angles)) throw new Error("bad shape");
+      res.json({ angles: data.angles.slice(0, 3) });
+    } catch {
+      res.status(500).json({ error: "Invalid AI response" });
+    }
+  } catch (err) {
+    console.error("[agent-news-angles]", err);
+    res.status(500).json({ error: "Failed to generate news angles" });
+  }
+});
+
 router.get("/agent/themes", requireAuth, async (req, res): Promise<void> => {
   try {
     const recentDrafts = await db

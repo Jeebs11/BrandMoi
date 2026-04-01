@@ -119,6 +119,8 @@ export default function Dashboard() {
   const [briefLoading, setBriefLoading] = useState(!loadCachedBrief());
   const [themes, setThemes] = useState<AgentTheme[]>([]);
   const [themesLoading, setThemesLoading] = useState(true);
+  const [newsAngles, setNewsAngles] = useState<string[] | null>(null);
+  const [newsAnglesLoading, setNewsAnglesLoading] = useState(false);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -242,26 +244,77 @@ export default function Dashboard() {
 
               {/* News signal — shown when a real news article was found */}
               {brief.newsHeadline && (
-                <div className="flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-3 py-2.5 mb-3">
-                  <Newspaper className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">In the news</p>
-                    <p className="text-white/80 text-xs font-medium leading-snug">{brief.newsHeadline}</p>
-                    {brief.newsSourceLine && (
-                      <p className="text-white/40 text-[11px] leading-snug mt-1 italic">{brief.newsSourceLine}</p>
-                    )}
-                    {brief.newsUrl && (
-                      <a
-                        href={brief.newsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-2 text-[11px] text-emerald-400/70 hover:text-emerald-300 transition-colors underline underline-offset-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        View source →
-                      </a>
-                    )}
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-3 py-2.5 mb-3">
+                  <div className="flex items-start gap-2">
+                    <Newspaper className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">In the news</p>
+                      <p className="text-white/80 text-xs font-medium leading-snug">{brief.newsHeadline}</p>
+                      {brief.newsSourceLine && (
+                        <p className="text-white/40 text-[11px] leading-snug mt-1 italic">{brief.newsSourceLine}</p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        {brief.newsUrl && (
+                          <a
+                            href={brief.newsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-emerald-400/70 hover:text-emerald-300 transition-colors underline underline-offset-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View source →
+                          </a>
+                        )}
+                        {!newsAngles && (
+                          <button
+                            onClick={() => {
+                              if (newsAnglesLoading || !brief.newsHeadline) return;
+                              setNewsAnglesLoading(true);
+                              agentApi.newsAngles({
+                                newsHeadline: brief.newsHeadline!,
+                                newsSourceLine: brief.newsSourceLine,
+                                newsUrl: brief.newsUrl,
+                              }).then((r) => setNewsAngles(r.angles))
+                                .catch(() => {})
+                                .finally(() => setNewsAnglesLoading(false));
+                            }}
+                            disabled={newsAnglesLoading}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300 hover:text-emerald-200 transition-colors disabled:opacity-50"
+                          >
+                            {newsAnglesLoading ? (
+                              <><span className="w-2.5 h-2.5 rounded-full border border-emerald-400/60 border-t-transparent animate-spin inline-block" /> Generating…</>
+                            ) : (
+                              <>✦ Create post angles</>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Generated news angles */}
+                  {newsAngles && newsAngles.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-emerald-500/15">
+                      <p className="text-[10px] font-bold text-emerald-400/70 uppercase tracking-wider mb-2">Post angles from this news</p>
+                      <div className="flex flex-col gap-1.5">
+                        {newsAngles.map((angle, i) => (
+                          <button
+                            key={i}
+                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
+                            className="w-full text-left bg-emerald-500/10 hover:bg-emerald-500/20 text-white/80 text-xs font-medium px-3 py-2 rounded-xl transition-colors border border-emerald-500/10"
+                          >
+                            {angle} →
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setNewsAngles(null)}
+                          className="text-[10px] text-emerald-400/40 hover:text-emerald-400/70 transition-colors text-right pt-0.5"
+                        >
+                          Regenerate
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
