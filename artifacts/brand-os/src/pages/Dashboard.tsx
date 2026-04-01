@@ -121,6 +121,8 @@ export default function Dashboard() {
   const [themesLoading, setThemesLoading] = useState(true);
   const [newsAngles, setNewsAngles] = useState<string[] | null>(null);
   const [newsAnglesLoading, setNewsAnglesLoading] = useState(false);
+  const [expandedNewsAngle, setExpandedNewsAngle] = useState<number | null>(null);
+  const [expandedBriefAngle, setExpandedBriefAngle] = useState<number | null>(null);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -305,18 +307,33 @@ export default function Dashboard() {
                             brief.newsSourceLine ?? "",
                           ].filter(Boolean).join("\n");
                           const newsUrlParam = brief.newsUrl ? `&newsUrl=${encodeURIComponent(brief.newsUrl)}` : "";
+                          const isOpen = expandedNewsAngle === i;
                           return (
-                            <button
-                              key={i}
-                              onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}`)}
-                              className="w-full text-left bg-emerald-500/10 hover:bg-emerald-500/20 text-white/80 text-xs font-medium px-3 py-2 rounded-xl transition-colors border border-emerald-500/10"
-                            >
-                              {angle} →
-                            </button>
+                            <div key={i} className="rounded-xl border border-emerald-500/15 overflow-hidden">
+                              <button
+                                onClick={() => setExpandedNewsAngle(isOpen ? null : i)}
+                                className="w-full text-left flex items-start justify-between gap-2 bg-emerald-500/10 hover:bg-emerald-500/15 px-3 py-2.5 transition-colors"
+                              >
+                                <span className={cn("text-white/80 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
+                                  {angle}
+                                </span>
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                              </button>
+                              {isOpen && (
+                                <div className="px-3 pb-3 pt-2.5 bg-emerald-500/5 border-t border-emerald-500/10">
+                                  <button
+                                    onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}`)}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-colors"
+                                  >
+                                    Write this post →
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                         <button
-                          onClick={() => setNewsAngles(null)}
+                          onClick={() => { setNewsAngles(null); setExpandedNewsAngle(null); }}
                           className="w-full flex items-center justify-center gap-1.5 mt-1 py-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300 text-xs font-semibold transition-colors"
                         >
                           <RefreshCw className="w-3 h-3" />
@@ -330,16 +347,33 @@ export default function Dashboard() {
 
               <p className="text-white font-extrabold text-base leading-snug mb-2">{brief.headline}</p>
               <p className="text-white/50 text-xs leading-relaxed mb-4">{brief.insight}</p>
-              <div className="flex flex-wrap gap-2">
-                {brief.angles.map((angle, i) => (
-                  <button
-                    key={i}
-                    onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
-                    className="bg-white/10 hover:bg-white/20 text-white/80 text-xs font-medium px-3 py-1.5 rounded-full transition-colors text-left"
-                  >
-                    {angle} →
-                  </button>
-                ))}
+              <div className="flex flex-col gap-1.5">
+                {brief.angles.map((angle, i) => {
+                  const isOpen = expandedBriefAngle === i;
+                  return (
+                    <div key={i} className="rounded-xl border border-white/10 overflow-hidden">
+                      <button
+                        onClick={() => setExpandedBriefAngle(isOpen ? null : i)}
+                        className="w-full text-left flex items-start justify-between gap-2 bg-white/10 hover:bg-white/15 px-3 py-2.5 transition-colors"
+                      >
+                        <span className={cn("text-white/80 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
+                          {angle}
+                        </span>
+                        <ChevronDown className={cn("w-3.5 h-3.5 text-white/30 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                      </button>
+                      {isOpen && (
+                        <div className="px-3 pb-3 pt-2.5 bg-white/5 border-t border-white/10">
+                          <button
+                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
+                            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors"
+                          >
+                            Write this post →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : null}
