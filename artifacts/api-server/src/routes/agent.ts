@@ -226,13 +226,18 @@ router.post("/agent/news-angles", requireAuth, aiRateLimit, async (req, res): Pr
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 300,
-      system: `You are a LinkedIn content strategist. Given a news headline and a creator's brand context, generate exactly 3 post angles that:
-- Are directly inspired by the news headline
-- Align with the creator's role, audience, and core belief
-- Are specific and concrete (not generic takes)
-- Are different from each other — vary the framing (personal story, contrarian take, tactical advice, etc.)
-- Max 10 words each — punchy and post-ready
+      max_tokens: 450,
+      system: `You are a LinkedIn content strategist. Given a news headline and a creator's brand context, generate exactly 3 post angles.
+
+Each angle must be 1-2 sentences (20–35 words) that:
+- Opens with the specific tension, stat, or insight FROM the news headline
+- Adds the creator's unique perspective, experience, or contrarian take
+- Gives Claude enough context to structure a full post — not just a topic label
+- Varies the framing across the 3 angles: one personal story, one contrarian take, one tactical/how-to
+- Reads like a strong opening sentence or post premise, not a title
+
+Bad example: "AI adoption is growing fast"
+Good example: "AI adoption hit 70% — but structured delivery infrastructure is under 5%. Most teams bought the tool without building the system around it."
 
 Return JSON only (no markdown):
 { "angles": ["angle 1", "angle 2", "angle 3"] }`,
