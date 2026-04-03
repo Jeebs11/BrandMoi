@@ -31,13 +31,13 @@ function formatNewsAge(publishedAt: string | undefined): string | null {
     const date = new Date(publishedAt);
     if (isNaN(date.getTime())) return null;
     const diffMs = Date.now() - date.getTime();
+    if (diffMs < 0) return null;
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffHours < 1) return "Just published";
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return null;
+    if (diffHours < 1) return "Published today";
+    if (diffHours < 24) return `Published ${diffHours}h ago`;
+    if (diffDays === 1) return "Published yesterday";
+    return `Published ${diffDays} days ago`;
   } catch { return null; }
 }
 
@@ -267,14 +267,19 @@ export default function Dashboard() {
                     <Newspaper className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       {/* Header row: label + freshness badge */}
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">In the news</p>
-                        {formatNewsAge(brief.newsPublishedAt) && (
-                          <span className="text-[10px] font-semibold text-emerald-300/80 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
-                            {formatNewsAge(brief.newsPublishedAt)}
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const ageLabel = formatNewsAge(brief.newsPublishedAt);
+                        return (
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">In the news</p>
+                            {ageLabel && (
+                              <span className="text-[10px] font-semibold text-emerald-300/80 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
+                                {ageLabel}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <p className="text-white/80 text-xs font-medium leading-snug">{brief.newsHeadline}</p>
                       {/* Source domain + source line */}
                       {(brief.newsSourceDomain || brief.newsSourceLine) && (
