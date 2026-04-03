@@ -25,6 +25,22 @@ function saveBriefCache(brief: AgentBrief) {
   try { sessionStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ brief, ts: Date.now() })); } catch { /* noop */ }
 }
 
+function formatNewsAge(publishedAt: string | undefined): string | null {
+  if (!publishedAt) return null;
+  try {
+    const date = new Date(publishedAt);
+    if (isNaN(date.getTime())) return null;
+    const diffMs = Date.now() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffHours < 1) return "Just published";
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return null;
+  } catch { return null; }
+}
+
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
   ready: "bg-blue-50 text-blue-600",
@@ -250,10 +266,28 @@ export default function Dashboard() {
                   <div className="flex items-start gap-2">
                     <Newspaper className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-0.5">In the news</p>
+                      {/* Header row: label + freshness badge */}
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">In the news</p>
+                        {formatNewsAge(brief.newsPublishedAt) && (
+                          <span className="text-[10px] font-semibold text-emerald-300/80 bg-emerald-500/15 px-1.5 py-0.5 rounded-full">
+                            {formatNewsAge(brief.newsPublishedAt)}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-white/80 text-xs font-medium leading-snug">{brief.newsHeadline}</p>
-                      {brief.newsSourceLine && (
-                        <p className="text-white/40 text-[11px] leading-snug mt-1 italic">{brief.newsSourceLine}</p>
+                      {/* Source domain + source line */}
+                      {(brief.newsSourceDomain || brief.newsSourceLine) && (
+                        <div className="mt-1 space-y-0.5">
+                          {brief.newsSourceDomain && (
+                            <p className="text-emerald-400/60 text-[10px] font-semibold uppercase tracking-wider">
+                              via {brief.newsSourceDomain}
+                            </p>
+                          )}
+                          {brief.newsSourceLine && (
+                            <p className="text-white/40 text-[11px] leading-snug italic">{brief.newsSourceLine}</p>
+                          )}
+                        </div>
                       )}
                       <div className="flex items-center gap-3 mt-2 flex-wrap">
                         {brief.newsUrl && (
@@ -276,6 +310,7 @@ export default function Dashboard() {
                                 newsHeadline: brief.newsHeadline!,
                                 newsSourceLine: brief.newsSourceLine,
                                 newsUrl: brief.newsUrl,
+                                newsDescription: brief.newsDescription,
                               }).then((r) => setNewsAngles(r.angles))
                                 .catch(() => {})
                                 .finally(() => setNewsAnglesLoading(false));

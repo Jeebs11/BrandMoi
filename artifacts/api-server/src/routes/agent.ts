@@ -66,18 +66,21 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
     let newsHeadline = "";
     let newsSourceLine = "";
     let newsUrl = "";
+    let newsPublishedAt = "";
+    let newsSourceDomain = "";
+    let newsDescription = "";
     try {
       const { default: OpenAI } = await import("openai");
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const roleContext = [prefs?.brandRole, prefs?.brandAudience].filter(Boolean).join(" working with ");
-      const searchQuery = `What is the most relevant recent news, study, or development for a ${roleContext || "LinkedIn professional"}? Give me 1-2 specific headlines with a short summary (include date if known).`;
+      const searchQuery = `Find the single most relevant recent news article, study, or development for a ${roleContext || "LinkedIn professional"}. Include: the headline, the publication name and date (day/month/year or relative like "2 hours ago"), and a 2-3 sentence summary of the key finding or development.`;
       const searchResp = await openai.chat.completions.create({
         model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
         messages: [{ role: "user" as const, content: searchQuery }],
-        max_tokens: 250,
+        max_tokens: 350,
       });
       newsContext = searchResp.choices[0]?.message?.content ?? "";
-      // Extract the first cited URL from search annotations
+      // Extract the first cited URL and title from search annotations
       const annotations = (searchResp.choices[0]?.message as Record<string, unknown>)?.annotations;
       if (Array.isArray(annotations)) {
         for (const ann of annotations) {
@@ -112,7 +115,7 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 450,
+      max_tokens: 600,
       system: `You are an AI creative director for a LinkedIn creator. Generate a personalized daily brief — like a smart chief-of-staff, not a motivational poster.
 
 Return JSON only (no markdown):
@@ -121,7 +124,10 @@ Return JSON only (no markdown):
   "insight": "One specific observation about their content gap or momentum (max 25 words)",
   "angles": ["specific post angle 1 (max 10 words)", "angle 2 (max 10 words)", "angle 3 (max 10 words)"],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
-  "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string."
+  "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string.",
+  "newsPublishedAt": "If today's news context includes a date or time (e.g. '2 hours ago', 'April 3', 'yesterday'), convert it to an ISO 8601 datetime string (e.g. '2026-04-03T10:00:00Z'). Use today's date as the reference. If no date mentioned, empty string.",
+  "newsSourceDomain": "If today's news context includes a publication name (e.g. 'Reuters', 'TechCrunch', 'Harvard Business Review'), extract it as a clean short name. Otherwise empty string.",
+  "newsDescription": "If today's news context was provided, write 2-3 sentences (max 60 words) summarising the key finding or development — this will be used as context for post angle generation. Otherwise empty string."
 }
 
 Rules:
@@ -130,7 +136,7 @@ Rules:
 - if news context is available, at least one angle should reference or be inspired by it
 - angles are real post ideas they could write today
 - tone: direct, peer-level, no fluff, no "great job"
-- newsHeadline and newsSourceLine must only be set when real news context was provided — not invented`,
+- newsHeadline, newsSourceLine, newsPublishedAt, newsSourceDomain, newsDescription must only be set when real news context was provided — not invented`,
       messages: [{ role: "user", content: userMessage }],
     });
 
@@ -140,11 +146,21 @@ Rules:
       const parsed = parseJson(block.text) as Record<string, unknown>;
       newsHeadline = typeof parsed.newsHeadline === "string" ? parsed.newsHeadline.trim() : "";
       newsSourceLine = typeof parsed.newsSourceLine === "string" ? parsed.newsSourceLine.trim() : "";
+      newsPublishedAt = typeof parsed.newsPublishedAt === "string" ? parsed.newsPublishedAt.trim() : "";
+      newsSourceDomain = typeof parsed.newsSourceDomain === "string" ? parsed.newsSourceDomain.trim() : "";
+      newsDescription = typeof parsed.newsDescription === "string" ? parsed.newsDescription.trim() : "";
       res.json({
         headline: parsed.headline,
         insight: parsed.insight,
         angles: parsed.angles,
-        ...(newsHeadline ? { newsHeadline, newsSourceLine, ...(newsUrl ? { newsUrl } : {}) } : {}),
+        ...(newsHeadline ? {
+          newsHeadline,
+          newsSourceLine,
+          ...(newsUrl ? { newsUrl } : {}),
+          ...(newsPublishedAt ? { newsPublishedAt } : {}),
+          ...(newsSourceDomain ? { newsSourceDomain } : {}),
+          ...(newsDescription ? { newsDescription } : {}),
+        } : {}),
       });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
@@ -203,6 +219,7 @@ const NewsAnglesBody = z.object({
   newsHeadline: z.string().min(5).max(300),
   newsSourceLine: z.string().max(300).optional(),
   newsUrl: z.string().url().optional(),
+  newsDescription: z.string().max(500).optional(),
 });
 
 router.post("/agent/news-angles", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -215,6 +232,7 @@ router.post("/agent/news-angles", requireAuth, aiRateLimit, async (req, res): Pr
     const userMessage = [
       `News headline: "${parsed.data.newsHeadline}"`,
       parsed.data.newsSourceLine ? `What it means: "${parsed.data.newsSourceLine}"` : "",
+      parsed.data.newsDescription ? `Article summary: "${parsed.data.newsDescription}"` : "",
       parsed.data.newsUrl ? `Source: ${parsed.data.newsUrl}` : "",
       prefs?.brandRole ? `\nRole: ${prefs.brandRole}` : "",
       prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
