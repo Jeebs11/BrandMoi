@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
@@ -8,21 +8,20 @@ import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, momentumApi, agentApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme } from "@/lib/api";
 
-const BRIEF_CACHE_KEY = "brand_os_brief";
-const BRIEF_TTL_MS = 60 * 60 * 1000;
+function todayKey() {
+  return `brand_os_brief_${new Date().toISOString().slice(0, 10)}`;
+}
 
 function loadCachedBrief(): AgentBrief | null {
   try {
-    const raw = sessionStorage.getItem(BRIEF_CACHE_KEY);
+    const raw = sessionStorage.getItem(todayKey());
     if (!raw) return null;
-    const { brief, ts } = JSON.parse(raw) as { brief: AgentBrief; ts: number };
-    if (Date.now() - ts > BRIEF_TTL_MS) return null;
-    return brief;
+    return JSON.parse(raw) as AgentBrief;
   } catch { return null; }
 }
 
 function saveBriefCache(brief: AgentBrief) {
-  try { sessionStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ brief, ts: Date.now() })); } catch { /* noop */ }
+  try { sessionStorage.setItem(todayKey(), JSON.stringify(brief)); } catch { /* noop */ }
 }
 
 function formatNewsAge(publishedAt: string | undefined): string | null {
@@ -167,7 +166,7 @@ export default function Dashboard() {
 
   const refreshBrief = () => {
     setBriefLoading(true);
-    sessionStorage.removeItem(BRIEF_CACHE_KEY);
+    sessionStorage.removeItem(todayKey());
     agentApi.brief().then((b) => {
       setBrief(b);
       saveBriefCache(b);
@@ -385,24 +384,37 @@ export default function Dashboard() {
                 </div>
               )}
 
-              <p className="text-white font-extrabold text-base leading-snug mb-2">{brief.headline}</p>
-              <p className="text-white/50 text-xs leading-relaxed mb-4">{brief.insight}</p>
-              <div className="flex flex-col gap-1.5">
+              <p className="text-white font-extrabold text-base leading-snug mb-1">{brief.headline}</p>
+              <p className="text-white/50 text-xs leading-relaxed">{brief.insight}</p>
+            </div>
+          ) : null}
+
+          {/* Brand voice post ideas — separate card */}
+          {brief && brief.angles.length > 0 && (
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Post ideas for your brand</span>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium">From your voice & gaps</p>
+              </div>
+              <div className="px-5 pb-5 flex flex-col gap-1.5">
                 {brief.angles.map((angle, i) => {
                   const isOpen = expandedBriefAngle === i;
                   return (
-                    <div key={i} className="rounded-xl border border-white/10 overflow-hidden">
+                    <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
                       <button
                         onClick={() => setExpandedBriefAngle(isOpen ? null : i)}
-                        className="w-full text-left flex items-start justify-between gap-2 bg-white/10 hover:bg-white/15 px-3 py-2.5 transition-colors"
+                        className="w-full text-left flex items-start justify-between gap-2 bg-gray-50 hover:bg-gray-100 px-3 py-2.5 transition-colors"
                       >
-                        <span className={cn("text-white/80 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
+                        <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
                           {angle}
                         </span>
-                        <ChevronDown className={cn("w-3.5 h-3.5 text-white/30 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-3 pt-2.5 bg-white/5 border-t border-white/10">
+                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
                           <button
                             onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
                             className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors"
@@ -416,7 +428,7 @@ export default function Dashboard() {
                 })}
               </div>
             </div>
-          ) : null}
+          )}
 
           {/* Capture CTA */}
           <Link href="/capture">

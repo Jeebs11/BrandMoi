@@ -73,7 +73,7 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       const { default: OpenAI } = await import("openai");
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       const roleContext = [prefs?.brandRole, prefs?.brandAudience].filter(Boolean).join(" working with ");
-      const searchQuery = `Find the single most relevant recent news article, study, or development for a ${roleContext || "LinkedIn professional"}. Include: the headline, the publication name and date (day/month/year or relative like "2 hours ago"), and a 2-3 sentence summary of the key finding or development.`;
+      const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${roleContext || "LinkedIn professional"}. It must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the exact publication date/time (e.g. "2 hours ago", "yesterday", or the specific date), and a 2-3 sentence summary of the key finding or development.`;
       const searchResp = await openai.chat.completions.create({
         model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
         messages: [{ role: "user" as const, content: searchQuery }],
