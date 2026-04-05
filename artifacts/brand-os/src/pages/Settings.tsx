@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info } from "lucide-react";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +31,9 @@ export default function Settings() {
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
   const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
   const [brandTextColor, setBrandTextColor] = useState(prefs?.brandTextColor ?? "#ffffff");
+
+  const [openPanelId, setOpenPanelId] = useState<string | null>(null);
+  const togglePanel = (id: string) => setOpenPanelId(prev => prev === id ? null : id);
 
   const [voiceData, setVoiceData] = useState<VoiceSummaryResult | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(true);
@@ -185,9 +188,42 @@ export default function Settings() {
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Content Preferences</h2>
             <div className="space-y-5">
-              <SelRow label="Default Objective" options={OBJECTIVES} selected={objective} onSelect={setObjective} />
-              <SelRow label="Persona" options={PERSONAS} selected={persona} onSelect={setPersona} />
-              <SelRow label="Tone" options={TONES} selected={tone} onSelect={setTone} />
+              <SelRow
+                label="Default Objective" options={OBJECTIVES} selected={objective} onSelect={setObjective}
+                panelId="objective" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="Sets the LinkedIn goal shaping every post you generate."
+                optionInfo={{
+                  "Clients": "Positions you as the solution enterprise buyers are looking for.",
+                  "Job": "Signals career momentum and the value you bring to a new role.",
+                  "Authority": "Produces opinion-led content that builds long-term credibility.",
+                  "Documenting": "Shows the real work — builds trust through transparency.",
+                  "Expert": "Deep technical content that earns respect from peers.",
+                  "Hiring": "Attracts talent by showcasing culture, mission, and opportunity.",
+                }}
+              />
+              <SelRow
+                label="Persona" options={PERSONAS} selected={persona} onSelect={setPersona}
+                panelId="persona" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="Frames your point of view and what you optimise for."
+                optionInfo={{
+                  "Founder": "Assumes vision and leadership language.",
+                  "Operator": "Assumes systems, execution, and measurable outcomes.",
+                  "Career": "Focuses on professional growth, credibility, and opportunities.",
+                  "Technical": "Leads with depth, precision, and craft.",
+                  "Sales": "Focuses on value, trust, and closing the gap.",
+                }}
+              />
+              <SelRow
+                label="Tone" options={TONES} selected={tone} onSelect={setTone}
+                panelId="tone" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="The default writing energy applied to every post. You can override this per post."
+                optionInfo={{
+                  "Direct": "Punchy and efficient — no warm-up, straight to the point.",
+                  "Story": "Opens with a scene or moment that pulls the reader in.",
+                  "Educational": "Breaks down a concept clearly — great for growing a following.",
+                  "Bold": "Challenges assumptions and sparks debate.",
+                }}
+              />
             </div>
           </section>
 
@@ -195,9 +231,18 @@ export default function Settings() {
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Voice</h2>
             <div className="space-y-4">
-              <VoiceInput label="Your role" value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..." />
-              <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..." />
-              <VoiceInput label="Your core belief" value={brandBelief} onChange={setBrandBelief} placeholder="Clarity beats cleverness..." />
+              <VoiceInput label="Your role" value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..."
+                panelId="role" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="Tells the AI who you are in one sentence. The more specific, the more precise the content. Example: 'PMO consultant helping enterprise teams implement AI-driven project delivery'."
+              />
+              <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..."
+                panelId="audience" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="Tells the AI who you're speaking to. Example: 'CIOs and VPs of Engineering at companies with 500+ employees planning digital transformation'."
+              />
+              <VoiceInput label="Your core belief" value={brandBelief} onChange={setBrandBelief} placeholder="Clarity beats cleverness..."
+                panelId="belief" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="Your philosophical anchor — the contrarian or foundational idea that makes your POV unique. Example: 'Most digital transformations fail because of governance gaps, not technology gaps'."
+              />
             </div>
           </section>
 
@@ -396,10 +441,51 @@ export default function Settings() {
   );
 }
 
-function SelRow({ label, options, selected, onSelect }: { label: string; options: string[]; selected: string; onSelect: (v: string) => void }) {
+function SelRow({
+  label, options, selected, onSelect,
+  info, optionInfo,
+  panelId, openPanelId, onTogglePanel,
+}: {
+  label: string;
+  options: string[];
+  selected: string;
+  onSelect: (v: string) => void;
+  info?: string;
+  optionInfo?: Record<string, string>;
+  panelId?: string;
+  openPanelId?: string | null;
+  onTogglePanel?: (id: string) => void;
+}) {
+  const isOpen = panelId !== undefined && openPanelId === panelId;
   return (
     <div>
-      <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{label}</p>
+      <div className="flex items-center gap-1.5 mb-2">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</p>
+        {panelId && onTogglePanel && (
+          <button
+            type="button"
+            onClick={() => onTogglePanel(panelId)}
+            className={cn("p-0.5 rounded-md transition-colors", isOpen ? "text-primary" : "text-gray-400 hover:text-gray-600")}
+            aria-label={`Info about ${label}`}
+          >
+            <Info className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      {isOpen && (info || optionInfo) && (
+        <div className="mb-3 bg-indigo-50 border border-indigo-100 rounded-xl px-3.5 py-3 space-y-2">
+          {info && <p className="text-xs text-indigo-700 leading-relaxed">{info}</p>}
+          {optionInfo && (
+            <ul className="space-y-1">
+              {options.filter(o => optionInfo[o]).map(o => (
+                <li key={o} className="text-xs text-indigo-600 leading-relaxed">
+                  <span className="font-bold">{o}</span> — {optionInfo[o]}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <button key={o} onClick={() => onSelect(o)}
@@ -412,10 +498,40 @@ function SelRow({ label, options, selected, onSelect }: { label: string; options
   );
 }
 
-function VoiceInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function VoiceInput({
+  label, value, onChange, placeholder,
+  info, panelId, openPanelId, onTogglePanel,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  info?: string;
+  panelId?: string;
+  openPanelId?: string | null;
+  onTogglePanel?: (id: string) => void;
+}) {
+  const isOpen = panelId !== undefined && openPanelId === panelId;
   return (
     <div>
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+        {panelId && onTogglePanel && (
+          <button
+            type="button"
+            onClick={() => onTogglePanel(panelId)}
+            className={cn("p-0.5 rounded-md transition-colors", isOpen ? "text-primary" : "text-gray-400 hover:text-gray-600")}
+            aria-label={`Info about ${label}`}
+          >
+            <Info className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      {isOpen && info && (
+        <div className="mb-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3.5 py-3">
+          <p className="text-xs text-indigo-700 leading-relaxed">{info}</p>
+        </div>
+      )}
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
