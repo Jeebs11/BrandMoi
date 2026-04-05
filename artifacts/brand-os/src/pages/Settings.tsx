@@ -465,8 +465,9 @@ function SelRow({
           <button
             type="button"
             onClick={() => onTogglePanel(panelId)}
-            className={cn("p-0.5 rounded-md transition-colors", isOpen ? "text-primary" : "text-gray-400 hover:text-gray-600")}
+            aria-expanded={isOpen}
             aria-label={`Info about ${label}`}
+            className={cn("p-0.5 rounded-md transition-colors", isOpen ? "text-primary" : "text-gray-400 hover:text-gray-600")}
           >
             <Info className="w-3.5 h-3.5" />
           </button>
@@ -520,8 +521,9 @@ function VoiceInput({
           <button
             type="button"
             onClick={() => onTogglePanel(panelId)}
-            className={cn("p-0.5 rounded-md transition-colors", isOpen ? "text-primary" : "text-gray-400 hover:text-gray-600")}
+            aria-expanded={isOpen}
             aria-label={`Info about ${label}`}
+            className={cn("p-0.5 rounded-md transition-colors", isOpen ? "text-primary" : "text-gray-400 hover:text-gray-600")}
           >
             <Info className="w-3.5 h-3.5" />
           </button>
