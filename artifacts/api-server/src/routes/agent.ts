@@ -277,6 +277,53 @@ Return JSON only (no markdown):
   }
 });
 
+const HookAlternativesBody = z.object({
+  draftText: z.string().min(20).max(4000),
+  tone: z.string().optional(),
+});
+
+router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = HookAlternativesBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "draftText is required." }); return; }
+
+  try {
+    const { draftText, tone } = parsed.data;
+    const toneContext = tone ? `The post was written in a "${tone}" tone — the alternatives should match that energy.` : "";
+
+    const userMessage = `LinkedIn post draft:\n\n${draftText}\n\n${toneContext}`;
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 400,
+      system: `You are a LinkedIn hook specialist. Given a draft post, generate exactly 3 alternative opening lines (hooks) — each a stronger replacement for the current first line.
+
+Rules:
+- Each hook is maximum 200 characters
+- Each uses a DIFFERENT structural approach: one must be a bold statement, one a specific scenario or micro-story opener, one a pattern-interrupt or unexpected angle
+- Each should make a reader stop scrolling — specific, punchy, human
+- Match the tone and topic of the original post
+- Do NOT explain or label the hooks — just write them
+
+Return JSON only (no markdown):
+{ "hooks": ["hook 1", "hook 2", "hook 3"] }`,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    try {
+      const data = parseJson(block.text) as { hooks?: unknown };
+      if (!Array.isArray(data.hooks)) throw new Error("bad shape");
+      res.json({ hooks: (data.hooks as string[]).slice(0, 3) });
+    } catch {
+      res.status(500).json({ error: "Invalid AI response" });
+    }
+  } catch (err) {
+    console.error("[agent-hook-alternatives]", err);
+    res.status(500).json({ error: "Failed to generate hook alternatives" });
+  }
+});
+
 router.get("/agent/themes", requireAuth, async (req, res): Promise<void> => {
   try {
     const recentDrafts = await db

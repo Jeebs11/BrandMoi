@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
-  RefreshCw, Copy, AlertTriangle, BookOpen, ChevronDown,
+  RefreshCw, Copy, AlertTriangle, BookOpen, ChevronDown, Wand2,
 } from "lucide-react";
+import { agentApi } from "@/lib/api";
 import {
   useStructureIdea,
   useGenerateContent,
@@ -30,6 +31,17 @@ const TONES = ["Direct", "Story", "Educational", "Bold"];
 
 type TabType = "post" | "carousel" | "visual";
 
+const POST_TONES = [
+  { key: "Direct",     emoji: "🎯", label: "Direct",     desc: "Clear, authoritative, no fluff" },
+  { key: "Story",      emoji: "📖", label: "Story",      desc: "Opens with a vivid scene" },
+  { key: "Contrarian", emoji: "⚡", label: "Contrarian", desc: "Challenges conventional wisdom" },
+  { key: "Witty",      emoji: "😏", label: "Witty",      desc: "Dry, self-aware, human" },
+  { key: "Vulnerable", emoji: "💙", label: "Vulnerable", desc: "Personal, honest, open" },
+  { key: "Snappy",     emoji: "✂️", label: "Snappy",     desc: "Under 150 words, punchy" },
+] as const;
+
+type PostToneKey = typeof POST_TONES[number]["key"];
+
 type WorkflowState = {
   step: number;
   rawInput: string;
@@ -40,6 +52,7 @@ type WorkflowState = {
   selectedLane: "evergreen" | "trending";
   structure: StructuredBreakdown | null;
   selectedHook: string | null;
+  postTone: PostToneKey;
   content: GeneratedContent | null;
   activeTab: TabType;
   storyMode: boolean;
@@ -55,6 +68,7 @@ const initialState: WorkflowState = {
   selectedLane: "evergreen",
   structure: null,
   selectedHook: null,
+  postTone: "Direct",
   content: null,
   activeTab: "post",
   storyMode: false,
@@ -71,6 +85,8 @@ export default function Home() {
 
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
   const [storyArcOpen, setStoryArcOpen] = useState(false);
+  const [isLoadingHooks, setIsLoadingHooks] = useState(false);
+  const [hookAlternatives, setHookAlternatives] = useState<string[] | null>(null);
 
   // FIXED: immediately advance to step 3 so the loader shows during the API call
   const handleStructure = () => {
@@ -81,11 +97,19 @@ export default function Home() {
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
         onSuccess: (data) => {
+          const archetype = data.evergreen.archetype ?? "";
+          const autoTone: PostToneKey =
+            archetype === "storytelling" ? "Story" :
+            archetype === "contrarian" ? "Contrarian" :
+            state.tone === "Bold" ? "Contrarian" :
+            state.tone === "Story" ? "Story" :
+            "Direct";
           setState(s => ({
             ...s,
             structureResult: data,
             selectedLane: "evergreen",
             structure: data.evergreen,
+            postTone: autoTone,
             storyMode: s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling",
           }));
         },
@@ -120,10 +144,14 @@ export default function Home() {
           structure: state.structure,
           selectedHook: state.selectedHook,
           storyMode: state.storyMode,
+          postTone: state.postTone,
         },
       },
       {
-        onSuccess: (data) => setState(s => ({ ...s, content: data, activeTab: "post" })),
+        onSuccess: (data) => {
+          setHookAlternatives(null);
+          setState(s => ({ ...s, content: data, activeTab: "post" }));
+        },
       }
     );
   };
@@ -202,9 +230,39 @@ export default function Home() {
     toast({ title: "Copied to clipboard." });
   };
 
+  const handleLoadHooks = async () => {
+    if (!state.content?.post || isLoadingHooks) return;
+    setIsLoadingHooks(true);
+    setHookAlternatives(null);
+    try {
+      const result = await agentApi.hookAlternatives(state.content.post, state.postTone);
+      setHookAlternatives(result.hooks);
+    } catch {
+      toast({ title: "Couldn't generate hook alternatives. Try again.", variant: "destructive" });
+    } finally {
+      setIsLoadingHooks(false);
+    }
+  };
+
+  const applyHook = (hook: string) => {
+    if (!state.content) return;
+    const postLines = state.content.post.split("\n");
+    // Replace first non-empty line with the chosen hook
+    const firstNonEmptyIdx = postLines.findIndex(l => l.trim().length > 0);
+    if (firstNonEmptyIdx !== -1) {
+      postLines[firstNonEmptyIdx] = hook;
+    } else {
+      postLines.unshift(hook);
+    }
+    setState(s => s.content ? { ...s, content: { ...s.content, post: postLines.join("\n") } } : s);
+    setHookAlternatives(null);
+    toast({ title: "Hook applied." });
+  };
+
   const resetFlow = () => {
     resetStructure();
     resetGenerate();
+    setHookAlternatives(null);
     setState(initialState);
   };
 
@@ -444,9 +502,30 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
+            <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10 space-y-3">
+              {/* Tone dial */}
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Writing energy</p>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {POST_TONES.map(t => (
+                    <button
+                      key={t.key}
+                      onClick={() => setState(s => ({ ...s, postTone: t.key }))}
+                      title={t.desc}
+                      className={cn(
+                        "flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                        state.postTone === t.key
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-primary/40"
+                      )}
+                    >
+                      <span>{t.emoji}</span> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {!state.selectedHook && (
-                <p className="text-center text-xs text-gray-400 font-medium mb-3">← Tap a hook above to continue</p>
+                <p className="text-center text-xs text-gray-400 font-medium">← Tap a hook above to continue</p>
               )}
               <Button
                 className="w-full h-14 text-base font-semibold group"
@@ -530,6 +609,40 @@ export default function Home() {
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {/* Hook optimizer */}
+                  {state.content.post.trim().length >= 40 && (
+                    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => void handleLoadHooks()}
+                        disabled={isLoadingHooks}
+                        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        {isLoadingHooks ? (
+                          <RefreshCw className="w-3.5 h-3.5 text-primary animate-spin flex-shrink-0" />
+                        ) : (
+                          <Wand2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                        )}
+                        <span className="text-xs font-bold text-gray-700">
+                          {isLoadingHooks ? "Generating hooks..." : "Rewrite opening line →"}
+                        </span>
+                      </button>
+                      {hookAlternatives && hookAlternatives.length > 0 && (
+                        <div className="border-t border-gray-100 px-4 pb-3 pt-2 space-y-2">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Pick one to replace your opening line</p>
+                          {hookAlternatives.map((hook, i) => (
+                            <button
+                              key={i}
+                              onClick={() => applyHook(hook)}
+                              className="w-full text-left p-3 rounded-xl border-2 border-gray-100 hover:border-primary/40 hover:bg-primary/5 transition-all text-sm text-gray-700 leading-snug"
+                            >
+                              {hook}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {state.storyMode && (
                     <div className="bg-violet-50 border border-violet-100 rounded-2xl overflow-hidden">
                       <button

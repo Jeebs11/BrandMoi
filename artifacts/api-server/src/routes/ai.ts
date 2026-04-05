@@ -262,9 +262,21 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, storyMode } = parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, storyMode, postTone } = parsed.data;
   const brandContext = buildBrandContext(objective, persona, tone);
   const voiceContext = await getUserBrandContext(req.user!.userId);
+
+  const TONE_INSTRUCTIONS: Record<string, string> = {
+    "Direct":     "Write with authority and precision. Short sentences. No hedging. Every word earns its place. No filler phrases or wind-ups.",
+    "Story":      "Open with a vivid scene that drops the reader into a specific moment. Build tension before the insight lands. Write like you're talking to one person who needs this.",
+    "Contrarian": "Challenge the dominant assumption head-on in the first line. Use 'Everyone says X. Here's what they're missing.' structure. Provide the evidence or argument that flips the conventional take.",
+    "Witty":      "Write with dry wit and self-awareness — like someone who's been in the trenches long enough to laugh at the absurdity of it. Clever without being cynical. Warm without being soft.",
+    "Vulnerable": "Write like you're sharing something you learned the hard way. Specific, honest, emotionally open. No performance of vulnerability — just the real observation or mistake.",
+    "Snappy":     "Write a punchy, tight post under 150 words. 3–5 short lines maximum. Zero buildup or warm-up. Lead with the sharpest possible statement. No filler, no lists, no explanatory padding. Stop when the point is made.",
+  };
+  const toneInstruction = postTone && TONE_INSTRUCTIONS[postTone]
+    ? `\nWriting style for this post: ${TONE_INSTRUCTIONS[postTone]}`
+    : "";
 
   const ctaInstruction = includeCta
     ? `\nCTA requirement: End the LinkedIn post with a specific, natural call-to-action that fits the topic (e.g. "Follow for more on [topic]", "Save this if you want to remember [key point]", or "Tag someone who needs to hear this"). Avoid generic CTAs like "What do you think?" or "Drop a comment". For the carousel, make the final slide a strong CTA slide that prompts a specific action.`
@@ -287,7 +299,7 @@ Structure:
 - Why It Matters: ${structure.whyItMatters}
 - Selected Hook: ${selectedHook}
 - Narrative Flow: ${structure.narrativeFlow.join(" → ")}
-${ctaInstruction}${storyModeInstruction}
+${toneInstruction}${ctaInstruction}${storyModeInstruction}
 Return this exact JSON shape (no markdown fences):
 {
   "post": "",

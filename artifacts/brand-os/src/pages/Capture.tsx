@@ -6,7 +6,7 @@ import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
   RefreshCw, Copy, AlertTriangle, X, Lightbulb, Download,
-  ChevronDown, BookOpen, Newspaper,
+  ChevronDown, BookOpen, Newspaper, Wand2,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -31,6 +31,17 @@ const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hir
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 
+const POST_TONES = [
+  { key: "Direct",     emoji: "🎯", label: "Direct",     desc: "Clear, authoritative, no fluff" },
+  { key: "Story",      emoji: "📖", label: "Story",      desc: "Opens with a vivid scene" },
+  { key: "Contrarian", emoji: "⚡", label: "Contrarian", desc: "Challenges conventional wisdom" },
+  { key: "Witty",      emoji: "😏", label: "Witty",      desc: "Dry, self-aware, human" },
+  { key: "Vulnerable", emoji: "💙", label: "Vulnerable", desc: "Personal, honest, open" },
+  { key: "Snappy",     emoji: "✂️", label: "Snappy",     desc: "Under 150 words, punchy" },
+] as const;
+
+type PostToneKey = typeof POST_TONES[number]["key"];
+
 type TabType = "post" | "carousel" | "visual" | "infographic" | "illustration";
 
 type WorkflowState = {
@@ -43,6 +54,7 @@ type WorkflowState = {
   selectedLane: "evergreen" | "trending";
   structure: StructuredBreakdown | null;
   selectedHook: string | null;
+  postTone: PostToneKey;
   content: GeneratedContent | null;
   activeTab: TabType;
   storyMode: boolean;
@@ -73,6 +85,7 @@ export default function Capture() {
     selectedLane: "evergreen",
     structure: null,
     selectedHook: null,
+    postTone: "Direct",
     content: null,
     activeTab: "post",
     storyMode: false,
@@ -130,6 +143,8 @@ export default function Capture() {
 
   const [refiningTab, setRefiningTab] = useState<string | null>(null);
   const [storyArcOpen, setStoryArcOpen] = useState(false);
+  const [isLoadingHooks, setIsLoadingHooks] = useState(false);
+  const [hookAlternatives, setHookAlternatives] = useState<string[] | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
@@ -694,11 +709,19 @@ export default function Capture() {
       { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
       {
         onSuccess: (data) => {
+          const archetype = data.evergreen.archetype ?? "";
+          const autoTone: PostToneKey =
+            archetype === "storytelling" ? "Story" :
+            archetype === "contrarian" ? "Contrarian" :
+            state.tone === "Bold" ? "Contrarian" :
+            state.tone === "Story" ? "Story" :
+            "Direct";
           setState(s => ({
             ...s,
             structureResult: data,
             selectedLane: "evergreen",
             structure: data.evergreen,
+            postTone: autoTone,
             storyMode: s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling",
           }));
           void checkAngle(data.evergreen.topic, data.evergreen.angle);
@@ -723,13 +746,14 @@ export default function Capture() {
   const handleGenerate = () => {
     if (!state.structure || !state.selectedHook) return;
     resetGenerate();
+    setHookAlternatives(null);
     setState(s => ({ ...s, step: 4, content: null }));
     generateContent(
       {
         data: {
           rawInput: state.rawInput, objective: state.objective, persona: state.persona,
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
-          includeCta, storyMode: state.storyMode,
+          includeCta, storyMode: state.storyMode, postTone: state.postTone,
         },
       },
       {
@@ -741,6 +765,35 @@ export default function Capture() {
         },
       }
     );
+  };
+
+  const handleLoadHooks = async () => {
+    if (!state.content?.post || isLoadingHooks) return;
+    setIsLoadingHooks(true);
+    setHookAlternatives(null);
+    try {
+      const result = await agentApi.hookAlternatives(state.content.post, state.postTone);
+      setHookAlternatives(result.hooks);
+    } catch {
+      toast({ title: "Couldn't generate hook alternatives. Try again.", variant: "destructive" });
+    } finally {
+      setIsLoadingHooks(false);
+    }
+  };
+
+  const applyHook = (hook: string) => {
+    if (!state.content) return;
+    const postLines = state.content.post.split("\n");
+    const firstNonEmptyIdx = postLines.findIndex(l => l.trim().length > 0);
+    if (firstNonEmptyIdx !== -1) {
+      postLines[firstNonEmptyIdx] = hook;
+    } else {
+      postLines.unshift(hook);
+    }
+    setState(s => s.content ? { ...s, content: { ...s.content, post: postLines.join("\n") } } : s);
+    setHookAlternatives(null);
+    setUserEditedPost(true);
+    toast({ title: "Hook applied." });
   };
 
   const handleRefine = (instruction: string) => {
@@ -1171,9 +1224,30 @@ export default function Capture() {
                 </div>
               </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
-              {!state.selectedHook && <p className="text-center text-xs text-gray-400 font-medium mb-3">← Tap a hook above to continue</p>}
-              <label className="flex items-center gap-2.5 mb-3 cursor-pointer group">
+            <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10 space-y-2.5">
+              {/* Tone dial */}
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Writing energy</p>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {POST_TONES.map(t => (
+                    <button
+                      key={t.key}
+                      onClick={() => setState(s => ({ ...s, postTone: t.key }))}
+                      title={t.desc}
+                      className={cn(
+                        "flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                        state.postTone === t.key
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-primary/40"
+                      )}
+                    >
+                      <span>{t.emoji}</span> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {!state.selectedHook && <p className="text-center text-xs text-gray-400 font-medium">← Tap a hook above to continue</p>}
+              <label className="flex items-center gap-2.5 cursor-pointer group">
                 <div className={cn(
                   "w-5 h-5 rounded flex items-center justify-center border-2 flex-shrink-0 transition-all duration-150",
                   includeCta ? "bg-primary border-primary" : "border-gray-300 bg-white group-hover:border-primary/50"
@@ -1255,6 +1329,40 @@ export default function Capture() {
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
+                  {/* Hook optimizer */}
+                  {state.content.post.trim().length >= 40 && (
+                    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => void handleLoadHooks()}
+                        disabled={isLoadingHooks}
+                        className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        {isLoadingHooks ? (
+                          <RefreshCw className="w-3.5 h-3.5 text-primary animate-spin flex-shrink-0" />
+                        ) : (
+                          <Wand2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                        )}
+                        <span className="text-xs font-bold text-gray-700">
+                          {isLoadingHooks ? "Generating hooks..." : "Rewrite opening line →"}
+                        </span>
+                      </button>
+                      {hookAlternatives && hookAlternatives.length > 0 && (
+                        <div className="border-t border-gray-100 px-4 pb-3 pt-2 space-y-2">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Pick one to replace your opening line</p>
+                          {hookAlternatives.map((hook, i) => (
+                            <button
+                              key={i}
+                              onClick={() => applyHook(hook)}
+                              className="w-full text-left p-3 rounded-xl border-2 border-gray-100 hover:border-primary/40 hover:bg-primary/5 transition-all text-sm text-gray-700 leading-snug"
+                            >
+                              {hook}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Story Arc guide (visible when Story Mode is active) */}
                   {state.storyMode && (
                     <div className="bg-violet-50 border border-violet-100 rounded-2xl overflow-hidden">
