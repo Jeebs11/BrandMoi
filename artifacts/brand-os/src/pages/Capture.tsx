@@ -114,12 +114,20 @@ export default function Capture() {
           visual: existingDraft.visualOutput ?? "",
         };
       }
+      const archetype = structure?.archetype ?? "";
+      const draftAutoTone: PostToneKey =
+        archetype === "storytelling" ? "Story" :
+        archetype === "contrarian" ? "Contrarian" :
+        existingDraft.tone === "Bold" ? "Contrarian" :
+        existingDraft.tone === "Story" ? "Story" :
+        "Direct";
       setState({
         step: content ? 4 : 3,
         rawInput: existingDraft.rawInput,
         objective: existingDraft.objective,
         persona: existingDraft.persona,
         tone: existingDraft.tone,
+        postTone: draftAutoTone,
         structureResult: null,
         selectedLane: "evergreen",
         structure,
