@@ -295,17 +295,21 @@ router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, re
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 400,
-      system: `You are a LinkedIn hook specialist. Given a draft post, generate exactly 3 alternative opening lines (hooks) — each a stronger replacement for the current first line.
+      system: `You are a LinkedIn hook specialist. Given a draft post, generate exactly 3 alternative opening lines — each a stronger replacement for the current first line.
 
-Rules:
-- Each hook is maximum 200 characters
-- Each uses a DIFFERENT structural approach: one must be a bold statement, one a specific scenario or micro-story opener, one a pattern-interrupt or unexpected angle
-- Each should make a reader stop scrolling — specific, punchy, human
-- Match the tone and topic of the original post
-- Do NOT explain or label the hooks — just write them
+STRICT REQUIREMENTS:
+- Return exactly 3 hooks — no more, no fewer
+- Each hook must be maximum 200 characters (count carefully)
+- Each hook uses a DIFFERENT structure:
+  Hook 1 (Question): A specific, uncomfortable or provocative question that makes the reader stop. Must end with "?"
+  Hook 2 (Bold Statement): A direct, declarative assertion that challenges conventional wisdom or states something surprising. No question mark.
+  Hook 3 (Scene-setter): Drops the reader into a specific micro-moment or scenario using concrete detail. Past or present tense. No question mark.
+- Each must be specific, punchy, and human — not generic
+- Match the topic and ${toneContext ? "tone" : "energy"} of the original post
+- Do NOT explain or label the hooks
 
 Return JSON only (no markdown):
-{ "hooks": ["hook 1", "hook 2", "hook 3"] }`,
+{ "hooks": ["question hook", "bold statement hook", "scene-setter hook"] }`,
       messages: [{ role: "user", content: userMessage }],
     });
 
@@ -314,7 +318,12 @@ Return JSON only (no markdown):
     try {
       const data = parseJson(block.text) as { hooks?: unknown };
       if (!Array.isArray(data.hooks)) throw new Error("bad shape");
-      res.json({ hooks: (data.hooks as string[]).slice(0, 3) });
+      const hooks = (data.hooks as string[])
+        .slice(0, 3)
+        .map(h => String(h).trim().slice(0, 200))
+        .filter(h => h.length > 0);
+      if (hooks.length < 3) throw new Error("insufficient hooks");
+      res.json({ hooks });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }

@@ -275,7 +275,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "Snappy":     "Write a punchy, tight post under 150 words. 3–5 short lines maximum. Zero buildup or warm-up. Lead with the sharpest possible statement. No filler, no lists, no explanatory padding. Stop when the point is made.",
   };
   const toneInstruction = postTone && TONE_INSTRUCTIONS[postTone]
-    ? `\nWriting style for this post: ${TONE_INSTRUCTIONS[postTone]}`
+    ? `\n\n## TONE OVERRIDE FOR THIS POST\n${TONE_INSTRUCTIONS[postTone]}`
     : "";
 
   const ctaInstruction = includeCta
@@ -299,7 +299,7 @@ Structure:
 - Why It Matters: ${structure.whyItMatters}
 - Selected Hook: ${selectedHook}
 - Narrative Flow: ${structure.narrativeFlow.join(" → ")}
-${toneInstruction}${ctaInstruction}${storyModeInstruction}
+${ctaInstruction}${storyModeInstruction}
 Return this exact JSON shape (no markdown fences):
 {
   "post": "",
@@ -311,10 +311,14 @@ Return this exact JSON shape (no markdown fences):
   }
 }`;
 
+  const generateSystemPrompt = toneInstruction
+    ? `${GENERATE_SYSTEM_PROMPT}${toneInstruction}`
+    : GENERATE_SYSTEM_PROMPT;
+
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 8192,
-    system: GENERATE_SYSTEM_PROMPT,
+    system: generateSystemPrompt,
     messages: [{ role: "user", content: userMessage }],
   });
 
