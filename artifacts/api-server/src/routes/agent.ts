@@ -301,11 +301,14 @@ router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, re
     const { draftText, tone, hookTypes } = parsed.data;
     const toneContext = tone ? `The post was written in a "${tone}" tone — the alternatives should match that energy.` : "";
 
-    const availableTypes = hookTypes && hookTypes.length >= 3
+    const filteredTypes = hookTypes && hookTypes.length > 0
       ? ALL_HOOK_TYPES.filter(t => hookTypes.includes(t.key))
       : ALL_HOOK_TYPES;
-    const shuffled = [...availableTypes].sort(() => Math.random() - 0.5);
-    const chosen = shuffled.slice(0, 3);
+    const shuffled = [...filteredTypes].sort(() => Math.random() - 0.5);
+    // Ensure exactly 3 by cycling through filtered types if fewer than 3 selected
+    const chosen = shuffled.length >= 3
+      ? shuffled.slice(0, 3)
+      : Array.from({ length: 3 }, (_, i) => shuffled[i % shuffled.length]);
 
     const hookInstructions = chosen.map((t, i) =>
       `  Hook ${i + 1} (${t.key}): ${t.instruction}`

@@ -170,6 +170,7 @@ export default function Capture() {
   const [hookTypeFilter, setHookTypeFilter] = useState<Set<string>>(new Set(ALL_HOOK_TYPE_KEYS));
   const [shuffledHooks, setShuffledHooks] = useState<Array<{ text: string; type: string }> | null>(null);
   const [isShufflingHooks, setIsShufflingHooks] = useState(false);
+  const lastShuffleCombo = useRef<string>("");
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
@@ -1151,7 +1152,13 @@ export default function Capture() {
                       onClick={async () => {
                         if (!state.structureResult || !state.rawInput) return;
                         const all = ALL_HOOK_TYPE_KEYS;
-                        const picked = [...all].sort(() => Math.random() - 0.5).slice(0, 3);
+                        let picked: string[];
+                        let attempts = 0;
+                        do {
+                          picked = [...all].sort(() => Math.random() - 0.5).slice(0, 3);
+                          attempts++;
+                        } while (attempts < 10 && picked.slice().sort().join(",") === lastShuffleCombo.current);
+                        lastShuffleCombo.current = picked.slice().sort().join(",");
                         setHookTypeFilter(new Set(picked));
                         setIsShufflingHooks(true);
                         try {
@@ -1162,7 +1169,8 @@ export default function Capture() {
                             hookTypes: picked,
                           });
                           setShuffledHooks(result.hooks);
-                        } catch {
+                        } catch (err) {
+                          console.error("[Shuffle] API error:", err);
                           toast({ title: "Couldn't shuffle hooks. Try again.", variant: "destructive" });
                         } finally {
                           setIsShufflingHooks(false);
@@ -1190,6 +1198,8 @@ export default function Capture() {
                     return (
                       <button
                         key={type.key}
+                        aria-pressed={isActive}
+                        aria-label={`${type.label} hook style${isActive ? " (active)" : " (inactive)"}`}
                         onClick={() => {
                           setShuffledHooks(null);
                           setHookTypeFilter(prev => {
