@@ -179,6 +179,7 @@ export const InfographicDataSchema = zod.object({
 
 export const GenerateContentResponse = zod.object({
   post: zod.string(),
+  shortPost: zod.string().optional().default(""),
   carousel: zod.array(
     zod.object({
       slide: zod.number(),
@@ -237,6 +238,7 @@ export const ListDraftsResponseItem = zod.object({
   tone: zod.string(),
   structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
+  shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
@@ -256,6 +258,7 @@ export const CreateDraftBody = zod.object({
   structuredBreakdown: StructuredBreakdownSchema,
   selectedHook: zod.string().nullish(),
   postOutput: zod.string().nullish(),
+  shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
@@ -276,6 +279,7 @@ export const GetDraftResponse = zod.object({
   tone: zod.string(),
   structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
+  shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
@@ -292,6 +296,7 @@ export const UpdateDraftParams = zod.object({
 
 export const UpdateDraftBody = zod.object({
   postOutput: zod.string().nullish(),
+  shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
@@ -306,6 +311,7 @@ export const UpdateDraftResponse = zod.object({
   tone: zod.string(),
   structuredBreakdown: StructuredBreakdownSchema,
   postOutput: zod.string().nullish(),
+  shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),

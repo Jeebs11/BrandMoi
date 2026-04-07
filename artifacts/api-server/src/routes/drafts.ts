@@ -46,6 +46,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       structuredBreakdown: parsed.data.structuredBreakdown as object,
       selectedHook: parsed.data.selectedHook ?? null,
       postOutput: parsed.data.postOutput ?? null,
+      shortPost: parsed.data.shortPost ?? null,
       carouselOutput: parsed.data.carouselOutput ?? null,
       visualOutput: parsed.data.visualOutput ?? null,
       status: parsed.data.status ?? "draft",
@@ -95,6 +96,7 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
 
   const updateData: Record<string, unknown> = {};
   if (parsed.data.postOutput !== undefined) updateData.postOutput = parsed.data.postOutput;
+  if (parsed.data.shortPost !== undefined) updateData.shortPost = parsed.data.shortPost;
   if (parsed.data.carouselOutput !== undefined) updateData.carouselOutput = parsed.data.carouselOutput;
   if (parsed.data.visualOutput !== undefined) updateData.visualOutput = parsed.data.visualOutput;
   if (parsed.data.status !== undefined) updateData.status = parsed.data.status;

@@ -119,6 +119,7 @@ export interface GenerateContentBody {
 
 export interface GeneratedContent {
   post: string;
+  shortPost?: string;
   carousel: CarouselSlide[];
   visual: string;
   infographic?: InfographicData;
@@ -180,6 +181,8 @@ export interface Draft {
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */
+  shortPost?: string | null;
+  /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
@@ -208,6 +211,8 @@ export interface CreateDraftBody {
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */
+  shortPost?: string | null;
+  /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
@@ -226,6 +231,8 @@ export const UpdateDraftBodyStatus = {
 export interface UpdateDraftBody {
   /** @nullable */
   postOutput?: string | null;
+  /** @nullable */
+  shortPost?: string | null;
   /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */

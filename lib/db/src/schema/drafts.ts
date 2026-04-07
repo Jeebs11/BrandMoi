@@ -13,6 +13,7 @@ export const draftsTable = pgTable("drafts", {
   structuredBreakdown: jsonb("structured_breakdown").notNull(),
   selectedHook: text("selected_hook"),
   postOutput: text("post_output"),
+  shortPost: text("short_post"),
   carouselOutput: text("carousel_output"),
   visualOutput: text("visual_output"),
   status: text("status").notNull().default("draft"),

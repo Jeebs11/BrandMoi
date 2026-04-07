@@ -309,6 +309,7 @@ ${ctaInstruction}${storyModeInstruction}
 Return this exact JSON shape (no markdown fences):
 {
   "post": "",
+  "shortPost": "",
   "carousel": [{"slide": 1, "title": "", "description": ""}],
   "visual": "",
   "infographic": {

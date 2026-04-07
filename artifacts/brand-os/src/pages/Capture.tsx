@@ -56,7 +56,7 @@ const HOOK_TYPES_META = [
 
 const ALL_HOOK_TYPE_KEYS = HOOK_TYPES_META.map(t => t.key);
 
-type TabType = "post" | "carousel" | "visual" | "infographic" | "illustration";
+type TabType = "post" | "short" | "carousel" | "visual" | "infographic" | "illustration";
 
 type WorkflowState = {
   step: number;
@@ -85,12 +85,15 @@ export default function Capture() {
   const thoughtId = thoughtIdParam ? parseInt(thoughtIdParam) : null;
   const rawParam = params.get("raw") ?? "";
   const newsUrlParam = params.get("newsUrl") ?? "";
+  const toneParam = params.get("tone") ?? "";
+  const stepParam = params.get("step") ? parseInt(params.get("step")!) : null;
 
   const { preferences } = useAuth();
   const { toast } = useToast();
 
+  const forcedTone = POST_TONES.find(t => t.key === toneParam)?.key ?? null;
   const initialState: WorkflowState = {
-    step: 1,
+    step: stepParam ?? 1,
     rawInput: thoughtParam ? decodeURIComponent(thoughtParam) : rawParam ? decodeURIComponent(rawParam) : "",
     objective: preferences?.objective ?? "Authority",
     persona: preferences?.persona ?? "Founder",
@@ -99,7 +102,7 @@ export default function Capture() {
     selectedLane: "evergreen",
     structure: null,
     selectedHook: null,
-    postTone: "Direct",
+    postTone: (forcedTone as PostToneKey) ?? "Direct",
     content: null,
     activeTab: "post",
     storyMode: false,
@@ -124,6 +127,7 @@ export default function Capture() {
       if (existingDraft.postOutput || existingDraft.carouselOutput || existingDraft.visualOutput) {
         content = {
           post: existingDraft.postOutput ?? "",
+          shortPost: existingDraft.shortPost ?? "",
           carousel: existingDraft.carouselOutput ? JSON.parse(existingDraft.carouselOutput) as CarouselSlide[] : [],
           visual: existingDraft.visualOutput ?? "",
         };
@@ -786,7 +790,8 @@ export default function Capture() {
       },
       {
         onSuccess: (data) => {
-          setState(s => ({ ...s, content: data, activeTab: "post" }));
+          const defaultTab: TabType = state.postTone === "Snappy" && data.shortPost ? "short" : "post";
+          setState(s => ({ ...s, content: data, activeTab: defaultTab }));
           setImagePrompt("");
           setGeneratedImageBase64(null);
           setUserEditedPost(false);
@@ -829,19 +834,21 @@ export default function Capture() {
     if (!state.content) return;
     setRefiningTab(instruction);
     let contentToRefine = "";
+    const refineTab = state.activeTab === "short" ? "post" : state.activeTab;
     if (state.activeTab === "post") contentToRefine = state.content.post;
+    else if (state.activeTab === "short") contentToRefine = state.content.shortPost ?? "";
     else if (state.activeTab === "visual") contentToRefine = state.content.visual;
     else if (state.activeTab === "carousel") contentToRefine = JSON.stringify(state.content.carousel);
     else if (state.activeTab === "infographic") contentToRefine = JSON.stringify(state.content.infographic ?? { headline: "", bullets: [] });
 
     // When refining non-post tabs, always inject the current post as context
     let fullInstruction = instruction;
-    if (state.activeTab !== "post" && state.content.post?.trim()) {
+    if (state.activeTab !== "post" && state.activeTab !== "short" && state.content.post?.trim()) {
       fullInstruction = `${instruction}\n\nFor context, the current post reads:\n${state.content.post}`;
     }
 
     refineContent(
-      { data: { content: contentToRefine, instruction: fullInstruction, tab: state.activeTab } },
+      { data: { content: contentToRefine, instruction: fullInstruction, tab: refineTab } },
       {
         onSuccess: (data) => {
           setState(s => {
@@ -851,6 +858,7 @@ export default function Capture() {
               nc.post = data.content;
               setUserEditedPost(false);
             }
+            else if (s.activeTab === "short") nc.shortPost = data.content;
             else if (s.activeTab === "visual") nc.visual = data.content;
             else if (s.activeTab === "carousel") {
               try {
@@ -888,6 +896,7 @@ export default function Capture() {
       structuredBreakdown: { ...state.structure, storyMode: state.storyMode },
       selectedHook: state.selectedHook ?? null,
       postOutput: postOverride ?? state.content?.post ?? null,
+      shortPost: state.content?.shortPost ?? null,
       carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
       visualOutput: state.content?.visual ?? null,
       status: "draft" as const,
@@ -902,7 +911,7 @@ export default function Capture() {
 
     if (draftId) {
       updateDraft(
-        { id: draftId!, data: { postOutput: draftData.postOutput, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown } },
+        { id: draftId!, data: { postOutput: draftData.postOutput, shortPost: draftData.shortPost, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown } },
         {
           onSuccess: (saved: Draft) => {
             // Populate the cache so Library → "Edit and continue" always sees the latest content
@@ -1409,6 +1418,7 @@ export default function Capture() {
             <div className="flex p-1 bg-gray-100 rounded-xl mb-5 gap-1">
               {([
                 ["post", "Post", <PenTool className="w-3 h-3" />],
+                ...(state.content?.shortPost ? [["short", "Short", <Zap className="w-3 h-3" />]] : []) as [TabType, string, React.ReactNode][],
                 ["carousel", "Slides", <Layout className="w-3 h-3" />],
                 ["visual", "Card", <ImageIcon className="w-3 h-3" />],
                 ["infographic", "Info", <Sparkles className="w-3 h-3" />],
@@ -1532,6 +1542,37 @@ export default function Capture() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+              {state.activeTab === "short" && state.content?.shortPost && (
+                <div className="flex flex-col gap-3 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Short post</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {state.content.shortPost.trim().split(/\s+/).filter(Boolean).length} words
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(state.content!.shortPost!)}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition-all"
+                        title="Copy short post"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    className="w-full min-h-[200px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                    value={state.content.shortPost}
+                    onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, shortPost: e.target.value } } : s)}
+                  />
+                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+                    <p className="text-xs font-bold text-amber-700 mb-1">Micro-post rules</p>
+                    <p className="text-[11px] text-amber-600 leading-relaxed">80–120 words · No lists · Immediate payoff · One idea, one CTA</p>
+                  </div>
                 </div>
               )}
               {state.activeTab === "visual" && (

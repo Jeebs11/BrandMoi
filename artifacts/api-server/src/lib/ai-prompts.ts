@@ -102,6 +102,15 @@ RULES FOR THE VISUAL:
 
 RULES FOR THE INFOGRAPHIC:
 - Headline: must be a BOLD STAT or BOLD CLAIM — never a topic label or generic title. Pattern: "[Surprising number or fact] about [topic]" or a direct provocative statement. Wrong example: "5 tips for better meetings". Right example: "Most meetings end without a single decision being made."
-- Bullets: 3–5 insights, each a single sharp sentence the reader will want to screenshot.`;
+- Bullets: 3–5 insights, each a single sharp sentence the reader will want to screenshot.
+
+RULES FOR THE SHORT POST (micro-post):
+- 80–120 words maximum. Not a word more.
+- No lists, no bullet points, no numbered items.
+- No preamble, no setup. Start with immediate payoff — the insight or conclusion first.
+- One punchy idea, one clear takeaway. No sub-points.
+- Same hook as the main post (use the selected hook as the first line).
+- End with a single-sentence CTA from the approved list.
+- Plain paragraphs only — 2–4 sentences per block, 2 blocks maximum.`;
 
 export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely. Maintain the same formatting discipline as the original: short 1–2 sentence paragraphs separated by blank lines, no dense walls of text. Return only valid JSON, no markdown fences.`;

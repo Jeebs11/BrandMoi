@@ -359,12 +359,18 @@ export default function Dashboard() {
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                               </button>
                               {isOpen && (
-                                <div className="px-3 pb-3 pt-2.5 bg-emerald-500/5 border-t border-emerald-500/10">
+                                <div className="px-3 pb-3 pt-2.5 bg-emerald-500/5 border-t border-emerald-500/10 flex flex-col gap-2">
                                   <button
                                     onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}`)}
                                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-colors"
                                   >
                                     Write this post →
+                                  </button>
+                                  <button
+                                    onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}&tone=Snappy&step=2`)}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors"
+                                  >
+                                    ⚡ Write short post →
                                   </button>
                                 </div>
                               )}
@@ -414,12 +420,18 @@ export default function Dashboard() {
                         <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
+                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100 flex flex-col gap-2">
                           <button
                             onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
                             className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors"
                           >
                             Write this post →
+                          </button>
+                          <button
+                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}&tone=Snappy&step=2`)}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-semibold transition-colors"
+                          >
+                            ⚡ Write short post →
                           </button>
                         </div>
                       )}

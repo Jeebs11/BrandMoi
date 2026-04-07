@@ -150,7 +150,7 @@ export default function Library() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-gray-900 truncate mb-1">{topic}</p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", OBJECTIVE_COLORS[draft.objective] ?? "bg-gray-100 text-gray-600")}>
                           {draft.objective}
                         </span>
@@ -158,6 +158,11 @@ export default function Library() {
                           <StatusIcon className="w-3 h-3" />
                           {draft.status}
                         </div>
+                        {draft.shortPost && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            ⚡ Short
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-300">
                           {new Date(draft.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         </span>
