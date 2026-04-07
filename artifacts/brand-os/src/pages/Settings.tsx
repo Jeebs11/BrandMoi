@@ -13,7 +13,7 @@ import type { ExtractedBrandVoice } from "@/lib/api";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
-const TONES = ["Executive", "Direct", "Story", "Educational", "Bold", "Playful"];
+const TONES = ["Executive", "Direct", "Story", "Contrarian", "Witty", "Vulnerable", "Playful", "Snappy"];
 
 export default function Settings() {
   const [, navigate] = useLocation();
@@ -221,9 +221,11 @@ export default function Settings() {
                   "Executive": "Polished, measured, authoritative — warm and human, never cold. Reads like a considered keynote.",
                   "Direct": "Punchy and efficient — no warm-up, straight to the point.",
                   "Story": "Opens with a scene or moment that pulls the reader in.",
-                  "Educational": "Breaks down a concept clearly — great for growing a following.",
-                  "Bold": "Challenges assumptions and sparks debate.",
+                  "Contrarian": "Challenges the dominant assumption head-on — sparks debate and earns attention.",
+                  "Witty": "Dry, self-aware humour — clever without being cynical, warm without being soft.",
+                  "Vulnerable": "Personal and honest — shares what was learned the hard way, no performance.",
                   "Playful": "Light wordplay and warm professional humour — personality-forward without being cringe.",
+                  "Snappy": "Under 150 words, 3–5 punchy lines — no buildup, straight to the sharpest point.",
                 }}
               />
             </div>
