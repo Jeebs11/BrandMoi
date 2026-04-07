@@ -29,7 +29,7 @@ import { previewIllustrationCard, downloadIllustrationCard, downloadAnimatedIllu
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
-const TONES = ["Direct", "Story", "Educational", "Bold"];
+const TONES = ["Executive", "Direct", "Story", "Contrarian", "Witty", "Vulnerable", "Playful", "Snappy"];
 
 const POST_TONES = [
   { key: "Executive",  emoji: "🎩", label: "Executive",  desc: "Polished, authoritative, considered" },
