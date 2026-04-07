@@ -273,6 +273,8 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "Witty":      "Write with dry wit and self-awareness — like someone who's been in the trenches long enough to laugh at the absurdity of it. Clever without being cynical. Warm without being soft.",
     "Vulnerable": "Write like you're sharing something you learned the hard way. Specific, honest, emotionally open. No performance of vulnerability — just the real observation or mistake.",
     "Snappy":     "Write a punchy, tight post under 150 words. 3–5 short lines maximum. Zero buildup or warm-up. Lead with the sharpest possible statement. No filler, no lists, no explanatory padding. Stop when the point is made.",
+    "Executive":  "Write with the measured authority of a senior leader addressing a room that already respects them. Precise, considered language — no slang, no shortcuts, no rhetorical tricks. Every sentence feels deliberate. The tone is warm and human, never cold or corporate. Think polished keynote, not press release.",
+    "Playful":    "Write with light, warm humour — the kind that makes someone smile and feel like they're talking to a real person. Wordplay is welcome. Gentle self-awareness about industry absurdity is great. Never cringe, never over-explain the joke. Stays clearly professional but lets personality shine through. Think: the smartest person in the room who also happens to be fun at dinner.",
   };
   const toneInstruction = postTone && TONE_INSTRUCTIONS[postTone]
     ? `\n\n## TONE OVERRIDE FOR THIS POST\n${TONE_INSTRUCTIONS[postTone]}`

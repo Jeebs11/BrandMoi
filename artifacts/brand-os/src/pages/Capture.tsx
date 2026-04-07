@@ -32,11 +32,13 @@ const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 const TONES = ["Direct", "Story", "Educational", "Bold"];
 
 const POST_TONES = [
+  { key: "Executive",  emoji: "🎩", label: "Executive",  desc: "Polished, authoritative, considered" },
   { key: "Direct",     emoji: "🎯", label: "Direct",     desc: "Clear, authoritative, no fluff" },
   { key: "Story",      emoji: "📖", label: "Story",      desc: "Opens with a vivid scene" },
   { key: "Contrarian", emoji: "⚡", label: "Contrarian", desc: "Challenges conventional wisdom" },
   { key: "Witty",      emoji: "😏", label: "Witty",      desc: "Dry, self-aware, human" },
   { key: "Vulnerable", emoji: "💙", label: "Vulnerable", desc: "Personal, honest, open" },
+  { key: "Playful",    emoji: "🎉", label: "Playful",    desc: "Warm humour, personality-forward" },
   { key: "Snappy",     emoji: "✂️", label: "Snappy",     desc: "Under 150 words, punchy" },
 ] as const;
 
