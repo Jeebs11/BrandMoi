@@ -277,9 +277,20 @@ Return JSON only (no markdown):
   }
 });
 
+const ALL_HOOK_TYPES = [
+  { key: "how-i",       instruction: 'A personal "How I [achieved X]" opener. Doesn\'t start with "I". Implies you\'ve done it.' },
+  { key: "contrarian",  instruction: 'A bold claim challenging conventional wisdom. No question mark. Doesn\'t start with "I" or "You".' },
+  { key: "number",      instruction: 'Starts with a specific number, percentage, or timeframe. E.g. "After 3 years…" or "47% of…".' },
+  { key: "question",    instruction: 'A specific, uncomfortable question that makes the reader stop and reconsider. Must end with "?".' },
+  { key: "scene-setter",instruction: 'Drops the reader into a specific moment using concrete sensory detail. Past or present tense. No question mark.' },
+  { key: "prediction",  instruction: 'A bold, specific claim about what will happen. Must start with a timeframe or "By [year]".' },
+  { key: "analogy",     instruction: 'Uses a surprising comparison or metaphor to reframe the topic in an unexpected way.' },
+];
+
 const HookAlternativesBody = z.object({
   draftText: z.string().min(20).max(4000),
   tone: z.string().optional(),
+  hookTypes: z.array(z.string()).optional(),
 });
 
 router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -287,8 +298,18 @@ router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, re
   if (!parsed.success) { res.status(400).json({ error: "draftText is required." }); return; }
 
   try {
-    const { draftText, tone } = parsed.data;
+    const { draftText, tone, hookTypes } = parsed.data;
     const toneContext = tone ? `The post was written in a "${tone}" tone — the alternatives should match that energy.` : "";
+
+    const availableTypes = hookTypes && hookTypes.length >= 3
+      ? ALL_HOOK_TYPES.filter(t => hookTypes.includes(t.key))
+      : ALL_HOOK_TYPES;
+    const shuffled = [...availableTypes].sort(() => Math.random() - 0.5);
+    const chosen = shuffled.slice(0, 3);
+
+    const hookInstructions = chosen.map((t, i) =>
+      `  Hook ${i + 1} (${t.key}): ${t.instruction}`
+    ).join("\n");
 
     const userMessage = `LinkedIn post draft:\n\n${draftText}\n\n${toneContext}`;
 
@@ -300,16 +321,14 @@ router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, re
 STRICT REQUIREMENTS:
 - Return exactly 3 hooks — no more, no fewer
 - Each hook must be maximum 200 characters (count carefully)
-- Each hook uses a DIFFERENT structure:
-  Hook 1 (Question): A specific, uncomfortable or provocative question that makes the reader stop. Must end with "?"
-  Hook 2 (Bold Statement): A direct, declarative assertion that challenges conventional wisdom or states something surprising. No question mark.
-  Hook 3 (Scene-setter): Drops the reader into a specific micro-moment or scenario using concrete detail. Past or present tense. No question mark.
+- Each hook uses a DIFFERENT structure as defined below:
+${hookInstructions}
 - Each must be specific, punchy, and human — not generic
 - Match the topic and ${toneContext ? "tone" : "energy"} of the original post
 - Do NOT explain or label the hooks
 
 Return JSON only (no markdown):
-{ "hooks": ["question hook", "bold statement hook", "scene-setter hook"] }`,
+{ "hooks": ["hook 1", "hook 2", "hook 3"] }`,
       messages: [{ role: "user", content: userMessage }],
     });
 

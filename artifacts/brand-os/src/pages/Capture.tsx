@@ -6,7 +6,7 @@ import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
   RefreshCw, Copy, AlertTriangle, X, Lightbulb, Download,
-  ChevronDown, BookOpen, Newspaper, Wand2,
+  ChevronDown, BookOpen, Newspaper, Wand2, Shuffle,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -43,6 +43,18 @@ const POST_TONES = [
 ] as const;
 
 type PostToneKey = typeof POST_TONES[number]["key"];
+
+const HOOK_TYPES_META = [
+  { key: "how-i",        label: "How I",       emoji: "🙋", color: "bg-violet-100 text-violet-700", border: "border-violet-200" },
+  { key: "contrarian",   label: "Contrarian",  emoji: "⚡", color: "bg-rose-100 text-rose-700",     border: "border-rose-200" },
+  { key: "number",       label: "Numbers",     emoji: "📊", color: "bg-amber-100 text-amber-700",   border: "border-amber-200" },
+  { key: "question",     label: "Question",    emoji: "❓", color: "bg-blue-100 text-blue-700",     border: "border-blue-200" },
+  { key: "scene-setter", label: "Scene",       emoji: "🎬", color: "bg-teal-100 text-teal-700",     border: "border-teal-200" },
+  { key: "prediction",   label: "Prediction",  emoji: "🔮", color: "bg-purple-100 text-purple-700", border: "border-purple-200" },
+  { key: "analogy",      label: "Analogy",     emoji: "🔗", color: "bg-orange-100 text-orange-700", border: "border-orange-200" },
+] as const;
+
+const ALL_HOOK_TYPE_KEYS = HOOK_TYPES_META.map(t => t.key);
 
 type TabType = "post" | "carousel" | "visual" | "infographic" | "illustration";
 
@@ -155,6 +167,7 @@ export default function Capture() {
   const [storyArcOpen, setStoryArcOpen] = useState(false);
   const [isLoadingHooks, setIsLoadingHooks] = useState(false);
   const [hookAlternatives, setHookAlternatives] = useState<string[] | null>(null);
+  const [hookTypeFilter, setHookTypeFilter] = useState<Set<string>>(new Set(ALL_HOOK_TYPE_KEYS));
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
@@ -782,7 +795,8 @@ export default function Capture() {
     setIsLoadingHooks(true);
     setHookAlternatives(null);
     try {
-      const result = await agentApi.hookAlternatives(state.content.post, state.postTone);
+      const activeTypes = hookTypeFilter.size > 0 ? Array.from(hookTypeFilter) : undefined;
+      const result = await agentApi.hookAlternatives(state.content.post, state.postTone, activeTypes);
       setHookAlternatives(result.hooks);
     } catch {
       toast({ title: "Couldn't generate hook alternatives. Try again.", variant: "destructive" });
@@ -1127,15 +1141,69 @@ export default function Capture() {
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-sm text-gray-900">Choose a hook</h3>
-                  <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required to continue</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const all = ALL_HOOK_TYPE_KEYS;
+                        const shuffled = [...all].sort(() => Math.random() - 0.5);
+                        setHookTypeFilter(new Set(shuffled.slice(0, 3)));
+                      }}
+                      className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-gray-100"
+                      title="Show 3 random hook styles"
+                    >
+                      <Shuffle className="w-3 h-3" />
+                      Shuffle
+                    </button>
+                    <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required</span>
+                  </div>
+                </div>
+                {/* Hook style filter chips */}
+                <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 -mx-1 px-1 scrollbar-none">
+                  {HOOK_TYPES_META.map(type => {
+                    const isActive = hookTypeFilter.has(type.key);
+                    const usageCount = state.structureResult?.hookUsage?.[type.key] ?? 0;
+                    const isOverused = usageCount >= 3;
+                    return (
+                      <button
+                        key={type.key}
+                        onClick={() => setHookTypeFilter(prev => {
+                          const next = new Set(prev);
+                          if (next.has(type.key)) {
+                            if (next.size > 1) next.delete(type.key);
+                          } else {
+                            next.add(type.key);
+                          }
+                          return next;
+                        })}
+                        className={cn(
+                          "flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all",
+                          isActive ? `${type.color} ${type.border}` : "bg-gray-50 text-gray-400 border-gray-100"
+                        )}
+                      >
+                        <span>{type.emoji}</span>
+                        <span>{type.label}</span>
+                        {isOverused && <span className="ml-0.5 text-orange-500">!</span>}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS))}
+                    className="flex-shrink-0 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border-2 border-dashed border-gray-200 text-gray-400 hover:border-primary/40 hover:text-primary transition-all"
+                  >
+                    All
+                  </button>
                 </div>
                 {(() => {
                   const HOOK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-                    "how-i":      { label: "How I",          color: "bg-violet-100 text-violet-700" },
-                    "contrarian": { label: "Contrarian",     color: "bg-rose-100 text-rose-700" },
-                    "number":     { label: "By the Numbers", color: "bg-amber-100 text-amber-700" },
-                    "how-to":     { label: "How To",         color: "bg-sky-100 text-sky-700" },
-                    "story":      { label: "Story",          color: "bg-emerald-100 text-emerald-700" },
+                    "how-i":        { label: "How I",       color: "bg-violet-100 text-violet-700" },
+                    "contrarian":   { label: "Contrarian",  color: "bg-rose-100 text-rose-700" },
+                    "number":       { label: "Numbers",     color: "bg-amber-100 text-amber-700" },
+                    "question":     { label: "Question",    color: "bg-blue-100 text-blue-700" },
+                    "scene-setter": { label: "Scene",       color: "bg-teal-100 text-teal-700" },
+                    "prediction":   { label: "Prediction",  color: "bg-purple-100 text-purple-700" },
+                    "analogy":      { label: "Analogy",     color: "bg-orange-100 text-orange-700" },
+                    "how-to":       { label: "How To",      color: "bg-sky-100 text-sky-700" },
+                    "story":        { label: "Story",       color: "bg-emerald-100 text-emerald-700" },
                   };
                   const renderHook = (hook: HookItem, idx: number, lane: "evergreen" | "trending") => {
                     const hookMeta = hook.type ? HOOK_TYPE_LABELS[hook.type] : null;
@@ -1192,13 +1260,20 @@ export default function Capture() {
                     );
                   };
 
+                  const filteredEvergreen = state.structureResult!.evergreen.hooks.filter(
+                    h => !h.type || hookTypeFilter.has(h.type)
+                  );
+
                   return (
                     <div className="space-y-5">
                       {/* Evergreen section */}
                       <div>
                         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Timeless</p>
                         <div className="space-y-3">
-                          {state.structureResult!.evergreen.hooks.map((hook, idx) => renderHook(hook, idx, "evergreen"))}
+                          {filteredEvergreen.length > 0
+                            ? filteredEvergreen.map((hook, idx) => renderHook(hook, idx, "evergreen"))
+                            : <p className="text-xs text-gray-400 text-center py-3">No hooks match the selected styles. Tap a chip above to show more.</p>
+                          }
                         </div>
                       </div>
                       {/* Trending section */}

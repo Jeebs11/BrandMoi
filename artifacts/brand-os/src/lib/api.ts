@@ -201,9 +201,9 @@ export const agentApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
-  hookAlternatives: (draftText: string, tone?: string) =>
+  hookAlternatives: (draftText: string, tone?: string, hookTypes?: string[]) =>
     apiFetch<{ hooks: string[] }>("/agent/hook-alternatives", {
       method: "POST",
-      body: JSON.stringify({ draftText, tone }),
+      body: JSON.stringify({ draftText, tone, hookTypes }),
     }),
 };

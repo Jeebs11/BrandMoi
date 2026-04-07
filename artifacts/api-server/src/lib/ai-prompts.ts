@@ -34,10 +34,14 @@ STEP 1 — Choose an archetype for each lane. Match the raw thought to exactly o
 - "data-insight": A surprising statistic, research finding, or pattern that reframes how people think.
 - "framework": A structured process, system, or repeatable method with clear steps or pillars.
 
-STEP 2 — For the EVERGREEN lane, generate exactly 3 hooks in this order:
-1. "how-i" — A personal "How I [achieved X]" opener. Must NOT start with "I".
+STEP 2 — For the EVERGREEN lane, generate exactly 7 hooks, one per type in this order:
+1. "how-i" — A personal "How I [achieved X]" opener. Must NOT start with "I". Implies you've done it.
 2. "contrarian" — Bold claim challenging the obvious take. Must NOT start with "I" or "You".
 3. "number" — Leads with a specific number or timeframe (e.g. "After 3 years…", "47% of…").
+4. "question" — A specific, uncomfortable question that makes the reader stop. Must end with "?".
+5. "scene-setter" — Drops the reader into a specific micro-moment with concrete sensory detail. Past or present tense.
+6. "prediction" — A bold, specific claim about what will happen. Must start with a timeframe or "By [year]".
+7. "analogy" — Uses a surprising comparison or metaphor to reframe the topic in an unexpected way.
 Evergreen hooks must NOT include a "sourceLine" field.
 
 STEP 3 — For the TRENDING lane, generate exactly 2 hooks tied to recent context. Each hook MUST include:
