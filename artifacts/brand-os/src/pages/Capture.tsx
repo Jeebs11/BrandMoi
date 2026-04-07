@@ -86,7 +86,8 @@ export default function Capture() {
   const rawParam = params.get("raw") ?? "";
   const newsUrlParam = params.get("newsUrl") ?? "";
   const toneParam = params.get("tone") ?? "";
-  const stepParam = params.get("step") ? parseInt(params.get("step")!) : null;
+  const stepParamRaw = params.get("step") ? parseInt(params.get("step")!, 10) : null;
+  const stepParam = stepParamRaw !== null && !isNaN(stepParamRaw) ? stepParamRaw : null;
 
   const { preferences } = useAuth();
   const { toast } = useToast();
@@ -1553,7 +1554,7 @@ export default function Capture() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {state.content.shortPost.trim().split(/\s+/).filter(Boolean).length} words
+                        {state.content.shortPost.trim().length} chars
                       </span>
                       <button
                         onClick={() => copyToClipboard(state.content!.shortPost!)}

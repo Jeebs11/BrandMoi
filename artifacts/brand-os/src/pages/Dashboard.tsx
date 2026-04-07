@@ -564,10 +564,15 @@ export default function Dashboard() {
                           {new Date(draft.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                         <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", OBJECTIVE_COLORS[draft.objective] ?? "bg-gray-100 text-gray-600")}>
                           {draft.objective}
                         </span>
+                        {draft.shortPost && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            ⚡ Short
+                          </span>
+                        )}
                         <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full capitalize", STATUS_COLORS[draft.status] ?? "bg-gray-100 text-gray-600")}>
                           {draft.status}
                         </span>
