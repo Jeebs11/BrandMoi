@@ -207,3 +207,11 @@ export const agentApi = {
       body: JSON.stringify({ draftText, tone, hookTypes }),
     }),
 };
+
+export const aiApi = {
+  generateHooks: (payload: { rawInput: string; topic: string; angle: string; hookTypes: string[] }) =>
+    apiFetch<{ hooks: Array<{ text: string; type: string }> }>("/ai/hooks", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+};

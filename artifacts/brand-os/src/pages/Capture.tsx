@@ -19,7 +19,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, agentApi, illustrationConceptApi, type AngleCheckResult, type AgentCoach } from "@/lib/api";
+import { angleApi, thoughtsApi, imageGenApi, imagePromptApi, preferencesApi, agentApi, aiApi, illustrationConceptApi, type AngleCheckResult, type AgentCoach } from "@/lib/api";
 import { downloadCarouselPDF, previewCarouselSlide } from "@/lib/export-carousel";
 import { downloadVisualCard, previewVisualCard } from "@/lib/export-visual-card";
 import { downloadAnimatedCard, type CardAnimPreset, CARD_BASE_DURATIONS } from "@/lib/export-animated-card";
@@ -168,6 +168,8 @@ export default function Capture() {
   const [isLoadingHooks, setIsLoadingHooks] = useState(false);
   const [hookAlternatives, setHookAlternatives] = useState<string[] | null>(null);
   const [hookTypeFilter, setHookTypeFilter] = useState<Set<string>>(new Set(ALL_HOOK_TYPE_KEYS));
+  const [shuffledHooks, setShuffledHooks] = useState<Array<{ text: string; type: string }> | null>(null);
+  const [isShufflingHooks, setIsShufflingHooks] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [isAnimatingCard, setIsAnimatingCard] = useState<CardAnimPreset | null>(null);
@@ -747,6 +749,8 @@ export default function Capture() {
             postTone: autoTone,
             storyMode: s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling",
           }));
+          setShuffledHooks(null);
+          setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS));
           void checkAngle(data.evergreen.topic, data.evergreen.angle);
         }
       }
@@ -1143,15 +1147,35 @@ export default function Capture() {
                   <h3 className="font-bold text-sm text-gray-900">Choose a hook</h3>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
+                      disabled={isShufflingHooks}
+                      onClick={async () => {
+                        if (!state.structureResult || !state.rawInput) return;
                         const all = ALL_HOOK_TYPE_KEYS;
-                        const shuffled = [...all].sort(() => Math.random() - 0.5);
-                        setHookTypeFilter(new Set(shuffled.slice(0, 3)));
+                        const picked = [...all].sort(() => Math.random() - 0.5).slice(0, 3);
+                        setHookTypeFilter(new Set(picked));
+                        setIsShufflingHooks(true);
+                        try {
+                          const result = await aiApi.generateHooks({
+                            rawInput: state.rawInput,
+                            topic: state.structureResult.evergreen.topic,
+                            angle: state.structureResult.evergreen.angle,
+                            hookTypes: picked,
+                          });
+                          setShuffledHooks(result.hooks);
+                        } catch {
+                          toast({ title: "Couldn't shuffle hooks. Try again.", variant: "destructive" });
+                        } finally {
+                          setIsShufflingHooks(false);
+                        }
                       }}
-                      className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-gray-100"
-                      title="Show 3 random hook styles"
+                      className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+                      title="Generate 3 fresh hooks in random styles"
                     >
-                      <Shuffle className="w-3 h-3" />
+                      {isShufflingHooks ? (
+                        <span className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin inline-block" />
+                      ) : (
+                        <Shuffle className="w-3 h-3" />
+                      )}
                       Shuffle
                     </button>
                     <span className="text-xs text-primary font-semibold bg-primary/10 px-2 py-1 rounded-full">Required</span>
@@ -1166,15 +1190,18 @@ export default function Capture() {
                     return (
                       <button
                         key={type.key}
-                        onClick={() => setHookTypeFilter(prev => {
-                          const next = new Set(prev);
-                          if (next.has(type.key)) {
-                            if (next.size > 1) next.delete(type.key);
-                          } else {
-                            next.add(type.key);
-                          }
-                          return next;
-                        })}
+                        onClick={() => {
+                          setShuffledHooks(null);
+                          setHookTypeFilter(prev => {
+                            const next = new Set(prev);
+                            if (next.has(type.key)) {
+                              if (next.size > 1) next.delete(type.key);
+                            } else {
+                              next.add(type.key);
+                            }
+                            return next;
+                          });
+                        }}
                         className={cn(
                           "flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border-2 transition-all",
                           isActive ? `${type.color} ${type.border}` : "bg-gray-50 text-gray-400 border-gray-100"
@@ -1187,7 +1214,10 @@ export default function Capture() {
                     );
                   })}
                   <button
-                    onClick={() => setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS))}
+                    onClick={() => {
+                      setShuffledHooks(null);
+                      setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS));
+                    }}
                     className="flex-shrink-0 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border-2 border-dashed border-gray-200 text-gray-400 hover:border-primary/40 hover:text-primary transition-all"
                   >
                     All
@@ -1260,15 +1290,25 @@ export default function Capture() {
                     );
                   };
 
-                  const filteredEvergreen = state.structureResult!.evergreen.hooks.filter(
+                  const baseEvergreen = shuffledHooks
+                    ? shuffledHooks.map(h => ({ ...h, usedBefore: false } as HookItem))
+                    : state.structureResult!.evergreen.hooks;
+
+                  const filteredEvergreen = baseEvergreen.filter(
                     h => !h.type || hookTypeFilter.has(h.type)
                   );
+
+                  const filteredTrending = state.structureResult?.trending?.hooks.filter(
+                    h => !h.type || hookTypeFilter.has(h.type)
+                  ) ?? [];
 
                   return (
                     <div className="space-y-5">
                       {/* Evergreen section */}
                       <div>
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Timeless</p>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                          {shuffledHooks ? "Fresh shuffle" : "Timeless"}
+                        </p>
                         <div className="space-y-3">
                           {filteredEvergreen.length > 0
                             ? filteredEvergreen.map((hook, idx) => renderHook(hook, idx, "evergreen"))
@@ -1276,15 +1316,15 @@ export default function Capture() {
                           }
                         </div>
                       </div>
-                      {/* Trending section */}
-                      {state.structureResult?.trending && (
+                      {/* Trending section — only show when not in shuffled mode */}
+                      {!shuffledHooks && state.structureResult?.trending && filteredTrending.length > 0 && (
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Based on what's happening now</p>
                             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           </div>
                           <div className="space-y-3">
-                            {state.structureResult.trending.hooks.map((hook, idx) =>
+                            {filteredTrending.map((hook, idx) =>
                               renderHook(hook as HookItem, idx, "trending")
                             )}
                           </div>

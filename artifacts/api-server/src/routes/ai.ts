@@ -147,7 +147,11 @@ Return this exact JSON shape (no markdown fences):
     "hooks": [
       { "text": "how-i hook under 140 chars", "type": "how-i" },
       { "text": "contrarian hook under 140 chars", "type": "contrarian" },
-      { "text": "number hook under 140 chars", "type": "number" }
+      { "text": "number hook under 140 chars", "type": "number" },
+      { "text": "question hook under 140 chars ending with ?", "type": "question" },
+      { "text": "scene-setter hook under 140 chars", "type": "scene-setter" },
+      { "text": "prediction hook under 140 chars", "type": "prediction" },
+      { "text": "analogy hook under 140 chars", "type": "analogy" }
     ],
     "narrativeFlow": ["", "", "", ""]
   },
@@ -584,5 +588,70 @@ export async function extractVoiceDNA(userId: number, draftId: number, postOutpu
     // Non-critical — fail silently
   }
 }
+
+const HOOK_TYPE_DESCRIPTIONS: Record<string, string> = {
+  "how-i":        'Personal "How I [achieved X]" opener. Must NOT start with "I".',
+  "contrarian":   'Bold claim challenging the obvious take. Must NOT start with "I" or "You".',
+  "number":       'Leads with a specific number, stat, or timeframe.',
+  "question":     'A specific uncomfortable question. Must end with "?".',
+  "scene-setter": 'Drops the reader into a specific micro-moment (time + place + action).',
+  "prediction":   'Bold future claim. Must start with a timeframe like "By [year]" or "Within".',
+  "analogy":      'A surprising comparison or metaphor reframing the topic.',
+};
+
+const GenerateHooksBody = z.object({
+  rawInput: z.string().min(1),
+  topic: z.string().min(1),
+  angle: z.string().min(1),
+  hookTypes: z.array(z.string()).min(1).max(7),
+});
+
+router.post("/ai/hooks", requireAuth, aiRateLimit, async (req, res) => {
+  const parsed = GenerateHooksBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const { rawInput, topic, angle, hookTypes } = parsed.data;
+
+  const validTypes = hookTypes.filter(t => HOOK_TYPE_DESCRIPTIONS[t]);
+  const hookInstructions = validTypes
+    .map((t, i) => `${i + 1}. type="${t}" — ${HOOK_TYPE_DESCRIPTIONS[t]}`)
+    .join("\n");
+
+  const userMessage = `Topic: ${topic}
+Angle: ${angle}
+Raw thought: ${rawInput}
+
+Generate exactly ${validTypes.length} hooks, one per type listed below. Each hook must be under 140 characters and be a strong LinkedIn opener.
+
+${hookInstructions}
+
+Return only valid JSON, no markdown:
+{"hooks":[{"text":"...","type":"..."},...]}`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 500,
+      system:
+        "You are an expert LinkedIn hook writer. Generate only the opening line for a LinkedIn post — no body, no hashtags. Every hook must be under 140 characters. Return only valid JSON with no markdown fences.",
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const t = message.content[0];
+    if (t.type !== "text") {
+      res.status(500).json({ error: "Unexpected AI response type" });
+      return;
+    }
+
+    const cleaned = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    const result = JSON.parse(cleaned) as { hooks: Array<{ text: string; type: string }> };
+    res.json({ hooks: result.hooks ?? [] });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to generate hooks" });
+  }
+});
 
 export default router;
