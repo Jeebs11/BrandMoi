@@ -1181,16 +1181,29 @@ export default function Capture() {
                   </button>
                 </div>
               )}
-              {/* Teacher Mode indicator */}
-              {state.teacherMode && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
-                  <GraduationCap className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
-                  <p className="text-xs font-semibold text-indigo-700">Teacher Mode — analogy + case + lesson format</p>
-                  <button onClick={() => setState(s => ({ ...s, teacherMode: false }))} className="ml-auto text-indigo-300 hover:text-indigo-500">
+              {/* Teacher Mode toggle (step 3) */}
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-2 border rounded-xl transition-colors cursor-pointer",
+                state.teacherMode
+                  ? "bg-indigo-50 border-indigo-100"
+                  : "bg-white border-gray-100 hover:border-indigo-100"
+              )} onClick={() => setState(s => {
+                const enabling = !s.teacherMode;
+                return { ...s, teacherMode: enabling, storyMode: enabling ? false : s.storyMode };
+              })}>
+                <GraduationCap className={cn("w-3.5 h-3.5 flex-shrink-0", state.teacherMode ? "text-indigo-500" : "text-gray-400")} />
+                <p className={cn("text-xs font-semibold", state.teacherMode ? "text-indigo-700" : "text-gray-500")}>
+                  {state.teacherMode ? "Teacher Mode — analogy + case + lesson format" : "Enable Teacher Mode"}
+                </p>
+                {state.teacherMode && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setState(s => ({ ...s, teacherMode: false })); }}
+                    className="ml-auto text-indigo-300 hover:text-indigo-500"
+                  >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Info cards — show the selected lane's data (default: evergreen) */}
               <div className="space-y-3">

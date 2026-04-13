@@ -151,10 +151,12 @@ Rules:
       newsPublishedAt = typeof parsed.newsPublishedAt === "string" ? parsed.newsPublishedAt.trim() : "";
       newsSourceDomain = typeof parsed.newsSourceDomain === "string" ? parsed.newsSourceDomain.trim() : "";
       newsDescription = typeof parsed.newsDescription === "string" ? parsed.newsDescription.trim() : "";
+      const role = prefs?.brandRole ?? "professional";
+      const audience = prefs?.brandAudience ?? "your audience";
       const FALLBACK_TEACH_ANGLES = [
-        "Explain a core concept via analogy",
-        "Debunk a common misconception in your field",
-        "Simplify a complex idea for your audience",
+        `Explain a core ${role} concept via analogy for ${audience}`,
+        `Debunk a common misconception in ${role} — explained simply`,
+        `Simplify the most complex thing about ${role} for ${audience}`,
       ];
       const rawTeachAngles: string[] = Array.isArray(parsed.teachAngles)
         ? (parsed.teachAngles as unknown[]).filter((a): a is string => typeof a === "string").slice(0, 3)
