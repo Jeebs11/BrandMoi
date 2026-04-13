@@ -326,3 +326,17 @@ export const UpdateDraftResponse = zod.object({
 export const DeleteDraftParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary Agent brief response including AI-generated angle ideas
+ */
+export const AgentBriefResponse = zod.object({
+  angles: zod.array(zod.object({
+    title: zod.string(),
+    description: zod.string(),
+    hooks: zod.array(zod.string()),
+    contentIdeas: zod.array(zod.string()).optional(),
+    linkedinTip: zod.string().optional(),
+  })),
+  teachAngles: zod.array(zod.string()).optional(),
+});

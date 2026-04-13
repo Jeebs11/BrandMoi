@@ -241,3 +241,16 @@ export interface UpdateDraftBody {
   status?: UpdateDraftBodyStatus;
   structuredBreakdown?: StructuredBreakdown;
 }
+
+export interface AgentBriefAngle {
+  title: string;
+  description: string;
+  hooks: string[];
+  contentIdeas?: string[];
+  linkedinTip?: string;
+}
+
+export interface AgentBriefResponse {
+  angles: AgentBriefAngle[];
+  teachAngles?: string[];
+}

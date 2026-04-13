@@ -852,6 +852,10 @@ export default function Capture() {
     if (state.activeTab !== "post" && state.activeTab !== "short" && state.content.post?.trim()) {
       fullInstruction = `${instruction}\n\nFor context, the current post reads:\n${state.content.post}`;
     }
+    // When Teacher Mode is active, preserve the analogy structure
+    if (state.teacherMode) {
+      fullInstruction = `${fullInstruction}\n\nIMPORTANT: This content was written in Teacher Mode. Preserve the 4-part analogy structure: (1) analogy hook line under 140 chars, (2) real-world case or FAQ answer, (3) transferable lesson/insight, (4) CTA. Do not collapse or reorder these parts.`;
+    }
 
     refineContent(
       { data: { content: contentToRefine, instruction: fullInstruction, tab: refineTab } },
@@ -1067,7 +1071,7 @@ export default function Capture() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setState(s => ({ ...s, storyMode: !s.storyMode }))}
+                    onClick={() => setState(s => ({ ...s, storyMode: !s.storyMode, teacherMode: s.storyMode ? s.teacherMode : false }))}
                     className={cn(
                       "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
                       state.storyMode ? "bg-violet-500" : "bg-gray-200"
@@ -1090,7 +1094,7 @@ export default function Capture() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setState(s => ({ ...s, teacherMode: !s.teacherMode }))}
+                    onClick={() => setState(s => ({ ...s, teacherMode: !s.teacherMode, storyMode: s.teacherMode ? s.storyMode : false }))}
                     className={cn(
                       "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
                       state.teacherMode ? "bg-indigo-500" : "bg-gray-200"
