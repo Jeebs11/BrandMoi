@@ -60,15 +60,12 @@ export function LengthPicker({ open, onClose, onSelect, title }: LengthPickerPro
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
-      style={{ maxWidth: 430, left: "50%", transform: "translateX(-50%)" }}
-    >
+    <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-t-3xl shadow-2xl px-5 pb-8 pt-5 z-10">
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl shadow-2xl px-5 pb-8 pt-5 z-10">
         <div className="flex items-center justify-between mb-5">
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Choose length</p>
