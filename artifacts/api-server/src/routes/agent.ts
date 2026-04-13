@@ -151,9 +151,19 @@ Rules:
       newsPublishedAt = typeof parsed.newsPublishedAt === "string" ? parsed.newsPublishedAt.trim() : "";
       newsSourceDomain = typeof parsed.newsSourceDomain === "string" ? parsed.newsSourceDomain.trim() : "";
       newsDescription = typeof parsed.newsDescription === "string" ? parsed.newsDescription.trim() : "";
-      const teachAngles: string[] = Array.isArray(parsed.teachAngles)
+      const FALLBACK_TEACH_ANGLES = [
+        "Explain a core concept via analogy",
+        "Debunk a common misconception in your field",
+        "Simplify a complex idea for your audience",
+      ];
+      const rawTeachAngles: string[] = Array.isArray(parsed.teachAngles)
         ? (parsed.teachAngles as unknown[]).filter((a): a is string => typeof a === "string").slice(0, 3)
         : [];
+      const teachAngles: string[] = [
+        rawTeachAngles[0] ?? FALLBACK_TEACH_ANGLES[0],
+        rawTeachAngles[1] ?? FALLBACK_TEACH_ANGLES[1],
+        rawTeachAngles[2] ?? FALLBACK_TEACH_ANGLES[2],
+      ];
       res.json({
         headline: parsed.headline,
         insight: parsed.insight,

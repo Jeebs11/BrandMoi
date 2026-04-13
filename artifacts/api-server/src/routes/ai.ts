@@ -293,8 +293,6 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use exactly 5 chapter-format slides (Opening scene → Struggle → Turn → Lesson → CTA). Do not use numbered slide titles.`
     : "";
 
-  const teacherModeInstruction = teacherMode ? TEACHER_MODE_INSTRUCTION : "";
-
   const userMessage = `Create LinkedIn content based on this structure:
 
 Raw thought: ${rawInput}
@@ -308,7 +306,7 @@ Structure:
 - Why It Matters: ${structure.whyItMatters}
 - Selected Hook: ${selectedHook}
 - Narrative Flow: ${structure.narrativeFlow.join(" → ")}
-${ctaInstruction}${storyModeInstruction}${teacherModeInstruction}
+${ctaInstruction}${storyModeInstruction}
 Return this exact JSON shape (no markdown fences):
 {
   "post": "",
@@ -321,9 +319,11 @@ Return this exact JSON shape (no markdown fences):
   }
 }`;
 
-  const generateSystemPrompt = toneInstruction
-    ? `${GENERATE_SYSTEM_PROMPT}${toneInstruction}`
-    : GENERATE_SYSTEM_PROMPT;
+  const generateSystemPrompt = [
+    GENERATE_SYSTEM_PROMPT,
+    toneInstruction || "",
+    teacherMode ? TEACHER_MODE_INSTRUCTION : "",
+  ].filter(Boolean).join("");
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",

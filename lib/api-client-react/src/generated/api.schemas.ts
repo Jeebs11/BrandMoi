@@ -246,7 +246,7 @@ export interface AgentBriefResponse {
   headline: string;
   insight: string;
   angles: string[];
-  teachAngles?: string[];
+  teachAngles: string[];
   newsHeadline?: string;
   newsSourceLine?: string;
   newsUrl?: string;

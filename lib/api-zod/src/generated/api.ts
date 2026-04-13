@@ -334,7 +334,7 @@ export const AgentBriefResponse = zod.object({
   headline: zod.string(),
   insight: zod.string(),
   angles: zod.array(zod.string()),
-  teachAngles: zod.array(zod.string()).optional(),
+  teachAngles: zod.array(zod.string()),
   newsHeadline: zod.string().optional(),
   newsSourceLine: zod.string().optional(),
   newsUrl: zod.string().optional(),
