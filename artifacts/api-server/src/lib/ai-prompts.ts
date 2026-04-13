@@ -113,4 +113,23 @@ RULES FOR THE SHORT POST (micro-post):
 - End with a single-sentence CTA from the approved list.
 - Plain paragraphs only — 2–4 sentences per block, 2 blocks maximum.`;
 
+export const TEACHER_MODE_INSTRUCTION = `
+
+## TEACHER MODE IS ACTIVE
+Structure ALL content (post, shortPost, carousel, visual, infographic) around the "Explain via Analogy" format. Rules:
+
+POST structure — 4 clear parts, each a paragraph separated by a blank line:
+1. ANALOGY HOOK (first line, under 140 chars): A sharp metaphor or comparison that reframes the topic unexpectedly. Pattern: "[Familiar thing] is like [unexpected comparison]." Never start with "I". Must feel insightful, not condescending.
+2. REAL-WORLD CASE: 2–4 sentences. A concrete example, story, or FAQ answer that proves the analogy. Ground it in the user's specific industry/brand. Use real-sounding specifics (role, situation, consequence).
+3. THE LESSON: 1–2 sentences. The transferable insight — what this means for the reader. Write in second person ("You", "Your team") or universal truth ("Most [professionals] don't realise…").
+4. CTA: One approved CTA from the list in the main system prompt.
+
+SHORT POST (teacher mode): Compress to 80–120 words. Keep the analogy hook (line 1) + one concrete example sentence + one takeaway sentence. End with a CTA. No lists.
+
+CAROUSEL (teacher mode): Lead with the analogy as slide 1 title. Slides 2–N break down the real-world case step-by-step. Final slide is the lesson/CTA. Use numbered titles for slides 2+.
+
+VISUAL (teacher mode): Use the analogy line itself as the visual quote card text (15–30 words).
+
+TONE: Always insightful and peer-level. Never patronising. The reader is smart — you are helping them see something they haven't framed this way before.`;
+
 export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely. Maintain the same formatting discipline as the original: short 1–2 sentence paragraphs separated by blank lines, no dense walls of text. Return only valid JSON, no markdown fences.`;

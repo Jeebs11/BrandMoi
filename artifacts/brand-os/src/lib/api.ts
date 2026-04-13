@@ -160,6 +160,7 @@ export type AgentBrief = {
   headline: string;
   insight: string;
   angles: string[];
+  teachAngles: string[];
   newsHeadline?: string;
   newsSourceLine?: string;
   newsUrl?: string;

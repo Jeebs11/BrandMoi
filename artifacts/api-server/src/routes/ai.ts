@@ -17,6 +17,7 @@ import {
   buildBrandContext,
   STRUCTURE_SYSTEM_PROMPT,
   GENERATE_SYSTEM_PROMPT,
+  TEACHER_MODE_INSTRUCTION,
   REFINE_SYSTEM_PROMPT,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -266,7 +267,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, storyMode, postTone } = parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, storyMode, postTone, teacherMode } = parsed.data;
   const brandContext = buildBrandContext(objective, persona, tone);
   const voiceContext = await getUserBrandContext(req.user!.userId);
 
@@ -292,6 +293,8 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use exactly 5 chapter-format slides (Opening scene → Struggle → Turn → Lesson → CTA). Do not use numbered slide titles.`
     : "";
 
+  const teacherModeInstruction = teacherMode ? TEACHER_MODE_INSTRUCTION : "";
+
   const userMessage = `Create LinkedIn content based on this structure:
 
 Raw thought: ${rawInput}
@@ -305,7 +308,7 @@ Structure:
 - Why It Matters: ${structure.whyItMatters}
 - Selected Hook: ${selectedHook}
 - Narrative Flow: ${structure.narrativeFlow.join(" → ")}
-${ctaInstruction}${storyModeInstruction}
+${ctaInstruction}${storyModeInstruction}${teacherModeInstruction}
 Return this exact JSON shape (no markdown fences):
 {
   "post": "",

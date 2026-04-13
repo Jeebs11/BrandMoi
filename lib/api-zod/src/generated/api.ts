@@ -170,6 +170,7 @@ export const GenerateContentBody = zod.object({
   includeCta: zod.boolean().optional(),
   storyMode: zod.boolean().optional(),
   postTone: zod.string().optional(),
+  teacherMode: zod.boolean().optional(),
 });
 
 export const InfographicDataSchema = zod.object({

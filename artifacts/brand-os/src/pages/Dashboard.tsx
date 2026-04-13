@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
@@ -138,6 +138,7 @@ export default function Dashboard() {
   const [newsAnglesLoading, setNewsAnglesLoading] = useState(false);
   const [expandedNewsAngle, setExpandedNewsAngle] = useState<number | null>(null);
   const [expandedBriefAngle, setExpandedBriefAngle] = useState<number | null>(null);
+  const [expandedTeachAngle, setExpandedTeachAngle] = useState<number | null>(null);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -432,6 +433,53 @@ export default function Dashboard() {
                             className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-semibold transition-colors"
                           >
                             ⚡ Write short post →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Teach your audience pillar */}
+          {brief && brief.teachAngles && brief.teachAngles.length > 0 && (
+            <div className="bg-white rounded-3xl border border-indigo-100 shadow-sm overflow-hidden">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Teach your audience</span>
+                </div>
+                <p className="text-[10px] text-gray-400 font-medium">Analogy &amp; FAQ ideas</p>
+              </div>
+              <div className="px-5 pb-5 flex flex-col gap-1.5">
+                {brief.teachAngles.map((angle, i) => {
+                  const isOpen = expandedTeachAngle === i;
+                  return (
+                    <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
+                      <button
+                        onClick={() => setExpandedTeachAngle(isOpen ? null : i)}
+                        className="w-full text-left flex items-start justify-between gap-2 bg-indigo-50/60 hover:bg-indigo-100/60 px-3 py-2.5 transition-colors"
+                      >
+                        <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
+                          {angle}
+                        </span>
+                        <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                      </button>
+                      {isOpen && (
+                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100 flex flex-col gap-2">
+                          <button
+                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}&teacherMode=true&step=2`)}
+                            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+                          >
+                            Write this →
+                          </button>
+                          <button
+                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}&teacherMode=true&tone=Snappy&step=2`)}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold transition-colors"
+                          >
+                            ⚡ Write short version →
                           </button>
                         </div>
                       )}

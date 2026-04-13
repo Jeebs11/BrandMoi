@@ -6,7 +6,7 @@ import {
   ArrowRight, Sparkles, Check, ChevronLeft, Briefcase,
   Target, Zap, PenTool, Layout, Image as ImageIcon,
   RefreshCw, Copy, AlertTriangle, X, Lightbulb, Download,
-  ChevronDown, BookOpen, Newspaper, Wand2, Shuffle,
+  ChevronDown, BookOpen, Newspaper, Wand2, Shuffle, GraduationCap,
 } from "lucide-react";
 import {
   useStructureIdea, useGenerateContent, useRefineContent,
@@ -72,6 +72,7 @@ type WorkflowState = {
   content: GeneratedContent | null;
   activeTab: TabType;
   storyMode: boolean;
+  teacherMode: boolean;
 };
 
 export default function Capture() {
@@ -88,6 +89,7 @@ export default function Capture() {
   const toneParam = params.get("tone") ?? "";
   const stepParamRaw = params.get("step") ? parseInt(params.get("step")!, 10) : null;
   const stepParam = stepParamRaw !== null && !isNaN(stepParamRaw) ? stepParamRaw : null;
+  const teacherModeParam = params.get("teacherMode") === "true";
 
   const { preferences } = useAuth();
   const { toast } = useToast();
@@ -107,6 +109,7 @@ export default function Capture() {
     content: null,
     activeTab: "post",
     storyMode: false,
+    teacherMode: teacherModeParam,
   };
 
   const [state, setState] = useState<WorkflowState>(initialState);
@@ -154,6 +157,7 @@ export default function Capture() {
         content,
         activeTab: "post",
         storyMode: structure?.storyMode ?? (structure?.archetype === "storytelling"),
+        teacherMode: false,
       });
       setInitialized(true);
       setUserEditedPost(false);
@@ -787,6 +791,7 @@ export default function Capture() {
           rawInput: state.rawInput, objective: state.objective, persona: state.persona,
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
           includeCta, storyMode: state.storyMode, postTone: state.postTone,
+          teacherMode: state.teacherMode,
         },
       },
       {
@@ -1076,6 +1081,29 @@ export default function Capture() {
                     )} />
                   </button>
                 </div>
+                <div className="flex items-center justify-between bg-white border border-indigo-100 rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-indigo-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Teacher Mode</p>
+                      <p className="text-[11px] text-gray-400 leading-tight">Analogy hook → real-world case → lesson → CTA</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setState(s => ({ ...s, teacherMode: !s.teacherMode }))}
+                    className={cn(
+                      "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
+                      state.teacherMode ? "bg-indigo-500" : "bg-gray-200"
+                    )}
+                    role="switch"
+                    aria-checked={state.teacherMode}
+                  >
+                    <span className={cn(
+                      "absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200",
+                      state.teacherMode ? "translate-x-5" : "translate-x-0"
+                    )} />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
@@ -1139,6 +1167,16 @@ export default function Capture() {
                   <BookOpen className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
                   <p className="text-xs font-semibold text-violet-700">Story Mode — 5-beat arc will be used</p>
                   <button onClick={() => setState(s => ({ ...s, storyMode: false }))} className="ml-auto text-violet-300 hover:text-violet-500">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              {/* Teacher Mode indicator */}
+              {state.teacherMode && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
+                  <GraduationCap className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                  <p className="text-xs font-semibold text-indigo-700">Teacher Mode — analogy + case + lesson format</p>
+                  <button onClick={() => setState(s => ({ ...s, teacherMode: false }))} className="ml-auto text-indigo-300 hover:text-indigo-500">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>

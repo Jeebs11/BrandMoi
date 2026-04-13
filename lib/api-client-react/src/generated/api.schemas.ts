@@ -115,6 +115,7 @@ export interface GenerateContentBody {
   includeCta?: boolean;
   storyMode?: boolean;
   postTone?: string;
+  teacherMode?: boolean;
 }
 
 export interface GeneratedContent {

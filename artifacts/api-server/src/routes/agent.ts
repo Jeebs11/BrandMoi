@@ -123,6 +123,7 @@ Return JSON only (no markdown):
   "headline": "One sharp directive about what to focus on today (max 12 words)",
   "insight": "One specific observation about their content gap or momentum (max 25 words)",
   "angles": ["specific post angle 1 (max 10 words)", "angle 2 (max 10 words)", "angle 3 (max 10 words)"],
+  "teachAngles": ["FAQ or analogy seed 1 (max 12 words)", "FAQ or analogy seed 2 (max 12 words)", "FAQ or analogy seed 3 (max 12 words)"],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
   "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string.",
   "newsPublishedAt": "If today's news context includes a date or time (e.g. '2 hours ago', 'April 3', 'yesterday'), convert it to an ISO 8601 datetime string (e.g. '2026-04-03T10:00:00Z'). Use today's date as the reference. If no date mentioned, empty string.",
@@ -135,6 +136,7 @@ Rules:
 - insight must reference something concrete from their history or underused objectives
 - if news context is available, at least one angle should reference or be inspired by it
 - angles are real post ideas they could write today
+- teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Each should be a short prompt like "Why [common misconception] — an analogy for [audience]" or "The real reason [industry thing] fails (explained simply)". Never generic — always tied to their specific brand context.
 - tone: direct, peer-level, no fluff, no "great job"
 - newsHeadline, newsSourceLine, newsPublishedAt, newsSourceDomain, newsDescription must only be set when real news context was provided — not invented`,
       messages: [{ role: "user", content: userMessage }],
@@ -149,10 +151,14 @@ Rules:
       newsPublishedAt = typeof parsed.newsPublishedAt === "string" ? parsed.newsPublishedAt.trim() : "";
       newsSourceDomain = typeof parsed.newsSourceDomain === "string" ? parsed.newsSourceDomain.trim() : "";
       newsDescription = typeof parsed.newsDescription === "string" ? parsed.newsDescription.trim() : "";
+      const teachAngles: string[] = Array.isArray(parsed.teachAngles)
+        ? (parsed.teachAngles as unknown[]).filter((a): a is string => typeof a === "string").slice(0, 3)
+        : [];
       res.json({
         headline: parsed.headline,
         insight: parsed.insight,
         angles: parsed.angles,
+        teachAngles,
         ...(newsHeadline ? {
           newsHeadline,
           newsSourceLine,
