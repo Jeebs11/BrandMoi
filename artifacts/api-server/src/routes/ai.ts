@@ -267,7 +267,10 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, storyMode, postTone, teacherMode } = parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, postTone } = parsed.data;
+  // teacherMode takes precedence; when both arrive, teacher mode wins
+  const teacherMode = parsed.data.teacherMode ?? false;
+  const storyMode = !teacherMode && (parsed.data.storyMode ?? false);
   const brandContext = buildBrandContext(objective, persona, tone);
   const voiceContext = await getUserBrandContext(req.user!.userId);
 

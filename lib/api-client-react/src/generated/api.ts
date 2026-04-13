@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AgentBriefResponse,
   CreateDraftBody,
   Draft,
   ErrorResponse,
@@ -1343,3 +1344,56 @@ export const useDeleteDraft = <
 > => {
   return useMutation(getDeleteDraftMutationOptions(options));
 };
+
+/**
+ * @summary Get AI-generated daily brief with content angles and teach ideas
+ */
+export const getGetAgentBriefUrl = () => {
+  return `/api/agent/brief`;
+};
+
+export const getAgentBrief = async (
+  options?: RequestInit,
+): Promise<AgentBriefResponse> => {
+  return customFetch<AgentBriefResponse>(getGetAgentBriefUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAgentBriefQueryKey = () => {
+  return [`/api/agent/brief`] as const;
+};
+
+export const getGetAgentBriefQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAgentBrief>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getAgentBrief>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetAgentBriefQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentBrief>>> = ({ signal }) =>
+    getAgentBrief({ signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentBrief>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAgentBriefQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentBrief>>>;
+export type GetAgentBriefQueryError = ErrorType<ErrorResponse>;
+
+export function useGetAgentBrief<
+  TData = Awaited<ReturnType<typeof getAgentBrief>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getAgentBrief>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAgentBriefQueryOptions(options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
