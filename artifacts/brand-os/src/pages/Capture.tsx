@@ -761,13 +761,18 @@ export default function Capture() {
             state.tone === "Bold" ? "Contrarian" :
             state.tone === "Story" ? "Story" :
             "Direct";
+          // If user explicitly chose a length, preserve its derived tone and storyMode
+          const preserveLengthTone = lengthParam === "short" || lengthParam === "long";
+          const preserveStoryMode = lengthParam === "long" && !state.teacherMode;
           setState(s => ({
             ...s,
             structureResult: data,
             selectedLane: "evergreen",
             structure: data.evergreen,
-            postTone: autoTone,
-            storyMode: (s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling") && !s.teacherMode,
+            postTone: preserveLengthTone ? s.postTone : autoTone,
+            storyMode: preserveStoryMode
+              ? true
+              : (s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling") && !s.teacherMode,
           }));
           setShuffledHooks(null);
           setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS));
@@ -2382,8 +2387,8 @@ export default function Capture() {
                   <div className="flex gap-1.5">
                     {([
                       { key: "short", label: "✂️ Short", tone: "Snappy" as PostToneKey, story: false },
-                      { key: "medium", label: "📝 Medium", tone: state.postTone === "Snappy" ? "Direct" as PostToneKey : state.postTone, story: false },
-                      { key: "long", label: "📖 Long story", tone: state.postTone, story: true },
+                      { key: "medium", label: "📝 Medium", tone: (state.postTone === "Snappy" ? (preferences?.tone ?? "Direct") : state.postTone) as PostToneKey, story: false },
+                      { key: "long", label: "📖 Long story", tone: (state.postTone === "Snappy" ? (preferences?.tone ?? "Direct") : state.postTone) as PostToneKey, story: true },
                     ] as { key: string; label: string; tone: PostToneKey; story: boolean }[]).map(opt => {
                       const isActive =
                         (opt.key === "short" && state.postTone === "Snappy" && !state.storyMode) ||
