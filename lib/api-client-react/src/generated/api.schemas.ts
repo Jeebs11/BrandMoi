@@ -242,15 +242,15 @@ export interface UpdateDraftBody {
   structuredBreakdown?: StructuredBreakdown;
 }
 
-export interface AgentBriefAngle {
-  title: string;
-  description: string;
-  hooks: string[];
-  contentIdeas?: string[];
-  linkedinTip?: string;
-}
-
 export interface AgentBriefResponse {
-  angles: AgentBriefAngle[];
+  headline: string;
+  insight: string;
+  angles: string[];
   teachAngles?: string[];
+  newsHeadline?: string;
+  newsSourceLine?: string;
+  newsUrl?: string;
+  newsPublishedAt?: string;
+  newsSourceDomain?: string;
+  newsDescription?: string;
 }

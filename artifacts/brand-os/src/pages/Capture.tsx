@@ -757,7 +757,7 @@ export default function Capture() {
             selectedLane: "evergreen",
             structure: data.evergreen,
             postTone: autoTone,
-            storyMode: s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling",
+            storyMode: (s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling") && !s.teacherMode,
           }));
           setShuffledHooks(null);
           setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS));
@@ -775,7 +775,7 @@ export default function Capture() {
       selectedLane: lane,
       structure: newStructure,
       selectedHook: null,
-      storyMode: s.storyMode || newStructure.archetype === "storytelling",
+      storyMode: (s.storyMode || newStructure.archetype === "storytelling") && !s.teacherMode,
     }));
     void checkAngle(newStructure.topic, newStructure.angle);
   };
@@ -1312,7 +1312,7 @@ export default function Capture() {
                             selectedHook: hook.text,
                             selectedLane: lane,
                             structure: newStructure,
-                            storyMode: s.storyMode || newStructure?.archetype === "storytelling",
+                            storyMode: (s.storyMode || newStructure?.archetype === "storytelling") && !s.teacherMode,
                           };
                         })}
                         className={cn("w-full text-left p-4 rounded-2xl border-2 transition-all duration-200 relative", isSelected ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/40 bg-white")}
