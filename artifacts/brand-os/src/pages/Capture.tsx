@@ -1171,16 +1171,29 @@ export default function Capture() {
                 </div>
               )}
 
-              {/* Story Mode indicator */}
-              {state.storyMode && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-100 rounded-xl">
-                  <BookOpen className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
-                  <p className="text-xs font-semibold text-violet-700">Story Mode — 5-beat arc will be used</p>
-                  <button onClick={() => setState(s => ({ ...s, storyMode: false }))} className="ml-auto text-violet-300 hover:text-violet-500">
+              {/* Story Mode toggle (step 3) */}
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-2 border rounded-xl transition-colors cursor-pointer",
+                state.storyMode
+                  ? "bg-violet-50 border-violet-100"
+                  : "bg-white border-gray-100 hover:border-violet-100"
+              )} onClick={() => setState(s => {
+                const enabling = !s.storyMode;
+                return { ...s, storyMode: enabling, teacherMode: enabling ? false : s.teacherMode };
+              })}>
+                <BookOpen className={cn("w-3.5 h-3.5 flex-shrink-0", state.storyMode ? "text-violet-500" : "text-gray-400")} />
+                <p className={cn("text-xs font-semibold", state.storyMode ? "text-violet-700" : "text-gray-500")}>
+                  {state.storyMode ? "Story Mode — 5-beat arc will be used" : "Enable Story Mode"}
+                </p>
+                {state.storyMode && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setState(s => ({ ...s, storyMode: false })); }}
+                    className="ml-auto text-violet-300 hover:text-violet-500"
+                  >
                     <X className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              )}
+                )}
+              </div>
               {/* Teacher Mode toggle (step 3) */}
               <div className={cn(
                 "flex items-center gap-2 px-3 py-2 border rounded-xl transition-colors cursor-pointer",
