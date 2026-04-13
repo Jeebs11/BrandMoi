@@ -101,9 +101,8 @@ export default function Capture() {
   const lengthInitialTone: PostToneKey = lengthParam === "short"
     ? "Snappy"
     : (forcedTone as PostToneKey) ?? ((preferences?.tone ?? "Direct") as PostToneKey);
-  // Long + teacherMode: stay in teacher mode (long explainer), no storyMode
-  // Long + no teacherMode: storyMode = true
-  const lengthInitialStoryMode = lengthParam === "long" && !teacherModeParam;
+  // Long always → storyMode (spec: long=Story Mode+carousel regardless of other modes)
+  const lengthInitialStoryMode = lengthParam === "long";
 
   const initialState: WorkflowState = {
     step: stepParam ?? 1,
@@ -744,6 +743,49 @@ export default function Capture() {
     }
   };
 
+  // Fast path for short posts: auto-structure → pick first hook → auto-generate
+  const handleShortFastPath = () => {
+    if (!state.rawInput.trim()) return;
+    resetStructure();
+    resetGenerate();
+    setAngleResult(null);
+    setAngleDismissed(false);
+    setState(s => ({ ...s, step: 3, structureResult: null, selectedLane: "evergreen", structure: null, selectedHook: null }));
+    structureIdea(
+      { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone } },
+      {
+        onSuccess: (data) => {
+          const structure = data.evergreen;
+          const firstHook = structure.hooks?.[0] ?? null;
+          if (!firstHook) return;
+          setState(s => ({
+            ...s,
+            structureResult: data,
+            selectedLane: "evergreen",
+            structure,
+            selectedHook: firstHook,
+            postTone: "Snappy",
+            storyMode: false,
+            step: 4,
+            content: null,
+          }));
+          generateContent(
+            { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure, selectedHook: firstHook, includeCta: false, storyMode: false, postTone: "Snappy", teacherMode: false } },
+            {
+              onSuccess: (genData) => {
+                const defaultTab: TabType = genData.shortPost ? "short" : "post";
+                setState(s => ({ ...s, content: genData, activeTab: defaultTab }));
+                setImagePrompt("");
+                setGeneratedImageBase64(null);
+                setUserEditedPost(false);
+              },
+            }
+          );
+        },
+      }
+    );
+  };
+
   const handleStructure = () => {
     if (!state.rawInput.trim()) return;
     resetStructure();
@@ -762,8 +804,10 @@ export default function Capture() {
             state.tone === "Story" ? "Story" :
             "Direct";
           // If user explicitly chose a length, preserve its derived tone and storyMode
-          const preserveLengthTone = lengthParam === "short" || lengthParam === "long";
-          const preserveStoryMode = lengthParam === "long" && !state.teacherMode;
+          // medium → user preference tone is already set as initialState; preserve it
+          const preserveLengthTone = lengthParam === "short" || lengthParam === "medium" || lengthParam === "long";
+          // long always → storyMode (regardless of teacherMode — spec says long=Story Mode+carousel)
+          const preserveStoryMode = lengthParam === "long";
           setState(s => ({
             ...s,
             structureResult: data,
@@ -1147,7 +1191,16 @@ export default function Capture() {
                 </div>
               </div>
             </div>
-            <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
+            <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10 space-y-2.5">
+              {lengthParam === "short" && state.rawInput.trim() && (
+                <Button
+                  variant="outline"
+                  className="w-full h-12 text-sm font-semibold border-2 border-primary/30 text-primary group"
+                  onClick={handleShortFastPath}
+                >
+                  ⚡ Quick generate short post
+                </Button>
+              )}
               <Button className="w-full h-14 text-base font-semibold group" onClick={handleStructure}>
                 Structure this idea <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
