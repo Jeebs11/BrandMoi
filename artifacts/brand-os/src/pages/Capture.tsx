@@ -100,7 +100,9 @@ export default function Capture() {
   // Map length param → initial mode/tone
   const lengthInitialTone: PostToneKey = lengthParam === "short"
     ? "Snappy"
-    : forcedTone as PostToneKey ?? (preferences?.tone ?? "Direct") as PostToneKey;
+    : (forcedTone as PostToneKey) ?? ((preferences?.tone ?? "Direct") as PostToneKey);
+  // Long + teacherMode: stay in teacher mode (long explainer), no storyMode
+  // Long + no teacherMode: storyMode = true
   const lengthInitialStoryMode = lengthParam === "long" && !teacherModeParam;
 
   const initialState: WorkflowState = {
@@ -2374,7 +2376,7 @@ export default function Capture() {
 
             <div className="border-t border-gray-100 pt-4 space-y-3">
               {/* Length-switch strip */}
-              {state.activeTab === "post" && (
+              {(state.activeTab === "post" || state.activeTab === "short" || state.activeTab === "carousel") && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Regenerate as</p>
                   <div className="flex gap-1.5">
@@ -2402,7 +2404,7 @@ export default function Capture() {
                             generateContent(
                               { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure: state.structure, selectedHook: state.selectedHook, includeCta, storyMode: newStory, postTone: newTone, teacherMode: newTeacher } },
                               { onSuccess: (data) => {
-                                  const defaultTab: TabType = newTone === "Snappy" && data.shortPost ? "short" : "post";
+                                  const defaultTab: TabType = newTone === "Snappy" && data.shortPost ? "short" : newStory ? "carousel" : "post";
                                   setState(s => ({ ...s, content: data, activeTab: defaultTab }));
                                   setImagePrompt("");
                                   setGeneratedImageBase64(null);

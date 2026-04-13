@@ -186,14 +186,13 @@ export default function Dashboard() {
 
   const handleLengthSelect = (length: PostLength) => {
     setLengthPickerOpen(false);
-    const base = `/capture?raw=${encodeURIComponent(pendingRaw)}${pendingExtra ? "&" + pendingExtra : ""}`;
-    if (length === "short") {
-      navigate(`${base}&length=short&tone=Snappy&step=2`);
-    } else if (length === "medium") {
-      navigate(`${base}&length=medium&step=2`);
-    } else {
-      navigate(`${base}&length=long&step=2`);
-    }
+    const hasRaw = pendingRaw.trim().length > 0;
+    const extraStr = pendingExtra ? "&" + pendingExtra : "";
+    const rawStr = `raw=${encodeURIComponent(pendingRaw)}`;
+    // If no raw input, start at step 1 so user can enter their idea; preserve length intent
+    const step = hasRaw ? 2 : 1;
+    const base = `/capture?${rawStr}${extraStr}&length=${length}&step=${step}`;
+    navigate(base);
   };
 
   const recentDrafts = drafts?.slice(0, 5) ?? [];
@@ -385,7 +384,7 @@ export default function Dashboard() {
                                 <div className="px-3 pb-3 pt-2.5 bg-emerald-500/5 border-t border-emerald-500/10">
                                   <button
                                     onClick={() => {
-                                      const extra = newsUrlParam ? `newsUrl=${encodeURIComponent(newsUrlParam)}` : "";
+                                      const extra = brief.newsUrl ? `newsUrl=${encodeURIComponent(brief.newsUrl)}` : "";
                                       openLengthPicker(enrichedRaw, extra);
                                     }}
                                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-colors"
