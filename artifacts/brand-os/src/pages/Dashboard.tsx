@@ -10,7 +10,7 @@ import { thoughtsApi, momentumApi, agentApi, type Thought, type MomentumData, ty
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 
 function todayKey() {
-  return `brand_os_brief_${new Date().toISOString().slice(0, 10)}`;
+  return `brand_os_brief_v2_${new Date().toISOString().slice(0, 10)}`;
 }
 
 function loadCachedBrief(): AgentBrief | null {
