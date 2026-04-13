@@ -121,6 +121,7 @@ const StructuredBreakdownSchema = zod.object({
   ),
   narrativeFlow: zod.array(zod.string()),
   storyMode: zod.boolean().optional(),
+  teacherMode: zod.boolean().optional(),
 });
 
 /**

@@ -156,8 +156,8 @@ export default function Capture() {
         selectedHook: structure?.hooks?.[0]?.text ?? null,
         content,
         activeTab: "post",
-        storyMode: structure?.storyMode ?? (structure?.archetype === "storytelling"),
-        teacherMode: false,
+        storyMode: (structure?.storyMode ?? (structure?.archetype === "storytelling")) && !structure?.teacherMode,
+        teacherMode: !!structure?.teacherMode,
       });
       setInitialized(true);
       setUserEditedPost(false);
@@ -903,7 +903,7 @@ export default function Capture() {
       objective: state.objective,
       persona: state.persona,
       tone: state.tone,
-      structuredBreakdown: { ...state.structure, storyMode: state.storyMode },
+      structuredBreakdown: { ...state.structure, storyMode: state.storyMode, teacherMode: state.teacherMode },
       selectedHook: state.selectedHook ?? null,
       postOutput: postOverride ?? state.content?.post ?? null,
       shortPost: state.content?.shortPost ?? null,
@@ -1071,7 +1071,10 @@ export default function Capture() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setState(s => ({ ...s, storyMode: !s.storyMode, teacherMode: s.storyMode ? s.teacherMode : false }))}
+                    onClick={() => setState(s => {
+                      const enabling = !s.storyMode;
+                      return { ...s, storyMode: enabling, teacherMode: enabling ? false : s.teacherMode };
+                    })}
                     className={cn(
                       "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
                       state.storyMode ? "bg-violet-500" : "bg-gray-200"
@@ -1094,7 +1097,10 @@ export default function Capture() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setState(s => ({ ...s, teacherMode: !s.teacherMode, storyMode: s.teacherMode ? s.storyMode : false }))}
+                    onClick={() => setState(s => {
+                      const enabling = !s.teacherMode;
+                      return { ...s, teacherMode: enabling, storyMode: enabling ? false : s.storyMode };
+                    })}
                     className={cn(
                       "relative w-11 h-6 rounded-full transition-colors duration-200 flex-shrink-0",
                       state.teacherMode ? "bg-indigo-500" : "bg-gray-200"

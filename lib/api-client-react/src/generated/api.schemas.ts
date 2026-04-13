@@ -92,6 +92,7 @@ export interface StructuredBreakdown {
   hooks: HookItem[];
   narrativeFlow: string[];
   storyMode?: boolean;
+  teacherMode?: boolean;
 }
 
 export interface CarouselSlide {
