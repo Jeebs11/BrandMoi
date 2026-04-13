@@ -166,10 +166,29 @@ Rules:
         rawTeachAngles[1] ?? FALLBACK_TEACH_ANGLES[1],
         rawTeachAngles[2] ?? FALLBACK_TEACH_ANGLES[2],
       ];
+      const headline = typeof parsed.headline === "string" && parsed.headline.trim()
+        ? parsed.headline.trim()
+        : `What should you post today as a ${role}?`;
+      const insight = typeof parsed.insight === "string" && parsed.insight.trim()
+        ? parsed.insight.trim()
+        : `Focus on your most underused content angle to build authority faster.`;
+      const rawAngles: string[] = Array.isArray(parsed.angles)
+        ? (parsed.angles as unknown[]).filter((a): a is string => typeof a === "string").slice(0, 3)
+        : [];
+      const FALLBACK_ANGLES = [
+        `Share a hard lesson from your ${role} experience`,
+        `Challenge the most common assumption in your field`,
+        `Teach one thing you wish you knew earlier in your career`,
+      ];
+      const angles: string[] = [
+        rawAngles[0] ?? FALLBACK_ANGLES[0],
+        rawAngles[1] ?? FALLBACK_ANGLES[1],
+        rawAngles[2] ?? FALLBACK_ANGLES[2],
+      ];
       res.json({
-        headline: parsed.headline,
-        insight: parsed.insight,
-        angles: parsed.angles,
+        headline,
+        insight,
+        angles,
         teachAngles,
         ...(newsHeadline ? {
           newsHeadline,
