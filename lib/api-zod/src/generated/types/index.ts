@@ -30,3 +30,5 @@ export * from "./updateDraftBody";
 export * from "./updateDraftBodyStatus";
 export * from "./updatePreferencesBody";
 export * from "./userResponse";
+
+export * from "./agentBriefResponse";

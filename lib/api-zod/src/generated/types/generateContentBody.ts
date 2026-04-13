@@ -16,4 +16,6 @@ export interface GenerateContentBody {
   selectedHook: string;
   includeCta?: boolean;
   storyMode?: boolean;
+  postTone?: string;
+  teacherMode?: boolean;
 }
