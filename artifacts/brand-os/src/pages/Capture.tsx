@@ -101,8 +101,10 @@ export default function Capture() {
   const lengthInitialTone: PostToneKey = lengthParam === "short"
     ? "Snappy"
     : (forcedTone as PostToneKey) ?? ((preferences?.tone ?? "Direct") as PostToneKey);
-  // Long always → storyMode (spec: long=Story Mode+carousel regardless of other modes)
+  // Long always → storyMode; teacherMode must be off (Story Mode takes precedence)
   const lengthInitialStoryMode = lengthParam === "long";
+  // When length=long, teacherMode is disabled (storyMode takes precedence per spec)
+  const lengthInitialTeacherMode = lengthParam === "long" ? false : teacherModeParam;
 
   const initialState: WorkflowState = {
     step: stepParam ?? 1,
@@ -118,7 +120,7 @@ export default function Capture() {
     content: null,
     activeTab: "post",
     storyMode: lengthInitialStoryMode,
-    teacherMode: teacherModeParam,
+    teacherMode: lengthInitialTeacherMode,
   };
 
   const [state, setState] = useState<WorkflowState>(initialState);
@@ -825,19 +827,19 @@ export default function Capture() {
             state.tone === "Story" ? "Story" :
             "Direct";
           // If user explicitly chose a length, preserve its derived tone and storyMode
-          // medium → user preference tone is already set as initialState; preserve it
           const preserveLengthTone = lengthParam === "short" || lengthParam === "medium" || lengthParam === "long";
-          // long always → storyMode (regardless of teacherMode — spec says long=Story Mode+carousel)
-          const preserveStoryMode = lengthParam === "long";
+          // long always → storyMode (spec says long=Story Mode+carousel); teacherMode disabled for long
+          const isLong = lengthParam === "long";
           setState(s => ({
             ...s,
             structureResult: data,
             selectedLane: "evergreen",
             structure: data.evergreen,
             postTone: preserveLengthTone ? s.postTone : autoTone,
-            storyMode: preserveStoryMode
+            storyMode: isLong
               ? true
               : (s.storyMode || data.evergreen.archetype === "storytelling" || data.trending?.archetype === "storytelling") && !s.teacherMode,
+            teacherMode: isLong ? false : s.teacherMode,
           }));
           setShuffledHooks(null);
           setHookTypeFilter(new Set(ALL_HOOK_TYPE_KEYS));
