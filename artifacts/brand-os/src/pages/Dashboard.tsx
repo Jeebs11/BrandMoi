@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, momentumApi, agentApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme } from "@/lib/api";
+import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 
 function todayKey() {
   return `brand_os_brief_${new Date().toISOString().slice(0, 10)}`;
@@ -139,6 +140,9 @@ export default function Dashboard() {
   const [expandedNewsAngle, setExpandedNewsAngle] = useState<number | null>(null);
   const [expandedBriefAngle, setExpandedBriefAngle] = useState<number | null>(null);
   const [expandedTeachAngle, setExpandedTeachAngle] = useState<number | null>(null);
+  const [lengthPickerOpen, setLengthPickerOpen] = useState(false);
+  const [pendingRaw, setPendingRaw] = useState<string>("");
+  const [pendingExtra, setPendingExtra] = useState<string>("");
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -172,6 +176,24 @@ export default function Dashboard() {
       setBrief(b);
       saveBriefCache(b);
     }).catch(() => {}).finally(() => setBriefLoading(false));
+  };
+
+  const openLengthPicker = (raw: string, extra = "") => {
+    setPendingRaw(raw);
+    setPendingExtra(extra);
+    setLengthPickerOpen(true);
+  };
+
+  const handleLengthSelect = (length: PostLength) => {
+    setLengthPickerOpen(false);
+    const base = `/capture?raw=${encodeURIComponent(pendingRaw)}${pendingExtra ? "&" + pendingExtra : ""}`;
+    if (length === "short") {
+      navigate(`${base}&length=short&tone=Snappy&step=2`);
+    } else if (length === "medium") {
+      navigate(`${base}&length=medium&step=2`);
+    } else {
+      navigate(`${base}&length=long&step=2`);
+    }
   };
 
   const recentDrafts = drafts?.slice(0, 5) ?? [];
@@ -360,18 +382,15 @@ export default function Dashboard() {
                                 <ChevronDown className={cn("w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                               </button>
                               {isOpen && (
-                                <div className="px-3 pb-3 pt-2.5 bg-emerald-500/5 border-t border-emerald-500/10 flex flex-col gap-2">
+                                <div className="px-3 pb-3 pt-2.5 bg-emerald-500/5 border-t border-emerald-500/10">
                                   <button
-                                    onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}`)}
+                                    onClick={() => {
+                                      const extra = newsUrlParam ? `newsUrl=${encodeURIComponent(newsUrlParam)}` : "";
+                                      openLengthPicker(enrichedRaw, extra);
+                                    }}
                                     className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold transition-colors"
                                   >
-                                    Write this post →
-                                  </button>
-                                  <button
-                                    onClick={() => navigate(`/capture?raw=${encodeURIComponent(enrichedRaw)}${newsUrlParam}&tone=Snappy&step=2`)}
-                                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition-colors"
-                                  >
-                                    ⚡ Write short post →
+                                    Write this →
                                   </button>
                                 </div>
                               )}
@@ -395,6 +414,25 @@ export default function Dashboard() {
               <p className="text-white/50 text-xs leading-relaxed">{brief.insight}</p>
             </div>
           ) : null}
+
+          {/* Write your own — prominent primary CTA (above suggestion pillars) */}
+          <button
+            onClick={() => openLengthPicker("", "")}
+            className="w-full bg-primary rounded-3xl p-5 flex items-center justify-between shadow-lg shadow-primary/20 cursor-pointer hover:bg-primary/90 transition-colors group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <PenLine className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-primary-foreground/70 text-[10px] font-bold uppercase tracking-wider mb-0.5">Your idea</p>
+                <h2 className="text-base font-extrabold text-white leading-tight">Write your own post</h2>
+              </div>
+            </div>
+            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+              <ArrowRight className="w-5 h-5 text-white" />
+            </div>
+          </button>
 
           {/* Brand voice post ideas — separate card */}
           {brief && brief.angles.length > 0 && (
@@ -421,18 +459,12 @@ export default function Dashboard() {
                         <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100 flex flex-col gap-2">
+                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
                           <button
-                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}`)}
+                            onClick={() => openLengthPicker(angle)}
                             className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors"
                           >
-                            Write this post →
-                          </button>
-                          <button
-                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}&tone=Snappy&step=2`)}
-                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary text-xs font-semibold transition-colors"
-                          >
-                            ⚡ Write short post →
+                            Write this →
                           </button>
                         </div>
                       )}
@@ -468,18 +500,12 @@ export default function Dashboard() {
                         <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100 flex flex-col gap-2">
+                        <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100">
                           <button
-                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}&teacherMode=true&step=2`)}
+                            onClick={() => openLengthPicker(angle, "teacherMode=true")}
                             className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
                           >
                             Write this →
-                          </button>
-                          <button
-                            onClick={() => navigate(`/capture?raw=${encodeURIComponent(angle)}&teacherMode=true&tone=Snappy&step=2`)}
-                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold transition-colors"
-                          >
-                            ⚡ Write short version →
                           </button>
                         </div>
                       )}
@@ -489,20 +515,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
-          {/* Capture CTA */}
-          <Link href="/capture">
-            <div className="bg-primary rounded-3xl p-6 flex items-center justify-between shadow-lg shadow-primary/20 cursor-pointer hover:bg-primary/90 transition-colors group">
-              <div>
-                <p className="text-primary-foreground/70 text-xs font-bold uppercase tracking-wider mb-1">Start here</p>
-                <h2 className="text-xl font-extrabold text-white leading-tight">Capture a new idea</h2>
-                <p className="text-primary-foreground/60 text-xs mt-1">Turn a rough thought into polished content</p>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                <ArrowRight className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Link>
 
           {/* Ripe Thoughts */}
           {!thoughtsLoading && ripeThoughts.length > 0 && (
@@ -634,6 +646,13 @@ export default function Dashboard() {
         </main>
 
         <BottomNav />
+
+        <LengthPicker
+          open={lengthPickerOpen}
+          onClose={() => setLengthPickerOpen(false)}
+          onSelect={handleLengthSelect}
+          title={pendingRaw ? "How long should this be?" : "Choose post length"}
+        />
       </div>
     </div>
   );

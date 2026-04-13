@@ -90,11 +90,19 @@ export default function Capture() {
   const stepParamRaw = params.get("step") ? parseInt(params.get("step")!, 10) : null;
   const stepParam = stepParamRaw !== null && !isNaN(stepParamRaw) ? stepParamRaw : null;
   const teacherModeParam = params.get("teacherMode") === "true";
+  const lengthParam = (params.get("length") ?? "") as "short" | "medium" | "long" | "";
 
   const { preferences } = useAuth();
   const { toast } = useToast();
 
   const forcedTone = POST_TONES.find(t => t.key === toneParam)?.key ?? null;
+
+  // Map length param → initial mode/tone
+  const lengthInitialTone: PostToneKey = lengthParam === "short"
+    ? "Snappy"
+    : forcedTone as PostToneKey ?? (preferences?.tone ?? "Direct") as PostToneKey;
+  const lengthInitialStoryMode = lengthParam === "long" && !teacherModeParam;
+
   const initialState: WorkflowState = {
     step: stepParam ?? 1,
     rawInput: thoughtParam ? decodeURIComponent(thoughtParam) : rawParam ? decodeURIComponent(rawParam) : "",
@@ -105,10 +113,10 @@ export default function Capture() {
     selectedLane: "evergreen",
     structure: null,
     selectedHook: null,
-    postTone: (forcedTone as PostToneKey) ?? "Direct",
+    postTone: lengthInitialTone,
     content: null,
     activeTab: "post",
-    storyMode: false,
+    storyMode: lengthInitialStoryMode,
     teacherMode: teacherModeParam,
   };
 
@@ -796,7 +804,8 @@ export default function Capture() {
       },
       {
         onSuccess: (data) => {
-          const defaultTab: TabType = state.postTone === "Snappy" && data.shortPost ? "short" : "post";
+          const isSnappy = state.postTone === "Snappy";
+          const defaultTab: TabType = isSnappy && data.shortPost ? "short" : state.storyMode ? "carousel" : "post";
           setState(s => ({ ...s, content: data, activeTab: defaultTab }));
           setImagePrompt("");
           setGeneratedImageBase64(null);
@@ -1055,9 +1064,24 @@ export default function Capture() {
           <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
             <div className="flex-1 overflow-y-auto no-scrollbar pb-36 space-y-7">
               <BackBtn onClick={() => setState(s => ({ ...s, step: 1 }))} />
-              <div className="bg-white p-4 rounded-2xl border border-gray-100">
-                <p className="text-gray-500 text-sm line-clamp-3 italic">"{state.rawInput}"</p>
-              </div>
+              {(state.rawInput || lengthParam) && (
+                <div className="bg-white p-4 rounded-2xl border border-gray-100">
+                  {state.rawInput && <p className={cn("text-gray-500 text-sm line-clamp-3 italic", lengthParam && "mb-2")}>"{state.rawInput}"</p>}
+                  {lengthParam && (
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                        lengthParam === "short" ? "bg-blue-50 text-blue-600" :
+                        lengthParam === "long" ? "bg-violet-50 text-violet-600" :
+                        "bg-gray-100 text-gray-500"
+                      )}>
+                        {lengthParam === "short" ? "✂️ Short post" : lengthParam === "long" ? "📖 Long story" : "📝 Medium post"}
+                      </span>
+                      <span className="text-[10px] text-gray-400">You can change this below</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="space-y-6">
                 <SelGroup label="Objective" icon={<Target className="w-4 h-4" />} options={OBJECTIVES} selected={state.objective} onSelect={v => setState(s => ({ ...s, objective: v }))} />
                 <SelGroup label="Persona" icon={<Briefcase className="w-4 h-4" />} options={PERSONAS} selected={state.persona} onSelect={v => setState(s => ({ ...s, persona: v }))} />
@@ -2349,6 +2373,58 @@ export default function Capture() {
             </div>
 
             <div className="border-t border-gray-100 pt-4 space-y-3">
+              {/* Length-switch strip */}
+              {state.activeTab === "post" && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Regenerate as</p>
+                  <div className="flex gap-1.5">
+                    {([
+                      { key: "short", label: "✂️ Short", tone: "Snappy" as PostToneKey, story: false },
+                      { key: "medium", label: "📝 Medium", tone: state.postTone === "Snappy" ? "Direct" as PostToneKey : state.postTone, story: false },
+                      { key: "long", label: "📖 Long story", tone: state.postTone, story: true },
+                    ] as { key: string; label: string; tone: PostToneKey; story: boolean }[]).map(opt => {
+                      const isActive =
+                        (opt.key === "short" && state.postTone === "Snappy" && !state.storyMode) ||
+                        (opt.key === "medium" && state.postTone !== "Snappy" && !state.storyMode) ||
+                        (opt.key === "long" && state.storyMode);
+                      return (
+                        <button
+                          key={opt.key}
+                          disabled={isRefining || isGenerating || isActive}
+                          onClick={() => {
+                            if (!state.structure || !state.selectedHook) return;
+                            const newTone = opt.tone;
+                            const newStory = opt.story;
+                            const newTeacher = newStory ? false : state.teacherMode;
+                            resetGenerate();
+                            setHookAlternatives(null);
+                            setState(s => ({ ...s, postTone: newTone, storyMode: newStory, teacherMode: newTeacher, content: null, step: 4 }));
+                            generateContent(
+                              { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure: state.structure, selectedHook: state.selectedHook, includeCta, storyMode: newStory, postTone: newTone, teacherMode: newTeacher } },
+                              { onSuccess: (data) => {
+                                  const defaultTab: TabType = newTone === "Snappy" && data.shortPost ? "short" : "post";
+                                  setState(s => ({ ...s, content: data, activeTab: defaultTab }));
+                                  setImagePrompt("");
+                                  setGeneratedImageBase64(null);
+                                  setUserEditedPost(false);
+                                }
+                              }
+                            );
+                          }}
+                          className={cn(
+                            "flex-1 py-2 rounded-xl text-[11px] font-bold border-2 transition-all",
+                            isActive
+                              ? "bg-primary text-white border-primary"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-primary/50 disabled:opacity-40"
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {state.activeTab !== "visual" && state.activeTab !== "infographic" && state.activeTab !== "illustration" && (
                 <div className="grid grid-cols-2 gap-2">
                   {[
