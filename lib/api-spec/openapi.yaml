@@ -529,6 +529,10 @@ components:
           type: array
           items:
             type: string
+        storyMode:
+          type: boolean
+        teacherMode:
+          type: boolean
       required:
         - topic
         - angle
@@ -582,6 +586,12 @@ components:
         selectedHook:
           type: string
         includeCta:
+          type: boolean
+        storyMode:
+          type: boolean
+        postTone:
+          type: string
+        teacherMode:
           type: boolean
       required:
         - rawInput
@@ -713,3 +723,36 @@ components:
         status:
           type: string
           enum: [draft, ready, published]
+
+    AgentBriefResponse:
+      type: object
+      properties:
+        headline:
+          type: string
+        insight:
+          type: string
+        angles:
+          type: array
+          items:
+            type: string
+        teachAngles:
+          type: array
+          items:
+            type: string
+        newsHeadline:
+          type: string
+        newsSourceLine:
+          type: string
+        newsUrl:
+          type: string
+        newsPublishedAt:
+          type: string
+        newsSourceDomain:
+          type: string
+        newsDescription:
+          type: string
+      required:
+        - headline
+        - insight
+        - angles
+        - teachAngles
