@@ -758,7 +758,7 @@ export default function Capture() {
       {
         onSuccess: (data) => {
           const structure = data.evergreen;
-          const firstHook = structure.hooks?.[0] ?? null;
+          const firstHook = structure.hooks?.[0]?.text ?? null;
           if (!firstHook) return;
           setState(s => ({
             ...s,
@@ -1217,7 +1217,7 @@ export default function Capture() {
                 <Button
                   variant="outline"
                   className="w-full h-12 text-sm font-semibold border-2 border-primary/30 text-primary group"
-                  onClick={handleShortFastPath}
+                  onClick={() => handleShortFastPath()}
                 >
                   ⚡ Quick generate short post
                 </Button>
