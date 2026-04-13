@@ -191,6 +191,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /agent/brief:
+    get:
+      operationId: getAgentBrief
+      tags: [agent]
+      summary: Get AI-generated daily brief with content angles and teach ideas
+      responses:
+        "200":
+          description: Agent brief with angles and teach angles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentBriefResponse"
+        "401":
+          description: Unauthorized
+
   /ai/generate:
     post:
       operationId: generateContent
