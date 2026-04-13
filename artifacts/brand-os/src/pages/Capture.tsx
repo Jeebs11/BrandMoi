@@ -744,8 +744,10 @@ export default function Capture() {
   };
 
   // Fast path for short posts: auto-structure → pick first hook → auto-generate
-  const handleShortFastPath = () => {
+  // teacherModeOverride: explicit teacherMode from URL (preserved from suggestion context)
+  const handleShortFastPath = (teacherModeOverride?: boolean) => {
     if (!state.rawInput.trim()) return;
+    const useTeacherMode = teacherModeOverride ?? state.teacherMode;
     resetStructure();
     resetGenerate();
     setAngleResult(null);
@@ -766,11 +768,12 @@ export default function Capture() {
             selectedHook: firstHook,
             postTone: "Snappy",
             storyMode: false,
+            teacherMode: useTeacherMode,
             step: 4,
             content: null,
           }));
           generateContent(
-            { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure, selectedHook: firstHook, includeCta: false, storyMode: false, postTone: "Snappy", teacherMode: false } },
+            { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure, selectedHook: firstHook, includeCta: false, storyMode: false, postTone: "Snappy", teacherMode: useTeacherMode } },
             {
               onSuccess: (genData) => {
                 const defaultTab: TabType = genData.shortPost ? "short" : "post";
@@ -785,6 +788,24 @@ export default function Capture() {
       }
     );
   };
+
+  // Auto-trigger short fast-path on mount when length=short + raw is pre-filled + step=2
+  // (suggestion-origin flows: user tapped "Write this →" from a pillar card)
+  const shortFastPathFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      lengthParam === "short" &&
+      state.rawInput.trim() &&
+      state.step === 2 &&
+      !shortFastPathFiredRef.current &&
+      !draftId
+    ) {
+      shortFastPathFiredRef.current = true;
+      handleShortFastPath(teacherModeParam);
+    }
+  // Only run once on mount — all deps intentionally omitted
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleStructure = () => {
     if (!state.rawInput.trim()) return;
