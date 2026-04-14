@@ -304,13 +304,20 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     : "";
 
   const newsReactionInstruction = newsUrl
-    ? `\n\n## NEWS-REACTION MODE (shortPost only)
-This is triggered from a news article. For the "shortPost" field, write a news-reaction post with this exact structure:
-- Line 1: Your immediate gut reaction to the news — provocative, personality-forward, emoji welcome (e.g. "Nobody is safe 😅" or "This changes things." or "Well. That escalated quickly 👀").
-- 1–2 sentences: The single most surprising stat, implication, or insight from the article. Be specific — name the number or the finding.
-- 1–2 sentences: Your personal take — what does this mean for your audience? A genuine question or challenge to the conventional view.
-Keep shortPost under 75 words (the article URL and hashtags are appended separately below the body — do NOT include them in shortPost).
-For the "hashtags" field: generate 6–8 targeted hashtags relevant to the article topic and the user's professional field. Format as a single space-separated string: "#Tag1 #Tag2 #Tag3 #Tag4 #Tag5 #Tag6". Capitalise each word for readability.`
+    ? `\n\n## NEWS-REACTION MODE — OVERRIDES ALL DEFAULT SHORT-POST RULES
+This post is triggered from a news article. The following instructions completely replace the standard "RULES FOR THE SHORT POST" section for the shortPost field only.
+
+DO NOT use "same hook as the main post" — ignore that rule entirely for shortPost.
+Instead, write a fresh reactive opener specific to the news.
+
+shortPost structure (strict):
+Line 1: Your immediate gut reaction to the news — provocative, personality-forward, emoji welcome (e.g. "Nobody is safe 😅" or "This changes things." or "Well. That escalated quickly 👀"). Under 100 characters.
+1–2 sentences: The single most surprising stat, implication, or insight from the article. Be specific — name the number or the finding if available.
+1–2 sentences: Your personal take — what does this mean for your audience? A genuine question or challenge to the conventional view.
+
+Keep shortPost under 75 words total. The article URL and hashtags are appended below the body — do NOT include them in shortPost.
+
+For the "hashtags" field: generate 6–8 targeted hashtags relevant to this article's topic and the user's professional field. Format as a single space-separated string: "#Tag1 #Tag2 #Tag3 #Tag4 #Tag5 #Tag6". Capitalise each word for readability.`
     : "";
 
   const userMessage = `Your job is to write LinkedIn content that sounds exactly like the person below — their rhythm, their phrasing, their specific way of seeing the world. Stay as close to their raw thought as possible. Do NOT paraphrase their voice into polished LinkedIn language. Keep it human and specific.

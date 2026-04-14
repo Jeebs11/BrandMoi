@@ -1757,12 +1757,10 @@ export default function Capture() {
                     value={state.content.shortPost}
                     onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, shortPost: e.target.value } } : s)}
                   />
-                  {(newsUrlParam || state.content.hashtags?.trim()) && (
+                  {newsUrlParam && (
                     <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Appended when you copy</p>
-                      {newsUrlParam && (
-                        <p className="text-xs text-blue-500 break-all leading-relaxed">{newsUrlParam}</p>
-                      )}
+                      <p className="text-xs text-blue-500 break-all leading-relaxed">{newsUrlParam}</p>
                       {state.content.hashtags?.trim() && (
                         <p className="text-xs text-gray-500 leading-relaxed">{state.content.hashtags}</p>
                       )}
