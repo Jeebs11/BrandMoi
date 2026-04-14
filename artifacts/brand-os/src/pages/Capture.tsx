@@ -775,7 +775,7 @@ export default function Capture() {
             content: null,
           }));
           generateContent(
-            { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure, selectedHook: firstHook, includeCta: false, storyMode: false, postTone: "Snappy", teacherMode: useTeacherMode } },
+            { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure, selectedHook: firstHook, includeCta: false, storyMode: false, postTone: "Snappy", teacherMode: useTeacherMode, newsUrl: newsUrlParam || undefined } },
             {
               onSuccess: (genData) => {
                 const defaultTab: TabType = genData.shortPost ? "short" : "post";
@@ -873,7 +873,7 @@ export default function Capture() {
           rawInput: state.rawInput, objective: state.objective, persona: state.persona,
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
           includeCta, storyMode: state.storyMode, postTone: state.postTone,
-          teacherMode: state.teacherMode,
+          teacherMode: state.teacherMode, newsUrl: newsUrlParam || undefined,
         },
       },
       {
@@ -1726,7 +1726,13 @@ export default function Capture() {
                   )}
                 </div>
               )}
-              {state.activeTab === "short" && state.content?.shortPost && (
+              {state.activeTab === "short" && state.content?.shortPost && (() => {
+                const assembledShort = [
+                  state.content.shortPost,
+                  newsUrlParam ? newsUrlParam : null,
+                  state.content.hashtags?.trim() ? state.content.hashtags.trim() : null,
+                ].filter(Boolean).join("\n\n");
+                return (
                 <div className="flex flex-col gap-3 pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -1735,28 +1741,40 @@ export default function Capture() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {state.content.shortPost.trim().length} chars
+                        {assembledShort.trim().length} chars
                       </span>
                       <button
-                        onClick={() => copyToClipboard(state.content!.shortPost!)}
+                        onClick={() => copyToClipboard(assembledShort)}
                         className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition-all"
-                        title="Copy short post"
+                        title="Copy full post"
                       >
                         <Copy className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                   <textarea
-                    className="w-full min-h-[200px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
+                    className="w-full min-h-[180px] p-5 bg-white border border-gray-100 rounded-2xl text-sm outline-none resize-none leading-relaxed text-gray-800 focus:ring-2 focus:ring-primary/20 transition-shadow"
                     value={state.content.shortPost}
                     onChange={e => setState(s => s.content ? { ...s, content: { ...s.content, shortPost: e.target.value } } : s)}
                   />
+                  {(newsUrlParam || state.content.hashtags?.trim()) && (
+                    <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Appended when you copy</p>
+                      {newsUrlParam && (
+                        <p className="text-xs text-blue-500 break-all leading-relaxed">{newsUrlParam}</p>
+                      )}
+                      {state.content.hashtags?.trim() && (
+                        <p className="text-xs text-gray-500 leading-relaxed">{state.content.hashtags}</p>
+                      )}
+                    </div>
+                  )}
                   <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
                     <p className="text-xs font-bold text-amber-700 mb-1">Micro-post rules</p>
-                    <p className="text-[11px] text-amber-600 leading-relaxed">80–120 words · No lists · Immediate payoff · One idea, one CTA</p>
+                    <p className="text-[11px] text-amber-600 leading-relaxed">Gut reaction · Real voice · Emoji OK · Under 120 words</p>
                   </div>
                 </div>
-              )}
+                );
+              })()}
               {state.activeTab === "visual" && (
                 <div className="space-y-3 pb-4">
                   {/* 1. Visual Card editable text */}
@@ -2483,7 +2501,7 @@ export default function Capture() {
                             setHookAlternatives(null);
                             setState(s => ({ ...s, postTone: newTone, storyMode: newStory, teacherMode: newTeacher, content: null, step: 4 }));
                             generateContent(
-                              { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure: state.structure, selectedHook: state.selectedHook, includeCta, storyMode: newStory, postTone: newTone, teacherMode: newTeacher } },
+                              { data: { rawInput: state.rawInput, objective: state.objective, persona: state.persona, tone: state.tone, structure: state.structure, selectedHook: state.selectedHook, includeCta, storyMode: newStory, postTone: newTone, teacherMode: newTeacher, newsUrl: newsUrlParam || undefined } },
                               { onSuccess: (data) => {
                                   const defaultTab: TabType = newTone === "Snappy" && data.shortPost ? "short" : newStory ? "carousel" : "post";
                                   setState(s => ({ ...s, content: data, activeTab: defaultTab }));

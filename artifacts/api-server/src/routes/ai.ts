@@ -274,7 +274,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, postTone } = parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, postTone, newsUrl } = parsed.data;
   // teacherMode takes precedence; when both arrive, teacher mode wins
   const teacherMode = parsed.data.teacherMode ?? false;
   const storyMode = !teacherMode && (parsed.data.storyMode ?? false);
@@ -287,7 +287,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "Contrarian": "Challenge the dominant assumption head-on in the first line. Use 'Everyone says X. Here's what they're missing.' structure. Provide the evidence or argument that flips the conventional take.",
     "Witty":      "Write with dry wit and self-awareness — like someone who's been in the trenches long enough to laugh at the absurdity of it. Clever without being cynical. Warm without being soft.",
     "Vulnerable": "Write like you're sharing something you learned the hard way. Specific, honest, emotionally open. No performance of vulnerability — just the real observation or mistake.",
-    "Snappy":     "Write a punchy, tight post under 150 words. 3–5 short lines maximum. Zero buildup or warm-up. Lead with the sharpest possible statement. No filler, no lists, no explanatory padding. Stop when the point is made.",
+    "Snappy":     "Write your actual gut reaction — the real, unfiltered take you'd say to someone in person. Don't polish it into a 'LinkedIn post'. Lead with your opinion, not a summary of the topic. Emoji is fine if it genuinely fits. Under 120 words. No wind-up, no filler, no hedging. Stop the moment the point is made. The test: would you actually say this out loud?",
     "Executive":  "Write with the measured authority of a senior leader addressing a room that already respects them. Precise, considered language — no slang, no shortcuts, no rhetorical tricks. Every sentence feels deliberate. The tone is warm and human, never cold or corporate. Think polished keynote, not press release.",
     "Playful":    "Write with light, warm humour — the kind that makes someone smile and feel like they're talking to a real person. Wordplay is welcome. Gentle self-awareness about industry absurdity is great. Never cringe, never over-explain the joke. Stays clearly professional but lets personality shine through. Think: the smartest person in the room who also happens to be fun at dinner.",
   };
@@ -301,6 +301,16 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
 
   const storyModeInstruction = storyMode
     ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use exactly 5 chapter-format slides (Opening scene → Struggle → Turn → Lesson → CTA). Do not use numbered slide titles.`
+    : "";
+
+  const newsReactionInstruction = newsUrl
+    ? `\n\n## NEWS-REACTION MODE (shortPost only)
+This is triggered from a news article. For the "shortPost" field, write a news-reaction post with this exact structure:
+- Line 1: Your immediate gut reaction to the news — provocative, personality-forward, emoji welcome (e.g. "Nobody is safe 😅" or "This changes things." or "Well. That escalated quickly 👀").
+- 1–2 sentences: The single most surprising stat, implication, or insight from the article. Be specific — name the number or the finding.
+- 1–2 sentences: Your personal take — what does this mean for your audience? A genuine question or challenge to the conventional view.
+Keep shortPost under 75 words (the article URL and hashtags are appended separately below the body — do NOT include them in shortPost).
+For the "hashtags" field: generate 6–8 targeted hashtags relevant to the article topic and the user's professional field. Format as a single space-separated string: "#Tag1 #Tag2 #Tag3 #Tag4 #Tag5 #Tag6". Capitalise each word for readability.`
     : "";
 
   const userMessage = `Your job is to write LinkedIn content that sounds exactly like the person below — their rhythm, their phrasing, their specific way of seeing the world. Stay as close to their raw thought as possible. Do NOT paraphrase their voice into polished LinkedIn language. Keep it human and specific.
@@ -322,6 +332,7 @@ Return this exact JSON shape (no markdown fences):
 {
   "post": "",
   "shortPost": "",
+  "hashtags": "",
   "carousel": [{"slide": 1, "title": "", "description": ""}],
   "visual": "",
   "infographic": {
@@ -334,6 +345,7 @@ Return this exact JSON shape (no markdown fences):
     GENERATE_SYSTEM_PROMPT,
     toneInstruction || "",
     teacherMode ? TEACHER_MODE_INSTRUCTION : "",
+    newsReactionInstruction,
   ].filter(Boolean).join("");
 
   const message = await anthropic.messages.create({

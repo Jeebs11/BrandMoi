@@ -175,6 +175,7 @@ export const GenerateContentBody = zod.object({
   storyMode: zod.boolean().optional(),
   postTone: zod.string().optional(),
   teacherMode: zod.boolean().optional(),
+  newsUrl: zod.string().optional(),
 });
 
 export const InfographicDataSchema = zod.object({
@@ -185,6 +186,7 @@ export const InfographicDataSchema = zod.object({
 export const GenerateContentResponse = zod.object({
   post: zod.string(),
   shortPost: zod.string().optional().default(""),
+  hashtags: zod.string().optional().default(""),
   carousel: zod.array(
     zod.object({
       slide: zod.number(),

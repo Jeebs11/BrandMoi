@@ -119,11 +119,13 @@ export interface GenerateContentBody {
   storyMode?: boolean;
   postTone?: string;
   teacherMode?: boolean;
+  newsUrl?: string;
 }
 
 export interface GeneratedContent {
   post: string;
   shortPost?: string;
+  hashtags?: string;
   carousel: CarouselSlide[];
   visual: string;
   infographic?: InfographicData;

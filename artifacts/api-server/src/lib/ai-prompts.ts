@@ -121,12 +121,14 @@ RULES FOR THE INFOGRAPHIC:
 - Bullets: 3–5 insights, each a single sharp sentence the reader will want to screenshot.
 
 RULES FOR THE SHORT POST (micro-post):
-- 80–120 words maximum. Not a word more.
+- Voice-first: this is the author's actual gut reaction — their real, unfiltered take. NOT a polished summary. NOT a LinkedIn-formatted version of the topic. Write like they'd say it in person.
+- Personality over polish. Emoji is fine if it genuinely fits the reaction. Direct opinion over neutral observation.
+- 80–120 words maximum. Not a word more. (For news-reaction posts, aim for 60–80 words — the URL and hashtags are added separately.)
 - No lists, no bullet points, no numbered items.
-- No preamble, no setup. Start with immediate payoff — the insight or conclusion first.
-- One punchy idea, one clear takeaway. No sub-points.
+- No preamble, no setup. Lead with the sharpest version of what you actually think — not what sounds impressive.
+- One punchy idea, one clear takeaway. No sub-points, no hedging language ("it's worth noting", "arguably", "perhaps").
 - Same hook as the main post (use the selected hook as the first line).
-- End with a single-sentence CTA from the approved list.
+- End with a single-sentence CTA or a natural question — or skip CTA entirely if the last line already lands on its own.
 - Plain paragraphs only — 2–4 sentences per block, 2 blocks maximum.`;
 
 export const TEACHER_MODE_INSTRUCTION = `
