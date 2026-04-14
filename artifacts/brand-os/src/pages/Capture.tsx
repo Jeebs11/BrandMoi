@@ -108,7 +108,7 @@ export default function Capture() {
 
   const initialState: WorkflowState = {
     step: stepParam ?? 1,
-    rawInput: thoughtParam ? decodeURIComponent(thoughtParam) : rawParam ? decodeURIComponent(rawParam) : "",
+    rawInput: thoughtParam || rawParam || "",
     objective: preferences?.objective ?? "Authority",
     persona: preferences?.persona ?? "Founder",
     tone: preferences?.tone ?? "Direct",
