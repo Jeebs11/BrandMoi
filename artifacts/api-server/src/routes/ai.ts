@@ -27,23 +27,29 @@ import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
 const router: IRouter = Router();
 
 async function getUserBrandContext(userId: number): Promise<string> {
-  const [prefs] = await db
-    .select()
-    .from(preferencesTable)
-    .where(eq(preferencesTable.userId, userId))
-    .limit(1);
+  const [[prefs], dna] = await Promise.all([
+    db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
+    buildVoiceDNA(userId),
+  ]);
 
   const parts: string[] = [];
 
   if (prefs) {
-    const voiceLines: string[] = [];
-    if (prefs.brandRole) voiceLines.push(`- Role: ${prefs.brandRole}`);
-    if (prefs.brandAudience) voiceLines.push(`- Audience: ${prefs.brandAudience}`);
-    if (prefs.brandBelief) voiceLines.push(`- Belief: ${prefs.brandBelief}`);
-    if (voiceLines.length > 0) parts.push("Brand voice:\n" + voiceLines.join("\n"));
+    const p = prefs as typeof prefs & { aboutMe?: string };
+    const aboutMe = p.aboutMe?.trim() ?? "";
+    if (aboutMe) {
+      const lines = [`About this creator: ${aboutMe}`];
+      if (prefs.brandBelief) lines.push(`Core belief: ${prefs.brandBelief}`);
+      parts.push(lines.join("\n"));
+    } else {
+      const voiceLines: string[] = [];
+      if (prefs.brandRole) voiceLines.push(`- Role: ${prefs.brandRole}`);
+      if (prefs.brandAudience) voiceLines.push(`- Audience: ${prefs.brandAudience}`);
+      if (prefs.brandBelief) voiceLines.push(`- Core belief: ${prefs.brandBelief}`);
+      if (voiceLines.length > 0) parts.push("Creator context:\n" + voiceLines.join("\n"));
+    }
   }
 
-  const dna = await buildVoiceDNA(userId);
   if (dna) parts.push(dna);
 
   return parts.join("\n\n");
@@ -296,19 +302,20 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use exactly 5 chapter-format slides (Opening scene → Struggle → Turn → Lesson → CTA). Do not use numbered slide titles.`
     : "";
 
-  const userMessage = `Create LinkedIn content based on this structure:
+  const userMessage = `Your job is to write LinkedIn content that sounds exactly like the person below — their rhythm, their phrasing, their specific way of seeing the world. Stay as close to their raw thought as possible. Do NOT paraphrase their voice into polished LinkedIn language. Keep it human and specific.
 
-Raw thought: ${rawInput}
-${brandContext}
-${voiceContext ? `\n${voiceContext}` : ""}
+## THE RAW THOUGHT (primary source — write from this):
+${rawInput}
 
-Structure:
+${voiceContext ? `## WHO THIS PERSON IS:\n${voiceContext}` : brandContext}
+
+## CONTENT STRUCTURE (context to guide the angle — the raw thought is still the primary source):
+- Start with this hook: ${selectedHook}
 - Topic: ${structure.topic}
 - Angle: ${structure.angle}
-- Core Message: ${structure.coreMessage}
-- Why It Matters: ${structure.whyItMatters}
-- Selected Hook: ${selectedHook}
-- Narrative Flow: ${structure.narrativeFlow.join(" → ")}
+- Core message: ${structure.coreMessage}
+- Why it matters: ${structure.whyItMatters}
+- Narrative arc: ${structure.narrativeFlow.join(" → ")}
 ${ctaInstruction}${storyModeInstruction}
 Return this exact JSON shape (no markdown fences):
 {

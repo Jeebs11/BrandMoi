@@ -1,6 +1,6 @@
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { brandVoiceSignalsTable } from "@workspace/db";
+import { brandVoiceSignalsTable, draftsTable } from "@workspace/db";
 
 export type VoiceSignals = {
   sentenceStyle: string;
@@ -12,36 +12,61 @@ export type VoiceSignals = {
 };
 
 /**
- * Compose a concise voice DNA excerpt from a user's latest brand voice signals.
+ * Compose a concise voice DNA excerpt from a user's latest brand voice signals,
+ * plus actual writing samples extracted from real published/ready drafts.
  * This is injected into AI prompts to personalise the output.
  */
 export async function buildVoiceDNA(userId: number): Promise<string> {
-  const signals = await db
-    .select()
-    .from(brandVoiceSignalsTable)
-    .where(eq(brandVoiceSignalsTable.userId, userId))
-    .orderBy(desc(brandVoiceSignalsTable.createdAt))
-    .limit(10);
+  const [signals, recentDrafts] = await Promise.all([
+    db
+      .select()
+      .from(brandVoiceSignalsTable)
+      .where(eq(brandVoiceSignalsTable.userId, userId))
+      .orderBy(desc(brandVoiceSignalsTable.createdAt))
+      .limit(10),
+    db
+      .select({ postOutput: draftsTable.postOutput, status: draftsTable.status })
+      .from(draftsTable)
+      .where(eq(draftsTable.userId, userId))
+      .orderBy(desc(draftsTable.createdAt))
+      .limit(10),
+  ]);
 
-  if (signals.length === 0) return "";
+  const parts: string[] = [];
 
-  const allSignals = signals.map((s) => s.signals as VoiceSignals);
+  if (signals.length > 0) {
+    const allSignals = signals.map((s) => s.signals as VoiceSignals);
+    const sentenceStyles = allSignals.map((s) => s.sentenceStyle).filter(Boolean);
+    const toneMarkers = [...new Set(allSignals.flatMap((s) => s.toneMarkers ?? []))].slice(0, 5);
+    const vocabulary = [...new Set(allSignals.flatMap((s) => s.vocabulary ?? []))].slice(0, 8);
+    const openingStyles = allSignals.map((s) => s.openingStyle).filter(Boolean);
+    const dominantSentenceStyle = mostCommon(sentenceStyles);
+    const dominantOpeningStyle = mostCommon(openingStyles);
 
-  const sentenceStyles = allSignals.map((s) => s.sentenceStyle).filter(Boolean);
-  const toneMarkers = [...new Set(allSignals.flatMap((s) => s.toneMarkers ?? []))].slice(0, 5);
-  const vocabulary = [...new Set(allSignals.flatMap((s) => s.vocabulary ?? []))].slice(0, 8);
-  const openingStyles = allSignals.map((s) => s.openingStyle).filter(Boolean);
+    const dnaLines: string[] = ["Voice DNA (writing style patterns from past posts):"];
+    if (dominantSentenceStyle) dnaLines.push(`- Sentence style: ${dominantSentenceStyle}`);
+    if (dominantOpeningStyle) dnaLines.push(`- Typical opening: ${dominantOpeningStyle}`);
+    if (toneMarkers.length > 0) dnaLines.push(`- Tone markers: ${toneMarkers.join(", ")}`);
+    if (vocabulary.length > 0) dnaLines.push(`- Vocabulary fingerprint: ${vocabulary.join(", ")}`);
+    parts.push(dnaLines.join("\n"));
+  }
 
-  const dominantSentenceStyle = mostCommon(sentenceStyles);
-  const dominantOpeningStyle = mostCommon(openingStyles);
+  const writingSamples = recentDrafts
+    .filter((d) => d.postOutput && d.postOutput.trim().length > 50)
+    .slice(0, 3)
+    .map((d) => {
+      const text = (d.postOutput ?? "").trim();
+      const words = text.split(/\s+/);
+      return words.slice(0, 60).join(" ") + (words.length > 60 ? "…" : "");
+    });
 
-  const parts: string[] = ["Voice DNA (learned from this user's past writing):"];
-  if (dominantSentenceStyle) parts.push(`- Sentence style: ${dominantSentenceStyle}`);
-  if (dominantOpeningStyle) parts.push(`- Typical opening: ${dominantOpeningStyle}`);
-  if (toneMarkers.length > 0) parts.push(`- Tone markers: ${toneMarkers.join(", ")}`);
-  if (vocabulary.length > 0) parts.push(`- Vocabulary fingerprint: ${vocabulary.join(", ")}`);
+  if (writingSamples.length > 0) {
+    const sampleLines = ["Real writing samples from this creator (imitate this voice, rhythm, and phrasing):"];
+    writingSamples.forEach((s, i) => sampleLines.push(`Sample ${i + 1}: "${s}"`));
+    parts.push(sampleLines.join("\n"));
+  }
 
-  return parts.join("\n");
+  return parts.join("\n\n");
 }
 
 function mostCommon<T>(arr: T[]): T | undefined {

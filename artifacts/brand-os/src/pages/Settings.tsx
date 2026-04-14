@@ -26,6 +26,7 @@ export default function Settings() {
   const [brandRole, setBrandRole] = useState(preferences?.brandRole ?? "");
   const [brandAudience, setBrandAudience] = useState(preferences?.brandAudience ?? "");
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
+  const [aboutMe, setAboutMe] = useState((preferences as typeof preferences & { aboutMe?: string })?.aboutMe ?? "");
 
   const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string; brandTextColor?: string });
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
@@ -58,6 +59,7 @@ export default function Settings() {
       setBrandAudience(preferences.brandAudience);
       setBrandBelief(preferences.brandBelief);
       const p = preferences as Record<string, unknown>;
+      if (typeof p.aboutMe === "string") setAboutMe(p.aboutMe);
       if (typeof p.brandBgColor === "string") setBrandBgColor(p.brandBgColor);
       if (typeof p.brandAccentColor === "string") setBrandAccentColor(p.brandAccentColor);
       if (typeof p.brandTextColor === "string") setBrandTextColor(p.brandTextColor);
@@ -128,7 +130,7 @@ export default function Settings() {
 
     setIsSavingAccount(true);
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, brandBgColor, brandAccentColor, brandTextColor } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor } },
       {
         onSuccess: async () => {
           try {
@@ -184,9 +186,29 @@ export default function Settings() {
             <SmartImportButton onApply={handleSmartImport} />
           </section>
 
+          {/* About me — primary context for AI */}
+          <section>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">About You</h2>
+            <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+              Write 1–3 sentences describing who you are and what you write about. When filled, this replaces the generic Objective + Persona labels and gives the AI real context to write in your voice.
+            </p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <textarea
+                value={aboutMe}
+                onChange={e => setAboutMe(e.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="e.g. I'm a PMO consultant who helps enterprise teams implement AI-driven project delivery. I write for CIOs and VPs of Engineering who are planning digital transformation but keep hitting governance roadblocks."
+                className="w-full text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow resize-none leading-relaxed placeholder:text-gray-300"
+              />
+              <p className="text-[10px] text-gray-300 text-right mt-1">{aboutMe.length}/500</p>
+            </div>
+          </section>
+
           {/* Content Settings */}
           <section>
-            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Content Preferences</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">Content Preferences</h2>
+            <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">Used as fallback when "About You" is empty.</p>
             <div className="space-y-5">
               <SelRow
                 label="Default Objective" options={OBJECTIVES} selected={objective} onSelect={setObjective}

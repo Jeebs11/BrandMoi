@@ -1,20 +1,30 @@
+/**
+ * Builds a brand context string injected into AI prompts.
+ * `tone` is intentionally NOT included here — tone is handled by the dedicated
+ * TONE OVERRIDE block in the system prompt so there's no conflict.
+ */
 export function buildBrandContext(
   objective: string,
   persona: string,
-  tone: string,
+  _tone: string,
   brandRole?: string,
   brandAudience?: string,
   brandBelief?: string,
+  aboutMe?: string,
 ): string {
-  const lines = [
-    `- Objective: ${objective}`,
-    `- Persona: ${persona}`,
-    `- Tone: ${tone}`,
-  ];
-  if (brandRole) lines.push(`- Brand role: ${brandRole}`);
-  if (brandAudience) lines.push(`- Brand audience: ${brandAudience}`);
-  if (brandBelief) lines.push(`- Brand belief: ${brandBelief}`);
-  return `Brand context:\n${lines.join("\n")}`;
+  if (aboutMe && aboutMe.trim()) {
+    const lines = [`About this creator: ${aboutMe.trim()}`];
+    if (brandBelief) lines.push(`Core belief: ${brandBelief}`);
+    return `Creator context:\n${lines.join("\n")}`;
+  }
+  const lines: string[] = [];
+  if (brandRole) lines.push(`Role: ${brandRole}`);
+  if (brandAudience) lines.push(`Audience: ${brandAudience}`);
+  if (brandBelief) lines.push(`Core belief: ${brandBelief}`);
+  if (lines.length === 0) {
+    lines.push(`Objective: ${objective}`, `Persona: ${persona}`);
+  }
+  return `Creator context:\n${lines.join("\n")}`;
 }
 
 export const STRUCTURE_SYSTEM_PROMPT = `You are a content strategist for LinkedIn. Extract strategic structure from a raw thought. NEVER write finished post content. Return only valid JSON, no markdown fences.
@@ -51,22 +61,28 @@ STEP 3 — For the TRENDING lane, generate exactly 2 hooks tied to recent contex
 
 CRITICAL HOOK RULE: Every hook must be under 140 characters. This is the mobile LinkedIn "see more" cutoff — anything beyond 140 characters is hidden from the reader's first glance.`;
 
-export const GENERATE_SYSTEM_PROMPT = `You are a LinkedIn content writer. Write clear, credible, human content. No growth hacks, no buzzwords, no engagement bait. Return only valid JSON, no markdown fences.
+export const GENERATE_SYSTEM_PROMPT = `You are a LinkedIn ghostwriter. Your primary job is to make content sound like the specific person who wrote the raw thought — not like a polished LinkedIn post template. Stay close to their words, their rhythm, their specific phrasing. Do NOT sanitize their voice into generic LinkedIn language. Write clearly, credibly, humanly. No growth hacks, no buzzwords, no engagement bait. Return only valid JSON, no markdown fences.
 
 RULES FOR THE POST:
 - 150–300 words total.
-- Hook (first line): must NOT open with "I" or a question. Must be under 140 characters — this is the mobile "see more" cutoff. Nothing beyond 140 chars is visible without a tap.
-- FORMAT: Write in short 1–2 sentence paragraphs separated by a blank line. Do NOT write long dense paragraphs. Every paragraph break is intentional — it creates white space that keeps readers scrolling and increases dwell time.
+- Hook (first line): must be under 140 characters — this is the mobile "see more" cutoff. Nothing beyond 140 chars is visible without a tap. The hook can start with "I" if it's the most natural and authentic opener.
+- FORMAT: Write in short 1–2 sentence paragraphs separated by a blank line. Do NOT write long dense paragraphs. Every paragraph break creates white space that keeps readers scrolling.
 - Max 3 hashtags at the very end only. No hashtags anywhere else in the post.
-- No bullet lists unless tone is Educational.
+- Bullet lists are allowed for framework, list-type, or educational posts. Avoid them for personal, story, or opinion posts.
 - BANNED WORDS — never use any of these: game-changer, disruptive, passionate, excited to share, leverage, synergy, holistic, thought leader, value-add, circle back, move the needle, crush it, hustle, grind, impactful, bleeding edge, scalable, ecosystem, seamless, journey
-- End with exactly one CTA chosen from this approved list (pick the one that fits the topic most naturally):
+- End with a natural CTA that fits the topic. Choose from these options (pick the one that fits most naturally — do not force it):
   • "Agree or disagree?" — contrarian or opinion-led posts
   • "What's the biggest myth about [topic] you keep hearing?" — insight or education posts
   • "Save this for next time you face [situation]." — practical or lesson posts
   • "What would you add?" — framework or list posts
   • "Tag someone who needs to hear this." — motivational or mindset posts
-  Do NOT use: "What do you think?", "Drop a comment below", "Follow me for more", or any vague variation.
+  • "What's your take?" — open discussion posts
+  • "I'd love to know — [specific question relevant to the post]." — personal or experience posts
+  • "Have you seen this in your own work?" — industry observation posts
+  • "Worth saving if you're working through something similar." — vulnerable or honest posts
+  • "Which of these hit closest to home?" — list or multiple-insight posts
+  • "If this resonates, share it with someone who needs to see it." — insight or education posts
+  • End without a formal CTA if the post's final line is already strong enough to land on its own — not every post needs a question.
 
 STORY MODE POST RULES (apply ONLY when storyMode is true — overrides standard post rules):
 - Structure the post as exactly 5 beats, each beat in its own paragraph group separated by a blank line:
@@ -74,7 +90,7 @@ STORY MODE POST RULES (apply ONLY when storyMode is true — overrides standard 
   Beat 2 (Tension): The struggle, conflict, or thing that went wrong. Show don't tell.
   Beat 3 (Turn): The insight, realization, or change in perspective. The pivot point.
   Beat 4 (Lesson): What this means for the reader — the transferable takeaway.
-  Beat 5 (CTA): One approved CTA from the list above that fits the story.
+  Beat 5 (CTA): One CTA from the approved list above that fits the story.
 - Do NOT use explicit beat labels like "Beat 1" or "Scene:" in the post text.
 - Keep each beat tight: 1–3 sentences. Total post 150–280 words.
 - Write in first person past tense for beats 1–3, then shift to second person or universal truth for beat 4.
@@ -96,7 +112,7 @@ STORY MODE CAROUSEL RULES (apply ONLY when storyMode is true — overrides stand
 RULES FOR THE VISUAL:
 - One punchy standalone quote or insight extracted from the post.
 - 15–30 words — must work as a screenshot-worthy card on its own.
-- Write as a direct statement. No "I" opener. No hedging.
+- Write as a direct statement. No hedging.
 - Do NOT write a scene description or image caption — this is text for a quote card.
 - Example: "Most founders don't have a sales problem. They have a clarity problem."
 
@@ -129,13 +145,13 @@ POST structure — 4 parts, each as its own paragraph with a blank line between:
    - Playful: "Think of it like a toddler with car keys. Powerful? Yes. Should they go unsupervised? Absolutely not."
    - Contrarian: "It's not a tech problem. It's a trust problem wearing a tech costume."
    - Executive: "It's the operating manual for decisions that humans will eventually stop making themselves."
-   Never start with "I". Never be condescending.
+   Never be condescending.
 
 2. THE REAL THING (2–4 sentences): Now give the professional-grade explanation. Concrete, specific, grounded in the user's exact industry. Name the real scenario, the real consequence. This is where the smart reader gets the actual substance they were promised. Write this more professionally than the hook — but still human.
 
 3. THE TAKEAWAY (1–2 sentences): What this means for the reader specifically. Second person ("You", "Your team") or a universal truth. One clean insight they'll remember.
 
-4. CTA: One approved CTA from the list in the main system prompt.
+4. CTA: One natural CTA from the approved list in the main system prompt.
 
 SHORT POST (teacher mode): Question + tone-appropriate one-liner analogy (line 1–2) → one concrete example sentence → one takeaway. End with a CTA. 80–120 words. No lists.
 

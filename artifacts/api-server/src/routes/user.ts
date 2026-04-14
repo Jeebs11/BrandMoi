@@ -24,6 +24,7 @@ const UpdatePreferencesBody = z.object({
   brandRole: z.string().optional(),
   brandAudience: z.string().optional(),
   brandBelief: z.string().optional(),
+  aboutMe: z.string().max(500).optional(),
   onboarded: z.boolean().optional(),
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
@@ -63,6 +64,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.brandRole !== undefined) updateData.brandRole = parsed.data.brandRole;
   if (parsed.data.brandAudience !== undefined) updateData.brandAudience = parsed.data.brandAudience;
   if (parsed.data.brandBelief !== undefined) updateData.brandBelief = parsed.data.brandBelief;
+  if (parsed.data.aboutMe !== undefined) updateData.aboutMe = parsed.data.aboutMe;
   if (parsed.data.onboarded !== undefined) updateData.onboarded = parsed.data.onboarded;
   if (parsed.data.brandBgColor !== undefined) updateData.brandBgColor = parsed.data.brandBgColor;
   if (parsed.data.brandAccentColor !== undefined) updateData.brandAccentColor = parsed.data.brandAccentColor;

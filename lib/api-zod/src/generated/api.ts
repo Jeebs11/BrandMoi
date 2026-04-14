@@ -60,6 +60,7 @@ export const GetPreferencesResponse = zod.object({
   brandRole: zod.string(),
   brandAudience: zod.string(),
   brandBelief: zod.string(),
+  aboutMe: zod.string().optional().default(""),
   onboarded: zod.boolean(),
 });
 
@@ -73,6 +74,7 @@ export const UpdatePreferencesBody = zod.object({
   brandRole: zod.string().optional(),
   brandAudience: zod.string().optional(),
   brandBelief: zod.string().optional(),
+  aboutMe: zod.string().max(500).optional(),
   onboarded: zod.boolean().optional(),
 });
 
@@ -85,6 +87,7 @@ export const UpdatePreferencesResponse = zod.object({
   brandRole: zod.string(),
   brandAudience: zod.string(),
   brandBelief: zod.string(),
+  aboutMe: zod.string().optional().default(""),
   onboarded: zod.boolean(),
 });
 

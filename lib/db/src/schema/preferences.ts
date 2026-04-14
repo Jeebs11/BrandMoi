@@ -12,6 +12,7 @@ export const preferencesTable = pgTable("preferences", {
   brandRole: text("brand_role").notNull().default(""),
   brandAudience: text("brand_audience").notNull().default(""),
   brandBelief: text("brand_belief").notNull().default(""),
+  aboutMe: text("about_me").default(""),
   onboarded: boolean("onboarded").notNull().default(false),
   brandVoiceSummary: text("brand_voice_summary"),
   voiceSummaryDraftCount: integer("voice_summary_draft_count").notNull().default(0),

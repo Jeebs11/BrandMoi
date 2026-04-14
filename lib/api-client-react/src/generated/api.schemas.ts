@@ -40,6 +40,7 @@ export interface PreferencesResponse {
   brandRole: string;
   brandAudience: string;
   brandBelief: string;
+  aboutMe?: string;
   onboarded: boolean;
 }
 
@@ -50,6 +51,7 @@ export interface UpdatePreferencesBody {
   brandRole?: string;
   brandAudience?: string;
   brandBelief?: string;
+  aboutMe?: string;
   onboarded?: boolean;
   brandBgColor?: string;
   brandAccentColor?: string;
