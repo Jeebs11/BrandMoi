@@ -139,8 +139,7 @@ router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise
 
   const userMessage = `Raw thought: ${rawInput}
 
-${brandContext}
-${voiceContext ? `\n${voiceContext}` : ""}
+${voiceContext || brandContext}
 ${trendingInstruction}
 
 Return this exact JSON shape (no markdown fences):

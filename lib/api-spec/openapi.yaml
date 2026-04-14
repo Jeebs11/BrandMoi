@@ -447,6 +447,9 @@ components:
           type: string
         brandBelief:
           type: string
+        aboutMe:
+          type: string
+          description: Free-text creator bio used as primary AI context; replaces Objective/Persona labels when non-empty.
         onboarded:
           type: boolean
       required:
@@ -475,6 +478,10 @@ components:
           type: string
         brandBelief:
           type: string
+        aboutMe:
+          type: string
+          maxLength: 500
+          description: Free-text creator bio; replaces Objective/Persona labels in AI context when non-empty.
         onboarded:
           type: boolean
 

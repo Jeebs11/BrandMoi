@@ -207,34 +207,8 @@ export default function Settings() {
 
           {/* Content Settings */}
           <section>
-            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">Content Preferences</h2>
-            <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">Used as fallback when "About You" is empty.</p>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Writing Tone</h2>
             <div className="space-y-5">
-              <SelRow
-                label="Default Objective" options={OBJECTIVES} selected={objective} onSelect={setObjective}
-                panelId="objective" openPanelId={openPanelId} onTogglePanel={togglePanel}
-                info="Sets the LinkedIn goal shaping every post you generate."
-                optionInfo={{
-                  "Clients": "Positions you as the solution enterprise buyers are looking for.",
-                  "Job": "Signals career momentum and the value you bring to a new role.",
-                  "Authority": "Produces opinion-led content that builds long-term credibility.",
-                  "Documenting": "Shows the real work — builds trust through transparency.",
-                  "Expert": "Deep technical content that earns respect from peers.",
-                  "Hiring": "Attracts talent by showcasing culture, mission, and opportunity.",
-                }}
-              />
-              <SelRow
-                label="Persona" options={PERSONAS} selected={persona} onSelect={setPersona}
-                panelId="persona" openPanelId={openPanelId} onTogglePanel={togglePanel}
-                info="Frames your point of view and what you optimise for."
-                optionInfo={{
-                  "Founder": "Assumes vision and leadership language.",
-                  "Operator": "Assumes systems, execution, and measurable outcomes.",
-                  "Career": "Focuses on professional growth, credibility, and opportunities.",
-                  "Technical": "Leads with depth, precision, and craft.",
-                  "Sales": "Focuses on value, trust, and closing the gap.",
-                }}
-              />
               <SelRow
                 label="Tone" options={TONES} selected={tone} onSelect={setTone}
                 panelId="tone" openPanelId={openPanelId} onTogglePanel={togglePanel}
@@ -252,6 +226,43 @@ export default function Settings() {
               />
             </div>
           </section>
+
+          {/* Legacy Objective + Persona — only shown when About Me is empty */}
+          {!aboutMe.trim() && (
+            <section>
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">Content Labels</h2>
+              <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
+                Fill in "About You" above to replace these with real context. These are only used as fallback.
+              </p>
+              <div className="space-y-5">
+                <SelRow
+                  label="Default Objective" options={OBJECTIVES} selected={objective} onSelect={setObjective}
+                  panelId="objective" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                  info="Sets the LinkedIn goal shaping every post you generate."
+                  optionInfo={{
+                    "Clients": "Positions you as the solution enterprise buyers are looking for.",
+                    "Job": "Signals career momentum and the value you bring to a new role.",
+                    "Authority": "Produces opinion-led content that builds long-term credibility.",
+                    "Documenting": "Shows the real work — builds trust through transparency.",
+                    "Expert": "Deep technical content that earns respect from peers.",
+                    "Hiring": "Attracts talent by showcasing culture, mission, and opportunity.",
+                  }}
+                />
+                <SelRow
+                  label="Persona" options={PERSONAS} selected={persona} onSelect={setPersona}
+                  panelId="persona" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                  info="Frames your point of view and what you optimise for."
+                  optionInfo={{
+                    "Founder": "Assumes vision and leadership language.",
+                    "Operator": "Assumes systems, execution, and measurable outcomes.",
+                    "Career": "Focuses on professional growth, credibility, and opportunities.",
+                    "Technical": "Leads with depth, precision, and craft.",
+                    "Sales": "Focuses on value, trust, and closing the gap.",
+                  }}
+                />
+              </div>
+            </section>
+          )}
 
           {/* Brand Voice */}
           <section>
