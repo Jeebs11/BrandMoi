@@ -43,6 +43,8 @@ async function getUserBrandContext(userId: number): Promise<string> {
       parts.push(lines.join("\n"));
     } else {
       const voiceLines: string[] = [];
+      if (prefs.objective) voiceLines.push(`- Objective: ${prefs.objective}`);
+      if (prefs.persona) voiceLines.push(`- Persona: ${prefs.persona}`);
       if (prefs.brandRole) voiceLines.push(`- Role: ${prefs.brandRole}`);
       if (prefs.brandAudience) voiceLines.push(`- Audience: ${prefs.brandAudience}`);
       if (prefs.brandBelief) voiceLines.push(`- Core belief: ${prefs.brandBelief}`);

@@ -52,7 +52,7 @@ export async function buildVoiceDNA(userId: number): Promise<string> {
   }
 
   const writingSamples = recentDrafts
-    .filter((d) => d.postOutput && d.postOutput.trim().length > 50)
+    .filter((d) => d.postOutput && d.postOutput.trim().length > 120)
     .slice(0, 3)
     .map((d) => {
       const text = (d.postOutput ?? "").trim();
@@ -61,7 +61,7 @@ export async function buildVoiceDNA(userId: number): Promise<string> {
     });
 
   if (writingSamples.length > 0) {
-    const sampleLines = ["Real writing samples from this creator (imitate this voice, rhythm, and phrasing):"];
+    const sampleLines = ["Here is how this user actually writes:"];
     writingSamples.forEach((s, i) => sampleLines.push(`Sample ${i + 1}: "${s}"`));
     parts.push(sampleLines.join("\n"));
   }
