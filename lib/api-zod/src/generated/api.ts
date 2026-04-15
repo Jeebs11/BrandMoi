@@ -251,6 +251,7 @@ export const ListDraftsResponseItem = zod.object({
   status: zod.enum(["draft", "ready", "published"]),
   externalId: zod.string().nullish(),
   postType: zod.string().nullish(),
+  diagnosis: zod.unknown().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });
@@ -294,6 +295,7 @@ export const GetDraftResponse = zod.object({
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
+  diagnosis: zod.unknown().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });

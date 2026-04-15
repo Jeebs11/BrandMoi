@@ -782,11 +782,10 @@ router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promis
     return;
   }
 
-  const [signal] = await db
-    .select()
-    .from(performanceSignalsTable)
-    .where(eq(performanceSignalsTable.draftId, draftId))
-    .limit(1);
+  const [[signal], [prefs]] = await Promise.all([
+    db.select().from(performanceSignalsTable).where(eq(performanceSignalsTable.draftId, draftId)).limit(1),
+    db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
+  ]);
 
   const bd = draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string; coreMessage?: string; visualType?: string } | null;
   const postText = draft.postOutput ?? draft.rawInput;
@@ -795,40 +794,56 @@ router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promis
     ? `Performance: ${resonance} resonance score (${signal.impressions} impressions, ${signal.reactions} reactions, ${signal.comments} comments, ${signal.reposts} reposts)`
     : "No performance data yet";
 
+  // Derive visual type robustly: check structuredBreakdown, draft.visualType column, and output fields
+  const deriveVisualType = (): string => {
+    if (bd?.visualType) return bd.visualType;
+    if (draft.visualType) return draft.visualType;
+    if (draft.carouselOutput) return "carousel";
+    if (draft.visualOutput) return "image";
+    const infographicMarkers = ["infographic", "data viz", "chart", "graph"];
+    if (infographicMarkers.some((m) => postText?.toLowerCase().includes(m))) return "infographic";
+    return "text-only";
+  };
+  const thisVisualType = deriveVisualType();
+
   // Visual type track-record analysis: benchmark against user's other high performers
-  const thisVisualType = bd?.visualType ?? null;
   let visualBenchmarkContext = "";
-  if (thisVisualType) {
-    const allPublished = await db
-      .select({ id: draftsTable.id, structuredBreakdown: draftsTable.structuredBreakdown })
-      .from(draftsTable)
-      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
+  const allPublished = await db
+    .select({ id: draftsTable.id, structuredBreakdown: draftsTable.structuredBreakdown, visualType: draftsTable.visualType, carouselOutput: draftsTable.carouselOutput, visualOutput: draftsTable.visualOutput })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
 
-    const siblingIds = allPublished
-      .filter((d) => {
-        const sbd = d.structuredBreakdown as { visualType?: string } | null;
-        return sbd?.visualType === thisVisualType && d.id !== draftId;
-      })
-      .map((d) => d.id);
+  const siblingIds = allPublished
+    .filter((d) => {
+      if (d.id === draftId) return false;
+      const sbd = d.structuredBreakdown as { visualType?: string } | null;
+      const dvt = sbd?.visualType ?? d.visualType ?? (d.carouselOutput ? "carousel" : d.visualOutput ? "image" : "text-only");
+      return dvt === thisVisualType;
+    })
+    .map((d) => d.id);
 
-    if (siblingIds.length > 0) {
-      const siblingSignals = await db
-        .select()
-        .from(performanceSignalsTable)
-        .where(inArray(performanceSignalsTable.draftId, siblingIds));
-      const siblingScores = siblingSignals.map((s) => resonanceScore(s)).filter((r) => r > 0);
-      if (siblingScores.length > 0) {
-        const avgScore = Math.round(siblingScores.reduce((a, b) => a + b, 0) / siblingScores.length);
-        const highCount = siblingScores.filter((r) => r >= 60).length;
-        visualBenchmarkContext = `\nVisual type "${thisVisualType}" benchmark: ${siblingScores.length} other post(s) with this visual type averaged ${avgScore} resonance (${highCount} high-performer${highCount !== 1 ? "s" : ""} ≥ 60). ${resonance !== null && resonance > avgScore ? "This post outperformed the average for its visual type." : resonance !== null ? "This post was below average for its visual type." : ""}`;
-      }
+  if (siblingIds.length > 0) {
+    const siblingSignals = await db
+      .select()
+      .from(performanceSignalsTable)
+      .where(inArray(performanceSignalsTable.draftId, siblingIds));
+    const siblingScores = siblingSignals.map((s) => resonanceScore(s)).filter((r) => r > 0);
+    if (siblingScores.length > 0) {
+      const avgScore = Math.round(siblingScores.reduce((a, b) => a + b, 0) / siblingScores.length);
+      const highCount = siblingScores.filter((r) => r >= 60).length;
+      visualBenchmarkContext = `\nVisual type "${thisVisualType}" benchmark: ${siblingScores.length} other post(s) with this visual type averaged ${avgScore} resonance (${highCount} high-performer${highCount !== 1 ? "s" : ""} ≥ 60). ${resonance !== null && resonance > avgScore ? "This post outperformed the average for its visual type." : resonance !== null ? "This post was below average for its visual type." : ""}`;
     }
   }
 
+  // Voice profile context for tone alignment evaluation
+  const voiceProfileContext = prefs
+    ? `\nUser voice profile: Declared tone="${draft.tone}", Persona="${prefs.persona ?? "not set"}", Brand role="${prefs.brandRole ?? "not set"}", Audience="${prefs.brandAudience ?? "not set"}", Core belief="${prefs.brandBelief ?? "not set"}"`
+    : "";
+
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 800,
-    system: `You are a LinkedIn content analyst. Diagnose why a post performed well by analyzing each structural element. Return only valid JSON — no markdown fences.
+    max_tokens: 900,
+    system: `You are a LinkedIn content analyst. Diagnose a post by analyzing each structural element. Return only valid JSON — no markdown fences.
 
 JSON shape:
 {
@@ -836,7 +851,7 @@ JSON shape:
   "sections": {
     "hook": {"rating": 4, "analysis": "1-2 sentences on the opening line effectiveness (1=weak, 5=exceptional)"},
     "body": {"rating": 3, "analysis": "1-2 sentences on the body structure and flow (1=weak, 5=exceptional)"},
-    "tone": {"rating": 5, "analysis": "1-2 sentences on tone-audience fit (1=weak, 5=exceptional)"},
+    "tone": {"rating": 5, "analysis": "1-2 sentences on tone alignment with the author's declared voice profile (1=weak, 5=exceptional)"},
     "cta": {"rating": 2, "analysis": "1-2 sentences on call-to-action effectiveness (1=weak, 5=exceptional; null rating if no CTA)"},
     "visual": {"rating": null, "analysis": "Note if visual element present/absent and its impact; null rating for text-only posts"}
   },
@@ -846,6 +861,7 @@ JSON shape:
 
 Rules:
 - Rating is 1-5 integer or null for visual if no visual.
+- For the tone section: evaluate whether the post voice matches the user's declared brand profile (persona, role, audience, belief).
 - Be specific to the actual post content and hook.
 - If no performance data, note what the content suggests about performance.`,
     messages: [{
@@ -853,13 +869,13 @@ Rules:
       content: `Post topic: ${bd?.topic ?? "unknown"}
 Angle: ${bd?.angle ?? "unknown"}
 Tone: ${draft.tone} | Objective: ${draft.objective}
-Visual type: ${thisVisualType ?? "none/unknown"}
+Visual type: ${thisVisualType}${voiceProfileContext}
 ${perfContext}${visualBenchmarkContext}
 
 Post excerpt:
 ${postText?.slice(0, 800) ?? "(no text)"}
 
-Diagnose why this post worked. Return JSON only.`,
+Diagnose this post. Return JSON only.`,
     }],
   });
 
