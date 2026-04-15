@@ -192,8 +192,8 @@ router.post("/drafts/:id/performance", requireAuth, async (req, res): Promise<vo
 
 router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
+  const windowDays = req.query["window"] === "30" ? 30 : req.query["window"] === "60" ? 60 : 90;
 
-  // All published drafts for this user
   const allDrafts = await db
     .select()
     .from(draftsTable)
@@ -202,7 +202,6 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
 
   const totalPublished = allDrafts.length;
 
-  // Fetch performance signals for these drafts
   const draftIds = allDrafts.map(d => d.id);
   const perfMap = new Map<number, { impressions: number; reactions: number; comments: number; reposts: number }>();
   if (draftIds.length > 0) {
@@ -226,13 +225,17 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     return Math.min(100, Math.round(Math.log2(1 + engagementWeight) * 12));
   };
 
-  // Avg resonance across all published with perf data
+  const engagementRateOf = (draftId: number): number | null => {
+    const p = perfMap.get(draftId);
+    if (!p || p.impressions === 0) return null;
+    return Math.round(((p.reactions + p.comments) / p.impressions) * 10000) / 100;
+  };
+
   const resonanceValues = allDrafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
   const avgResonance = resonanceValues.length > 0
     ? Math.round(resonanceValues.reduce((a, b) => a + b, 0) / resonanceValues.length)
     : 0;
 
-  // By tone (with sampledCount for sparse-bucket enforcement)
   const toneMap = new Map<string, { count: number; resonances: number[] }>();
   for (const d of allDrafts) {
     const tone = d.tone || "Unknown";
@@ -251,13 +254,11 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
 
   const loggedPerformanceCount = resonanceValues.length;
 
-  // Helper to compute avg resonance for a list of drafts, enforcing 2+ sample minimum
   const avgResForDrafts = (drafts: typeof allDrafts) => {
     const vals = drafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
     return { avgResonance: vals.length >= 2 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null, sampledCount: vals.length };
   };
 
-  // By content source (with resonance)
   const srcBuckets = new Map<string, typeof allDrafts>();
   for (const d of allDrafts) {
     const src = (d.contentSource as string | null) || "capture";
@@ -268,7 +269,6 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([source, drafts]) => ({ source, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  // By visual type (with resonance)
   const visBuckets = new Map<string, typeof allDrafts>();
   for (const d of allDrafts) {
     const vt = (d.visualType as string | null) || "none";
@@ -279,7 +279,6 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([type, drafts]) => ({ type, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  // By objective (with resonance)
   const objBuckets = new Map<string, typeof allDrafts>();
   for (const d of allDrafts) {
     const obj = d.objective || "Unknown";
@@ -290,7 +289,6 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([objective, drafts]) => ({ objective, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  // Top 5 by resonance (only those with perf data), include source + visual metadata
   const withResonance = allDrafts
     .map(d => ({ d, r: resonanceOf(d.id) }))
     .filter((x): x is { d: typeof allDrafts[0]; r: number } => x.r !== null)
@@ -300,13 +298,13 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     id: d.id,
     topic: ((d.structuredBreakdown as Record<string, unknown>)?.topic as string | undefined) ?? "Untitled",
     resonance: r,
+    engagementRate: engagementRateOf(d.id),
     tone: d.tone,
     contentSource: (d.contentSource as string | null) || "capture",
     visualType: (d.visualType as string | null) || "none",
     publishedAt: d.updatedAt.toISOString(),
   }));
 
-  // Weekly trend — last 13 weeks (90 days), with 30/60/90-day totals
   const now = new Date();
   const cutoffs = { 30: new Date(now.getTime() - 30 * 86400000), 60: new Date(now.getTime() - 60 * 86400000), 90: new Date(now.getTime() - 91 * 86400000) };
   const weekMap = new Map<string, number>();
@@ -322,7 +320,6 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([week, count]) => ({ week, count }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
-  // Weekly resonance trend — avg resonance per week (only weeks with ≥2 performance samples)
   const weekResMap = new Map<string, number[]>();
   for (const d of allDrafts) {
     const r = resonanceOf(d.id);
@@ -339,10 +336,180 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([week, vals]) => ({ week, avgResonance: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length), sampleCount: vals.length }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
-  // 30/60/90-day counts
   const last30 = allDrafts.filter(d => d.createdAt >= cutoffs[30]).length;
   const last60 = allDrafts.filter(d => d.createdAt >= cutoffs[60]).length;
   const last90 = allDrafts.filter(d => d.createdAt >= cutoffs[90]).length;
+
+  // ── Time-windowed analytics (respects ?window param) ──────────────────────
+  const windowMs = windowDays * 86400000;
+  const windowStart = new Date(now.getTime() - windowMs);
+  const priorStart = new Date(now.getTime() - windowMs * 2);
+  const windowDrafts = allDrafts.filter(d => d.createdAt >= windowStart);
+  const priorDrafts = allDrafts.filter(d => d.createdAt >= priorStart && d.createdAt < windowStart);
+
+  const trendDir = (curr: number | null, prior: number | null): "up" | "down" | "flat" | null => {
+    if (curr === null || prior === null) return null;
+    if (prior === 0 && curr === 0) return "flat";
+    if (prior === 0) return "up";
+    const change = (curr - prior) / prior;
+    if (change > 0.05) return "up";
+    if (change < -0.05) return "down";
+    return "flat";
+  };
+
+  const avgResOf = (drafts: typeof allDrafts): number | null => {
+    const vals = drafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
+    return vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+  };
+
+  const avgEngRateOf = (drafts: typeof allDrafts): number | null => {
+    const vals = drafts.map(d => engagementRateOf(d.id)).filter((v): v is number => v !== null);
+    return vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null;
+  };
+
+  const currAvgRes = avgResOf(windowDrafts);
+  const priorAvgRes = avgResOf(priorDrafts);
+  const currEngRate = avgEngRateOf(windowDrafts);
+  const priorEngRate = avgEngRateOf(priorDrafts);
+
+  const kpiTrends = {
+    avgResonance: { current: currAvgRes, prior: priorAvgRes, trend: trendDir(currAvgRes, priorAvgRes) },
+    totalPublished: { current: windowDrafts.length, prior: priorDrafts.length, trend: trendDir(windowDrafts.length, priorDrafts.length) },
+    avgEngagementRate: { current: currEngRate, prior: priorEngRate, trend: trendDir(currEngRate, priorEngRate) },
+  };
+
+  const avgEngagementRate = currEngRate;
+
+  // Posting consistency
+  const computeConsistency = (drafts: typeof allDrafts): number | null => {
+    if (drafts.length < 2) return null;
+    const sorted = [...drafts].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const gaps: number[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      gaps.push((sorted[i].createdAt.getTime() - sorted[i - 1].createdAt.getTime()) / 86400000);
+    }
+    return Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
+  };
+  const currConsistency = computeConsistency(windowDrafts);
+  const priorConsistency = computeConsistency(priorDrafts);
+  // "improved" means posting MORE frequently (smaller gap), so invert for trend direction
+  const postingConsistency = {
+    avgDaysBetweenPosts: currConsistency,
+    prior: priorConsistency,
+    trend: trendDir(
+      currConsistency !== null ? -currConsistency : null,
+      priorConsistency !== null ? -priorConsistency : null
+    ) as "up" | "down" | "flat" | null,
+  };
+
+  // Best time to post
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const timeBlock = (hour: number): string => {
+    if (hour >= 6 && hour <= 11) return "Morning";
+    if (hour >= 12 && hour <= 13) return "Midday";
+    if (hour >= 14 && hour <= 17) return "Afternoon";
+    if (hour >= 18 && hour <= 21) return "Evening";
+    return "Night";
+  };
+
+  const timeCells = new Map<string, { resonances: number[]; count: number }>();
+  const dayMap = new Map<string, { resonances: number[]; count: number }>();
+  const blockMap = new Map<string, { resonances: number[]; count: number }>();
+
+  for (const d of windowDrafts) {
+    const r = resonanceOf(d.id);
+    const date = new Date(d.createdAt);
+    const day = DAY_NAMES[date.getDay()] ?? "Unknown";
+    const block = timeBlock(date.getHours());
+    const cellKey = `${day}|${block}`;
+
+    if (!timeCells.has(cellKey)) timeCells.set(cellKey, { resonances: [], count: 0 });
+    const cell = timeCells.get(cellKey)!;
+    cell.count++;
+    if (r !== null) cell.resonances.push(r);
+
+    if (!dayMap.has(day)) dayMap.set(day, { resonances: [], count: 0 });
+    const de = dayMap.get(day)!;
+    de.count++;
+    if (r !== null) de.resonances.push(r);
+
+    if (!blockMap.has(block)) blockMap.set(block, { resonances: [], count: 0 });
+    const be = blockMap.get(block)!;
+    be.count++;
+    if (r !== null) be.resonances.push(r);
+  }
+
+  const byDayOfWeek = DAY_NAMES
+    .map(day => {
+      const e = dayMap.get(day);
+      if (!e) return null;
+      return {
+        day,
+        count: e.count,
+        avgResonance: e.resonances.length >= 2 ? Math.round(e.resonances.reduce((a, b) => a + b, 0) / e.resonances.length) : null,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  const TIME_BLOCK_ORDER = ["Morning", "Midday", "Afternoon", "Evening", "Night"];
+  const byTimeBlock = TIME_BLOCK_ORDER
+    .map(block => {
+      const e = blockMap.get(block);
+      if (!e) return null;
+      return {
+        block,
+        count: e.count,
+        avgResonance: e.resonances.length >= 2 ? Math.round(e.resonances.reduce((a, b) => a + b, 0) / e.resonances.length) : null,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  let topCombination: { day: string; block: string; avgResonance: number } | null = null;
+  let bestCellRes = -1;
+  for (const [key, { resonances, count }] of timeCells.entries()) {
+    if (count < 2 || resonances.length < 2) continue;
+    const avg = Math.round(resonances.reduce((a, b) => a + b, 0) / resonances.length);
+    if (avg > bestCellRes) {
+      bestCellRes = avg;
+      const parts = key.split("|");
+      topCombination = { day: parts[0] ?? "", block: parts[1] ?? "", avgResonance: avg };
+    }
+  }
+
+  const bestTimeToPost = { byDayOfWeek, byTimeBlock, topCombination };
+
+  // Hashtag performance
+  const hashtagMap = new Map<string, { resonances: number[]; count: number }>();
+  for (const d of windowDrafts) {
+    if (!d.postOutput) continue;
+    const tags = [...d.postOutput.matchAll(/#([A-Za-z][A-Za-z0-9_]*)/g)].map(m => m[1]!.toLowerCase());
+    const r = resonanceOf(d.id);
+    for (const tag of new Set(tags)) {
+      if (!hashtagMap.has(tag)) hashtagMap.set(tag, { resonances: [], count: 0 });
+      const e = hashtagMap.get(tag)!;
+      e.count++;
+      if (r !== null) e.resonances.push(r);
+    }
+  }
+  const hashtagPerformance = Array.from(hashtagMap.entries())
+    .map(([hashtag, { resonances, count }]) => ({
+      hashtag,
+      count,
+      avgResonance: resonances.length >= 2 ? Math.round(resonances.reduce((a, b) => a + b, 0) / resonances.length) : null,
+    }))
+    .sort((a, b) => (b.avgResonance ?? -1) - (a.avgResonance ?? -1) || b.count - a.count)
+    .slice(0, 10);
+
+  // Media format breakdown (LinkedIn shareMediaCategory)
+  const fmtBuckets = new Map<string, typeof allDrafts>();
+  for (const d of windowDrafts) {
+    const fmt = (d.mediaFormat as string | null) || "NONE";
+    if (!fmtBuckets.has(fmt)) fmtBuckets.set(fmt, []);
+    fmtBuckets.get(fmt)!.push(d);
+  }
+  const byMediaFormat = Array.from(fmtBuckets.entries())
+    .map(([format, drafts]) => ({ format, count: drafts.length, ...avgResForDrafts(drafts) }))
+    .sort((a, b) => b.count - a.count);
 
   const result = AnalyticsOverviewResponse.parse({
     totalPublished,
@@ -358,6 +525,12 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     last30,
     last60,
     last90,
+    kpiTrends,
+    avgEngagementRate,
+    postingConsistency,
+    bestTimeToPost,
+    hashtagPerformance,
+    byMediaFormat,
   });
 
   res.json(result);

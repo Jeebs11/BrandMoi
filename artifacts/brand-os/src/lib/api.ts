@@ -220,6 +220,8 @@ export const aiApi = {
     }),
 };
 
+export type KpiTrend = { current: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };
+
 export type AnalyticsOverview = {
   totalPublished: number;
   avgResonance: number;
@@ -228,16 +230,26 @@ export type AnalyticsOverview = {
   byContentSource: { source: string; count: number; avgResonance: number | null; sampledCount: number }[];
   byVisualType: { type: string; count: number; avgResonance: number | null; sampledCount: number }[];
   byObjective: { objective: string; count: number; avgResonance: number | null; sampledCount: number }[];
-  topPosts: { id: number; topic: string; resonance: number; tone: string | null; contentSource: string; visualType: string; publishedAt: string }[];
+  topPosts: { id: number; topic: string; resonance: number; engagementRate: number | null; tone: string | null; contentSource: string; visualType: string; publishedAt: string }[];
   weeklyTrend: { week: string; count: number }[];
   weeklyResonanceTrend: { week: string; avgResonance: number; sampleCount: number }[];
   last30: number;
   last60: number;
   last90: number;
+  kpiTrends: { avgResonance: KpiTrend; totalPublished: KpiTrend; avgEngagementRate: KpiTrend };
+  avgEngagementRate: number | null;
+  postingConsistency: { avgDaysBetweenPosts: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };
+  bestTimeToPost: {
+    byDayOfWeek: { day: string; count: number; avgResonance: number | null }[];
+    byTimeBlock: { block: string; count: number; avgResonance: number | null }[];
+    topCombination: { day: string; block: string; avgResonance: number } | null;
+  };
+  hashtagPerformance: { hashtag: string; count: number; avgResonance: number | null }[];
+  byMediaFormat: { format: string; count: number; avgResonance: number | null; sampledCount: number }[];
 };
 
 export const analyticsApi = {
-  overview: () => apiFetch<AnalyticsOverview>("/analytics/overview"),
+  overview: (window: 30 | 60 | 90 = 90) => apiFetch<AnalyticsOverview>(`/analytics/overview?window=${window}`),
 };
 
 export type VoiceSuggestion = {

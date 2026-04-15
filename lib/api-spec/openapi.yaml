@@ -1137,11 +1137,12 @@ components:
               id: { type: integer }
               topic: { type: string }
               resonance: { type: integer }
+              engagementRate: { type: ["number", "null"] }
               tone: { type: ["string", "null"] }
               contentSource: { type: string }
               visualType: { type: string }
               publishedAt: { type: string }
-            required: [id, topic, resonance, tone, contentSource, visualType, publishedAt]
+            required: [id, topic, resonance, engagementRate, tone, contentSource, visualType, publishedAt]
         weeklyTrend:
           type: array
           items:
@@ -1162,6 +1163,72 @@ components:
         last30: { type: integer }
         last60: { type: integer }
         last90: { type: integer }
+        kpiTrends:
+          type: object
+          properties:
+            avgResonance:
+              $ref: "#/components/schemas/KpiTrendItem"
+            totalPublished:
+              $ref: "#/components/schemas/KpiTrendItem"
+            avgEngagementRate:
+              $ref: "#/components/schemas/KpiTrendItem"
+          required: [avgResonance, totalPublished, avgEngagementRate]
+        avgEngagementRate: { type: ["number", "null"] }
+        postingConsistency:
+          type: object
+          properties:
+            avgDaysBetweenPosts: { type: ["number", "null"] }
+            prior: { type: ["number", "null"] }
+            trend: { type: ["string", "null"], enum: ["up", "down", "flat", null] }
+          required: [avgDaysBetweenPosts, prior, trend]
+        bestTimeToPost:
+          type: object
+          properties:
+            byDayOfWeek:
+              type: array
+              items:
+                type: object
+                properties:
+                  day: { type: string }
+                  count: { type: integer }
+                  avgResonance: { type: ["integer", "null"] }
+                required: [day, count, avgResonance]
+            byTimeBlock:
+              type: array
+              items:
+                type: object
+                properties:
+                  block: { type: string }
+                  count: { type: integer }
+                  avgResonance: { type: ["integer", "null"] }
+                required: [block, count, avgResonance]
+            topCombination:
+              type: ["object", "null"]
+              properties:
+                day: { type: string }
+                block: { type: string }
+                avgResonance: { type: integer }
+              required: [day, block, avgResonance]
+          required: [byDayOfWeek, byTimeBlock, topCombination]
+        hashtagPerformance:
+          type: array
+          items:
+            type: object
+            properties:
+              hashtag: { type: string }
+              count: { type: integer }
+              avgResonance: { type: ["integer", "null"] }
+            required: [hashtag, count, avgResonance]
+        byMediaFormat:
+          type: array
+          items:
+            type: object
+            properties:
+              format: { type: string }
+              count: { type: integer }
+              avgResonance: { type: ["integer", "null"] }
+              sampledCount: { type: integer }
+            required: [format, count, avgResonance, sampledCount]
       required:
         - totalPublished
         - avgResonance
@@ -1176,6 +1243,12 @@ components:
         - last30
         - last60
         - last90
+        - kpiTrends
+        - avgEngagementRate
+        - postingConsistency
+        - bestTimeToPost
+        - hashtagPerformance
+        - byMediaFormat
 
     DiagnosisSection:
       type: object
@@ -1254,3 +1327,11 @@ components:
               items:
                 $ref: "#/components/schemas/VoiceSuggestion"
           required: [status, suggestions]
+
+    KpiTrendItem:
+      type: object
+      properties:
+        current: { type: ["number", "null"] }
+        prior: { type: ["number", "null"] }
+        trend: { type: ["string", "null"], enum: ["up", "down", "flat", null] }
+      required: [current, prior, trend]

@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { BarChart2, TrendingUp, Layers, FileText, Trophy, Zap, AlertCircle } from "lucide-react";
+import {
+  BarChart2, TrendingUp, Layers, FileText, Trophy, Zap, AlertCircle,
+  ArrowUp, ArrowDown, Minus, Clock, Hash, CalendarDays, Activity,
+} from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Cell,
@@ -9,7 +12,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { analyticsApi, type AnalyticsOverview } from "@/lib/api";
+import { analyticsApi, type AnalyticsOverview, type KpiTrend } from "@/lib/api";
 
 const SOURCE_LABELS: Record<string, string> = {
   capture: "Direct capture",
@@ -17,6 +20,7 @@ const SOURCE_LABELS: Record<string, string> = {
   teach_audience: "Teach audience",
   story_mode: "Story mode",
   brand_voice_idea: "Agent idea",
+  linkedin: "LinkedIn",
 };
 const SOURCE_EMOJI: Record<string, string> = {
   capture: "✍️",
@@ -24,6 +28,7 @@ const SOURCE_EMOJI: Record<string, string> = {
   teach_audience: "🎓",
   story_mode: "📖",
   brand_voice_idea: "🤖",
+  linkedin: "💼",
 };
 const VISUAL_LABELS: Record<string, string> = {
   none: "Text only",
@@ -49,22 +54,64 @@ const TONE_EMOJI: Record<string, string> = {
   Playful: "🎉",
   Snappy: "✂️",
 };
+const MEDIA_FORMAT_LABELS: Record<string, string> = {
+  NONE: "Text only",
+  IMAGE: "Image post",
+  VIDEO: "Video post",
+  DOCUMENT: "Document / Carousel",
+  ARTICLE: "Article",
+};
+const MEDIA_FORMAT_EMOJI: Record<string, string> = {
+  NONE: "📝",
+  IMAGE: "🖼️",
+  VIDEO: "🎬",
+  DOCUMENT: "📄",
+  ARTICLE: "📰",
+};
 
 const BAR_COLOR = "#7c3aed";
 const BAR_MUTED = "#ede9fe";
 
-function StatCard({ icon, label, value, sub, accent }: {
-  icon: React.ReactNode; label: string; value: string | number; sub?: string; accent?: boolean;
+function TrendArrow({ trend }: { trend: "up" | "down" | "flat" | null }) {
+  if (!trend) return null;
+  if (trend === "up") return <ArrowUp className="w-3.5 h-3.5 text-emerald-500 inline-block ml-1 flex-shrink-0" />;
+  if (trend === "down") return <ArrowDown className="w-3.5 h-3.5 text-red-400 inline-block ml-1 flex-shrink-0" />;
+  return <Minus className="w-3.5 h-3.5 text-gray-400 inline-block ml-1 flex-shrink-0" />;
+}
+
+function KpiTrendBadge({ kpi }: { kpi: KpiTrend }) {
+  if (!kpi.trend || kpi.prior === null) return null;
+  const pct = kpi.prior !== 0
+    ? Math.abs(Math.round(((( kpi.current ?? 0) - kpi.prior) / kpi.prior) * 100))
+    : null;
+  const color = kpi.trend === "up" ? "text-emerald-500" : kpi.trend === "down" ? "text-red-400" : "text-gray-400";
+  return (
+    <span className={cn("flex items-center gap-0.5 text-[10px] font-bold", color)}>
+      <TrendArrow trend={kpi.trend} />
+      {pct !== null && `${pct}%`}
+      <span className="text-gray-400 font-normal ml-0.5">vs prior</span>
+    </span>
+  );
+}
+
+function StatCard({ icon, label, value, sub, accent, trend }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: boolean;
+  trend?: KpiTrend;
 }) {
   return (
     <div className={cn("rounded-2xl border p-4 flex items-start gap-3", accent ? "bg-violet-600 border-violet-500" : "bg-white border-gray-100")}>
       <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0", accent ? "bg-violet-500 text-white" : "bg-violet-50 text-violet-600")}>
         {icon}
       </div>
-      <div>
+      <div className="min-w-0">
         <p className={cn("text-[11px] font-bold uppercase tracking-wider mb-0.5", accent ? "text-violet-200" : "text-gray-400")}>{label}</p>
         <p className={cn("text-2xl font-extrabold leading-none", accent ? "text-white" : "text-gray-900")}>{value}</p>
         {sub && <p className={cn("text-xs mt-0.5", accent ? "text-violet-200" : "text-gray-400")}>{sub}</p>}
+        {trend && <KpiTrendBadge kpi={trend} />}
       </div>
     </div>
   );
@@ -83,23 +130,38 @@ function SparseLabel() {
 }
 
 export default function Analytics() {
+  const [trendWindow, setTrendWindow] = useState<30 | 60 | 90>(90);
+
   const { data, isLoading } = useQuery<AnalyticsOverview>({
-    queryKey: ["analytics-overview"],
-    queryFn: analyticsApi.overview,
+    queryKey: ["analytics-overview", trendWindow],
+    queryFn: () => analyticsApi.overview(trendWindow),
     staleTime: 60_000,
   });
 
   return (
     <AppShell>
       <header className="px-6 pt-12 pb-4 bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <BarChart2 className="w-5 h-5 text-primary" />
-          <h1 className="text-xl font-extrabold text-gray-900">Analytics</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <BarChart2 className="w-5 h-5 text-primary" />
+            <h1 className="text-xl font-extrabold text-gray-900">Analytics</h1>
+          </div>
+          <div className="flex gap-1">
+            {([30, 60, 90] as const).map(w => (
+              <button
+                key={w}
+                onClick={() => setTrendWindow(w)}
+                className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors", trendWindow === w ? "bg-violet-100 text-violet-700" : "text-gray-400 hover:text-gray-600")}
+              >
+                {w}d
+              </button>
+            ))}
+          </div>
         </div>
         <p className="text-xs text-gray-400 mt-1 ml-8">Performance insights across your published posts</p>
       </header>
       <main className="flex-1 px-4 py-5 space-y-6 overflow-y-auto pb-28">
-        {isLoading ? <LoadingState /> : !data || data.totalPublished === 0 ? <EmptyState /> : <Content data={data} />}
+        {isLoading ? <LoadingState /> : !data || data.totalPublished === 0 ? <EmptyState /> : <Content data={data} trendWindow={trendWindow} />}
       </main>
     </AppShell>
   );
@@ -131,9 +193,8 @@ function EmptyState() {
   );
 }
 
-function Content({ data }: { data: AnalyticsOverview }) {
+function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 30 | 60 | 90 }) {
   const [, navigate] = useLocation();
-  const [trendWindow, setTrendWindow] = useState<30 | 60 | 90>(90);
 
   const hasResonanceData = data.loggedPerformanceCount > 0;
 
@@ -160,6 +221,13 @@ function Content({ data }: { data: AnalyticsOverview }) {
 
   const tonesWithResonance = data.byTone.filter(t => t.avgResonance !== null && t.sampledCount >= 2);
 
+  // Best day for recommendation callout
+  const bestDay = data.bestTimeToPost.byDayOfWeek
+    .filter(d => d.avgResonance !== null)
+    .sort((a, b) => (b.avgResonance ?? 0) - (a.avgResonance ?? 0))[0] ?? null;
+
+  const hasMediaFormatData = data.byMediaFormat.some(f => f.format !== "NONE");
+
   return (
     <>
       {/* Performance CTA */}
@@ -175,15 +243,40 @@ function Content({ data }: { data: AnalyticsOverview }) {
         </div>
       )}
 
-      {/* Overview stats */}
+      {/* Overview stats with trend arrows */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={<FileText className="w-4 h-4" />} label="Published" value={data.totalPublished} sub="total posts" />
+        <StatCard
+          icon={<FileText className="w-4 h-4" />}
+          label="Published"
+          value={data.kpiTrends.totalPublished.current ?? data.totalPublished}
+          sub={`last ${trendWindow} days`}
+          trend={data.kpiTrends.totalPublished}
+        />
         <StatCard
           icon={<TrendingUp className="w-4 h-4" />}
           label="Avg Resonance"
-          value={hasResonanceData ? `${data.avgResonance}` : "—"}
+          value={hasResonanceData ? `${data.kpiTrends.avgResonance.current ?? data.avgResonance}` : "—"}
           sub={hasResonanceData ? "out of 100" : "log performance to track"}
+          trend={hasResonanceData ? data.kpiTrends.avgResonance : undefined}
         />
+        {data.avgEngagementRate !== null && (
+          <StatCard
+            icon={<Activity className="w-4 h-4" />}
+            label="Eng. Rate"
+            value={`${data.avgEngagementRate}%`}
+            sub="reactions+comments/impressions"
+            trend={data.kpiTrends.avgEngagementRate}
+          />
+        )}
+        {data.postingConsistency.avgDaysBetweenPosts !== null && (
+          <StatCard
+            icon={<CalendarDays className="w-4 h-4" />}
+            label="Cadence"
+            value={`~${data.postingConsistency.avgDaysBetweenPosts}d`}
+            sub="avg days between posts"
+            trend={data.postingConsistency.trend ? { current: data.postingConsistency.avgDaysBetweenPosts, prior: data.postingConsistency.prior, trend: data.postingConsistency.trend } : undefined}
+          />
+        )}
         {bestTone && (
           <StatCard
             icon={<Trophy className="w-4 h-4" />}
@@ -203,23 +296,12 @@ function Content({ data }: { data: AnalyticsOverview }) {
         )}
       </div>
 
-      {/* Trend section */}
+      {/* Trend chart */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
           <SectionTitle>
             {useResonanceTrend ? "Resonance trend" : "Publishing trend"}
           </SectionTitle>
-          <div className="flex gap-1">
-            {([30, 60, 90] as const).map(w => (
-              <button
-                key={w}
-                onClick={() => setTrendWindow(w)}
-                className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors", trendWindow === w ? "bg-violet-100 text-violet-700" : "text-gray-400 hover:text-gray-600")}
-              >
-                {w}d
-              </button>
-            ))}
-          </div>
         </div>
 
         {useResonanceTrend ? (
@@ -270,7 +352,109 @@ function Content({ data }: { data: AnalyticsOverview }) {
         )}
       </div>
 
-      {/* Tone breakdown — resonance-centric chart */}
+      {/* Best time to post */}
+      {(data.bestTimeToPost.byDayOfWeek.length > 0 || data.bestTimeToPost.byTimeBlock.length > 0) && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock className="w-3.5 h-3.5 text-violet-500" />
+            <SectionTitle>Best time to post</SectionTitle>
+          </div>
+          {data.bestTimeToPost.topCombination && (
+            <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 mb-3">
+              <p className="text-[11px] font-bold text-violet-700">
+                🏆 {data.bestTimeToPost.topCombination.day} {data.bestTimeToPost.topCombination.block.toLowerCase()} posts average {data.bestTimeToPost.topCombination.avgResonance} resonance
+              </p>
+            </div>
+          )}
+          {!data.bestTimeToPost.topCombination && bestDay && bestDay.avgResonance !== null && (
+            <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 mb-3">
+              <p className="text-[11px] font-bold text-violet-700">
+                🏆 {bestDay.day} posts average {bestDay.avgResonance} resonance
+              </p>
+            </div>
+          )}
+          {data.bestTimeToPost.byDayOfWeek.length > 0 && (
+            <>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">By day of week</p>
+              <div className="space-y-1.5 mb-3">
+                {data.bestTimeToPost.byDayOfWeek.map(d => (
+                  <div key={d.day} className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-500 font-medium w-20 flex-shrink-0">{d.day.slice(0, 3)}</span>
+                    <span className="text-gray-400 tabular-nums text-[10px] w-6">{d.count}p</span>
+                    {d.avgResonance === null ? (
+                      <SparseLabel />
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${d.avgResonance}%` }} />
+                        </div>
+                        <span className="font-bold text-gray-700 tabular-nums w-5 text-right text-[10px]">{d.avgResonance}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {data.bestTimeToPost.byTimeBlock.length > 0 && (
+            <>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">By time of day</p>
+              <div className="space-y-1.5">
+                {data.bestTimeToPost.byTimeBlock.map(b => (
+                  <div key={b.block} className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-500 font-medium w-20 flex-shrink-0">{b.block}</span>
+                    <span className="text-gray-400 tabular-nums text-[10px] w-6">{b.count}p</span>
+                    {b.avgResonance === null ? (
+                      <SparseLabel />
+                    ) : (
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${b.avgResonance}%` }} />
+                        </div>
+                        <span className="font-bold text-gray-700 tabular-nums w-5 text-right text-[10px]">{b.avgResonance}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {data.bestTimeToPost.byDayOfWeek.length === 0 && data.bestTimeToPost.byTimeBlock.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-3">Publish more posts in this window to see timing data</p>
+          )}
+        </div>
+      )}
+
+      {/* Hashtag performance */}
+      {data.hashtagPerformance.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Hash className="w-3.5 h-3.5 text-violet-500" />
+            <SectionTitle>Hashtag performance</SectionTitle>
+          </div>
+          <div className="space-y-1.5">
+            {data.hashtagPerformance.map((h, i) => (
+              <div key={h.hashtag} className="flex items-center gap-2 text-xs">
+                <span className={cn("font-medium flex-shrink-0 w-4 text-[10px] tabular-nums text-center", i < 3 ? "text-violet-600" : "text-gray-400")}>{i + 1}</span>
+                <span className="text-gray-700 font-medium flex-1 truncate">#{h.hashtag}</span>
+                <span className="text-gray-400 tabular-nums text-[10px] flex-shrink-0">{h.count}×</span>
+                {h.avgResonance === null ? (
+                  <SparseLabel />
+                ) : (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${h.avgResonance}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
+                    </div>
+                    <span className="font-bold text-gray-700 tabular-nums w-5 text-right text-[10px]">{h.avgResonance}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tone breakdown */}
       {data.byTone.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
           <SectionTitle>By tone</SectionTitle>
@@ -316,7 +500,6 @@ function Content({ data }: { data: AnalyticsOverview }) {
               <p className="text-[10px] text-amber-500 mt-2 text-center">Log performance on 2+ posts per tone to see resonance breakdown</p>
             </>
           )}
-          {/* Per-tone resonance list */}
           <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
             {data.byTone.map((t) => (
               <div key={t.tone} className="flex items-center gap-2 text-xs">
@@ -357,6 +540,35 @@ function Content({ data }: { data: AnalyticsOverview }) {
                     </div>
                     {s.sampledCount < 2 ? <SparseLabel /> : (
                       <span className="text-[10px] font-bold text-violet-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {s.avgResonance}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* LinkedIn media format breakdown */}
+      {hasMediaFormatData && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <SectionTitle>LinkedIn content format</SectionTitle>
+          <div className="space-y-2.5">
+            {data.byMediaFormat.map((f, i) => {
+              const total = data.byMediaFormat.reduce((s, x) => s + x.count, 0);
+              const pct = total > 0 ? Math.round((f.count / total) * 100) : 0;
+              return (
+                <div key={f.format}>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs text-gray-600 flex-1 font-medium">{MEDIA_FORMAT_EMOJI[f.format] ?? "📄"} {MEDIA_FORMAT_LABELS[f.format] ?? f.format}</span>
+                    <span className="text-[10px] text-gray-400 tabular-nums">{f.count} post{f.count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#0ea5e9" : "#e0f2fe" }} />
+                    </div>
+                    {f.sampledCount < 2 ? <SparseLabel /> : (
+                      <span className="text-[10px] font-bold text-sky-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {f.avgResonance}</span>
                     )}
                   </div>
                 </div>
@@ -450,6 +662,11 @@ function Content({ data }: { data: AnalyticsOverview }) {
                     {p.visualType !== "none" && (
                       <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full font-medium">
                         {VISUAL_EMOJI[p.visualType] ?? ""} {VISUAL_LABELS[p.visualType] ?? p.visualType}
+                      </span>
+                    )}
+                    {p.engagementRate !== null && (
+                      <span className="text-[10px] bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full font-medium">
+                        {p.engagementRate}% eng
                       </span>
                     )}
                   </div>

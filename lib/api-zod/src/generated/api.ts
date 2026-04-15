@@ -188,7 +188,7 @@ export const StructureIdeaResponse = zod.object({
 /**
  * @summary Get AI-generated daily brief with content angles and teach ideas
  */
-export const GetAgentBriefResponse = zod.object({
+export const AgentBriefResponse = zod.object({
   headline: zod.string(),
   insight: zod.string(),
   angles: zod.array(zod.string()),
@@ -302,81 +302,6 @@ export const LinkedinSyncResponse = zod.object({
   imported: zod.number(),
   skipped: zod.number(),
   total: zod.number(),
-});
-
-/**
- * @summary Analytics overview response
- */
-export const GetAnalyticsOverviewResponse = zod.object({
-  totalPublished: zod.number(),
-  avgResonance: zod.number(),
-  loggedPerformanceCount: zod.number(),
-  byTone: zod.array(
-    zod.object({
-      tone: zod.string(),
-      count: zod.number(),
-      sampledCount: zod.number(),
-      avgResonance: zod.number().nullable(),
-    }),
-  ),
-  byContentSource: zod.array(
-    zod.object({
-      source: zod.enum([
-        "capture",
-        "news_reaction",
-        "teach_audience",
-        "story_mode",
-        "brand_voice_idea",
-        "linkedin",
-      ]),
-      count: zod.number(),
-      sampledCount: zod.number(),
-      avgResonance: zod.number().nullable(),
-    }),
-  ),
-  byVisualType: zod.array(
-    zod.object({
-      type: zod.enum(["none", "card", "carousel", "infographic", "art"]),
-      count: zod.number(),
-      sampledCount: zod.number(),
-      avgResonance: zod.number().nullable(),
-    }),
-  ),
-  byObjective: zod.array(
-    zod.object({
-      objective: zod.string(),
-      count: zod.number(),
-      sampledCount: zod.number(),
-      avgResonance: zod.number().nullable(),
-    }),
-  ),
-  topPosts: zod.array(
-    zod.object({
-      id: zod.number(),
-      topic: zod.string(),
-      resonance: zod.number(),
-      tone: zod.string().nullable(),
-      contentSource: zod.string(),
-      visualType: zod.string(),
-      publishedAt: zod.string(),
-    }),
-  ),
-  weeklyTrend: zod.array(
-    zod.object({
-      week: zod.string(),
-      count: zod.number(),
-    }),
-  ),
-  weeklyResonanceTrend: zod.array(
-    zod.object({
-      week: zod.string(),
-      avgResonance: zod.number(),
-      sampleCount: zod.number(),
-    }),
-  ),
-  last30: zod.number(),
-  last60: zod.number(),
-  last90: zod.number(),
 });
 
 /**
@@ -995,4 +920,56 @@ export const UpdateDraftResponse = zod.object({
  */
 export const DeleteDraftParams = zod.object({
   id: zod.coerce.number(),
+});
+
+/**
+ * @summary Analytics overview response
+ */
+const KpiTrendItem = zod.object({
+  current: zod.number().nullable(),
+  prior: zod.number().nullable(),
+  trend: zod.enum(["up", "down", "flat"]).nullable(),
+});
+
+export const AnalyticsOverviewResponse = zod.object({
+  totalPublished: zod.number(),
+  avgResonance: zod.number(),
+  loggedPerformanceCount: zod.number(),
+  byTone: zod.array(zod.object({ tone: zod.string(), count: zod.number(), sampledCount: zod.number(), avgResonance: zod.number().nullable() })),
+  byContentSource: zod.array(zod.object({ source: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
+  byVisualType: zod.array(zod.object({ type: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
+  byObjective: zod.array(zod.object({ objective: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
+  topPosts: zod.array(zod.object({
+    id: zod.number(),
+    topic: zod.string(),
+    resonance: zod.number(),
+    engagementRate: zod.number().nullable(),
+    tone: zod.string().nullable(),
+    contentSource: zod.string(),
+    visualType: zod.string(),
+    publishedAt: zod.string(),
+  })),
+  weeklyTrend: zod.array(zod.object({ week: zod.string(), count: zod.number() })),
+  weeklyResonanceTrend: zod.array(zod.object({ week: zod.string(), avgResonance: zod.number(), sampleCount: zod.number() })),
+  last30: zod.number(),
+  last60: zod.number(),
+  last90: zod.number(),
+  kpiTrends: zod.object({
+    avgResonance: KpiTrendItem,
+    totalPublished: KpiTrendItem,
+    avgEngagementRate: KpiTrendItem,
+  }),
+  avgEngagementRate: zod.number().nullable(),
+  postingConsistency: zod.object({
+    avgDaysBetweenPosts: zod.number().nullable(),
+    prior: zod.number().nullable(),
+    trend: zod.enum(["up", "down", "flat"]).nullable(),
+  }),
+  bestTimeToPost: zod.object({
+    byDayOfWeek: zod.array(zod.object({ day: zod.string(), count: zod.number(), avgResonance: zod.number().nullable() })),
+    byTimeBlock: zod.array(zod.object({ block: zod.string(), count: zod.number(), avgResonance: zod.number().nullable() })),
+    topCombination: zod.object({ day: zod.string(), block: zod.string(), avgResonance: zod.number() }).nullable(),
+  }),
+  hashtagPerformance: zod.array(zod.object({ hashtag: zod.string(), count: zod.number(), avgResonance: zod.number().nullable() })),
+  byMediaFormat: zod.array(zod.object({ format: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
 });

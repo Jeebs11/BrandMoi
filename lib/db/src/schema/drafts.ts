@@ -22,6 +22,7 @@ export const draftsTable = pgTable("drafts", {
   externalId: text("external_id"),
   postType: text("post_type"),
   diagnosis: jsonb("diagnosis"),
+  mediaFormat: text("media_format"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

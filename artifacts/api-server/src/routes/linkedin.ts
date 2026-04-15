@@ -385,6 +385,7 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
             contentSource: "linkedin",
             externalId,
             postType,
+            mediaFormat: mediaCategory,
             createdAt: publishedAt,
           })
           .returning();

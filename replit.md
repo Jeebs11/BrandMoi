@@ -36,7 +36,16 @@ Users can manage drafts with filtering capabilities. A "Log Performance" feature
 ### Analytics & Performance Tracking
 - **Momentum Engine**: Calculates a "Momentum Score" based on recency, variety, volume, and resonance, displayed on the dashboard.
 - **Cadence Intelligence**: Provides alerts for inactivity or lack of content for specific objectives.
-- **Analytics Page**: Displays various metrics like total published posts, average resonance, trends by tone, content source, visual type, and top-performing posts. Drafts are tracked with `content_source` and `visual_type`.
+- **Analytics Page**: Displays various metrics including:
+  - Total published posts, average resonance, trends by tone, content source, visual type, and top-performing posts
+  - **30/60/90-day time window toggle** — all metrics respect the selected window
+  - **KPI trend arrows** (↑ ↓ →) comparing current vs prior equivalent period for Published, Avg Resonance, and Engagement Rate
+  - **Best time to post** — ranks days of week and time-of-day blocks (Morning/Midday/Afternoon/Evening) by average resonance with a highlighted recommendation callout
+  - **Posting consistency** — avg days between consecutive published posts with a trend indicator
+  - **Hashtag performance** — top 10 hashtags from `postOutput` ranked by average resonance with usage counts
+  - **LinkedIn content format breakdown** — groups posts by `mediaFormat` (NONE/IMAGE/VIDEO/DOCUMENT/ARTICLE) from LinkedIn's `shareMediaCategory`
+  - **Engagement rate** — shown as reactions+comments÷impressions where impressions > 0, with trend direction
+- **LinkedIn Sync**: During import, maps `shareMediaCategory` to the `mediaFormat` field on the draft for richer format analytics
 
 ### UI/UX
 The frontend is mobile-first, utilizing TailwindCSS and shadcn/ui for a consistent design. Bottom navigation (Home, Capture, Vault, Library) and a dashboard provide intuitive access to features. Export options include Carousel PDF export (using `html-to-image` + `jspdf`) and Visual card PNG downloads.
