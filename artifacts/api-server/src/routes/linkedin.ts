@@ -17,7 +17,7 @@ const ENCRYPTION_KEY = Buffer.from(
   (process.env["JWT_SECRET"] ?? "brand-os-dev-secret-change-in-production").padEnd(32, "!").slice(0, 32),
 );
 
-const SCOPES = ["openid", "profile", "r_basicprofile"].join(" ");
+const SCOPES = ["openid", "profile", "email", "w_member_social"].join(" ");
 
 function getRedirectUri(req: { protocol: string; get: (h: string) => string | undefined }): string {
   const host = req.get("host") ?? "localhost";
@@ -355,17 +355,15 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
         })
         .returning();
 
-      if (reactions > 0 || comments > 0) {
-        await db
-          .insert(performanceSignalsTable)
-          .values({
-            draftId: draft.id,
-            reactions,
-            comments,
-            impressions: 0,
-          })
-          .onConflictDoNothing();
-      }
+      await db
+        .insert(performanceSignalsTable)
+        .values({
+          draftId: draft.id,
+          reactions,
+          comments,
+          impressions: 0,
+        })
+        .onConflictDoNothing();
 
       imported++;
     }
