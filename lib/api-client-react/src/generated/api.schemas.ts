@@ -317,6 +317,20 @@ export interface AnalyticsWeeklyResonanceTrend {
   sampleCount: number;
 }
 
+export interface LinkedinStatus {
+  configured: boolean;
+  connected: boolean;
+  displayName?: string;
+  memberUrn?: string;
+  lastSyncedAt?: string | null;
+}
+
+export interface LinkedinSyncResult {
+  imported: number;
+  skipped: number;
+  total: number;
+}
+
 export interface AnalyticsOverview {
   totalPublished: number;
   avgResonance: number;

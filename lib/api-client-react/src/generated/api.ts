@@ -24,6 +24,8 @@ import type {
   GenerateContentBody,
   GeneratedContent,
   HealthStatus,
+  LinkedinStatus,
+  LinkedinSyncResult,
   LoginBody,
   PreferencesResponse,
   RefineContentBody,
@@ -1397,3 +1399,121 @@ export function useGetAgentBrief<
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get LinkedIn connection status
+ */
+export const getLinkedinStatusUrl = () => `/api/linkedin/status`;
+
+export const getLinkedinStatus = async (options?: RequestInit): Promise<LinkedinStatus> => {
+  return customFetch<LinkedinStatus>(getLinkedinStatusUrl(), { ...options, method: "GET" });
+};
+
+export const getGetLinkedinStatusQueryKey = () => [`/api/linkedin/status`] as const;
+
+export const getGetLinkedinStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLinkedinStatus>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getLinkedinStatus>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetLinkedinStatusQueryKey();
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLinkedinStatus>>> = ({ signal }) =>
+    getLinkedinStatus({ signal, ...requestOptions });
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLinkedinStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLinkedinStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getLinkedinStatus>>>;
+export type GetLinkedinStatusQueryError = ErrorType<ErrorResponse>;
+
+export function useGetLinkedinStatus<
+  TData = Awaited<ReturnType<typeof getLinkedinStatus>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof getLinkedinStatus>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLinkedinStatusQueryOptions(options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Sync original LinkedIn posts into the Library
+ */
+export const linkedinSync = async (options?: RequestInit): Promise<LinkedinSyncResult> => {
+  return customFetch<LinkedinSyncResult>(`/api/linkedin/sync`, { ...options, method: "POST" });
+};
+
+export const getLinkedinSyncMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinSync>>, TError, void, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkedinSync>>, void> = () => {
+    return linkedinSync(requestOptions);
+  };
+  return { mutationFn, ...mutationOptions } as UseMutationOptions<
+    Awaited<ReturnType<typeof linkedinSync>>,
+    TError,
+    void,
+    TContext
+  >;
+};
+
+export type LinkedinSyncMutationResult = NonNullable<Awaited<ReturnType<typeof linkedinSync>>>;
+export type LinkedinSyncMutationError = ErrorType<ErrorResponse>;
+
+export const useLinkedinSync = <TError = ErrorType<ErrorResponse>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinSync>>, TError, void, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<Awaited<ReturnType<typeof linkedinSync>>, TError, void, TContext> => {
+  const mutationOptions = getLinkedinSyncMutationOptions(options);
+  return useMutation(mutationOptions);
+};
+
+/**
+ * @summary Disconnect LinkedIn account
+ */
+export const linkedinDisconnect = async (options?: RequestInit): Promise<{ ok: boolean }> => {
+  return customFetch<{ ok: boolean }>(`/api/linkedin/disconnect`, { ...options, method: "DELETE" });
+};
+
+export const getLinkedinDisconnectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinDisconnect>>, TError, void, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkedinDisconnect>>, void> = () => {
+    return linkedinDisconnect(requestOptions);
+  };
+  return { mutationFn, ...mutationOptions } as UseMutationOptions<
+    Awaited<ReturnType<typeof linkedinDisconnect>>,
+    TError,
+    void,
+    TContext
+  >;
+};
+
+export type LinkedinDisconnectMutationResult = NonNullable<Awaited<ReturnType<typeof linkedinDisconnect>>>;
+export type LinkedinDisconnectMutationError = ErrorType<ErrorResponse>;
+
+export const useLinkedinDisconnect = <TError = ErrorType<ErrorResponse>, TContext = unknown>(options?: {
+  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinDisconnect>>, TError, void, TContext>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<Awaited<ReturnType<typeof linkedinDisconnect>>, TError, void, TContext> => {
+  const mutationOptions = getLinkedinDisconnectMutationOptions(options);
+  return useMutation(mutationOptions);
+};

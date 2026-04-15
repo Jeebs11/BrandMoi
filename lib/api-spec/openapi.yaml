@@ -802,7 +802,7 @@ components:
           enum: [draft, ready, published]
         contentSource:
           type: string
-          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea]
+          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea, linkedin]
         visualType:
           type: string
           enum: [none, card, carousel, infographic, art]
@@ -828,7 +828,7 @@ components:
           enum: [draft, ready, published]
         contentSource:
           type: string
-          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea]
+          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea, linkedin]
         visualType:
           type: string
           enum: [none, card, carousel, infographic, art]
@@ -911,7 +911,7 @@ components:
             properties:
               source:
                 type: string
-                enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea]
+                enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea, linkedin]
               count: { type: integer }
               sampledCount: { type: integer }
               avgResonance: { type: ["integer", "null"] }

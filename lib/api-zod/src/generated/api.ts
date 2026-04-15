@@ -271,7 +271,7 @@ export const CreateDraftBody = zod.object({
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
-  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea"]).optional(),
+  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea","linkedin"]).optional(),
   visualType: zod.enum(["none","card","carousel","infographic","art"]).optional(),
 });
 
@@ -312,8 +312,28 @@ export const UpdateDraftBody = zod.object({
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
   structuredBreakdown: StructuredBreakdownSchema.optional(),
-  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea"]).optional(),
+  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea","linkedin"]).optional(),
   visualType: zod.enum(["none","card","carousel","infographic","art"]).optional(),
+});
+
+/**
+ * @summary Get LinkedIn connection status
+ */
+export const LinkedinStatusResponse = zod.object({
+  configured: zod.boolean(),
+  connected: zod.boolean(),
+  displayName: zod.string().optional(),
+  memberUrn: zod.string().optional(),
+  lastSyncedAt: zod.string().nullable().optional(),
+});
+
+/**
+ * @summary LinkedIn sync result
+ */
+export const LinkedinSyncResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  total: zod.number(),
 });
 
 export const UpdateDraftResponse = zod.object({
