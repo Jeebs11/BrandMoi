@@ -21,9 +21,14 @@ const ENCRYPTION_KEY = Buffer.from(secretBase);
 
 const SCOPES = ["openid", "profile", "email", "w_member_social"].join(" ");
 
+const ALLOWED_HOST_PATTERN = /^(localhost(:\d+)?|127\.0\.0\.1(:\d+)?|[\w-]+\.replit\.dev|[\w-]+\.replit\.app|[\w-]+\.repl\.co)$/;
+
 function getRedirectUri(req: { protocol: string; get: (h: string) => string | undefined }): string {
-  const host = req.get("host") ?? "localhost";
-  return `${req.protocol}://${host}/api/linkedin/callback`;
+  const rawHost = req.get("host") ?? "";
+  if (!ALLOWED_HOST_PATTERN.test(rawHost)) {
+    throw new Error(`Untrusted Host header for redirect URI: ${rawHost}`);
+  }
+  return `${req.protocol}://${rawHost}/api/linkedin/callback`;
 }
 
 function signState(userId: number): string {
