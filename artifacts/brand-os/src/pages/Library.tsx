@@ -5,7 +5,7 @@ import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-cl
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, type PerformanceSignal, type PostDiagnosis } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection } from "@/lib/api";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
@@ -302,20 +302,23 @@ export default function Library() {
                   <div className="bg-violet-50 rounded-2xl p-4">
                     <p className="text-sm font-bold text-violet-800 leading-relaxed">{diagnosisPanel.diagnosis.headline}</p>
                   </div>
-                  {(diagnosisPanel.diagnosis.hookAnalysis || diagnosisPanel.diagnosis.toneMatch) && (
-                    <div className="grid grid-cols-1 gap-2">
-                      {diagnosisPanel.diagnosis.hookAnalysis && (
-                        <div className="bg-blue-50 rounded-xl px-4 py-3">
-                          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Hook</p>
-                          <p className="text-xs text-blue-900 leading-relaxed">{diagnosisPanel.diagnosis.hookAnalysis}</p>
-                        </div>
-                      )}
-                      {diagnosisPanel.diagnosis.toneMatch && (
-                        <div className="bg-amber-50 rounded-xl px-4 py-3">
-                          <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">Tone</p>
-                          <p className="text-xs text-amber-900 leading-relaxed">{diagnosisPanel.diagnosis.toneMatch}</p>
-                        </div>
-                      )}
+                  {diagnosisPanel.diagnosis.sections && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Section breakdown</p>
+                      {(["hook", "body", "tone", "cta", "visual"] as const).map((key) => {
+                        const sec = diagnosisPanel.diagnosis!.sections?.[key] as DiagnosisSection | undefined;
+                        if (!sec) return null;
+                        const ratingColor = sec.rating === null ? "text-gray-400" : sec.rating >= 4 ? "text-emerald-600" : sec.rating >= 3 ? "text-amber-600" : "text-red-500";
+                        return (
+                          <div key={key} className="flex items-start gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                            <div className="flex-shrink-0 w-12">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase">{key}</p>
+                              <p className={`text-xs font-black ${ratingColor}`}>{sec.rating !== null ? `${sec.rating}/5` : "—"}</p>
+                            </div>
+                            <p className="text-xs text-gray-600 leading-relaxed flex-1">{sec.analysis}</p>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   <div>

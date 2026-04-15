@@ -171,8 +171,23 @@ export default function Dashboard() {
 
     agentApi.themes().then((r) => setThemes(r.themes ?? [])).catch(() => {}).finally(() => setThemesLoading(false));
 
-    voiceInsightsApi.list().then(setVoiceSuggestions).catch(() => {}).finally(() => setVoiceSuggestionsLoading(false));
-    resonanceMapApi.get().then((map) => setScoredPostCount(Object.keys(map).length)).catch(() => {});
+    Promise.all([
+      voiceInsightsApi.list().catch(() => [] as VoiceSuggestion[]),
+      resonanceMapApi.get().catch(() => ({} as Record<string, number>)),
+    ]).then(([suggestions, map]) => {
+      const count = Object.keys(map).length;
+      setScoredPostCount(count);
+      if (suggestions.length > 0) {
+        setVoiceSuggestions(suggestions);
+      } else if (count >= 5 && !sessionStorage.getItem("brand_os_vi_auto_v1")) {
+        sessionStorage.setItem("brand_os_vi_auto_v1", "1");
+        voiceInsightsApi.generate().then((result) => {
+          if (result.status === "ok" && result.suggestions.length > 0) {
+            setVoiceSuggestions(result.suggestions);
+          }
+        }).catch(() => {});
+      }
+    }).finally(() => setVoiceSuggestionsLoading(false));
   }, []);
 
   const refreshBrief = () => {
@@ -313,6 +328,13 @@ export default function Dashboard() {
                             <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">{s.suggestedValue}</span>
                           </div>
                           <p className="text-xs text-gray-600 leading-relaxed">{s.rationale}</p>
+                          {Array.isArray(s.evidenceSnippets) && s.evidenceSnippets.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {(s.evidenceSnippets as string[]).slice(0, 2).map((snippet, i) => (
+                                <p key={i} className="text-[10px] text-gray-400 italic leading-snug border-l-2 border-violet-200 pl-2">&ldquo;{snippet}&rdquo;</p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">

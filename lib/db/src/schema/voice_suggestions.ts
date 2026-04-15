@@ -9,6 +9,7 @@ export const voiceSuggestionsTable = pgTable("voice_suggestions", {
   suggestedValue: text("suggested_value").notNull(),
   rationale: text("rationale").notNull(),
   evidenceDraftIds: jsonb("evidence_draft_ids").notNull().default([]),
+  evidenceSnippets: jsonb("evidence_snippets").notNull().default([]),
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

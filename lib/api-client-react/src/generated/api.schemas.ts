@@ -202,10 +202,17 @@ export interface Draft {
   /** @nullable */
   diagnosis?: {
     headline: string;
-    hookAnalysis?: string;
-    toneMatch?: string;
+    sections?: {
+      hook?: { rating: number | null; analysis: string };
+      body?: { rating: number | null; analysis: string };
+      tone?: { rating: number | null; analysis: string };
+      cta?: { rating: number | null; analysis: string };
+      visual?: { rating: number | null; analysis: string };
+    };
     reasons: string[];
     replicateTip: string;
+    hookAnalysis?: string;
+    toneMatch?: string;
   } | null;
 }
 

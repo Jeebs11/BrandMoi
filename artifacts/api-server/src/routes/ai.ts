@@ -659,9 +659,13 @@ router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Pr
   }
 
   const top = scored.slice(0, 10);
+  const snippetMap = new Map(top.map((x) => [
+    x.draft.id,
+    (x.draft.postOutput ?? x.draft.rawInput ?? "").slice(0, 120).replace(/\n/g, " ").trim()
+  ]));
   const topPostSummaries = top.map((x) => {
     const bd = x.draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string } | null;
-    return `[id:${x.draft.id}] Topic: ${bd?.topic ?? "unknown"} | Angle: ${bd?.angle ?? "unknown"} | Tone: ${x.draft.tone} | Objective: ${x.draft.objective} | Resonance: ${x.resonance}`;
+    return `[id:${x.draft.id}] Topic: ${bd?.topic ?? "unknown"} | Angle: ${bd?.angle ?? "unknown"} | Tone: ${x.draft.tone} | Objective: ${x.draft.objective} | Resonance: ${x.resonance} | Snippet: "${snippetMap.get(x.draft.id) ?? ""}"`;
   }).join("\n");
 
   const currentProfile = `Current profile:
@@ -736,14 +740,19 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
 
   const inserted = await db
     .insert(voiceSuggestionsTable)
-    .values(valid.map((s) => ({
-      userId,
-      field: s.field,
-      currentValue: currentPrefsMap[s.field] ?? "",
-      suggestedValue: s.suggestedValue,
-      rationale: s.rationale,
-      evidenceDraftIds: Array.isArray(s.evidenceDraftIds) ? s.evidenceDraftIds : [],
-    })))
+    .values(valid.map((s) => {
+      const ids = Array.isArray(s.evidenceDraftIds) ? s.evidenceDraftIds : [];
+      const snippets = ids.map((id: number) => snippetMap.get(id) ?? "").filter(Boolean);
+      return {
+        userId,
+        field: s.field,
+        currentValue: currentPrefsMap[s.field] ?? "",
+        suggestedValue: s.suggestedValue,
+        rationale: s.rationale,
+        evidenceDraftIds: ids,
+        evidenceSnippets: snippets,
+      };
+    }))
     .returning();
 
   res.json({ status: "ok", suggestions: inserted });
@@ -763,8 +772,9 @@ router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promis
 
   if (!draft) { res.status(404).json({ error: "Draft not found" }); return; }
 
-  if (draft.diagnosis) {
-    res.json({ diagnosis: draft.diagnosis });
+  const cached = draft.diagnosis as { sections?: unknown } | null;
+  if (cached && cached.sections) {
+    res.json({ diagnosis: cached });
     return;
   }
 
@@ -783,24 +793,33 @@ router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promis
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 600,
-    system: `You are a LinkedIn content analyst. Diagnose why a post performed well. Return only valid JSON — no markdown fences.
+    max_tokens: 800,
+    system: `You are a LinkedIn content analyst. Diagnose why a post performed well by analyzing each structural element. Return only valid JSON — no markdown fences.
 
 JSON shape:
 {
-  "headline": "1 sentence summary of the key success factor",
-  "hookAnalysis": "1 sentence on what made the opening hook effective",
-  "toneMatch": "1 sentence on how the tone connected with the audience",
+  "headline": "1 sentence summary of the single biggest success factor",
+  "sections": {
+    "hook": {"rating": 4, "analysis": "1-2 sentences on the opening line effectiveness (1=weak, 5=exceptional)"},
+    "body": {"rating": 3, "analysis": "1-2 sentences on the body structure and flow (1=weak, 5=exceptional)"},
+    "tone": {"rating": 5, "analysis": "1-2 sentences on tone-audience fit (1=weak, 5=exceptional)"},
+    "cta": {"rating": 2, "analysis": "1-2 sentences on call-to-action effectiveness (1=weak, 5=exceptional; null rating if no CTA)"},
+    "visual": {"rating": null, "analysis": "Note if visual element present/absent and its impact; null rating for text-only posts"}
+  },
   "reasons": ["specific reason 1 under 20 words", "specific reason 2 under 20 words", "specific reason 3 under 20 words"],
   "replicateTip": "1 actionable tip to replicate this success in your next post"
 }
 
-Be specific to the actual post content. Reference the hook or key phrases where relevant.`,
+Rules:
+- Rating is 1-5 integer or null for visual if no visual.
+- Be specific to the actual post content and hook.
+- If no performance data, note what the content suggests about performance.`,
     messages: [{
       role: "user",
       content: `Post topic: ${bd?.topic ?? "unknown"}
 Angle: ${bd?.angle ?? "unknown"}
 Tone: ${draft.tone} | Objective: ${draft.objective}
+Visual type: ${(draft.structuredBreakdown as Record<string, unknown> | null)?.visualType ?? "none/unknown"}
 ${perfContext}
 
 Post excerpt:
@@ -813,7 +832,21 @@ Diagnose why this post worked. Return JSON only.`,
   const t = message.content[0];
   if (t.type !== "text") { res.status(500).json({ error: "Unexpected AI response" }); return; }
 
-  let diagnosis: { headline: string; hookAnalysis?: string; toneMatch?: string; reasons: string[]; replicateTip: string };
+  type DiagnosisSection = { rating: number | null; analysis: string };
+  let diagnosis: {
+    headline: string;
+    sections?: {
+      hook?: DiagnosisSection;
+      body?: DiagnosisSection;
+      tone?: DiagnosisSection;
+      cta?: DiagnosisSection;
+      visual?: DiagnosisSection;
+    };
+    reasons: string[];
+    replicateTip: string;
+    hookAnalysis?: string;
+    toneMatch?: string;
+  };
   try {
     const stripped = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     diagnosis = JSON.parse(stripped) as typeof diagnosis;
