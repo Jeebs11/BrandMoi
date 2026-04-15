@@ -269,8 +269,8 @@ export const CreateDraftBody = zod.object({
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
-  contentSource: zod.string().optional(),
-  visualType: zod.string().optional(),
+  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea"]).optional(),
+  visualType: zod.enum(["none","card","carousel","infographic","art"]).optional(),
 });
 
 /**
@@ -310,8 +310,8 @@ export const UpdateDraftBody = zod.object({
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
   structuredBreakdown: StructuredBreakdownSchema.optional(),
-  contentSource: zod.string().optional(),
-  visualType: zod.string().optional(),
+  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea"]).optional(),
+  visualType: zod.enum(["none","card","carousel","infographic","art"]).optional(),
 });
 
 export const UpdateDraftResponse = zod.object({
@@ -359,10 +359,14 @@ export const AgentBriefResponse = zod.object({
 export const AnalyticsOverviewResponse = zod.object({
   totalPublished: zod.number(),
   avgResonance: zod.number(),
+  loggedPerformanceCount: zod.number(),
   byTone: zod.array(zod.object({ tone: zod.string(), count: zod.number(), avgResonance: zod.number() })),
-  byContentSource: zod.array(zod.object({ source: zod.string(), count: zod.number() })),
-  byVisualType: zod.array(zod.object({ type: zod.string(), count: zod.number() })),
-  byObjective: zod.array(zod.object({ objective: zod.string(), count: zod.number() })),
-  topPosts: zod.array(zod.object({ id: zod.number(), topic: zod.string(), resonance: zod.number(), tone: zod.string(), publishedAt: zod.string() })),
+  byContentSource: zod.array(zod.object({ source: zod.string(), count: zod.number(), avgResonance: zod.number(), sampledCount: zod.number() })),
+  byVisualType: zod.array(zod.object({ type: zod.string(), count: zod.number(), avgResonance: zod.number(), sampledCount: zod.number() })),
+  byObjective: zod.array(zod.object({ objective: zod.string(), count: zod.number(), avgResonance: zod.number(), sampledCount: zod.number() })),
+  topPosts: zod.array(zod.object({ id: zod.number(), topic: zod.string(), resonance: zod.number(), tone: zod.string().nullable(), contentSource: zod.string(), visualType: zod.string(), publishedAt: zod.string() })),
   weeklyTrend: zod.array(zod.object({ week: zod.string(), count: zod.number() })),
+  last30: zod.number(),
+  last60: zod.number(),
+  last90: zod.number(),
 });

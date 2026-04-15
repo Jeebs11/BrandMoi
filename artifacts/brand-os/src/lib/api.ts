@@ -220,12 +220,16 @@ export const aiApi = {
 export type AnalyticsOverview = {
   totalPublished: number;
   avgResonance: number;
+  loggedPerformanceCount: number;
   byTone: { tone: string; count: number; avgResonance: number }[];
-  byContentSource: { source: string; count: number }[];
-  byVisualType: { type: string; count: number }[];
-  byObjective: { objective: string; count: number }[];
-  topPosts: { id: number; topic: string; resonance: number; tone: string; publishedAt: string }[];
+  byContentSource: { source: string; count: number; avgResonance: number; sampledCount: number }[];
+  byVisualType: { type: string; count: number; avgResonance: number; sampledCount: number }[];
+  byObjective: { objective: string; count: number; avgResonance: number; sampledCount: number }[];
+  topPosts: { id: number; topic: string; resonance: number; tone: string | null; contentSource: string; visualType: string; publishedAt: string }[];
   weeklyTrend: { week: string; count: number }[];
+  last30: number;
+  last60: number;
+  last90: number;
 };
 
 export const analyticsApi = {

@@ -243,34 +243,48 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     avgResonance: resonances.length > 0 ? Math.round(resonances.reduce((a, b) => a + b, 0) / resonances.length) : 0,
   })).sort((a, b) => b.count - a.count);
 
-  // By content source
-  const srcMap = new Map<string, number>();
+  const loggedPerformanceCount = resonanceValues.length;
+
+  // Helper to compute avg resonance for a list of draft IDs
+  const avgResForDrafts = (drafts: typeof allDrafts) => {
+    const vals = drafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
+    return { avgResonance: vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0, sampledCount: vals.length };
+  };
+
+  // By content source (with resonance)
+  const srcBuckets = new Map<string, typeof allDrafts>();
   for (const d of allDrafts) {
     const src = (d.contentSource as string | null) || "capture";
-    srcMap.set(src, (srcMap.get(src) ?? 0) + 1);
+    if (!srcBuckets.has(src)) srcBuckets.set(src, []);
+    srcBuckets.get(src)!.push(d);
   }
-  const byContentSource = Array.from(srcMap.entries()).map(([source, count]) => ({ source, count }))
+  const byContentSource = Array.from(srcBuckets.entries())
+    .map(([source, drafts]) => ({ source, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  // By visual type
-  const visMap = new Map<string, number>();
+  // By visual type (with resonance)
+  const visBuckets = new Map<string, typeof allDrafts>();
   for (const d of allDrafts) {
     const vt = (d.visualType as string | null) || "none";
-    visMap.set(vt, (visMap.get(vt) ?? 0) + 1);
+    if (!visBuckets.has(vt)) visBuckets.set(vt, []);
+    visBuckets.get(vt)!.push(d);
   }
-  const byVisualType = Array.from(visMap.entries()).map(([type, count]) => ({ type, count }))
+  const byVisualType = Array.from(visBuckets.entries())
+    .map(([type, drafts]) => ({ type, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  // By objective
-  const objMap = new Map<string, number>();
+  // By objective (with resonance)
+  const objBuckets = new Map<string, typeof allDrafts>();
   for (const d of allDrafts) {
     const obj = d.objective || "Unknown";
-    objMap.set(obj, (objMap.get(obj) ?? 0) + 1);
+    if (!objBuckets.has(obj)) objBuckets.set(obj, []);
+    objBuckets.get(obj)!.push(d);
   }
-  const byObjective = Array.from(objMap.entries()).map(([objective, count]) => ({ objective, count }))
+  const byObjective = Array.from(objBuckets.entries())
+    .map(([objective, drafts]) => ({ objective, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  // Top 5 by resonance (only those with perf data)
+  // Top 5 by resonance (only those with perf data), include source + visual metadata
   const withResonance = allDrafts
     .map(d => ({ d, r: resonanceOf(d.id) }))
     .filter((x): x is { d: typeof allDrafts[0]; r: number } => x.r !== null)
@@ -281,16 +295,17 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     topic: ((d.structuredBreakdown as Record<string, unknown>)?.topic as string | undefined) ?? "Untitled",
     resonance: r,
     tone: d.tone,
+    contentSource: (d.contentSource as string | null) || "capture",
+    visualType: (d.visualType as string | null) || "none",
     publishedAt: d.updatedAt.toISOString(),
   }));
 
-  // Weekly trend — last 13 weeks
-  const thirteenWeeksAgo = new Date();
-  thirteenWeeksAgo.setDate(thirteenWeeksAgo.getDate() - 91);
+  // Weekly trend — last 13 weeks (90 days), with 30/60/90-day totals
+  const now = new Date();
+  const cutoffs = { 30: new Date(now.getTime() - 30 * 86400000), 60: new Date(now.getTime() - 60 * 86400000), 90: new Date(now.getTime() - 91 * 86400000) };
   const weekMap = new Map<string, number>();
   for (const d of allDrafts) {
-    if (d.createdAt < thirteenWeeksAgo) continue;
-    // ISO week label: YYYY-Www
+    if (d.createdAt < cutoffs[90]) continue;
     const date = new Date(d.createdAt);
     const jan1 = new Date(date.getFullYear(), 0, 1);
     const weekNum = Math.ceil(((date.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
@@ -301,15 +316,24 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([week, count]) => ({ week, count }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
+  // 30/60/90-day counts
+  const last30 = allDrafts.filter(d => d.createdAt >= cutoffs[30]).length;
+  const last60 = allDrafts.filter(d => d.createdAt >= cutoffs[60]).length;
+  const last90 = allDrafts.filter(d => d.createdAt >= cutoffs[90]).length;
+
   const result = AnalyticsOverviewResponse.parse({
     totalPublished,
     avgResonance,
+    loggedPerformanceCount,
     byTone,
     byContentSource,
     byVisualType,
     byObjective,
     topPosts,
     weeklyTrend,
+    last30,
+    last60,
+    last90,
   });
 
   res.json(result);
