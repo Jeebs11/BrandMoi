@@ -101,4 +101,37 @@ router.post("/auth/logout", (_req, res): void => {
   res.sendStatus(204);
 });
 
+const ChangePasswordBody = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
+router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {
+  const parsed = ChangePasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
+    return;
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+  const userId = req.user!.userId;
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Current password is incorrect" });
+    return;
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+  await db.update(usersTable).set({ passwordHash: newHash }).where(eq(usersTable.id, userId));
+
+  res.sendStatus(204);
+});
+
 export default router;

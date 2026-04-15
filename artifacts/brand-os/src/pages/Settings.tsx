@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export default function Settings() {
   const [linkedinStatus, setLinkedinStatus] = useState<LinkedinStatus | null>(null);
   const [linkedinSyncing, setLinkedinSyncing] = useState(false);
   const [linkedinDisconnecting, setLinkedinDisconnecting] = useState(false);
+  const [linkedinGuideOpen, setLinkedinGuideOpen] = useState(false);
 
   const search = useSearch();
   const linkedinParam = new URLSearchParams(search).get("linkedin");
@@ -420,12 +421,72 @@ export default function Settings() {
                   Checking connection…
                 </div>
               ) : !linkedinStatus.configured ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-500 font-medium">LinkedIn integration not configured</p>
-                  <p className="text-xs text-gray-400 leading-relaxed">
-                    To enable LinkedIn sync, add <code className="bg-gray-100 px-1 rounded">LINKEDIN_CLIENT_ID</code> and{" "}
-                    <code className="bg-gray-100 px-1 rounded">LINKEDIN_CLIENT_SECRET</code> environment variables.
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Link2 className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">LinkedIn not connected yet</p>
+                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                        Connecting LinkedIn lets you import your posts, track real engagement data, and get smarter AI suggestions based on what's actually working for you.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLinkedinGuideOpen(v => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors"
+                  >
+                    <span>How to set this up (one-time, 5 min)</span>
+                    {linkedinGuideOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                  {linkedinGuideOpen && (
+                    <div className="bg-gray-50 rounded-xl p-4 space-y-4 text-xs text-gray-600 leading-relaxed">
+                      <p className="font-semibold text-gray-800 text-sm">One-time setup — done by the app owner</p>
+                      <ol className="space-y-3 list-none">
+                        <li className="flex gap-3">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                          <span>
+                            Go to <a href="https://www.linkedin.com/developers/apps/new" target="_blank" rel="noreferrer" className="text-blue-600 font-semibold underline inline-flex items-center gap-0.5">LinkedIn Developer Portal <ExternalLink className="w-3 h-3" /></a> and create a new app. Use "Brand OS" as the app name.
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                          <span>
+                            Inside the app, go to the <strong>Auth</strong> tab. Add this as an Authorized Redirect URL:<br />
+                            <code className="mt-1 block bg-white border border-gray-200 rounded-lg px-2 py-1 text-[11px] break-all select-all">{window.location.origin}/api/linkedin/callback</code>
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                          <span>
+                            On the <strong>Products</strong> tab, request access to <strong>"Share on LinkedIn"</strong> and <strong>"Sign In with LinkedIn using OpenID Connect"</strong>.
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+                          <span>
+                            Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> from the Auth tab.
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
+                          <span>
+                            In Replit, open the <strong>Secrets</strong> panel (lock icon in the left sidebar). Add two secrets:<br />
+                            <code className="mt-1 block bg-white border border-gray-200 rounded-lg px-2 py-1 text-[11px]">LINKEDIN_CLIENT_ID</code>
+                            <code className="mt-1 block bg-white border border-gray-200 rounded-lg px-2 py-1 text-[11px]">LINKEDIN_CLIENT_SECRET</code>
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">6</span>
+                          <span>
+                            Restart the API server workflow, then come back here and refresh the page. A "Connect LinkedIn" button will appear.
+                          </span>
+                        </li>
+                      </ol>
+                    </div>
+                  )}
                 </div>
               ) : linkedinStatus.connected ? (
                 <div className="space-y-3">

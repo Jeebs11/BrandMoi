@@ -6,7 +6,7 @@ import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, brandVoiceSignalsTable, performanceSignalsTable, voiceSuggestionsTable } from "@workspace/db";
 import {
   StructureIdeaBody,
-  StrictStructureIdeaResponse,
+  StructureIdeaResponse,
   GenerateContentBody,
   GenerateContentResponse,
   RefineContentBody,
@@ -248,7 +248,7 @@ Evergreen hooks must NOT have a "sourceLine" field.`;
     (rawParsed.trending as Record<string, unknown[]>).hooks = trendingHooks;
   }
   const payload = { ...rawParsed, hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined };
-  const validated = StrictStructureIdeaResponse.safeParse(payload);
+  const validated = StructureIdeaResponse.safeParse(payload);
   if (!validated.success) {
     res.status(500).json({ error: "AI response did not match expected shape" });
     return;
