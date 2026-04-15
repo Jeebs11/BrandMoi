@@ -267,29 +267,38 @@ export interface AgentBriefResponse {
 export interface AnalyticsToneBreakdown {
   tone: string;
   count: number;
-  avgResonance: number;
+  sampledCount: number;
+  avgResonance: number | null;
 }
 
 export interface AnalyticsSourceBreakdown {
   source: string;
   count: number;
+  avgResonance: number | null;
+  sampledCount: number;
 }
 
 export interface AnalyticsVisualBreakdown {
   type: string;
   count: number;
+  avgResonance: number | null;
+  sampledCount: number;
 }
 
 export interface AnalyticsObjectiveBreakdown {
   objective: string;
   count: number;
+  avgResonance: number | null;
+  sampledCount: number;
 }
 
 export interface AnalyticsTopPost {
   id: number;
   topic: string;
   resonance: number;
-  tone: string;
+  tone: string | null;
+  contentSource: string;
+  visualType: string;
   publishedAt: string;
 }
 
@@ -298,13 +307,24 @@ export interface AnalyticsWeeklyTrend {
   count: number;
 }
 
+export interface AnalyticsWeeklyResonanceTrend {
+  week: string;
+  avgResonance: number;
+  sampleCount: number;
+}
+
 export interface AnalyticsOverview {
   totalPublished: number;
   avgResonance: number;
+  loggedPerformanceCount: number;
   byTone: AnalyticsToneBreakdown[];
   byContentSource: AnalyticsSourceBreakdown[];
   byVisualType: AnalyticsVisualBreakdown[];
   byObjective: AnalyticsObjectiveBreakdown[];
   topPosts: AnalyticsTopPost[];
   weeklyTrend: AnalyticsWeeklyTrend[];
+  weeklyResonanceTrend: AnalyticsWeeklyResonanceTrend[];
+  last30: number;
+  last60: number;
+  last90: number;
 }

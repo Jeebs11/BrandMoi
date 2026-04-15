@@ -125,6 +125,7 @@ export default function Capture() {
 
   const [state, setState] = useState<WorkflowState>(initialState);
   const downloadedVisualTypeRef = useRef<string | null>(null);
+  const currentDraftIdRef = useRef<number | null>(draftId);
   const [initialized, setInitialized] = useState(false);
   const [angleResult, setAngleResult] = useState<AngleCheckResult | null>(null);
   const [angleChecking, setAngleChecking] = useState(false);
@@ -452,7 +453,7 @@ export default function Capture() {
         accentColor,
         textColor
       );
-      downloadedVisualTypeRef.current = "carousel";
+      patchVisualType("carousel");
     } catch {
       toast({ title: "PDF export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -465,7 +466,7 @@ export default function Capture() {
     setIsExportingCard(true);
     try {
       await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor, textColor);
-      downloadedVisualTypeRef.current = "card";
+      patchVisualType("card");
     } catch {
       toast({ title: "Card export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -486,7 +487,7 @@ export default function Capture() {
         textColor,
         Math.round(CARD_BASE_DURATIONS[preset] * animSpeedMult)
       );
-      downloadedVisualTypeRef.current = "card";
+      patchVisualType("card");
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -509,7 +510,7 @@ export default function Capture() {
         Math.round(holdMs * animSpeedMult),
         Math.round(transMs * animSpeedMult)
       );
-      downloadedVisualTypeRef.current = "carousel";
+      patchVisualType("carousel");
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -523,7 +524,7 @@ export default function Capture() {
     setIsExportingInfographic(true);
     try {
       await downloadInfographic(info.headline, info.bullets, state.structure?.topic ?? "infographic", bgColor, accentColor, textColor);
-      downloadedVisualTypeRef.current = "infographic";
+      patchVisualType("infographic");
     } catch {
       toast({ title: "Infographic export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -546,7 +547,7 @@ export default function Capture() {
         preset,
         Math.round(INFOGRAPHIC_BASE_DURATIONS[preset] * animSpeedMult)
       );
-      downloadedVisualTypeRef.current = "infographic";
+      patchVisualType("infographic");
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -649,7 +650,7 @@ export default function Capture() {
     a.download = `${safeName}-generated.png`;
     a.href = `data:image/png;base64,${generatedImageBase64}`;
     a.click();
-    downloadedVisualTypeRef.current = "art";
+    patchVisualType("art");
   };
 
   // ── Illustration handlers ──────────────────────────────────────────────────
@@ -719,7 +720,7 @@ export default function Capture() {
     setIsExportingIllust(true);
     try {
       await downloadIllustrationCard(illustImageBase64, illustCaption, `illustration-${illustStyle}`);
-      downloadedVisualTypeRef.current = "art";
+      patchVisualType("art");
     } finally {
       setIsExportingIllust(false);
     }
@@ -736,7 +737,7 @@ export default function Capture() {
         `illustration-${illustStyle}`,
         Math.round(ILLUS_BASE_DURATIONS[preset] * animSpeedMult)
       );
-      downloadedVisualTypeRef.current = "art";
+      patchVisualType("art");
     } finally {
       setIsAnimatingIllust(null);
     }
@@ -1014,10 +1015,11 @@ export default function Capture() {
       visualOutput: state.content?.visual ?? null,
       status: "draft" as const,
       contentSource: derivedContentSource,
-      visualType: downloadedVisualTypeRef.current ?? undefined,
+      visualType: (downloadedVisualTypeRef.current as "none" | "card" | "carousel" | "infographic" | "art" | undefined) ?? "none",
     };
 
-    const afterSave = () => {
+    const afterSave = (savedId: number) => {
+      currentDraftIdRef.current = savedId;
       setState(s => ({ ...s, step: 6 }));
       if (thoughtId) {
         void thoughtsApi.markDeveloped(thoughtId);
@@ -1031,7 +1033,7 @@ export default function Capture() {
           onSuccess: (saved: Draft) => {
             // Populate the cache so Library → "Edit and continue" always sees the latest content
             queryClient.setQueryData(getGetDraftQueryKey(draftId!), saved);
-            afterSave();
+            afterSave(saved.id);
           },
           onError: () => toast({ title: "Failed to update draft.", variant: "destructive" }),
         }
@@ -1043,11 +1045,20 @@ export default function Capture() {
           onSuccess: (saved: Draft) => {
             // Pre-populate the new draft's cache entry so the first load is instant and correct
             queryClient.setQueryData(getGetDraftQueryKey(saved.id), saved);
-            afterSave();
+            afterSave(saved.id);
           },
           onError: () => toast({ title: "Failed to save draft.", variant: "destructive" }),
         }
       );
+    }
+  };
+
+  // Patch visual type on the already-saved draft whenever user downloads in step 6
+  const patchVisualType = (vt: "card" | "carousel" | "infographic" | "art") => {
+    downloadedVisualTypeRef.current = vt;
+    const id = currentDraftIdRef.current;
+    if (id) {
+      updateDraft({ id, data: { visualType: vt } });
     }
   };
 
