@@ -724,15 +724,6 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
     return;
   }
 
-  const valid = (parsed.suggestions ?? []).filter(
-    (s) => ALLOWED_VOICE_FIELDS.includes(s.field as AllowedVoiceField) && s.suggestedValue && s.rationale
-  );
-
-  if (valid.length === 0) {
-    res.json({ status: "ok", suggestions: [] });
-    return;
-  }
-
   const currentPrefsMap: Record<string, string> = {
     tone: prefs?.tone ?? "",
     objective: prefs?.objective ?? "",
@@ -741,6 +732,20 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
     brandAudience: prefs?.brandAudience ?? "",
     brandBelief: prefs?.brandBelief ?? "",
   };
+
+  const valid = (parsed.suggestions ?? [])
+    .filter(
+      (s) => ALLOWED_VOICE_FIELDS.includes(s.field as AllowedVoiceField) && s.suggestedValue && s.rationale
+    )
+    .filter(
+      (s) => s.suggestedValue.trim().toLowerCase() !== (currentPrefsMap[s.field] ?? "").trim().toLowerCase()
+    )
+    .slice(0, 3);
+
+  if (valid.length === 0) {
+    res.json({ status: "ok", suggestions: [] });
+    return;
+  }
 
   const inserted = await db
     .insert(voiceSuggestionsTable)
