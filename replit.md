@@ -62,12 +62,13 @@ A mobile-first web app (max-width 430px) for AI-powered LinkedIn content creatio
 - **Production hardening**: Rate limiting on AI endpoints (10 req/min per user via in-memory map), React `ErrorBoundary` wrapping the full app, clean 404/error pages.
 
 **Task #29: Analytics Page** ✅
-- **DB schema**: Added `content_source` and `visual_type` columns to `drafts` table (both nullable text)
-- **Content source tracking**: Captured at draft save time — "news_reaction", "teach_audience", "story_mode", "brand_voice_idea", or "capture" (inferred from URL params and workflow state)
-- **Visual type tracking**: Tracked via `downloadedVisualTypeRef` in Capture — set to "card", "carousel", "infographic", or "art" when user downloads a visual; stored at save time
-- **Analytics API**: `GET /api/analytics/overview` (authenticated) aggregates published drafts + performance signals; returns totalPublished, avgResonance, byTone (with resonance), byContentSource, byVisualType, byObjective, topPosts (top 5 by resonance), weeklyTrend (13-week publishing trend)
-- **Analytics page**: `/analytics` with AppShell layout; overview stat cards, line chart (weekly trend), bar chart (by tone with resonance bars), horizontal bars (content source, visual format, objective), ranked top-5 list; empty state if no published posts
-- **Conditional nav**: "Analytics" item shows in BottomNav and SideNav only when ≥1 published post exists; uses `useListDrafts` to check status
+- **DB schema**: Added `content_source` and `visual_type` columns to `drafts` table (nullable text with enum constraints in Zod)
+- **Content source tracking**: Captured at draft save time — "news_reaction", "teach_audience", "story_mode", "brand_voice_idea", or "capture"
+- **Visual type tracking**: `downloadedVisualTypeRef` in Capture tracks download type — "card", "carousel", "infographic", "art"; saved at draft save time
+- **Analytics API** `GET /api/analytics/overview`: returns totalPublished, avgResonance, loggedPerformanceCount; byTone/byContentSource/byVisualType/byObjective each include count + sampledCount + avgResonance (null when sampledCount < 2, enforcing sparse-bucket minimum); topPosts (top 5 by resonance with contentSource + visualType); weeklyTrend (count); weeklyResonanceTrend (avg resonance per week with ≥2 perf samples); last30/last60/last90
+- **Analytics page** `/analytics`: performance CTA when loggedPerformanceCount < 5; 4 stat cards (Published, Avg Resonance, Best Tone accent, Top Source); 30d/60d/90d trend toggle — shows resonance trend when ≥5 weeks of data, else count trend; tone chart shows avg resonance per tone when 2+ tones qualify, else count chart; "Limited data" labels where sampledCount < 2; top posts clickable → `/library?highlight={id}` with source + visual chips
+- **Library deep-linking**: `useSearch()` reads `?highlight={id}`; highlighted card gets violet ring + auto-scrolls into view
+- **Conditional nav**: "Analytics" in BottomNav/SideNav only when ≥1 published post exists
 
 **Phase 3: Agentic Intelligence Layer** ✅
 - **Brand Voice DNA**: Automatically extracts voice signals (sentence style, tone markers, vocabulary) from published/ready drafts via Claude. Signals stored in `brand_voice_signals` table and injected into future AI prompts for personalised output.

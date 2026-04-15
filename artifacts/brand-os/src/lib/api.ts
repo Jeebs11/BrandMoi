@@ -221,12 +221,13 @@ export type AnalyticsOverview = {
   totalPublished: number;
   avgResonance: number;
   loggedPerformanceCount: number;
-  byTone: { tone: string; count: number; avgResonance: number }[];
-  byContentSource: { source: string; count: number; avgResonance: number; sampledCount: number }[];
-  byVisualType: { type: string; count: number; avgResonance: number; sampledCount: number }[];
-  byObjective: { objective: string; count: number; avgResonance: number; sampledCount: number }[];
+  byTone: { tone: string; count: number; sampledCount: number; avgResonance: number | null }[];
+  byContentSource: { source: string; count: number; avgResonance: number | null; sampledCount: number }[];
+  byVisualType: { type: string; count: number; avgResonance: number | null; sampledCount: number }[];
+  byObjective: { objective: string; count: number; avgResonance: number | null; sampledCount: number }[];
   topPosts: { id: number; topic: string; resonance: number; tone: string | null; contentSource: string; visualType: string; publishedAt: string }[];
   weeklyTrend: { week: string; count: number }[];
+  weeklyResonanceTrend: { week: string; avgResonance: number; sampleCount: number }[];
   last30: number;
   last60: number;
   last90: number;

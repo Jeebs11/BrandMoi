@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +47,9 @@ type PerformanceModalState = {
 
 export default function Library() {
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const highlightId = (() => { const m = new URLSearchParams(search).get("highlight"); return m ? Number(m) : null; })();
+  const highlightRef = useRef<HTMLDivElement | null>(null);
   const [objFilter, setObjFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -54,6 +57,12 @@ export default function Library() {
   const [showHeatmap, setShowHeatmap] = useState(false);
 
   const { data: drafts, isLoading, refetch } = useListDrafts();
+
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      setTimeout(() => highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    }
+  }, [highlightId, drafts]);
   const { mutate: deleteDraft, isPending: isDeleting } = useDeleteDraft();
   const { mutate: updateDraft } = useUpdateDraft();
 
@@ -144,8 +153,13 @@ export default function Library() {
               const topic = (draft.structuredBreakdown as { topic?: string })?.topic ?? "Untitled";
               const StatusIcon = STATUS_ICONS[draft.status] ?? FileText;
               const isBeingDeleted = deletingId === draft.id && isDeleting;
+              const isHighlighted = draft.id === highlightId;
               return (
-                <div key={draft.id} className={cn("bg-white rounded-2xl border border-gray-100 p-4 transition-opacity", isBeingDeleted && "opacity-40")}>
+                <div
+                  key={draft.id}
+                  ref={isHighlighted ? highlightRef : null}
+                  className={cn("bg-white rounded-2xl border p-4 transition-opacity", isBeingDeleted && "opacity-40", isHighlighted ? "border-violet-400 ring-2 ring-violet-200" : "border-gray-100")}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-gray-900 truncate mb-1">{topic}</p>

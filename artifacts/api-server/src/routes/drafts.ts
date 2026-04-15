@@ -227,7 +227,7 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     ? Math.round(resonanceValues.reduce((a, b) => a + b, 0) / resonanceValues.length)
     : 0;
 
-  // By tone
+  // By tone (with sampledCount for sparse-bucket enforcement)
   const toneMap = new Map<string, { count: number; resonances: number[] }>();
   for (const d of allDrafts) {
     const tone = d.tone || "Unknown";
@@ -240,15 +240,16 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
   const byTone = Array.from(toneMap.entries()).map(([tone, { count, resonances }]) => ({
     tone,
     count,
-    avgResonance: resonances.length > 0 ? Math.round(resonances.reduce((a, b) => a + b, 0) / resonances.length) : 0,
+    sampledCount: resonances.length,
+    avgResonance: resonances.length >= 2 ? Math.round(resonances.reduce((a, b) => a + b, 0) / resonances.length) : null,
   })).sort((a, b) => b.count - a.count);
 
   const loggedPerformanceCount = resonanceValues.length;
 
-  // Helper to compute avg resonance for a list of draft IDs
+  // Helper to compute avg resonance for a list of drafts, enforcing 2+ sample minimum
   const avgResForDrafts = (drafts: typeof allDrafts) => {
     const vals = drafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
-    return { avgResonance: vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0, sampledCount: vals.length };
+    return { avgResonance: vals.length >= 2 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null, sampledCount: vals.length };
   };
 
   // By content source (with resonance)
@@ -316,6 +317,23 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([week, count]) => ({ week, count }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
+  // Weekly resonance trend — avg resonance per week (only weeks with ≥2 performance samples)
+  const weekResMap = new Map<string, number[]>();
+  for (const d of allDrafts) {
+    const r = resonanceOf(d.id);
+    if (r === null || d.createdAt < cutoffs[90]) continue;
+    const date = new Date(d.createdAt);
+    const jan1 = new Date(date.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((date.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+    const key = `${date.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+    if (!weekResMap.has(key)) weekResMap.set(key, []);
+    weekResMap.get(key)!.push(r);
+  }
+  const weeklyResonanceTrend = Array.from(weekResMap.entries())
+    .filter(([, vals]) => vals.length >= 2)
+    .map(([week, vals]) => ({ week, avgResonance: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length), sampleCount: vals.length }))
+    .sort((a, b) => a.week.localeCompare(b.week));
+
   // 30/60/90-day counts
   const last30 = allDrafts.filter(d => d.createdAt >= cutoffs[30]).length;
   const last60 = allDrafts.filter(d => d.createdAt >= cutoffs[60]).length;
@@ -331,6 +349,7 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     byObjective,
     topPosts,
     weeklyTrend,
+    weeklyResonanceTrend,
     last30,
     last60,
     last90,
