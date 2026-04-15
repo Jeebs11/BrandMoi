@@ -639,6 +639,15 @@ components:
           description: Free-text creator bio used as primary AI context; replaces Objective/Persona labels when non-empty.
         onboarded:
           type: boolean
+        brandBgColor:
+          type: string
+          nullable: true
+        brandAccentColor:
+          type: string
+          nullable: true
+        brandTextColor:
+          type: string
+          nullable: true
       required:
         - id
         - userId
@@ -671,6 +680,15 @@ components:
           description: Free-text creator bio; replaces Objective/Persona labels in AI context when non-empty.
         onboarded:
           type: boolean
+        brandBgColor:
+          type: string
+          nullable: true
+        brandAccentColor:
+          type: string
+          nullable: true
+        brandTextColor:
+          type: string
+          nullable: true
 
     SuggestionItem:
       type: object
@@ -714,6 +732,12 @@ components:
         type:
           type: string
           enum: [how-i, contrarian, number, how-to, story]
+        usedBefore:
+          type: boolean
+          nullable: true
+        sourceLine:
+          type: string
+          nullable: true
       required:
         - text
 
@@ -779,6 +803,19 @@ components:
         - slide
         - title
 
+    InfographicData:
+      type: object
+      properties:
+        headline:
+          type: string
+        bullets:
+          type: array
+          items:
+            type: string
+      required:
+        - headline
+        - bullets
+
     GenerateContentBody:
       type: object
       properties:
@@ -802,6 +839,9 @@ components:
           type: string
         teacherMode:
           type: boolean
+        newsUrl:
+          type: string
+          nullable: true
       required:
         - rawInput
         - objective
@@ -815,12 +855,21 @@ components:
       properties:
         post:
           type: string
+        shortPost:
+          type: string
+          nullable: true
         carousel:
           type: array
           items:
             $ref: "#/components/schemas/CarouselSlide"
         visual:
           type: string
+        infographic:
+          $ref: "#/components/schemas/InfographicData"
+          nullable: true
+        hashtags:
+          type: string
+          nullable: true
       required:
         - post
         - carousel
@@ -835,7 +884,7 @@ components:
           type: string
         tab:
           type: string
-          enum: [post, carousel, visual]
+          enum: [post, short, carousel, visual, infographic, illustration]
       required:
         - content
         - instruction
@@ -866,10 +915,16 @@ components:
           $ref: "#/components/schemas/StructuredBreakdown"
         postOutput:
           type: ["string", "null"]
+        shortPost:
+          type: ["string", "null"]
         carouselOutput:
           type: ["string", "null"]
         visualOutput:
           type: ["string", "null"]
+        visualType:
+          type: ["string", "null"]
+          enum: [none, card, carousel, infographic, art]
+          nullable: true
         status:
           type: string
           enum: [draft, ready, published]
@@ -892,22 +947,8 @@ components:
         diagnosis:
           description: Cached AI post diagnosis (null if not yet generated)
           nullable: true
-          type: object
-          properties:
-            headline: { type: string }
-            sections:
-              type: object
-              properties:
-                hook: { $ref: "#/components/schemas/DiagnosisSection" }
-                body: { $ref: "#/components/schemas/DiagnosisSection" }
-                tone: { $ref: "#/components/schemas/DiagnosisSection" }
-                cta: { $ref: "#/components/schemas/DiagnosisSection" }
-                visual: { $ref: "#/components/schemas/DiagnosisSection" }
-            reasons:
-              type: array
-              items: { type: string }
-            replicateTip: { type: string }
-          required: [headline, reasons, replicateTip]
+          allOf:
+            - $ref: "#/components/schemas/PostDiagnosis"
       required:
         - id
         - rawInput
@@ -947,6 +988,11 @@ components:
         visualType:
           type: string
           enum: [none, card, carousel, infographic, art]
+        selectedHook:
+          type: string
+          nullable: true
+        shortPost:
+          type: ["string", "null"]
       required:
         - rawInput
         - objective
@@ -960,10 +1006,14 @@ components:
       properties:
         postOutput:
           type: ["string", "null"]
+        shortPost:
+          type: ["string", "null"]
         carouselOutput:
           type: ["string", "null"]
         visualOutput:
           type: ["string", "null"]
+        structuredBreakdown:
+          $ref: "#/components/schemas/StructuredBreakdown"
         status:
           type: string
           enum: [draft, ready, published]
@@ -1133,9 +1183,10 @@ components:
         rating:
           type: ["integer", "null"]
           description: "Section rating 1-5 or null if not applicable"
+          nullable: true
         analysis:
           type: string
-      required: [analysis]
+      required: [rating, analysis]
 
     PostDiagnosis:
       type: object

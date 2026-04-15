@@ -43,6 +43,9 @@ export interface PreferencesResponse {
   /** Free-text creator bio used as primary AI context; replaces Objective/Persona labels when non-empty. */
   aboutMe?: string;
   onboarded: boolean;
+  brandBgColor?: string | null;
+  brandAccentColor?: string | null;
+  brandTextColor?: string | null;
 }
 
 export interface UpdatePreferencesBody {
@@ -58,6 +61,9 @@ export interface UpdatePreferencesBody {
    */
   aboutMe?: string;
   onboarded?: boolean;
+  brandBgColor?: string | null;
+  brandAccentColor?: string | null;
+  brandTextColor?: string | null;
 }
 
 export interface SuggestionItem {
@@ -87,6 +93,8 @@ export const HookItemType = {
 export interface HookItem {
   text: string;
   type?: HookItemType;
+  usedBefore?: boolean | null;
+  sourceLine?: string | null;
 }
 
 export interface StructuredBreakdown {
@@ -115,6 +123,11 @@ export interface CarouselSlide {
   description?: string;
 }
 
+export interface InfographicData {
+  headline: string;
+  bullets: string[];
+}
+
 export interface GenerateContentBody {
   rawInput: string;
   objective: string;
@@ -126,12 +139,16 @@ export interface GenerateContentBody {
   storyMode?: boolean;
   postTone?: string;
   teacherMode?: boolean;
+  newsUrl?: string | null;
 }
 
 export interface GeneratedContent {
   post: string;
+  shortPost?: string | null;
   carousel: CarouselSlide[];
   visual: string;
+  infographic?: InfographicData | null;
+  hashtags?: string | null;
 }
 
 export type RefineContentBodyTab =
@@ -139,8 +156,11 @@ export type RefineContentBodyTab =
 
 export const RefineContentBodyTab = {
   post: "post",
+  short: "short",
   carousel: "carousel",
   visual: "visual",
+  infographic: "infographic",
+  illustration: "illustration",
 } as const;
 
 export interface RefineContentBody {
@@ -152,6 +172,21 @@ export interface RefineContentBody {
 export interface RefinedContent {
   content: string;
 }
+
+/**
+ * @nullable
+ */
+export type DraftVisualType =
+  | (typeof DraftVisualType)[keyof typeof DraftVisualType]
+  | null;
+
+export const DraftVisualType = {
+  none: "none",
+  card: "card",
+  carousel: "carousel",
+  infographic: "infographic",
+  art: "art",
+} as const;
 
 export type DraftStatus = (typeof DraftStatus)[keyof typeof DraftStatus];
 
@@ -179,11 +214,11 @@ export interface DiagnosisSection {
    * Section rating 1-5 or null if not applicable
    * @nullable
    */
-  rating?: number | null;
+  rating: number | null;
   analysis: string;
 }
 
-export type DraftDiagnosisSections = {
+export type PostDiagnosisSections = {
   hook?: DiagnosisSection;
   body?: DiagnosisSection;
   tone?: DiagnosisSection;
@@ -191,15 +226,12 @@ export type DraftDiagnosisSections = {
   visual?: DiagnosisSection;
 };
 
-/**
- * Cached AI post diagnosis (null if not yet generated)
- */
-export type DraftDiagnosis = {
+export interface PostDiagnosis {
   headline: string;
-  sections?: DraftDiagnosisSections;
+  sections?: PostDiagnosisSections;
   reasons: string[];
   replicateTip: string;
-} | null;
+}
 
 export interface Draft {
   id: number;
@@ -211,9 +243,13 @@ export interface Draft {
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */
+  shortPost?: string | null;
+  /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
+  /** @nullable */
+  visualType?: DraftVisualType;
   status: DraftStatus;
   createdAt: string;
   updatedAt: string;
@@ -229,7 +265,7 @@ export interface Draft {
    */
   postType?: string | null;
   /** Cached AI post diagnosis (null if not yet generated) */
-  diagnosis?: DraftDiagnosis;
+  diagnosis?: PostDiagnosis | null;
 }
 
 export type CreateDraftBodyStatus =
@@ -279,6 +315,9 @@ export interface CreateDraftBody {
   status: CreateDraftBodyStatus;
   contentSource?: CreateDraftBodyContentSource;
   visualType?: CreateDraftBodyVisualType;
+  selectedHook?: string | null;
+  /** @nullable */
+  shortPost?: string | null;
 }
 
 export type UpdateDraftBodyStatus =
@@ -317,9 +356,12 @@ export interface UpdateDraftBody {
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */
+  shortPost?: string | null;
+  /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
+  structuredBreakdown?: StructuredBreakdown;
   status?: UpdateDraftBodyStatus;
   contentSource?: UpdateDraftBodyContentSource;
   visualType?: UpdateDraftBodyVisualType;
@@ -447,21 +489,6 @@ export interface AnalyticsOverviewResponse {
   last30: number;
   last60: number;
   last90: number;
-}
-
-export type PostDiagnosisSections = {
-  hook?: DiagnosisSection;
-  body?: DiagnosisSection;
-  tone?: DiagnosisSection;
-  cta?: DiagnosisSection;
-  visual?: DiagnosisSection;
-};
-
-export interface PostDiagnosis {
-  headline: string;
-  sections?: PostDiagnosisSections;
-  reasons: string[];
-  replicateTip: string;
 }
 
 export type VoiceSuggestionStatus =

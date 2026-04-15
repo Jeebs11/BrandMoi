@@ -12,7 +12,7 @@ import {
   useStructureIdea, useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
 } from "@workspace/api-client-react";
-import type { HookItem, StructuredBreakdown, StructureIdeaResponse, GeneratedContent, CarouselSlide, Draft, InfographicData } from "@workspace/api-client-react";
+import type { HookItem, StructuredBreakdown, StructureIdeaResponse, GeneratedContent, CarouselSlide, Draft, InfographicData, CreateDraftBodyContentSource, UpdateDraftBodyContentSource } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
@@ -306,10 +306,9 @@ export default function Capture() {
   // Initialize palette from saved preferences (once)
   useEffect(() => {
     if (preferences && !paletteInitializedRef.current) {
-      const p = preferences as Record<string, unknown>;
-      if (typeof p.brandBgColor === "string") setBgColor(p.brandBgColor);
-      if (typeof p.brandAccentColor === "string") setAccentColor(p.brandAccentColor);
-      if (typeof p.brandTextColor === "string") setTextColor(p.brandTextColor);
+      if (preferences.brandBgColor) setBgColor(preferences.brandBgColor);
+      if (preferences.brandAccentColor) setAccentColor(preferences.brandAccentColor);
+      if (preferences.brandTextColor) setTextColor(preferences.brandTextColor);
       paletteInitializedRef.current = true;
     }
   }, [preferences]);
@@ -1014,7 +1013,7 @@ export default function Capture() {
       carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
       visualOutput: state.content?.visual ?? null,
       status: "draft" as const,
-      contentSource: derivedContentSource,
+      contentSource: derivedContentSource as CreateDraftBodyContentSource,
       visualType: (downloadedVisualTypeRef.current as "none" | "card" | "carousel" | "infographic" | "art" | undefined) ?? "none",
     };
 
@@ -1028,7 +1027,7 @@ export default function Capture() {
 
     if (draftId) {
       updateDraft(
-        { id: draftId!, data: { postOutput: draftData.postOutput, shortPost: draftData.shortPost, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown, contentSource: draftData.contentSource, visualType: draftData.visualType } },
+        { id: draftId!, data: { postOutput: draftData.postOutput, shortPost: draftData.shortPost, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown, contentSource: draftData.contentSource as unknown as UpdateDraftBodyContentSource, visualType: draftData.visualType } },
         {
           onSuccess: (saved: Draft) => {
             // Populate the cache so Library → "Edit and continue" always sees the latest content

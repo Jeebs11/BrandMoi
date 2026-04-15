@@ -60,13 +60,23 @@ export const GetPreferencesResponse = zod.object({
   brandRole: zod.string(),
   brandAudience: zod.string(),
   brandBelief: zod.string(),
-  aboutMe: zod.string().optional().default(""),
+  aboutMe: zod
+    .string()
+    .optional()
+    .describe(
+      "Free-text creator bio used as primary AI context; replaces Objective\/Persona labels when non-empty.",
+    ),
   onboarded: zod.boolean(),
+  brandBgColor: zod.string().nullish(),
+  brandAccentColor: zod.string().nullish(),
+  brandTextColor: zod.string().nullish(),
 });
 
 /**
  * @summary Update the current user's brand preferences
  */
+export const updatePreferencesBodyAboutMeMax = 500;
+
 export const UpdatePreferencesBody = zod.object({
   objective: zod.string().optional(),
   persona: zod.string().optional(),
@@ -74,8 +84,17 @@ export const UpdatePreferencesBody = zod.object({
   brandRole: zod.string().optional(),
   brandAudience: zod.string().optional(),
   brandBelief: zod.string().optional(),
-  aboutMe: zod.string().max(500).optional(),
+  aboutMe: zod
+    .string()
+    .max(updatePreferencesBodyAboutMeMax)
+    .optional()
+    .describe(
+      "Free-text creator bio; replaces Objective\/Persona labels in AI context when non-empty.",
+    ),
   onboarded: zod.boolean().optional(),
+  brandBgColor: zod.string().nullish(),
+  brandAccentColor: zod.string().nullish(),
+  brandTextColor: zod.string().nullish(),
 });
 
 export const UpdatePreferencesResponse = zod.object({
@@ -87,8 +106,16 @@ export const UpdatePreferencesResponse = zod.object({
   brandRole: zod.string(),
   brandAudience: zod.string(),
   brandBelief: zod.string(),
-  aboutMe: zod.string().optional().default(""),
+  aboutMe: zod
+    .string()
+    .optional()
+    .describe(
+      "Free-text creator bio used as primary AI context; replaces Objective\/Persona labels when non-empty.",
+    ),
   onboarded: zod.boolean(),
+  brandBgColor: zod.string().nullish(),
+  brandAccentColor: zod.string().nullish(),
+  brandTextColor: zod.string().nullish(),
 });
 
 /**
@@ -102,31 +129,6 @@ export const GetSuggestionsResponseItem = zod.object({
 });
 export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 
-const HookItemSchema = zod.object({
-  text: zod.string(),
-  type: zod.string().optional(),
-  sourceLine: zod.string().optional(),
-  usedBefore: zod.boolean().optional(),
-});
-
-const StructuredBreakdownSchema = zod.object({
-  topic: zod.string(),
-  angle: zod.string(),
-  coreMessage: zod.string(),
-  whyItMatters: zod.string(),
-  archetype: zod.string().optional(),
-  hooks: zod.preprocess(
-    (val) => {
-      if (!Array.isArray(val)) return val;
-      return val.map((item) => (typeof item === "string" ? { text: item } : item));
-    },
-    zod.array(HookItemSchema).min(1)
-  ),
-  narrativeFlow: zod.array(zod.string()),
-  storyMode: zod.boolean().optional(),
-  teacherMode: zod.boolean().optional(),
-});
-
 /**
  * @summary Extract structured breakdown from a raw thought
  */
@@ -137,28 +139,66 @@ export const StructureIdeaBody = zod.object({
   tone: zod.string(),
 });
 
-const TrendingHookSchema = HookItemSchema.extend({ sourceLine: zod.string() });
-
-const TrendingBreakdownSchema = StructuredBreakdownSchema.extend({
-  hooks: zod.preprocess(
-    (val) => {
-      if (!Array.isArray(val)) return val;
-      return val.map((item) => (typeof item === "string" ? { text: item } : item));
-    },
-    zod.array(TrendingHookSchema).min(2)
-  ),
-});
-
-export const StrictStructureIdeaResponse = zod.object({
-  evergreen: StructuredBreakdownSchema,
-  trending: TrendingBreakdownSchema,
-  hookUsage: zod.record(zod.string(), zod.number()).optional(),
-});
-
 export const StructureIdeaResponse = zod.object({
-  evergreen: StructuredBreakdownSchema,
-  trending: TrendingBreakdownSchema,
+  evergreen: zod.object({
+    topic: zod.string(),
+    angle: zod.string(),
+    coreMessage: zod.string(),
+    whyItMatters: zod.string(),
+    archetype: zod.string().optional(),
+    hooks: zod.array(
+      zod.object({
+        text: zod.string(),
+        type: zod
+          .enum(["how-i", "contrarian", "number", "how-to", "story"])
+          .optional(),
+        usedBefore: zod.boolean().nullish(),
+        sourceLine: zod.string().nullish(),
+      }),
+    ),
+    narrativeFlow: zod.array(zod.string()),
+    storyMode: zod.boolean().optional(),
+    teacherMode: zod.boolean().optional(),
+  }),
+  trending: zod
+    .object({
+      topic: zod.string(),
+      angle: zod.string(),
+      coreMessage: zod.string(),
+      whyItMatters: zod.string(),
+      archetype: zod.string().optional(),
+      hooks: zod.array(
+        zod.object({
+          text: zod.string(),
+          type: zod
+            .enum(["how-i", "contrarian", "number", "how-to", "story"])
+            .optional(),
+          usedBefore: zod.boolean().nullish(),
+          sourceLine: zod.string().nullish(),
+        }),
+      ),
+      narrativeFlow: zod.array(zod.string()),
+      storyMode: zod.boolean().optional(),
+      teacherMode: zod.boolean().optional(),
+    })
+    .nullish(),
   hookUsage: zod.record(zod.string(), zod.number()).optional(),
+});
+
+/**
+ * @summary Get AI-generated daily brief with content angles and teach ideas
+ */
+export const GetAgentBriefResponse = zod.object({
+  headline: zod.string(),
+  insight: zod.string(),
+  angles: zod.array(zod.string()),
+  teachAngles: zod.array(zod.string()),
+  newsHeadline: zod.string().optional(),
+  newsSourceLine: zod.string().optional(),
+  newsUrl: zod.string().optional(),
+  newsPublishedAt: zod.string().optional(),
+  newsSourceDomain: zod.string().optional(),
+  newsDescription: zod.string().optional(),
 });
 
 /**
@@ -169,56 +209,52 @@ export const GenerateContentBody = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structure: StructuredBreakdownSchema,
+  structure: zod.object({
+    topic: zod.string(),
+    angle: zod.string(),
+    coreMessage: zod.string(),
+    whyItMatters: zod.string(),
+    archetype: zod.string().optional(),
+    hooks: zod.array(
+      zod.object({
+        text: zod.string(),
+        type: zod
+          .enum(["how-i", "contrarian", "number", "how-to", "story"])
+          .optional(),
+        usedBefore: zod.boolean().nullish(),
+        sourceLine: zod.string().nullish(),
+      }),
+    ),
+    narrativeFlow: zod.array(zod.string()),
+    storyMode: zod.boolean().optional(),
+    teacherMode: zod.boolean().optional(),
+  }),
   selectedHook: zod.string(),
   includeCta: zod.boolean().optional(),
   storyMode: zod.boolean().optional(),
   postTone: zod.string().optional(),
   teacherMode: zod.boolean().optional(),
-  newsUrl: zod.string().optional(),
-});
-
-export const InfographicDataSchema = zod.object({
-  headline: zod.string(),
-  bullets: zod.array(zod.string()),
+  newsUrl: zod.string().nullish(),
 });
 
 export const GenerateContentResponse = zod.object({
   post: zod.string(),
-  shortPost: zod.string().optional().default(""),
-  hashtags: zod.string().optional().default(""),
+  shortPost: zod.string().nullish(),
   carousel: zod.array(
     zod.object({
       slide: zod.number(),
       title: zod.string(),
-      description: zod.string().optional().default(""),
+      description: zod.string().optional(),
     }),
   ),
   visual: zod.string(),
-  infographic: InfographicDataSchema.optional().catch(undefined),
-});
-
-/**
- * @summary Generate an image (DALL-E 3)
- */
-export const GenerateImageBody = zod.object({
-  prompt: zod.string().min(10).max(2000),
-  mode: zod.enum(["photo", "illustration"]).optional(),
-  illustrationStyle: zod.string().optional(),
-});
-
-/**
- * @summary Generate an illustration concept (scene + caption) for a LinkedIn post
- */
-export const GenerateIllustrationConceptBody = zod.object({
-  postContent: zod.string().min(10).max(5000),
-  style: zod.string().min(1).max(50),
-});
-
-export const GenerateIllustrationConceptResponse = zod.object({
-  scenePrompt: zod.string(),
-  caption: zod.string(),
-  chosenStyle: zod.string(),
+  infographic: zod
+    .object({
+      headline: zod.string(),
+      bullets: zod.array(zod.string()),
+    })
+    .nullish(),
+  hashtags: zod.string().nullish(),
 });
 
 /**
@@ -227,11 +263,276 @@ export const GenerateIllustrationConceptResponse = zod.object({
 export const RefineContentBody = zod.object({
   content: zod.string(),
   instruction: zod.string(),
-  tab: zod.enum(["post", "carousel", "visual", "infographic", "illustration"]),
+  tab: zod.enum([
+    "post",
+    "short",
+    "carousel",
+    "visual",
+    "infographic",
+    "illustration",
+  ]),
 });
 
 export const RefineContentResponse = zod.object({
   content: zod.string(),
+});
+
+/**
+ * @summary Get LinkedIn connection status for the current user
+ */
+export const GetLinkedinStatusResponse = zod.object({
+  configured: zod.boolean(),
+  connected: zod.boolean(),
+  displayName: zod.string().optional(),
+  memberUrn: zod.string().optional(),
+  lastSyncedAt: zod.string().nullish(),
+});
+
+/**
+ * @summary Disconnect LinkedIn account
+ */
+export const LinkedinDisconnectResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Sync original posts from LinkedIn into the Library
+ */
+export const LinkedinSyncResponse = zod.object({
+  imported: zod.number(),
+  skipped: zod.number(),
+  total: zod.number(),
+});
+
+/**
+ * @summary Analytics overview response
+ */
+export const GetAnalyticsOverviewResponse = zod.object({
+  totalPublished: zod.number(),
+  avgResonance: zod.number(),
+  loggedPerformanceCount: zod.number(),
+  byTone: zod.array(
+    zod.object({
+      tone: zod.string(),
+      count: zod.number(),
+      sampledCount: zod.number(),
+      avgResonance: zod.number().nullable(),
+    }),
+  ),
+  byContentSource: zod.array(
+    zod.object({
+      source: zod.enum([
+        "capture",
+        "news_reaction",
+        "teach_audience",
+        "story_mode",
+        "brand_voice_idea",
+        "linkedin",
+      ]),
+      count: zod.number(),
+      sampledCount: zod.number(),
+      avgResonance: zod.number().nullable(),
+    }),
+  ),
+  byVisualType: zod.array(
+    zod.object({
+      type: zod.enum(["none", "card", "carousel", "infographic", "art"]),
+      count: zod.number(),
+      sampledCount: zod.number(),
+      avgResonance: zod.number().nullable(),
+    }),
+  ),
+  byObjective: zod.array(
+    zod.object({
+      objective: zod.string(),
+      count: zod.number(),
+      sampledCount: zod.number(),
+      avgResonance: zod.number().nullable(),
+    }),
+  ),
+  topPosts: zod.array(
+    zod.object({
+      id: zod.number(),
+      topic: zod.string(),
+      resonance: zod.number(),
+      tone: zod.string().nullable(),
+      contentSource: zod.string(),
+      visualType: zod.string(),
+      publishedAt: zod.string(),
+    }),
+  ),
+  weeklyTrend: zod.array(
+    zod.object({
+      week: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  weeklyResonanceTrend: zod.array(
+    zod.object({
+      week: zod.string(),
+      avgResonance: zod.number(),
+      sampleCount: zod.number(),
+    }),
+  ),
+  last30: zod.number(),
+  last60: zod.number(),
+  last90: zod.number(),
+});
+
+/**
+ * @summary Get resonance scores for all published drafts with performance signals
+ */
+export const GetResonanceMapResponse = zod.record(zod.string(), zod.number());
+
+/**
+ * @summary Generate AI brand voice suggestions from top-resonance posts
+ */
+export const GenerateVoiceInsightsResponse = zod.union([
+  zod.object({
+    status: zod.enum(["insufficient"]),
+    count: zod.number(),
+    suggestions: zod.array(zod.unknown()),
+  }),
+  zod.object({
+    status: zod.enum(["ok"]),
+    suggestions: zod.array(
+      zod.object({
+        id: zod.number(),
+        userId: zod.number(),
+        field: zod.string(),
+        currentValue: zod.string(),
+        suggestedValue: zod.string(),
+        rationale: zod.string(),
+        evidenceDraftIds: zod.array(zod.number()),
+        evidenceSnippets: zod.array(zod.string()),
+        status: zod.enum(["pending", "accepted", "dismissed"]),
+        createdAt: zod.date(),
+      }),
+    ),
+  }),
+]);
+
+/**
+ * @summary List pending voice suggestions for the current user
+ */
+export const ListVoiceSuggestionsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  field: zod.string(),
+  currentValue: zod.string(),
+  suggestedValue: zod.string(),
+  rationale: zod.string(),
+  evidenceDraftIds: zod.array(zod.number()),
+  evidenceSnippets: zod.array(zod.string()),
+  status: zod.enum(["pending", "accepted", "dismissed"]),
+  createdAt: zod.date(),
+});
+export const ListVoiceSuggestionsResponse = zod.array(
+  ListVoiceSuggestionsResponseItem,
+);
+
+/**
+ * @summary Accept a voice suggestion and apply it to preferences
+ */
+export const AcceptVoiceSuggestionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AcceptVoiceSuggestionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  field: zod.string(),
+  currentValue: zod.string(),
+  suggestedValue: zod.string(),
+  rationale: zod.string(),
+  evidenceDraftIds: zod.array(zod.number()),
+  evidenceSnippets: zod.array(zod.string()),
+  status: zod.enum(["pending", "accepted", "dismissed"]),
+  createdAt: zod.date(),
+});
+
+/**
+ * @summary Dismiss a voice suggestion
+ */
+export const DismissVoiceSuggestionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const DismissVoiceSuggestionResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  field: zod.string(),
+  currentValue: zod.string(),
+  suggestedValue: zod.string(),
+  rationale: zod.string(),
+  evidenceDraftIds: zod.array(zod.number()),
+  evidenceSnippets: zod.array(zod.string()),
+  status: zod.enum(["pending", "accepted", "dismissed"]),
+  createdAt: zod.date(),
+});
+
+/**
+ * @summary Generate or retrieve cached diagnosis for a published post
+ */
+export const GeneratePostDiagnosisParams = zod.object({
+  draftId: zod.coerce.number(),
+});
+
+export const GeneratePostDiagnosisResponse = zod.object({
+  diagnosis: zod.object({
+    headline: zod.string(),
+    sections: zod
+      .object({
+        hook: zod
+          .object({
+            rating: zod
+              .number()
+              .nullable()
+              .describe("Section rating 1-5 or null if not applicable"),
+            analysis: zod.string(),
+          })
+          .optional(),
+        body: zod
+          .object({
+            rating: zod
+              .number()
+              .nullable()
+              .describe("Section rating 1-5 or null if not applicable"),
+            analysis: zod.string(),
+          })
+          .optional(),
+        tone: zod
+          .object({
+            rating: zod
+              .number()
+              .nullable()
+              .describe("Section rating 1-5 or null if not applicable"),
+            analysis: zod.string(),
+          })
+          .optional(),
+        cta: zod
+          .object({
+            rating: zod
+              .number()
+              .nullable()
+              .describe("Section rating 1-5 or null if not applicable"),
+            analysis: zod.string(),
+          })
+          .optional(),
+        visual: zod
+          .object({
+            rating: zod
+              .number()
+              .nullable()
+              .describe("Section rating 1-5 or null if not applicable"),
+            analysis: zod.string(),
+          })
+          .optional(),
+      })
+      .optional(),
+    reasons: zod.array(zod.string()),
+    replicateTip: zod.string(),
+  }),
 });
 
 /**
@@ -243,17 +544,113 @@ export const ListDraftsResponseItem = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: StructuredBreakdownSchema,
+  structuredBreakdown: zod.object({
+    topic: zod.string(),
+    angle: zod.string(),
+    coreMessage: zod.string(),
+    whyItMatters: zod.string(),
+    archetype: zod.string().optional(),
+    hooks: zod.array(
+      zod.object({
+        text: zod.string(),
+        type: zod
+          .enum(["how-i", "contrarian", "number", "how-to", "story"])
+          .optional(),
+        usedBefore: zod.boolean().nullish(),
+        sourceLine: zod.string().nullish(),
+      }),
+    ),
+    narrativeFlow: zod.array(zod.string()),
+    storyMode: zod.boolean().optional(),
+    teacherMode: zod.boolean().optional(),
+  }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  visualType: zod
+    .enum(["none", "card", "carousel", "infographic", "art"])
+    .nullish(),
   status: zod.enum(["draft", "ready", "published"]),
-  externalId: zod.string().nullish(),
-  postType: zod.string().nullish(),
-  diagnosis: zod.unknown().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
+  contentSource: zod
+    .enum([
+      "capture",
+      "news_reaction",
+      "teach_audience",
+      "story_mode",
+      "brand_voice_idea",
+      "linkedin",
+    ])
+    .nullish(),
+  externalId: zod
+    .string()
+    .nullish()
+    .describe(
+      "External platform ID (e.g. LinkedIn UGC post URN) for deduplication",
+    ),
+  postType: zod
+    .string()
+    .nullish()
+    .describe("Post subtype for imported content (post, article)"),
+  diagnosis: zod
+    .object({
+      headline: zod.string(),
+      sections: zod
+        .object({
+          hook: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          body: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          tone: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          cta: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          visual: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+        })
+        .optional(),
+      reasons: zod.array(zod.string()),
+      replicateTip: zod.string(),
+    })
+    .nullish()
+    .describe("Cached AI post diagnosis (null if not yet generated)"),
 });
 export const ListDraftsResponse = zod.array(ListDraftsResponseItem);
 
@@ -265,15 +662,45 @@ export const CreateDraftBody = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: StructuredBreakdownSchema,
-  selectedHook: zod.string().nullish(),
+  structuredBreakdown: zod.object({
+    topic: zod.string(),
+    angle: zod.string(),
+    coreMessage: zod.string(),
+    whyItMatters: zod.string(),
+    archetype: zod.string().optional(),
+    hooks: zod.array(
+      zod.object({
+        text: zod.string(),
+        type: zod
+          .enum(["how-i", "contrarian", "number", "how-to", "story"])
+          .optional(),
+        usedBefore: zod.boolean().nullish(),
+        sourceLine: zod.string().nullish(),
+      }),
+    ),
+    narrativeFlow: zod.array(zod.string()),
+    storyMode: zod.boolean().optional(),
+    teacherMode: zod.boolean().optional(),
+  }),
   postOutput: zod.string().nullish(),
-  shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
-  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea","linkedin"]).optional(),
-  visualType: zod.enum(["none","card","carousel","infographic","art"]).optional(),
+  contentSource: zod
+    .enum([
+      "capture",
+      "news_reaction",
+      "teach_audience",
+      "story_mode",
+      "brand_voice_idea",
+      "linkedin",
+    ])
+    .optional(),
+  visualType: zod
+    .enum(["none", "card", "carousel", "infographic", "art"])
+    .optional(),
+  selectedHook: zod.string().nullish(),
+  shortPost: zod.string().nullish(),
 });
 
 /**
@@ -289,15 +716,113 @@ export const GetDraftResponse = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: StructuredBreakdownSchema,
+  structuredBreakdown: zod.object({
+    topic: zod.string(),
+    angle: zod.string(),
+    coreMessage: zod.string(),
+    whyItMatters: zod.string(),
+    archetype: zod.string().optional(),
+    hooks: zod.array(
+      zod.object({
+        text: zod.string(),
+        type: zod
+          .enum(["how-i", "contrarian", "number", "how-to", "story"])
+          .optional(),
+        usedBefore: zod.boolean().nullish(),
+        sourceLine: zod.string().nullish(),
+      }),
+    ),
+    narrativeFlow: zod.array(zod.string()),
+    storyMode: zod.boolean().optional(),
+    teacherMode: zod.boolean().optional(),
+  }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  visualType: zod
+    .enum(["none", "card", "carousel", "infographic", "art"])
+    .nullish(),
   status: zod.enum(["draft", "ready", "published"]),
-  diagnosis: zod.unknown().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
+  contentSource: zod
+    .enum([
+      "capture",
+      "news_reaction",
+      "teach_audience",
+      "story_mode",
+      "brand_voice_idea",
+      "linkedin",
+    ])
+    .nullish(),
+  externalId: zod
+    .string()
+    .nullish()
+    .describe(
+      "External platform ID (e.g. LinkedIn UGC post URN) for deduplication",
+    ),
+  postType: zod
+    .string()
+    .nullish()
+    .describe("Post subtype for imported content (post, article)"),
+  diagnosis: zod
+    .object({
+      headline: zod.string(),
+      sections: zod
+        .object({
+          hook: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          body: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          tone: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          cta: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          visual: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+        })
+        .optional(),
+      reasons: zod.array(zod.string()),
+      replicateTip: zod.string(),
+    })
+    .nullish()
+    .describe("Cached AI post diagnosis (null if not yet generated)"),
 });
 
 /**
@@ -312,30 +837,42 @@ export const UpdateDraftBody = zod.object({
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  structuredBreakdown: zod
+    .object({
+      topic: zod.string(),
+      angle: zod.string(),
+      coreMessage: zod.string(),
+      whyItMatters: zod.string(),
+      archetype: zod.string().optional(),
+      hooks: zod.array(
+        zod.object({
+          text: zod.string(),
+          type: zod
+            .enum(["how-i", "contrarian", "number", "how-to", "story"])
+            .optional(),
+          usedBefore: zod.boolean().nullish(),
+          sourceLine: zod.string().nullish(),
+        }),
+      ),
+      narrativeFlow: zod.array(zod.string()),
+      storyMode: zod.boolean().optional(),
+      teacherMode: zod.boolean().optional(),
+    })
+    .optional(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
-  structuredBreakdown: StructuredBreakdownSchema.optional(),
-  contentSource: zod.enum(["capture","news_reaction","teach_audience","story_mode","brand_voice_idea","linkedin"]).optional(),
-  visualType: zod.enum(["none","card","carousel","infographic","art"]).optional(),
-});
-
-/**
- * @summary Get LinkedIn connection status
- */
-export const LinkedinStatusResponse = zod.object({
-  configured: zod.boolean(),
-  connected: zod.boolean(),
-  displayName: zod.string().optional(),
-  memberUrn: zod.string().optional(),
-  lastSyncedAt: zod.string().nullable().optional(),
-});
-
-/**
- * @summary LinkedIn sync result
- */
-export const LinkedinSyncResponse = zod.object({
-  imported: zod.number(),
-  skipped: zod.number(),
-  total: zod.number(),
+  contentSource: zod
+    .enum([
+      "capture",
+      "news_reaction",
+      "teach_audience",
+      "story_mode",
+      "brand_voice_idea",
+      "linkedin",
+    ])
+    .optional(),
+  visualType: zod
+    .enum(["none", "card", "carousel", "infographic", "art"])
+    .optional(),
 });
 
 export const UpdateDraftResponse = zod.object({
@@ -344,14 +881,113 @@ export const UpdateDraftResponse = zod.object({
   objective: zod.string(),
   persona: zod.string(),
   tone: zod.string(),
-  structuredBreakdown: StructuredBreakdownSchema,
+  structuredBreakdown: zod.object({
+    topic: zod.string(),
+    angle: zod.string(),
+    coreMessage: zod.string(),
+    whyItMatters: zod.string(),
+    archetype: zod.string().optional(),
+    hooks: zod.array(
+      zod.object({
+        text: zod.string(),
+        type: zod
+          .enum(["how-i", "contrarian", "number", "how-to", "story"])
+          .optional(),
+        usedBefore: zod.boolean().nullish(),
+        sourceLine: zod.string().nullish(),
+      }),
+    ),
+    narrativeFlow: zod.array(zod.string()),
+    storyMode: zod.boolean().optional(),
+    teacherMode: zod.boolean().optional(),
+  }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  visualType: zod
+    .enum(["none", "card", "carousel", "infographic", "art"])
+    .nullish(),
   status: zod.enum(["draft", "ready", "published"]),
   createdAt: zod.date(),
   updatedAt: zod.date(),
+  contentSource: zod
+    .enum([
+      "capture",
+      "news_reaction",
+      "teach_audience",
+      "story_mode",
+      "brand_voice_idea",
+      "linkedin",
+    ])
+    .nullish(),
+  externalId: zod
+    .string()
+    .nullish()
+    .describe(
+      "External platform ID (e.g. LinkedIn UGC post URN) for deduplication",
+    ),
+  postType: zod
+    .string()
+    .nullish()
+    .describe("Post subtype for imported content (post, article)"),
+  diagnosis: zod
+    .object({
+      headline: zod.string(),
+      sections: zod
+        .object({
+          hook: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          body: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          tone: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          cta: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+          visual: zod
+            .object({
+              rating: zod
+                .number()
+                .nullable()
+                .describe("Section rating 1-5 or null if not applicable"),
+              analysis: zod.string(),
+            })
+            .optional(),
+        })
+        .optional(),
+      reasons: zod.array(zod.string()),
+      replicateTip: zod.string(),
+    })
+    .nullish()
+    .describe("Cached AI post diagnosis (null if not yet generated)"),
 });
 
 /**
@@ -359,39 +995,4 @@ export const UpdateDraftResponse = zod.object({
  */
 export const DeleteDraftParams = zod.object({
   id: zod.coerce.number(),
-});
-
-/**
- * @summary Agent brief response including AI-generated angle ideas
- */
-export const AgentBriefResponse = zod.object({
-  headline: zod.string(),
-  insight: zod.string(),
-  angles: zod.array(zod.string()),
-  teachAngles: zod.array(zod.string()),
-  newsHeadline: zod.string().optional(),
-  newsSourceLine: zod.string().optional(),
-  newsUrl: zod.string().optional(),
-  newsPublishedAt: zod.string().optional(),
-  newsSourceDomain: zod.string().optional(),
-  newsDescription: zod.string().optional(),
-});
-
-/**
- * @summary Analytics overview response
- */
-export const AnalyticsOverviewResponse = zod.object({
-  totalPublished: zod.number(),
-  avgResonance: zod.number(),
-  loggedPerformanceCount: zod.number(),
-  byTone: zod.array(zod.object({ tone: zod.string(), count: zod.number(), sampledCount: zod.number(), avgResonance: zod.number().nullable() })),
-  byContentSource: zod.array(zod.object({ source: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
-  byVisualType: zod.array(zod.object({ type: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
-  byObjective: zod.array(zod.object({ objective: zod.string(), count: zod.number(), avgResonance: zod.number().nullable(), sampledCount: zod.number() })),
-  topPosts: zod.array(zod.object({ id: zod.number(), topic: zod.string(), resonance: zod.number(), tone: zod.string().nullable(), contentSource: zod.string(), visualType: zod.string(), publishedAt: zod.string() })),
-  weeklyTrend: zod.array(zod.object({ week: zod.string(), count: zod.number() })),
-  weeklyResonanceTrend: zod.array(zod.object({ week: zod.string(), avgResonance: zod.number(), sampleCount: zod.number() })),
-  last30: zod.number(),
-  last60: zod.number(),
-  last90: zod.number(),
 });

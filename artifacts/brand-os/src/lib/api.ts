@@ -1,3 +1,6 @@
+import type { DiagnosisSection, PostDiagnosis } from "@workspace/api-client-react";
+export type { DiagnosisSection, PostDiagnosis };
+
 export type Thought = {
   id: number;
   userId: number;
@@ -253,22 +256,6 @@ export type VoiceSuggestion = {
 export type VoiceInsightsResult =
   | { status: "insufficient"; count: number; suggestions: [] }
   | { status: "ok"; suggestions: VoiceSuggestion[] };
-
-export type DiagnosisSection = { rating: number | null; analysis: string };
-export type PostDiagnosis = {
-  headline: string;
-  sections?: {
-    hook?: DiagnosisSection;
-    body?: DiagnosisSection;
-    tone?: DiagnosisSection;
-    cta?: DiagnosisSection;
-    visual?: DiagnosisSection;
-  };
-  reasons: string[];
-  replicateTip: string;
-  hookAnalysis?: string;
-  toneMatch?: string;
-};
 
 export const voiceInsightsApi = {
   generate: () =>

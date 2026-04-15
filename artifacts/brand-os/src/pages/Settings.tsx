@@ -67,11 +67,10 @@ export default function Settings() {
       setBrandRole(preferences.brandRole);
       setBrandAudience(preferences.brandAudience);
       setBrandBelief(preferences.brandBelief);
-      const p = preferences as Record<string, unknown>;
-      if (typeof p.aboutMe === "string") setAboutMe(p.aboutMe);
-      if (typeof p.brandBgColor === "string") setBrandBgColor(p.brandBgColor);
-      if (typeof p.brandAccentColor === "string") setBrandAccentColor(p.brandAccentColor);
-      if (typeof p.brandTextColor === "string") setBrandTextColor(p.brandTextColor);
+      if (preferences.aboutMe) setAboutMe(preferences.aboutMe);
+      if (preferences.brandBgColor) setBrandBgColor(preferences.brandBgColor);
+      if (preferences.brandAccentColor) setBrandAccentColor(preferences.brandAccentColor);
+      if (preferences.brandTextColor) setBrandTextColor(preferences.brandTextColor);
     }
   }, [preferences]);
 
