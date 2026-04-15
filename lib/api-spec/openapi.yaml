@@ -767,6 +767,16 @@ components:
         updatedAt:
           type: string
           format: date-time
+        contentSource:
+          type: string
+          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea, linkedin]
+          nullable: true
+        externalId:
+          type: ["string", "null"]
+          description: External platform ID (e.g. LinkedIn UGC post URN) for deduplication
+        postType:
+          type: ["string", "null"]
+          description: Post subtype for imported content (post, article)
       required:
         - id
         - rawInput

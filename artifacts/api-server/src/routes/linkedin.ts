@@ -10,12 +10,14 @@ const router: IRouter = Router();
 const LINKEDIN_CLIENT_ID = process.env["LINKEDIN_CLIENT_ID"];
 const LINKEDIN_CLIENT_SECRET = process.env["LINKEDIN_CLIENT_SECRET"];
 
-const STATE_SECRET = Buffer.from(
-  (process.env["JWT_SECRET"] ?? "brand-os-dev-secret-change-in-production").padEnd(32, "!").slice(0, 32),
-);
-const ENCRYPTION_KEY = Buffer.from(
-  (process.env["JWT_SECRET"] ?? "brand-os-dev-secret-change-in-production").padEnd(32, "!").slice(0, 32),
-);
+const jwtSecret = process.env["JWT_SECRET"];
+if (!jwtSecret && process.env["NODE_ENV"] === "production") {
+  throw new Error("JWT_SECRET must be set in production — refusing to start with insecure default");
+}
+const secretBase = (jwtSecret ?? "brand-os-dev-secret-change-in-production").padEnd(32, "!").slice(0, 32);
+
+const STATE_SECRET = Buffer.from(secretBase);
+const ENCRYPTION_KEY = Buffer.from(secretBase);
 
 const SCOPES = ["openid", "profile", "email", "w_member_social"].join(" ");
 
@@ -227,10 +229,22 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
       };
     };
     resharedPost?: unknown;
+    containerEntity?: unknown;
     firstPublishedAt?: number;
     created?: { time?: number };
     lifecycleState?: string;
   };
+
+  function isOriginalPost(post: UgcPost): boolean {
+    if (post.lifecycleState && post.lifecycleState !== "PUBLISHED") return false;
+    if (post.resharedPost) return false;
+    if (post.containerEntity) return false;
+    const shareContent = post.specificContent?.["com.linkedin.ugc.ShareContent"];
+    if (!shareContent) return false;
+    const category = shareContent.shareMediaCategory ?? "NONE";
+    if (!["NONE", "ARTICLE", "IMAGE", "VIDEO", "DOCUMENT"].includes(category)) return false;
+    return true;
+  }
 
   try {
     const TARGET_ORIGINALS = 20;
@@ -262,10 +276,7 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
       const elements = ugcData.elements ?? [];
 
       for (const post of elements) {
-        if (post.resharedPost) continue;
-        const content = post.specificContent?.["com.linkedin.ugc.ShareContent"];
-        if (!content) continue;
-        if (post.lifecycleState && post.lifecycleState !== "PUBLISHED") continue;
+        if (!isOriginalPost(post)) continue;
         originalPosts.push(post);
         if (originalPosts.length >= TARGET_ORIGINALS) break;
       }
