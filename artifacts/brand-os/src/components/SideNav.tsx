@@ -65,11 +65,16 @@ export function SideNav() {
           Settings
         </Link>
         {user && (
-          <div className="px-3 py-2 mt-1">
-            <p className="text-[11px] text-gray-600 font-semibold truncate">{user.displayName || user.email}</p>
-            {user.displayName && (
-              <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
-            )}
+          <div className="flex items-center gap-2.5 px-3 py-2 mt-1">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary text-xs font-extrabold uppercase select-none">
+              {(user.displayName || user.email).charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] text-gray-700 font-semibold truncate leading-tight">{user.displayName || user.email}</p>
+              {user.displayName && (
+                <p className="text-[10px] text-gray-400 truncate leading-tight">{user.email}</p>
+              )}
+            </div>
           </div>
         )}
       </div>
