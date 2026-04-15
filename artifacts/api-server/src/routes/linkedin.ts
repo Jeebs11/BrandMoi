@@ -19,10 +19,9 @@ const ENCRYPTION_KEY = Buffer.from(
 
 const SCOPES = ["openid", "profile", "r_basicprofile"].join(" ");
 
-function getRedirectUri(req: { get: (h: string) => string | undefined }): string {
+function getRedirectUri(req: { protocol: string; get: (h: string) => string | undefined }): string {
   const host = req.get("host") ?? "localhost";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  return `${protocol}://${host}/api/linkedin/callback`;
+  return `${req.protocol}://${host}/api/linkedin/callback`;
 }
 
 function signState(userId: number): string {
@@ -71,7 +70,7 @@ function decryptToken(stored: string): string {
 }
 
 router.get("/linkedin/status", requireAuth, async (req, res): Promise<void> => {
-  if (!LINKEDIN_CLIENT_ID) {
+  if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
     res.json({ configured: false, connected: false });
     return;
   }
@@ -97,7 +96,7 @@ router.get("/linkedin/status", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.get("/linkedin/auth", requireAuth, (req, res): void => {
-  if (!LINKEDIN_CLIENT_ID) {
+  if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
     res.status(503).json({ error: "LinkedIn integration not configured" });
     return;
   }
@@ -219,50 +218,64 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  try {
-    const ugcRes = await fetch(
-      "https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(" +
-        encodeURIComponent(conn.memberUrn) +
-        ")&count=20&sortBy=LAST_MODIFIED",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "X-Restli-Protocol-Version": "2.0.0",
-        },
-      }
-    );
-
-    if (!ugcRes.ok) {
-      const errText = await ugcRes.text();
-      res.status(502).json({ error: "Failed to fetch LinkedIn posts", detail: errText });
-      return;
-    }
-
-    const ugcData = await ugcRes.json() as {
-      elements?: Array<{
-        id: string;
-        specificContent?: {
-          "com.linkedin.ugc.ShareContent"?: {
-            shareCommentary?: { text?: string };
-            shareMediaCategory?: string;
-          };
-        };
-        resharedPost?: unknown;
-        firstPublishedAt?: number;
-        created?: { time?: number };
-        lifecycleState?: string;
-      }>;
+  type UgcPost = {
+    id: string;
+    specificContent?: {
+      "com.linkedin.ugc.ShareContent"?: {
+        shareCommentary?: { text?: string };
+        shareMediaCategory?: string;
+      };
     };
+    resharedPost?: unknown;
+    firstPublishedAt?: number;
+    created?: { time?: number };
+    lifecycleState?: string;
+  };
 
-    const elements = ugcData.elements ?? [];
+  try {
+    const TARGET_ORIGINALS = 20;
+    const PAGE_SIZE = 20;
+    const originalPosts: UgcPost[] = [];
+    let start = 0;
+    let exhausted = false;
 
-    const originalPosts = elements.filter((post) => {
-      if (post.resharedPost) return false;
-      const content = post.specificContent?.["com.linkedin.ugc.ShareContent"];
-      if (!content) return false;
-      if (post.lifecycleState && post.lifecycleState !== "PUBLISHED") return false;
-      return true;
-    });
+    while (originalPosts.length < TARGET_ORIGINALS && !exhausted) {
+      const ugcRes = await fetch(
+        "https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(" +
+          encodeURIComponent(conn.memberUrn) +
+          `)&count=${PAGE_SIZE}&start=${start}&sortBy=LAST_MODIFIED`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "X-Restli-Protocol-Version": "2.0.0",
+          },
+        }
+      );
+
+      if (!ugcRes.ok) {
+        const errText = await ugcRes.text();
+        res.status(502).json({ error: "Failed to fetch LinkedIn posts", detail: errText });
+        return;
+      }
+
+      const ugcData = await ugcRes.json() as { elements?: UgcPost[]; paging?: { total?: number; count?: number } };
+      const elements = ugcData.elements ?? [];
+
+      for (const post of elements) {
+        if (post.resharedPost) continue;
+        const content = post.specificContent?.["com.linkedin.ugc.ShareContent"];
+        if (!content) continue;
+        if (post.lifecycleState && post.lifecycleState !== "PUBLISHED") continue;
+        originalPosts.push(post);
+        if (originalPosts.length >= TARGET_ORIGINALS) break;
+      }
+
+      if (elements.length < PAGE_SIZE) {
+        exhausted = true;
+      } else {
+        start += PAGE_SIZE;
+      }
+    }
 
     let imported = 0;
     let skipped = 0;
