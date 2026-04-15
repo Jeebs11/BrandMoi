@@ -345,10 +345,17 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
 
       if (existing.length > 0) {
         draftId = existing[0].id;
-        await db
+        const updated = await db
           .update(performanceSignalsTable)
           .set({ reactions, comments, reposts, loggedAt: new Date() })
-          .where(eq(performanceSignalsTable.draftId, draftId));
+          .where(eq(performanceSignalsTable.draftId, draftId))
+          .returning({ id: performanceSignalsTable.id });
+        if (updated.length === 0) {
+          await db
+            .insert(performanceSignalsTable)
+            .values({ draftId, reactions, comments, reposts, impressions: 0 })
+            .onConflictDoNothing();
+        }
         skipped++;
       } else {
         const topic = postText.split("\n")[0]?.slice(0, 80) ?? "LinkedIn Post";

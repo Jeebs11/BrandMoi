@@ -417,7 +417,15 @@ export default function Settings() {
                       <p className="text-sm font-semibold text-gray-800">Connected as {linkedinStatus.displayName}</p>
                       {linkedinStatus.lastSyncedAt && (
                         <p className="text-xs text-gray-400">
-                          Last synced {new Date(linkedinStatus.lastSyncedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          Last synced {(() => {
+                            const diffMs = Date.now() - new Date(linkedinStatus.lastSyncedAt!).getTime();
+                            const mins = Math.floor(diffMs / 60000);
+                            if (mins < 1) return "just now";
+                            if (mins < 60) return `${mins}m ago`;
+                            const hrs = Math.floor(mins / 60);
+                            if (hrs < 24) return `${hrs}h ago`;
+                            return `${Math.floor(hrs / 24)}d ago`;
+                          })()}
                         </p>
                       )}
                     </div>
