@@ -199,6 +199,14 @@ export interface Draft {
   postType?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** @nullable */
+  diagnosis?: {
+    headline: string;
+    hookAnalysis?: string;
+    toneMatch?: string;
+    reasons: string[];
+    replicateTip: string;
+  } | null;
 }
 
 export type CreateDraftBodyStatus =

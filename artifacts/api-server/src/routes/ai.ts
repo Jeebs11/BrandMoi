@@ -610,6 +610,22 @@ router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Pr
 
   const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
 
+  // Check if pending suggestions already exist — skip generation if so
+  const existingPending = await db
+    .select({ id: voiceSuggestionsTable.id })
+    .from(voiceSuggestionsTable)
+    .where(and(eq(voiceSuggestionsTable.userId, userId), eq(voiceSuggestionsTable.status, "pending")))
+    .limit(1);
+
+  if (existingPending.length > 0) {
+    const pending = await db
+      .select()
+      .from(voiceSuggestionsTable)
+      .where(and(eq(voiceSuggestionsTable.userId, userId), eq(voiceSuggestionsTable.status, "pending")));
+    res.json({ status: "ok", suggestions: pending });
+    return;
+  }
+
   const publishedDrafts = await db
     .select()
     .from(draftsTable)
@@ -645,7 +661,7 @@ router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Pr
   const top = scored.slice(0, 10);
   const topPostSummaries = top.map((x) => {
     const bd = x.draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string } | null;
-    return `- Topic: ${bd?.topic ?? "unknown"} | Angle: ${bd?.angle ?? "unknown"} | Tone: ${x.draft.tone} | Objective: ${x.draft.objective} | Resonance: ${x.resonance}`;
+    return `[id:${x.draft.id}] Topic: ${bd?.topic ?? "unknown"} | Angle: ${bd?.angle ?? "unknown"} | Tone: ${x.draft.tone} | Objective: ${x.draft.objective} | Resonance: ${x.resonance}`;
   }).join("\n");
 
   const currentProfile = `Current profile:
@@ -664,7 +680,7 @@ router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Pr
 Allowed fields to suggest: tone, objective, persona, brandRole, brandAudience, brandBelief.
 
 JSON shape:
-{"suggestions": [{"field": "tone", "suggestedValue": "...", "rationale": "1-2 sentences explaining why based on the data"}]}
+{"suggestions": [{"field": "tone", "suggestedValue": "...", "rationale": "1-2 sentences explaining why based on the data", "evidenceDraftIds": [123, 456]}]}
 
 Rules:
 - Only suggest fields where you see a clear pattern in the high-resonance posts.
@@ -672,7 +688,8 @@ Rules:
 - Maximum 3 suggestions.
 - Never suggest a value identical to the current value.
 - For "tone", only suggest values from: Executive, Direct, Story, Contrarian, Witty, Vulnerable, Playful, Snappy.
-- For "objective", only suggest values from: Clients, Job, Authority, Documenting, Expert, Hiring.`,
+- For "objective", only suggest values from: Clients, Job, Authority, Documenting, Expert, Hiring.
+- evidenceDraftIds: list 1-3 post IDs from the provided list that best support this suggestion.`,
     messages: [{
       role: "user",
       content: `${currentProfile}
@@ -690,7 +707,7 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
     return;
   }
 
-  let parsed: { suggestions: Array<{ field: string; suggestedValue: string; rationale: string }> };
+  let parsed: { suggestions: Array<{ field: string; suggestedValue: string; rationale: string; evidenceDraftIds?: number[] }> };
   try {
     const stripped = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     parsed = JSON.parse(stripped) as typeof parsed;
@@ -701,10 +718,6 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
 
   const valid = (parsed.suggestions ?? []).filter(
     (s) => ALLOWED_VOICE_FIELDS.includes(s.field as AllowedVoiceField) && s.suggestedValue && s.rationale
-  );
-
-  await db.delete(voiceSuggestionsTable).where(
-    and(eq(voiceSuggestionsTable.userId, userId), eq(voiceSuggestionsTable.status, "pending"))
   );
 
   if (valid.length === 0) {
@@ -729,6 +742,7 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
       currentValue: currentPrefsMap[s.field] ?? "",
       suggestedValue: s.suggestedValue,
       rationale: s.rationale,
+      evidenceDraftIds: Array.isArray(s.evidenceDraftIds) ? s.evidenceDraftIds : [],
     })))
     .returning();
 
@@ -769,13 +783,19 @@ router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promis
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 512,
-    system: `You are a LinkedIn content analyst. Diagnose why a post performed well (or explain what to watch for). Return only valid JSON — no markdown fences.
+    max_tokens: 600,
+    system: `You are a LinkedIn content analyst. Diagnose why a post performed well. Return only valid JSON — no markdown fences.
 
 JSON shape:
-{"headline": "1 sentence summary of why it worked", "reasons": ["reason 1", "reason 2", "reason 3"], "replicateTip": "1 actionable tip to replicate this success"}
+{
+  "headline": "1 sentence summary of the key success factor",
+  "hookAnalysis": "1 sentence on what made the opening hook effective",
+  "toneMatch": "1 sentence on how the tone connected with the audience",
+  "reasons": ["specific reason 1 under 20 words", "specific reason 2 under 20 words", "specific reason 3 under 20 words"],
+  "replicateTip": "1 actionable tip to replicate this success in your next post"
+}
 
-Keep each reason under 20 words. Be specific to the post content.`,
+Be specific to the actual post content. Reference the hook or key phrases where relevant.`,
     messages: [{
       role: "user",
       content: `Post topic: ${bd?.topic ?? "unknown"}
@@ -793,7 +813,7 @@ Diagnose why this post worked. Return JSON only.`,
   const t = message.content[0];
   if (t.type !== "text") { res.status(500).json({ error: "Unexpected AI response" }); return; }
 
-  let diagnosis: { headline: string; reasons: string[]; replicateTip: string };
+  let diagnosis: { headline: string; hookAnalysis?: string; toneMatch?: string; reasons: string[]; replicateTip: string };
   try {
     const stripped = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
     diagnosis = JSON.parse(stripped) as typeof diagnosis;

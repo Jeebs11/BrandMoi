@@ -70,7 +70,11 @@ export default function Library() {
     resonanceMapApi.get().then(setResonanceMap).catch(() => {});
   }, []);
 
-  const openDiagnosis = async (draftId: number, topic: string) => {
+  const openDiagnosis = async (draftId: number, topic: string, cachedDiagnosis?: PostDiagnosis | null) => {
+    if (cachedDiagnosis) {
+      setDiagnosisPanel({ draftId, topic, diagnosis: cachedDiagnosis, loading: false });
+      return;
+    }
     setDiagnosisPanel({ draftId, topic, diagnosis: null, loading: true });
     try {
       const result = await diagnosisApi.get(draftId);
@@ -208,7 +212,7 @@ export default function Library() {
                       </div>
                       {(resonanceMap[String(draft.id)] ?? 0) >= 60 && (
                         <button
-                          onClick={() => void openDiagnosis(draft.id, topic)}
+                          onClick={() => void openDiagnosis(draft.id, topic, draft.diagnosis)}
                           className="mt-2 flex items-center gap-1 text-xs text-violet-600 font-semibold hover:text-violet-800 transition-colors"
                         >
                           <Sparkles className="w-3 h-3" /> Why it worked →
@@ -298,6 +302,22 @@ export default function Library() {
                   <div className="bg-violet-50 rounded-2xl p-4">
                     <p className="text-sm font-bold text-violet-800 leading-relaxed">{diagnosisPanel.diagnosis.headline}</p>
                   </div>
+                  {(diagnosisPanel.diagnosis.hookAnalysis || diagnosisPanel.diagnosis.toneMatch) && (
+                    <div className="grid grid-cols-1 gap-2">
+                      {diagnosisPanel.diagnosis.hookAnalysis && (
+                        <div className="bg-blue-50 rounded-xl px-4 py-3">
+                          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Hook</p>
+                          <p className="text-xs text-blue-900 leading-relaxed">{diagnosisPanel.diagnosis.hookAnalysis}</p>
+                        </div>
+                      )}
+                      {diagnosisPanel.diagnosis.toneMatch && (
+                        <div className="bg-amber-50 rounded-xl px-4 py-3">
+                          <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">Tone</p>
+                          <p className="text-xs text-amber-900 leading-relaxed">{diagnosisPanel.diagnosis.toneMatch}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">What made it click</p>
                     <div className="space-y-2">

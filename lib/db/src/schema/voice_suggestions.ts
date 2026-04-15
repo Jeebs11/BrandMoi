@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 export const voiceSuggestionsTable = pgTable("voice_suggestions", {
@@ -8,6 +8,7 @@ export const voiceSuggestionsTable = pgTable("voice_suggestions", {
   currentValue: text("current_value").notNull().default(""),
   suggestedValue: text("suggested_value").notNull(),
   rationale: text("rationale").notNull(),
+  evidenceDraftIds: jsonb("evidence_draft_ids").notNull().default([]),
   status: text("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

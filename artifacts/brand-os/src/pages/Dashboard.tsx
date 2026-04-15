@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 
 function todayKey() {
@@ -145,6 +145,7 @@ export default function Dashboard() {
   const [pendingExtra, setPendingExtra] = useState<string>("");
   const [voiceSuggestions, setVoiceSuggestions] = useState<VoiceSuggestion[]>([]);
   const [voiceSuggestionsLoading, setVoiceSuggestionsLoading] = useState(true);
+  const [scoredPostCount, setScoredPostCount] = useState<number>(0);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -171,6 +172,7 @@ export default function Dashboard() {
     agentApi.themes().then((r) => setThemes(r.themes ?? [])).catch(() => {}).finally(() => setThemesLoading(false));
 
     voiceInsightsApi.list().then(setVoiceSuggestions).catch(() => {}).finally(() => setVoiceSuggestionsLoading(false));
+    resonanceMapApi.get().then((map) => setScoredPostCount(Object.keys(map).length)).catch(() => {});
   }, []);
 
   const refreshBrief = () => {
@@ -275,44 +277,62 @@ export default function Dashboard() {
           )}
 
           {/* Voice Insights */}
-          {!voiceSuggestionsLoading && voiceSuggestions.length > 0 && (
+          {!voiceSuggestionsLoading && scoredPostCount >= 1 && scoredPostCount < 5 && (
+            <div className="flex items-center gap-3 bg-violet-50 border border-violet-100 rounded-2xl px-4 py-3">
+              <Lightbulb className="w-4 h-4 text-violet-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-violet-800">Voice Insights unlocks at 5 posts</p>
+                <p className="text-[11px] text-violet-500 mt-0.5">Log performance on {5 - scoredPostCount} more post{5 - scoredPostCount !== 1 ? "s" : ""} to unlock AI-powered brand voice suggestions.</p>
+              </div>
+            </div>
+          )}
+          {!voiceSuggestionsLoading && scoredPostCount >= 5 && (
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <Lightbulb className="w-4 h-4 text-violet-500" />
                 <h3 className="text-sm font-bold text-gray-700">Voice Insights</h3>
-                <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{voiceSuggestions.length} suggestions</span>
+                {voiceSuggestions.length > 0 && (
+                  <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{voiceSuggestions.length} suggestion{voiceSuggestions.length !== 1 ? "s" : ""}</span>
+                )}
               </div>
-              <div className="space-y-3">
-                {voiceSuggestions.map((s) => (
-                  <div key={s.id} className="bg-white rounded-2xl border border-violet-100 p-4">
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{s.field}</span>
-                          <span className="text-[10px] text-gray-400 line-through truncate max-w-[80px]">{s.currentValue || "not set"}</span>
-                          <ChevronRight className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                          <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">{s.suggestedValue}</span>
+              {voiceSuggestions.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-5 text-center">
+                  <p className="text-xs text-gray-500">No suggestions yet.</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Tap "Get Insights" in Settings to generate AI voice suggestions.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {voiceSuggestions.map((s) => (
+                    <div key={s.id} className="bg-white rounded-2xl border border-violet-100 p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{s.field}</span>
+                            <span className="text-[10px] text-gray-400 line-through truncate max-w-[80px]">{s.currentValue || "not set"}</span>
+                            <ChevronRight className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                            <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">{s.suggestedValue}</span>
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed">{s.rationale}</p>
                         </div>
-                        <p className="text-xs text-gray-600 leading-relaxed">{s.rationale}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => void handleAcceptSuggestion(s.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-colors"
+                        >
+                          <Check className="w-3 h-3" /> Apply
+                        </button>
+                        <button
+                          onClick={() => void handleDismissSuggestion(s.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors"
+                        >
+                          <X className="w-3 h-3" /> Dismiss
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => void handleAcceptSuggestion(s.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-colors"
-                      >
-                        <Check className="w-3 h-3" /> Apply
-                      </button>
-                      <button
-                        onClick={() => void handleDismissSuggestion(s.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors"
-                      >
-                        <X className="w-3 h-3" /> Dismiss
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 

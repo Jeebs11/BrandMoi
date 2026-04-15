@@ -244,6 +244,7 @@ export type VoiceSuggestion = {
   currentValue: string;
   suggestedValue: string;
   rationale: string;
+  evidenceDraftIds: number[];
   status: string;
   createdAt: string;
 };
@@ -254,6 +255,8 @@ export type VoiceInsightsResult =
 
 export type PostDiagnosis = {
   headline: string;
+  hookAnalysis?: string;
+  toneMatch?: string;
   reasons: string[];
   replicateTip: string;
 };

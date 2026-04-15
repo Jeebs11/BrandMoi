@@ -267,22 +267,18 @@ router.patch("/voice-suggestions/:id/accept", requireAuth, async (req, res): Pro
 
   if (!suggestion) { res.status(404).json({ error: "Not found" }); return; }
 
-  const PREF_FIELD_MAP: Record<string, string> = {
-    tone: "tone",
-    objective: "objective",
-    persona: "persona",
-    brandRole: "brandRole",
-    brandAudience: "brandAudience",
-    brandBelief: "brandBelief",
-  };
+  const ALLOWED_FIELDS = ["tone", "objective", "persona", "brandRole", "brandAudience", "brandBelief"] as const;
+  type AllowedField = typeof ALLOWED_FIELDS[number];
 
-  const prefKey = PREF_FIELD_MAP[suggestion.field];
-  if (prefKey) {
-    await db
-      .update(preferencesTable)
-      .set({ [prefKey]: suggestion.suggestedValue })
-      .where(eq(preferencesTable.userId, userId));
+  if (!ALLOWED_FIELDS.includes(suggestion.field as AllowedField)) {
+    res.status(400).json({ error: `Invalid field: ${suggestion.field}. Allowed: ${ALLOWED_FIELDS.join(", ")}` });
+    return;
   }
+
+  await db
+    .update(preferencesTable)
+    .set({ [suggestion.field]: suggestion.suggestedValue })
+    .where(eq(preferencesTable.userId, userId));
 
   const [updated] = await db
     .update(voiceSuggestionsTable)
