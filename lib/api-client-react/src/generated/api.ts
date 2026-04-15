@@ -18,14 +18,18 @@ import type {
 
 import type {
   AgentBriefResponse,
+  AnalyticsOverviewResponse,
   CreateDraftBody,
   Draft,
   ErrorResponse,
   GenerateContentBody,
+  GeneratePostDiagnosis200,
   GeneratedContent,
+  GetResonanceMap200,
   HealthStatus,
-  LinkedinStatus,
-  LinkedinSyncResult,
+  LinkedinDisconnect200,
+  LinkedinStatusResponse,
+  LinkedinSyncResponse,
   LoginBody,
   PreferencesResponse,
   RefineContentBody,
@@ -33,11 +37,12 @@ import type {
   RegisterBody,
   StructureIdeaBody,
   StructureIdeaResponse,
-  StructuredBreakdown,
   SuggestionItem,
   UpdateDraftBody,
   UpdatePreferencesBody,
   UserResponse,
+  VoiceInsightsResult,
+  VoiceSuggestion,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -761,6 +766,81 @@ export const useStructureIdea = <
 };
 
 /**
+ * @summary Get AI-generated daily brief with content angles and teach ideas
+ */
+export const getGetAgentBriefUrl = () => {
+  return `/api/agent/brief`;
+};
+
+export const getAgentBrief = async (
+  options?: RequestInit,
+): Promise<AgentBriefResponse> => {
+  return customFetch<AgentBriefResponse>(getGetAgentBriefUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAgentBriefQueryKey = () => {
+  return [`/api/agent/brief`] as const;
+};
+
+export const getGetAgentBriefQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAgentBrief>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentBrief>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAgentBriefQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentBrief>>> = ({
+    signal,
+  }) => getAgentBrief({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentBrief>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAgentBriefQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAgentBrief>>
+>;
+export type GetAgentBriefQueryError = ErrorType<void>;
+
+/**
+ * @summary Get AI-generated daily brief with content angles and teach ideas
+ */
+
+export function useGetAgentBrief<
+  TData = Awaited<ReturnType<typeof getAgentBrief>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAgentBrief>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAgentBriefQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Generate LinkedIn content from confirmed structure
  */
 export const getGenerateContentUrl = () => {
@@ -930,6 +1010,952 @@ export const useRefineContent = <
   TContext
 > => {
   return useMutation(getRefineContentMutationOptions(options));
+};
+
+/**
+ * @summary Get LinkedIn connection status for the current user
+ */
+export const getGetLinkedinStatusUrl = () => {
+  return `/api/linkedin/status`;
+};
+
+export const getLinkedinStatus = async (
+  options?: RequestInit,
+): Promise<LinkedinStatusResponse> => {
+  return customFetch<LinkedinStatusResponse>(getGetLinkedinStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLinkedinStatusQueryKey = () => {
+  return [`/api/linkedin/status`] as const;
+};
+
+export const getGetLinkedinStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLinkedinStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getLinkedinStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLinkedinStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLinkedinStatus>>
+  > = ({ signal }) => getLinkedinStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLinkedinStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLinkedinStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLinkedinStatus>>
+>;
+export type GetLinkedinStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get LinkedIn connection status for the current user
+ */
+
+export function useGetLinkedinStatus<
+  TData = Awaited<ReturnType<typeof getLinkedinStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getLinkedinStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLinkedinStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Redirect to LinkedIn OAuth authorization screen
+ */
+export const getLinkedinAuthUrl = () => {
+  return `/api/linkedin/auth`;
+};
+
+export const linkedinAuth = async (options?: RequestInit): Promise<unknown> => {
+  return customFetch<unknown>(getLinkedinAuthUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getLinkedinAuthQueryKey = () => {
+  return [`/api/linkedin/auth`] as const;
+};
+
+export const getLinkedinAuthQueryOptions = <
+  TData = Awaited<ReturnType<typeof linkedinAuth>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof linkedinAuth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getLinkedinAuthQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof linkedinAuth>>> = ({
+    signal,
+  }) => linkedinAuth({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof linkedinAuth>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type LinkedinAuthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof linkedinAuth>>
+>;
+export type LinkedinAuthQueryError = ErrorType<void>;
+
+/**
+ * @summary Redirect to LinkedIn OAuth authorization screen
+ */
+
+export function useLinkedinAuth<
+  TData = Awaited<ReturnType<typeof linkedinAuth>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof linkedinAuth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getLinkedinAuthQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary LinkedIn OAuth callback — exchanges code, stores token, redirects to Settings
+ */
+export const getLinkedinCallbackUrl = () => {
+  return `/api/linkedin/callback`;
+};
+
+export const linkedinCallback = async (
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getLinkedinCallbackUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getLinkedinCallbackQueryKey = () => {
+  return [`/api/linkedin/callback`] as const;
+};
+
+export const getLinkedinCallbackQueryOptions = <
+  TData = Awaited<ReturnType<typeof linkedinCallback>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof linkedinCallback>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getLinkedinCallbackQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof linkedinCallback>>
+  > = ({ signal }) => linkedinCallback({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof linkedinCallback>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type LinkedinCallbackQueryResult = NonNullable<
+  Awaited<ReturnType<typeof linkedinCallback>>
+>;
+export type LinkedinCallbackQueryError = ErrorType<void>;
+
+/**
+ * @summary LinkedIn OAuth callback — exchanges code, stores token, redirects to Settings
+ */
+
+export function useLinkedinCallback<
+  TData = Awaited<ReturnType<typeof linkedinCallback>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof linkedinCallback>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getLinkedinCallbackQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Disconnect LinkedIn account
+ */
+export const getLinkedinDisconnectUrl = () => {
+  return `/api/linkedin/disconnect`;
+};
+
+export const linkedinDisconnect = async (
+  options?: RequestInit,
+): Promise<LinkedinDisconnect200> => {
+  return customFetch<LinkedinDisconnect200>(getLinkedinDisconnectUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getLinkedinDisconnectMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkedinDisconnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof linkedinDisconnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["linkedinDisconnect"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof linkedinDisconnect>>,
+    void
+  > = () => {
+    return linkedinDisconnect(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LinkedinDisconnectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof linkedinDisconnect>>
+>;
+
+export type LinkedinDisconnectMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Disconnect LinkedIn account
+ */
+export const useLinkedinDisconnect = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkedinDisconnect>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof linkedinDisconnect>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getLinkedinDisconnectMutationOptions(options));
+};
+
+/**
+ * @summary Sync original posts from LinkedIn into the Library
+ */
+export const getLinkedinSyncUrl = () => {
+  return `/api/linkedin/sync`;
+};
+
+export const linkedinSync = async (
+  options?: RequestInit,
+): Promise<LinkedinSyncResponse> => {
+  return customFetch<LinkedinSyncResponse>(getLinkedinSyncUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getLinkedinSyncMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkedinSync>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof linkedinSync>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["linkedinSync"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof linkedinSync>>,
+    void
+  > = () => {
+    return linkedinSync(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LinkedinSyncMutationResult = NonNullable<
+  Awaited<ReturnType<typeof linkedinSync>>
+>;
+
+export type LinkedinSyncMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Sync original posts from LinkedIn into the Library
+ */
+export const useLinkedinSync = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof linkedinSync>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof linkedinSync>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getLinkedinSyncMutationOptions(options));
+};
+
+/**
+ * @summary Analytics overview response
+ */
+export const getGetAnalyticsOverviewUrl = () => {
+  return `/api/analytics/overview`;
+};
+
+export const getAnalyticsOverview = async (
+  options?: RequestInit,
+): Promise<AnalyticsOverviewResponse> => {
+  return customFetch<AnalyticsOverviewResponse>(getGetAnalyticsOverviewUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAnalyticsOverviewQueryKey = () => {
+  return [`/api/analytics/overview`] as const;
+};
+
+export const getGetAnalyticsOverviewQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnalyticsOverview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsOverview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAnalyticsOverviewQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnalyticsOverview>>
+  > = ({ signal }) => getAnalyticsOverview({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsOverview>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAnalyticsOverviewQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnalyticsOverview>>
+>;
+export type GetAnalyticsOverviewQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Analytics overview response
+ */
+
+export function useGetAnalyticsOverview<
+  TData = Awaited<ReturnType<typeof getAnalyticsOverview>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAnalyticsOverview>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAnalyticsOverviewQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get resonance scores for all published drafts with performance signals
+ */
+export const getGetResonanceMapUrl = () => {
+  return `/api/analytics/resonance-map`;
+};
+
+export const getResonanceMap = async (
+  options?: RequestInit,
+): Promise<GetResonanceMap200> => {
+  return customFetch<GetResonanceMap200>(getGetResonanceMapUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetResonanceMapQueryKey = () => {
+  return [`/api/analytics/resonance-map`] as const;
+};
+
+export const getGetResonanceMapQueryOptions = <
+  TData = Awaited<ReturnType<typeof getResonanceMap>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getResonanceMap>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetResonanceMapQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getResonanceMap>>> = ({
+    signal,
+  }) => getResonanceMap({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getResonanceMap>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetResonanceMapQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getResonanceMap>>
+>;
+export type GetResonanceMapQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get resonance scores for all published drafts with performance signals
+ */
+
+export function useGetResonanceMap<
+  TData = Awaited<ReturnType<typeof getResonanceMap>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getResonanceMap>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetResonanceMapQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Generate AI brand voice suggestions from top-resonance posts
+ */
+export const getGenerateVoiceInsightsUrl = () => {
+  return `/api/ai/voice-insights`;
+};
+
+export const generateVoiceInsights = async (
+  options?: RequestInit,
+): Promise<VoiceInsightsResult> => {
+  return customFetch<VoiceInsightsResult>(getGenerateVoiceInsightsUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getGenerateVoiceInsightsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateVoiceInsights>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generateVoiceInsights>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["generateVoiceInsights"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generateVoiceInsights>>,
+    void
+  > = () => {
+    return generateVoiceInsights(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GenerateVoiceInsightsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generateVoiceInsights>>
+>;
+
+export type GenerateVoiceInsightsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Generate AI brand voice suggestions from top-resonance posts
+ */
+export const useGenerateVoiceInsights = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generateVoiceInsights>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generateVoiceInsights>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getGenerateVoiceInsightsMutationOptions(options));
+};
+
+/**
+ * @summary List pending voice suggestions for the current user
+ */
+export const getListVoiceSuggestionsUrl = () => {
+  return `/api/voice-suggestions`;
+};
+
+export const listVoiceSuggestions = async (
+  options?: RequestInit,
+): Promise<VoiceSuggestion[]> => {
+  return customFetch<VoiceSuggestion[]>(getListVoiceSuggestionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListVoiceSuggestionsQueryKey = () => {
+  return [`/api/voice-suggestions`] as const;
+};
+
+export const getListVoiceSuggestionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listVoiceSuggestions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listVoiceSuggestions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListVoiceSuggestionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listVoiceSuggestions>>
+  > = ({ signal }) => listVoiceSuggestions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listVoiceSuggestions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListVoiceSuggestionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listVoiceSuggestions>>
+>;
+export type ListVoiceSuggestionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List pending voice suggestions for the current user
+ */
+
+export function useListVoiceSuggestions<
+  TData = Awaited<ReturnType<typeof listVoiceSuggestions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listVoiceSuggestions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListVoiceSuggestionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Accept a voice suggestion and apply it to preferences
+ */
+export const getAcceptVoiceSuggestionUrl = (id: number) => {
+  return `/api/voice-suggestions/${id}/accept`;
+};
+
+export const acceptVoiceSuggestion = async (
+  id: number,
+  options?: RequestInit,
+): Promise<VoiceSuggestion> => {
+  return customFetch<VoiceSuggestion>(getAcceptVoiceSuggestionUrl(id), {
+    ...options,
+    method: "PATCH",
+  });
+};
+
+export const getAcceptVoiceSuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptVoiceSuggestion>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptVoiceSuggestion>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["acceptVoiceSuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptVoiceSuggestion>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return acceptVoiceSuggestion(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AcceptVoiceSuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptVoiceSuggestion>>
+>;
+
+export type AcceptVoiceSuggestionMutationError = ErrorType<void>;
+
+/**
+ * @summary Accept a voice suggestion and apply it to preferences
+ */
+export const useAcceptVoiceSuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptVoiceSuggestion>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof acceptVoiceSuggestion>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getAcceptVoiceSuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Dismiss a voice suggestion
+ */
+export const getDismissVoiceSuggestionUrl = (id: number) => {
+  return `/api/voice-suggestions/${id}/dismiss`;
+};
+
+export const dismissVoiceSuggestion = async (
+  id: number,
+  options?: RequestInit,
+): Promise<VoiceSuggestion> => {
+  return customFetch<VoiceSuggestion>(getDismissVoiceSuggestionUrl(id), {
+    ...options,
+    method: "PATCH",
+  });
+};
+
+export const getDismissVoiceSuggestionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissVoiceSuggestion>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof dismissVoiceSuggestion>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["dismissVoiceSuggestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof dismissVoiceSuggestion>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return dismissVoiceSuggestion(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DismissVoiceSuggestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof dismissVoiceSuggestion>>
+>;
+
+export type DismissVoiceSuggestionMutationError = ErrorType<void>;
+
+/**
+ * @summary Dismiss a voice suggestion
+ */
+export const useDismissVoiceSuggestion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof dismissVoiceSuggestion>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof dismissVoiceSuggestion>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDismissVoiceSuggestionMutationOptions(options));
+};
+
+/**
+ * @summary Generate or retrieve cached diagnosis for a published post
+ */
+export const getGeneratePostDiagnosisUrl = (draftId: number) => {
+  return `/api/ai/post-diagnosis/${draftId}`;
+};
+
+export const generatePostDiagnosis = async (
+  draftId: number,
+  options?: RequestInit,
+): Promise<GeneratePostDiagnosis200> => {
+  return customFetch<GeneratePostDiagnosis200>(
+    getGeneratePostDiagnosisUrl(draftId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getGeneratePostDiagnosisMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generatePostDiagnosis>>,
+    TError,
+    { draftId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof generatePostDiagnosis>>,
+  TError,
+  { draftId: number },
+  TContext
+> => {
+  const mutationKey = ["generatePostDiagnosis"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof generatePostDiagnosis>>,
+    { draftId: number }
+  > = (props) => {
+    const { draftId } = props ?? {};
+
+    return generatePostDiagnosis(draftId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GeneratePostDiagnosisMutationResult = NonNullable<
+  Awaited<ReturnType<typeof generatePostDiagnosis>>
+>;
+
+export type GeneratePostDiagnosisMutationError = ErrorType<void>;
+
+/**
+ * @summary Generate or retrieve cached diagnosis for a published post
+ */
+export const useGeneratePostDiagnosis = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof generatePostDiagnosis>>,
+    TError,
+    { draftId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof generatePostDiagnosis>>,
+  TError,
+  { draftId: number },
+  TContext
+> => {
+  return useMutation(getGeneratePostDiagnosisMutationOptions(options));
 };
 
 /**
@@ -1345,175 +2371,4 @@ export const useDeleteDraft = <
   TContext
 > => {
   return useMutation(getDeleteDraftMutationOptions(options));
-};
-
-/**
- * @summary Get AI-generated daily brief with content angles and teach ideas
- */
-export const getGetAgentBriefUrl = () => {
-  return `/api/agent/brief`;
-};
-
-export const getAgentBrief = async (
-  options?: RequestInit,
-): Promise<AgentBriefResponse> => {
-  return customFetch<AgentBriefResponse>(getGetAgentBriefUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetAgentBriefQueryKey = () => {
-  return [`/api/agent/brief`] as const;
-};
-
-export const getGetAgentBriefQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAgentBrief>>,
-  TError = ErrorType<ErrorResponse>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getAgentBrief>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-  const queryKey = queryOptions?.queryKey ?? getGetAgentBriefQueryKey();
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentBrief>>> = ({ signal }) =>
-    getAgentBrief({ signal, ...requestOptions });
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAgentBrief>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetAgentBriefQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentBrief>>>;
-export type GetAgentBriefQueryError = ErrorType<ErrorResponse>;
-
-export function useGetAgentBrief<
-  TData = Awaited<ReturnType<typeof getAgentBrief>>,
-  TError = ErrorType<ErrorResponse>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getAgentBrief>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAgentBriefQueryOptions(options);
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Get LinkedIn connection status
- */
-export const getLinkedinStatusUrl = () => `/api/linkedin/status`;
-
-export const getLinkedinStatus = async (options?: RequestInit): Promise<LinkedinStatus> => {
-  return customFetch<LinkedinStatus>(getLinkedinStatusUrl(), { ...options, method: "GET" });
-};
-
-export const getGetLinkedinStatusQueryKey = () => [`/api/linkedin/status`] as const;
-
-export const getGetLinkedinStatusQueryOptions = <
-  TData = Awaited<ReturnType<typeof getLinkedinStatus>>,
-  TError = ErrorType<ErrorResponse>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getLinkedinStatus>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-  const queryKey = queryOptions?.queryKey ?? getGetLinkedinStatusQueryKey();
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLinkedinStatus>>> = ({ signal }) =>
-    getLinkedinStatus({ signal, ...requestOptions });
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getLinkedinStatus>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetLinkedinStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getLinkedinStatus>>>;
-export type GetLinkedinStatusQueryError = ErrorType<ErrorResponse>;
-
-export function useGetLinkedinStatus<
-  TData = Awaited<ReturnType<typeof getLinkedinStatus>>,
-  TError = ErrorType<ErrorResponse>,
->(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof getLinkedinStatus>>, TError, TData>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetLinkedinStatusQueryOptions(options);
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Sync original LinkedIn posts into the Library
- */
-export const linkedinSync = async (options?: RequestInit): Promise<LinkedinSyncResult> => {
-  return customFetch<LinkedinSyncResult>(`/api/linkedin/sync`, { ...options, method: "POST" });
-};
-
-export const getLinkedinSyncMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinSync>>, TError, void, TContext>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkedinSync>>, void> = () => {
-    return linkedinSync(requestOptions);
-  };
-  return { mutationFn, ...mutationOptions } as UseMutationOptions<
-    Awaited<ReturnType<typeof linkedinSync>>,
-    TError,
-    void,
-    TContext
-  >;
-};
-
-export type LinkedinSyncMutationResult = NonNullable<Awaited<ReturnType<typeof linkedinSync>>>;
-export type LinkedinSyncMutationError = ErrorType<ErrorResponse>;
-
-export const useLinkedinSync = <TError = ErrorType<ErrorResponse>, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinSync>>, TError, void, TContext>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<Awaited<ReturnType<typeof linkedinSync>>, TError, void, TContext> => {
-  const mutationOptions = getLinkedinSyncMutationOptions(options);
-  return useMutation(mutationOptions);
-};
-
-/**
- * @summary Disconnect LinkedIn account
- */
-export const linkedinDisconnect = async (options?: RequestInit): Promise<{ ok: boolean }> => {
-  return customFetch<{ ok: boolean }>(`/api/linkedin/disconnect`, { ...options, method: "DELETE" });
-};
-
-export const getLinkedinDisconnectMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinDisconnect>>, TError, void, TContext>;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { mutation: mutationOptions, request: requestOptions } = options ?? {};
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkedinDisconnect>>, void> = () => {
-    return linkedinDisconnect(requestOptions);
-  };
-  return { mutationFn, ...mutationOptions } as UseMutationOptions<
-    Awaited<ReturnType<typeof linkedinDisconnect>>,
-    TError,
-    void,
-    TContext
-  >;
-};
-
-export type LinkedinDisconnectMutationResult = NonNullable<Awaited<ReturnType<typeof linkedinDisconnect>>>;
-export type LinkedinDisconnectMutationError = ErrorType<ErrorResponse>;
-
-export const useLinkedinDisconnect = <TError = ErrorType<ErrorResponse>, TContext = unknown>(options?: {
-  mutation?: UseMutationOptions<Awaited<ReturnType<typeof linkedinDisconnect>>, TError, void, TContext>;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<Awaited<ReturnType<typeof linkedinDisconnect>>, TError, void, TContext> => {
-  const mutationOptions = getLinkedinDisconnectMutationOptions(options);
-  return useMutation(mutationOptions);
 };

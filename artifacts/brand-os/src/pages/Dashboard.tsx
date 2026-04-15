@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
+import { useToast } from "@/hooks/use-toast";
 
 function todayKey() {
   return `brand_os_brief_v2_${new Date().toISOString().slice(0, 10)}`;
@@ -125,6 +126,7 @@ function MomentumCard({ data }: { data: MomentumData }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const { data: drafts, isLoading: draftsLoading } = useListDrafts();
   const [ripeThoughts, setRipeThoughts] = useState<Thought[]>([]);
@@ -217,16 +219,21 @@ export default function Dashboard() {
   };
 
   const handleAcceptSuggestion = async (id: number) => {
+    const suggestion = voiceSuggestions.find((s) => s.id === id);
     try {
       await voiceInsightsApi.accept(id);
       setVoiceSuggestions((prev) => prev.filter((s) => s.id !== id));
-    } catch { /* ignore */ }
+      toast({ title: suggestion ? `${suggestion.field} updated to "${suggestion.suggestedValue}"` : "Voice setting applied." });
+    } catch {
+      toast({ title: "Failed to apply suggestion.", variant: "destructive" });
+    }
   };
 
   const handleDismissSuggestion = async (id: number) => {
     try {
       await voiceInsightsApi.dismiss(id);
       setVoiceSuggestions((prev) => prev.filter((s) => s.id !== id));
+      toast({ title: "Suggestion dismissed." });
     } catch { /* ignore */ }
   };
 

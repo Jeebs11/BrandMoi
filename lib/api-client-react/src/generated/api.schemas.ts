@@ -40,6 +40,7 @@ export interface PreferencesResponse {
   brandRole: string;
   brandAudience: string;
   brandBelief: string;
+  /** Free-text creator bio used as primary AI context; replaces Objective/Persona labels when non-empty. */
   aboutMe?: string;
   onboarded: boolean;
 }
@@ -51,11 +52,12 @@ export interface UpdatePreferencesBody {
   brandRole?: string;
   brandAudience?: string;
   brandBelief?: string;
+  /**
+   * Free-text creator bio; replaces Objective/Persona labels in AI context when non-empty.
+   * @maxLength 500
+   */
   aboutMe?: string;
   onboarded?: boolean;
-  brandBgColor?: string;
-  brandAccentColor?: string;
-  brandTextColor?: string;
 }
 
 export interface SuggestionItem {
@@ -72,17 +74,19 @@ export interface StructureIdeaBody {
   tone: string;
 }
 
+export type HookItemType = (typeof HookItemType)[keyof typeof HookItemType];
+
+export const HookItemType = {
+  "how-i": "how-i",
+  contrarian: "contrarian",
+  number: "number",
+  "how-to": "how-to",
+  story: "story",
+} as const;
+
 export interface HookItem {
   text: string;
-  type?: string;
-  sourceLine?: string;
-  usedBefore?: boolean;
-}
-
-export interface StructureIdeaResponse {
-  evergreen: StructuredBreakdown;
-  trending: StructuredBreakdown;
-  hookUsage?: Record<string, number>;
+  type?: HookItemType;
 }
 
 export interface StructuredBreakdown {
@@ -97,15 +101,18 @@ export interface StructuredBreakdown {
   teacherMode?: boolean;
 }
 
+export type StructureIdeaResponseHookUsage = { [key: string]: number };
+
+export interface StructureIdeaResponse {
+  evergreen: StructuredBreakdown;
+  trending?: StructuredBreakdown | null;
+  hookUsage?: StructureIdeaResponseHookUsage;
+}
+
 export interface CarouselSlide {
   slide: number;
   title: string;
   description?: string;
-}
-
-export interface InfographicData {
-  headline: string;
-  bullets: string[];
 }
 
 export interface GenerateContentBody {
@@ -119,33 +126,12 @@ export interface GenerateContentBody {
   storyMode?: boolean;
   postTone?: string;
   teacherMode?: boolean;
-  newsUrl?: string;
 }
 
 export interface GeneratedContent {
   post: string;
-  shortPost?: string;
-  hashtags?: string;
   carousel: CarouselSlide[];
   visual: string;
-  infographic?: InfographicData;
-}
-
-export interface GenerateImageBody {
-  prompt: string;
-  mode?: "photo" | "illustration";
-  illustrationStyle?: string;
-}
-
-export interface GenerateIllustrationConceptBody {
-  postContent: string;
-  style: string;
-}
-
-export interface GenerateIllustrationConceptResponse {
-  scenePrompt: string;
-  caption: string;
-  chosenStyle: string;
 }
 
 export type RefineContentBodyTab =
@@ -155,8 +141,6 @@ export const RefineContentBodyTab = {
   post: "post",
   carousel: "carousel",
   visual: "visual",
-  infographic: "infographic",
-  illustration: "illustration",
 } as const;
 
 export interface RefineContentBody {
@@ -177,6 +161,46 @@ export const DraftStatus = {
   published: "published",
 } as const;
 
+export type DraftContentSource =
+  | (typeof DraftContentSource)[keyof typeof DraftContentSource]
+  | null;
+
+export const DraftContentSource = {
+  capture: "capture",
+  news_reaction: "news_reaction",
+  teach_audience: "teach_audience",
+  story_mode: "story_mode",
+  brand_voice_idea: "brand_voice_idea",
+  linkedin: "linkedin",
+} as const;
+
+export interface DiagnosisSection {
+  /**
+   * Section rating 1-5 or null if not applicable
+   * @nullable
+   */
+  rating?: number | null;
+  analysis: string;
+}
+
+export type DraftDiagnosisSections = {
+  hook?: DiagnosisSection;
+  body?: DiagnosisSection;
+  tone?: DiagnosisSection;
+  cta?: DiagnosisSection;
+  visual?: DiagnosisSection;
+};
+
+/**
+ * Cached AI post diagnosis (null if not yet generated)
+ */
+export type DraftDiagnosis = {
+  headline: string;
+  sections?: DraftDiagnosisSections;
+  reasons: string[];
+  replicateTip: string;
+} | null;
+
 export interface Draft {
   id: number;
   rawInput: string;
@@ -187,33 +211,25 @@ export interface Draft {
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */
-  shortPost?: string | null;
-  /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
   status: DraftStatus;
-  /** @nullable */
-  externalId?: string | null;
-  /** @nullable */
-  postType?: string | null;
   createdAt: string;
   updatedAt: string;
-  /** @nullable */
-  diagnosis?: {
-    headline: string;
-    sections?: {
-      hook?: { rating: number | null; analysis: string };
-      body?: { rating: number | null; analysis: string };
-      tone?: { rating: number | null; analysis: string };
-      cta?: { rating: number | null; analysis: string };
-      visual?: { rating: number | null; analysis: string };
-    };
-    reasons: string[];
-    replicateTip: string;
-    hookAnalysis?: string;
-    toneMatch?: string;
-  } | null;
+  contentSource?: DraftContentSource;
+  /**
+   * External platform ID (e.g. LinkedIn UGC post URN) for deduplication
+   * @nullable
+   */
+  externalId?: string | null;
+  /**
+   * Post subtype for imported content (post, article)
+   * @nullable
+   */
+  postType?: string | null;
+  /** Cached AI post diagnosis (null if not yet generated) */
+  diagnosis?: DraftDiagnosis;
 }
 
 export type CreateDraftBodyStatus =
@@ -225,6 +241,29 @@ export const CreateDraftBodyStatus = {
   published: "published",
 } as const;
 
+export type CreateDraftBodyContentSource =
+  (typeof CreateDraftBodyContentSource)[keyof typeof CreateDraftBodyContentSource];
+
+export const CreateDraftBodyContentSource = {
+  capture: "capture",
+  news_reaction: "news_reaction",
+  teach_audience: "teach_audience",
+  story_mode: "story_mode",
+  brand_voice_idea: "brand_voice_idea",
+  linkedin: "linkedin",
+} as const;
+
+export type CreateDraftBodyVisualType =
+  (typeof CreateDraftBodyVisualType)[keyof typeof CreateDraftBodyVisualType];
+
+export const CreateDraftBodyVisualType = {
+  none: "none",
+  card: "card",
+  carousel: "carousel",
+  infographic: "infographic",
+  art: "art",
+} as const;
+
 export interface CreateDraftBody {
   rawInput: string;
   objective: string;
@@ -232,18 +271,14 @@ export interface CreateDraftBody {
   tone: string;
   structuredBreakdown: StructuredBreakdown;
   /** @nullable */
-  selectedHook?: string | null;
-  /** @nullable */
   postOutput?: string | null;
-  /** @nullable */
-  shortPost?: string | null;
   /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
   status: CreateDraftBodyStatus;
-  contentSource?: string;
-  visualType?: string;
+  contentSource?: CreateDraftBodyContentSource;
+  visualType?: CreateDraftBodyVisualType;
 }
 
 export type UpdateDraftBodyStatus =
@@ -255,19 +290,54 @@ export const UpdateDraftBodyStatus = {
   published: "published",
 } as const;
 
+export type UpdateDraftBodyContentSource =
+  (typeof UpdateDraftBodyContentSource)[keyof typeof UpdateDraftBodyContentSource];
+
+export const UpdateDraftBodyContentSource = {
+  capture: "capture",
+  news_reaction: "news_reaction",
+  teach_audience: "teach_audience",
+  story_mode: "story_mode",
+  brand_voice_idea: "brand_voice_idea",
+  linkedin: "linkedin",
+} as const;
+
+export type UpdateDraftBodyVisualType =
+  (typeof UpdateDraftBodyVisualType)[keyof typeof UpdateDraftBodyVisualType];
+
+export const UpdateDraftBodyVisualType = {
+  none: "none",
+  card: "card",
+  carousel: "carousel",
+  infographic: "infographic",
+  art: "art",
+} as const;
+
 export interface UpdateDraftBody {
   /** @nullable */
   postOutput?: string | null;
-  /** @nullable */
-  shortPost?: string | null;
   /** @nullable */
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
   status?: UpdateDraftBodyStatus;
-  structuredBreakdown?: StructuredBreakdown;
-  contentSource?: string;
-  visualType?: string;
+  contentSource?: UpdateDraftBodyContentSource;
+  visualType?: UpdateDraftBodyVisualType;
+}
+
+export interface LinkedinStatusResponse {
+  configured: boolean;
+  connected: boolean;
+  displayName?: string;
+  memberUrn?: string;
+  /** @nullable */
+  lastSyncedAt?: string | null;
+}
+
+export interface LinkedinSyncResponse {
+  imported: number;
+  skipped: number;
+  total: number;
 }
 
 export interface AgentBriefResponse {
@@ -283,81 +353,156 @@ export interface AgentBriefResponse {
   newsDescription?: string;
 }
 
-export interface AnalyticsToneBreakdown {
+export type AnalyticsOverviewResponseByToneItem = {
   tone: string;
   count: number;
   sampledCount: number;
+  /** @nullable */
   avgResonance: number | null;
-}
+};
 
-export interface AnalyticsSourceBreakdown {
-  source: string;
+export type AnalyticsOverviewResponseByContentSourceItemSource =
+  (typeof AnalyticsOverviewResponseByContentSourceItemSource)[keyof typeof AnalyticsOverviewResponseByContentSourceItemSource];
+
+export const AnalyticsOverviewResponseByContentSourceItemSource = {
+  capture: "capture",
+  news_reaction: "news_reaction",
+  teach_audience: "teach_audience",
+  story_mode: "story_mode",
+  brand_voice_idea: "brand_voice_idea",
+  linkedin: "linkedin",
+} as const;
+
+export type AnalyticsOverviewResponseByContentSourceItem = {
+  source: AnalyticsOverviewResponseByContentSourceItemSource;
   count: number;
-  avgResonance: number | null;
   sampledCount: number;
-}
+  /** @nullable */
+  avgResonance: number | null;
+};
 
-export interface AnalyticsVisualBreakdown {
-  type: string;
+export type AnalyticsOverviewResponseByVisualTypeItemType =
+  (typeof AnalyticsOverviewResponseByVisualTypeItemType)[keyof typeof AnalyticsOverviewResponseByVisualTypeItemType];
+
+export const AnalyticsOverviewResponseByVisualTypeItemType = {
+  none: "none",
+  card: "card",
+  carousel: "carousel",
+  infographic: "infographic",
+  art: "art",
+} as const;
+
+export type AnalyticsOverviewResponseByVisualTypeItem = {
+  type: AnalyticsOverviewResponseByVisualTypeItemType;
   count: number;
-  avgResonance: number | null;
   sampledCount: number;
-}
+  /** @nullable */
+  avgResonance: number | null;
+};
 
-export interface AnalyticsObjectiveBreakdown {
+export type AnalyticsOverviewResponseByObjectiveItem = {
   objective: string;
   count: number;
-  avgResonance: number | null;
   sampledCount: number;
-}
+  /** @nullable */
+  avgResonance: number | null;
+};
 
-export interface AnalyticsTopPost {
+export type AnalyticsOverviewResponseTopPostsItem = {
   id: number;
   topic: string;
   resonance: number;
+  /** @nullable */
   tone: string | null;
   contentSource: string;
   visualType: string;
   publishedAt: string;
-}
+};
 
-export interface AnalyticsWeeklyTrend {
+export type AnalyticsOverviewResponseWeeklyTrendItem = {
   week: string;
   count: number;
-}
+};
 
-export interface AnalyticsWeeklyResonanceTrend {
+export type AnalyticsOverviewResponseWeeklyResonanceTrendItem = {
   week: string;
   avgResonance: number;
   sampleCount: number;
-}
+};
 
-export interface LinkedinStatus {
-  configured: boolean;
-  connected: boolean;
-  displayName?: string;
-  memberUrn?: string;
-  lastSyncedAt?: string | null;
-}
-
-export interface LinkedinSyncResult {
-  imported: number;
-  skipped: number;
-  total: number;
-}
-
-export interface AnalyticsOverview {
+/**
+ * @summary Analytics overview response
+ */
+export interface AnalyticsOverviewResponse {
   totalPublished: number;
   avgResonance: number;
   loggedPerformanceCount: number;
-  byTone: AnalyticsToneBreakdown[];
-  byContentSource: AnalyticsSourceBreakdown[];
-  byVisualType: AnalyticsVisualBreakdown[];
-  byObjective: AnalyticsObjectiveBreakdown[];
-  topPosts: AnalyticsTopPost[];
-  weeklyTrend: AnalyticsWeeklyTrend[];
-  weeklyResonanceTrend: AnalyticsWeeklyResonanceTrend[];
+  byTone: AnalyticsOverviewResponseByToneItem[];
+  byContentSource: AnalyticsOverviewResponseByContentSourceItem[];
+  byVisualType: AnalyticsOverviewResponseByVisualTypeItem[];
+  byObjective: AnalyticsOverviewResponseByObjectiveItem[];
+  topPosts: AnalyticsOverviewResponseTopPostsItem[];
+  weeklyTrend: AnalyticsOverviewResponseWeeklyTrendItem[];
+  weeklyResonanceTrend: AnalyticsOverviewResponseWeeklyResonanceTrendItem[];
   last30: number;
   last60: number;
   last90: number;
 }
+
+export type PostDiagnosisSections = {
+  hook?: DiagnosisSection;
+  body?: DiagnosisSection;
+  tone?: DiagnosisSection;
+  cta?: DiagnosisSection;
+  visual?: DiagnosisSection;
+};
+
+export interface PostDiagnosis {
+  headline: string;
+  sections?: PostDiagnosisSections;
+  reasons: string[];
+  replicateTip: string;
+}
+
+export type VoiceSuggestionStatus =
+  (typeof VoiceSuggestionStatus)[keyof typeof VoiceSuggestionStatus];
+
+export const VoiceSuggestionStatus = {
+  pending: "pending",
+  accepted: "accepted",
+  dismissed: "dismissed",
+} as const;
+
+export interface VoiceSuggestion {
+  id: number;
+  userId: number;
+  field: string;
+  currentValue: string;
+  suggestedValue: string;
+  rationale: string;
+  evidenceDraftIds: number[];
+  evidenceSnippets: string[];
+  status: VoiceSuggestionStatus;
+  createdAt: string;
+}
+
+export type VoiceInsightsResult =
+  | {
+      status: "insufficient";
+      count: number;
+      suggestions: unknown[];
+    }
+  | {
+      status: "ok";
+      suggestions: VoiceSuggestion[];
+    };
+
+export type LinkedinDisconnect200 = {
+  ok: boolean;
+};
+
+export type GetResonanceMap200 = { [key: string]: number };
+
+export type GeneratePostDiagnosis200 = {
+  diagnosis: PostDiagnosis;
+};

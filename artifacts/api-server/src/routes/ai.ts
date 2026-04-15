@@ -11,7 +11,6 @@ import {
   GenerateContentResponse,
   RefineContentBody,
   RefineContentResponse,
-  InfographicDataSchema,
 } from "@workspace/api-zod";
 import {
   buildBrandContext,
@@ -23,6 +22,11 @@ import {
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
+
+const InfographicDataSchema = z.object({
+  headline: z.string(),
+  bullets: z.array(z.string()),
+});
 
 const router: IRouter = Router();
 
@@ -784,12 +788,42 @@ router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promis
     .where(eq(performanceSignalsTable.draftId, draftId))
     .limit(1);
 
-  const bd = draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string; coreMessage?: string } | null;
+  const bd = draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string; coreMessage?: string; visualType?: string } | null;
   const postText = draft.postOutput ?? draft.rawInput;
   const resonance = signal ? resonanceScore(signal) : null;
   const perfContext = signal
     ? `Performance: ${resonance} resonance score (${signal.impressions} impressions, ${signal.reactions} reactions, ${signal.comments} comments, ${signal.reposts} reposts)`
     : "No performance data yet";
+
+  // Visual type track-record analysis: benchmark against user's other high performers
+  const thisVisualType = bd?.visualType ?? null;
+  let visualBenchmarkContext = "";
+  if (thisVisualType) {
+    const allPublished = await db
+      .select({ id: draftsTable.id, structuredBreakdown: draftsTable.structuredBreakdown })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
+
+    const siblingIds = allPublished
+      .filter((d) => {
+        const sbd = d.structuredBreakdown as { visualType?: string } | null;
+        return sbd?.visualType === thisVisualType && d.id !== draftId;
+      })
+      .map((d) => d.id);
+
+    if (siblingIds.length > 0) {
+      const siblingSignals = await db
+        .select()
+        .from(performanceSignalsTable)
+        .where(inArray(performanceSignalsTable.draftId, siblingIds));
+      const siblingScores = siblingSignals.map((s) => resonanceScore(s)).filter((r) => r > 0);
+      if (siblingScores.length > 0) {
+        const avgScore = Math.round(siblingScores.reduce((a, b) => a + b, 0) / siblingScores.length);
+        const highCount = siblingScores.filter((r) => r >= 60).length;
+        visualBenchmarkContext = `\nVisual type "${thisVisualType}" benchmark: ${siblingScores.length} other post(s) with this visual type averaged ${avgScore} resonance (${highCount} high-performer${highCount !== 1 ? "s" : ""} ≥ 60). ${resonance !== null && resonance > avgScore ? "This post outperformed the average for its visual type." : resonance !== null ? "This post was below average for its visual type." : ""}`;
+      }
+    }
+  }
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -819,8 +853,8 @@ Rules:
       content: `Post topic: ${bd?.topic ?? "unknown"}
 Angle: ${bd?.angle ?? "unknown"}
 Tone: ${draft.tone} | Objective: ${draft.objective}
-Visual type: ${(draft.structuredBreakdown as Record<string, unknown> | null)?.visualType ?? "none/unknown"}
-${perfContext}
+Visual type: ${thisVisualType ?? "none/unknown"}
+${perfContext}${visualBenchmarkContext}
 
 Post excerpt:
 ${postText?.slice(0, 800) ?? "(no text)"}

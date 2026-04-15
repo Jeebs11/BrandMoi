@@ -343,6 +343,118 @@ paths:
               schema:
                 $ref: "#/components/schemas/AnalyticsOverviewResponse"
 
+  /analytics/resonance-map:
+    get:
+      operationId: getResonanceMap
+      tags: [drafts]
+      summary: Get resonance scores for all published drafts with performance signals
+      responses:
+        "200":
+          description: Map of draftId to resonance score
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: number
+
+  /ai/voice-insights:
+    post:
+      operationId: generateVoiceInsights
+      tags: [ai]
+      summary: Generate AI brand voice suggestions from top-resonance posts
+      responses:
+        "200":
+          description: Voice insights result (ok or insufficient)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceInsightsResult"
+
+  /voice-suggestions:
+    get:
+      operationId: listVoiceSuggestions
+      tags: [user]
+      summary: List pending voice suggestions for the current user
+      responses:
+        "200":
+          description: List of pending voice suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VoiceSuggestion"
+
+  /voice-suggestions/{id}/accept:
+    patch:
+      operationId: acceptVoiceSuggestion
+      tags: [user]
+      summary: Accept a voice suggestion and apply it to preferences
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Suggestion accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceSuggestion"
+        "400":
+          description: Invalid field or suggestion
+        "404":
+          description: Suggestion not found
+
+  /voice-suggestions/{id}/dismiss:
+    patch:
+      operationId: dismissVoiceSuggestion
+      tags: [user]
+      summary: Dismiss a voice suggestion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Suggestion dismissed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceSuggestion"
+        "404":
+          description: Suggestion not found
+
+  /ai/post-diagnosis/{draftId}:
+    post:
+      operationId: generatePostDiagnosis
+      tags: [ai]
+      summary: Generate or retrieve cached diagnosis for a published post
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Post diagnosis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  diagnosis:
+                    $ref: "#/components/schemas/PostDiagnosis"
+                required: [diagnosis]
+        "404":
+          description: Draft not found
+
   /drafts:
     get:
       operationId: listDrafts
@@ -777,6 +889,25 @@ components:
         postType:
           type: ["string", "null"]
           description: Post subtype for imported content (post, article)
+        diagnosis:
+          description: Cached AI post diagnosis (null if not yet generated)
+          nullable: true
+          type: object
+          properties:
+            headline: { type: string }
+            sections:
+              type: object
+              properties:
+                hook: { $ref: "#/components/schemas/DiagnosisSection" }
+                body: { $ref: "#/components/schemas/DiagnosisSection" }
+                tone: { $ref: "#/components/schemas/DiagnosisSection" }
+                cta: { $ref: "#/components/schemas/DiagnosisSection" }
+                visual: { $ref: "#/components/schemas/DiagnosisSection" }
+            reasons:
+              type: array
+              items: { type: string }
+            replicateTip: { type: string }
+          required: [headline, reasons, replicateTip]
       required:
         - id
         - rawInput
@@ -995,3 +1126,80 @@ components:
         - last30
         - last60
         - last90
+
+    DiagnosisSection:
+      type: object
+      properties:
+        rating:
+          type: ["integer", "null"]
+          description: "Section rating 1-5 or null if not applicable"
+        analysis:
+          type: string
+      required: [analysis]
+
+    PostDiagnosis:
+      type: object
+      properties:
+        headline:
+          type: string
+        sections:
+          type: object
+          properties:
+            hook: { $ref: "#/components/schemas/DiagnosisSection" }
+            body: { $ref: "#/components/schemas/DiagnosisSection" }
+            tone: { $ref: "#/components/schemas/DiagnosisSection" }
+            cta: { $ref: "#/components/schemas/DiagnosisSection" }
+            visual: { $ref: "#/components/schemas/DiagnosisSection" }
+        reasons:
+          type: array
+          items: { type: string }
+        replicateTip:
+          type: string
+      required: [headline, reasons, replicateTip]
+
+    VoiceSuggestion:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        field: { type: string }
+        currentValue: { type: string }
+        suggestedValue: { type: string }
+        rationale: { type: string }
+        evidenceDraftIds:
+          type: array
+          items: { type: integer }
+        evidenceSnippets:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+          enum: [pending, accepted, dismissed]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, field, currentValue, suggestedValue, rationale, evidenceDraftIds, evidenceSnippets, status, createdAt]
+
+    VoiceInsightsResult:
+      oneOf:
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [insufficient]
+            count:
+              type: integer
+            suggestions:
+              type: array
+              items: {}
+          required: [status, count, suggestions]
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [ok]
+            suggestions:
+              type: array
+              items:
+                $ref: "#/components/schemas/VoiceSuggestion"
+          required: [status, suggestions]
