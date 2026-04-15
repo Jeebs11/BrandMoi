@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable, brandVoiceSignalsTable } from "@workspace/db";
+import { preferencesTable, draftsTable, brandVoiceSignalsTable, performanceSignalsTable, voiceSuggestionsTable } from "@workspace/db";
 import {
   StructureIdeaBody,
   StrictStructureIdeaResponse,
@@ -593,6 +593,218 @@ router.post("/ai/check-angle", requireAuth, async (req, res): Promise<void> => {
     score: Math.round(mostSimilar.score * 100),
     freshAngles,
   });
+});
+
+const ALLOWED_VOICE_FIELDS = ["tone", "objective", "persona", "brandRole", "brandAudience", "brandBelief"] as const;
+type AllowedVoiceField = typeof ALLOWED_VOICE_FIELDS[number];
+
+function resonanceScore(s: { impressions: number; reactions: number; comments: number; reposts: number }): number {
+  const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4;
+  if (s.impressions > 0) return Math.min(100, Math.round((w / s.impressions) * 1000));
+  if (w === 0) return 0;
+  return Math.min(100, Math.round(Math.log2(1 + w) * 12));
+}
+
+router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+
+  const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
+
+  const publishedDrafts = await db
+    .select()
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+    .orderBy(desc(draftsTable.updatedAt));
+
+  if (publishedDrafts.length === 0) {
+    res.json({ status: "insufficient", count: 0, suggestions: [] });
+    return;
+  }
+
+  const draftIds = publishedDrafts.map((d) => d.id);
+  const signals = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(inArray(performanceSignalsTable.draftId, draftIds));
+
+  const perfMap = new Map(signals.map((s) => [s.draftId, s]));
+  const scored = publishedDrafts
+    .map((d) => {
+      const p = perfMap.get(d.id);
+      if (!p) return null;
+      return { draft: d, resonance: resonanceScore(p), signal: p };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.resonance - a.resonance);
+
+  if (scored.length < 5) {
+    res.json({ status: "insufficient", count: scored.length, suggestions: [] });
+    return;
+  }
+
+  const top = scored.slice(0, 10);
+  const topPostSummaries = top.map((x) => {
+    const bd = x.draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string } | null;
+    return `- Topic: ${bd?.topic ?? "unknown"} | Angle: ${bd?.angle ?? "unknown"} | Tone: ${x.draft.tone} | Objective: ${x.draft.objective} | Resonance: ${x.resonance}`;
+  }).join("\n");
+
+  const currentProfile = `Current profile:
+- tone: ${prefs?.tone ?? "unknown"}
+- objective: ${prefs?.objective ?? "unknown"}
+- persona: ${prefs?.persona ?? "unknown"}
+- brandRole: ${prefs?.brandRole ?? ""}
+- brandAudience: ${prefs?.brandAudience ?? ""}
+- brandBelief: ${prefs?.brandBelief ?? ""}`;
+
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1024,
+    system: `You are a LinkedIn brand strategist. Based on a creator's best-performing posts, identify 1-3 specific improvements to their brand profile settings. Return only valid JSON — no markdown fences.
+
+Allowed fields to suggest: tone, objective, persona, brandRole, brandAudience, brandBelief.
+
+JSON shape:
+{"suggestions": [{"field": "tone", "suggestedValue": "...", "rationale": "1-2 sentences explaining why based on the data"}]}
+
+Rules:
+- Only suggest fields where you see a clear pattern in the high-resonance posts.
+- Keep rationale specific and data-driven (reference the actual post patterns).
+- Maximum 3 suggestions.
+- Never suggest a value identical to the current value.
+- For "tone", only suggest values from: Executive, Direct, Story, Contrarian, Witty, Vulnerable, Playful, Snappy.
+- For "objective", only suggest values from: Clients, Job, Authority, Documenting, Expert, Hiring.`,
+    messages: [{
+      role: "user",
+      content: `${currentProfile}
+
+Top performing posts (sorted by resonance):
+${topPostSummaries}
+
+Identify 1-3 brand voice improvements based on what's working. Return JSON only.`,
+    }],
+  });
+
+  const t = message.content[0];
+  if (t.type !== "text") {
+    res.status(500).json({ error: "Unexpected AI response" });
+    return;
+  }
+
+  let parsed: { suggestions: Array<{ field: string; suggestedValue: string; rationale: string }> };
+  try {
+    const stripped = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    parsed = JSON.parse(stripped) as typeof parsed;
+  } catch {
+    res.status(500).json({ error: "AI returned invalid JSON" });
+    return;
+  }
+
+  const valid = (parsed.suggestions ?? []).filter(
+    (s) => ALLOWED_VOICE_FIELDS.includes(s.field as AllowedVoiceField) && s.suggestedValue && s.rationale
+  );
+
+  await db.delete(voiceSuggestionsTable).where(
+    and(eq(voiceSuggestionsTable.userId, userId), eq(voiceSuggestionsTable.status, "pending"))
+  );
+
+  if (valid.length === 0) {
+    res.json({ status: "ok", suggestions: [] });
+    return;
+  }
+
+  const currentPrefsMap: Record<string, string> = {
+    tone: prefs?.tone ?? "",
+    objective: prefs?.objective ?? "",
+    persona: prefs?.persona ?? "",
+    brandRole: prefs?.brandRole ?? "",
+    brandAudience: prefs?.brandAudience ?? "",
+    brandBelief: prefs?.brandBelief ?? "",
+  };
+
+  const inserted = await db
+    .insert(voiceSuggestionsTable)
+    .values(valid.map((s) => ({
+      userId,
+      field: s.field,
+      currentValue: currentPrefsMap[s.field] ?? "",
+      suggestedValue: s.suggestedValue,
+      rationale: s.rationale,
+    })))
+    .returning();
+
+  res.json({ status: "ok", suggestions: inserted });
+});
+
+router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promise<void> => {
+  const draftId = Number(req.params.draftId);
+  if (isNaN(draftId)) { res.status(400).json({ error: "Invalid draft ID" }); return; }
+
+  const userId = req.user!.userId;
+
+  const [draft] = await db
+    .select()
+    .from(draftsTable)
+    .where(and(eq(draftsTable.id, draftId), eq(draftsTable.userId, userId)))
+    .limit(1);
+
+  if (!draft) { res.status(404).json({ error: "Draft not found" }); return; }
+
+  if (draft.diagnosis) {
+    res.json({ diagnosis: draft.diagnosis });
+    return;
+  }
+
+  const [signal] = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(eq(performanceSignalsTable.draftId, draftId))
+    .limit(1);
+
+  const bd = draft.structuredBreakdown as { topic?: string; angle?: string; archetype?: string; coreMessage?: string } | null;
+  const postText = draft.postOutput ?? draft.rawInput;
+  const resonance = signal ? resonanceScore(signal) : null;
+  const perfContext = signal
+    ? `Performance: ${resonance} resonance score (${signal.impressions} impressions, ${signal.reactions} reactions, ${signal.comments} comments, ${signal.reposts} reposts)`
+    : "No performance data yet";
+
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 512,
+    system: `You are a LinkedIn content analyst. Diagnose why a post performed well (or explain what to watch for). Return only valid JSON — no markdown fences.
+
+JSON shape:
+{"headline": "1 sentence summary of why it worked", "reasons": ["reason 1", "reason 2", "reason 3"], "replicateTip": "1 actionable tip to replicate this success"}
+
+Keep each reason under 20 words. Be specific to the post content.`,
+    messages: [{
+      role: "user",
+      content: `Post topic: ${bd?.topic ?? "unknown"}
+Angle: ${bd?.angle ?? "unknown"}
+Tone: ${draft.tone} | Objective: ${draft.objective}
+${perfContext}
+
+Post excerpt:
+${postText?.slice(0, 800) ?? "(no text)"}
+
+Diagnose why this post worked. Return JSON only.`,
+    }],
+  });
+
+  const t = message.content[0];
+  if (t.type !== "text") { res.status(500).json({ error: "Unexpected AI response" }); return; }
+
+  let diagnosis: { headline: string; reasons: string[]; replicateTip: string };
+  try {
+    const stripped = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    diagnosis = JSON.parse(stripped) as typeof diagnosis;
+  } catch {
+    res.status(500).json({ error: "AI returned invalid JSON" });
+    return;
+  }
+
+  await db.update(draftsTable).set({ diagnosis }).where(eq(draftsTable.id, draftId));
+
+  res.json({ diagnosis });
 });
 
 export async function extractVoiceDNA(userId: number, draftId: number, postOutput: string): Promise<void> {

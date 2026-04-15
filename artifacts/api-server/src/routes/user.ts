@@ -4,7 +4,7 @@ import { eq, desc, and } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable } from "@workspace/db";
+import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable, voiceSuggestionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { signToken } from "../lib/jwt.js";
 
@@ -241,6 +241,74 @@ function buildSuggestions(drafts: DraftRow[]): Array<{ id: string; type: string;
 
   return suggestions.slice(0, 4);
 }
+
+router.get("/voice-suggestions", requireAuth, async (req, res): Promise<void> => {
+  const suggestions = await db
+    .select()
+    .from(voiceSuggestionsTable)
+    .where(and(
+      eq(voiceSuggestionsTable.userId, req.user!.userId),
+      eq(voiceSuggestionsTable.status, "pending"),
+    ))
+    .orderBy(desc(voiceSuggestionsTable.createdAt));
+  res.json(suggestions);
+});
+
+router.patch("/voice-suggestions/:id/accept", requireAuth, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+  const userId = req.user!.userId;
+
+  const [suggestion] = await db
+    .select()
+    .from(voiceSuggestionsTable)
+    .where(and(eq(voiceSuggestionsTable.id, id), eq(voiceSuggestionsTable.userId, userId)))
+    .limit(1);
+
+  if (!suggestion) { res.status(404).json({ error: "Not found" }); return; }
+
+  const PREF_FIELD_MAP: Record<string, string> = {
+    tone: "tone",
+    objective: "objective",
+    persona: "persona",
+    brandRole: "brandRole",
+    brandAudience: "brandAudience",
+    brandBelief: "brandBelief",
+  };
+
+  const prefKey = PREF_FIELD_MAP[suggestion.field];
+  if (prefKey) {
+    await db
+      .update(preferencesTable)
+      .set({ [prefKey]: suggestion.suggestedValue })
+      .where(eq(preferencesTable.userId, userId));
+  }
+
+  const [updated] = await db
+    .update(voiceSuggestionsTable)
+    .set({ status: "accepted" })
+    .where(eq(voiceSuggestionsTable.id, id))
+    .returning();
+
+  res.json(updated);
+});
+
+router.patch("/voice-suggestions/:id/dismiss", requireAuth, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [updated] = await db
+    .update(voiceSuggestionsTable)
+    .set({ status: "dismissed" })
+    .where(and(
+      eq(voiceSuggestionsTable.id, id),
+      eq(voiceSuggestionsTable.userId, req.user!.userId),
+    ))
+    .returning();
+
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(updated);
+});
 
 const UpdateAccountBody = z.object({
   displayName: z.string().min(1).max(80).optional(),

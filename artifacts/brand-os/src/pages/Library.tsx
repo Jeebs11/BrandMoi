@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2 } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, type PerformanceSignal } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, type PerformanceSignal, type PostDiagnosis } from "@/lib/api";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
@@ -55,6 +55,8 @@ export default function Library() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [resonanceMap, setResonanceMap] = useState<Record<string, number>>({});
+  const [diagnosisPanel, setDiagnosisPanel] = useState<{ draftId: number; topic: string; diagnosis: PostDiagnosis | null; loading: boolean } | null>(null);
 
   const { data: drafts, isLoading, refetch } = useListDrafts();
 
@@ -63,6 +65,20 @@ export default function Library() {
       setTimeout(() => highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
     }
   }, [highlightId, drafts]);
+
+  useEffect(() => {
+    resonanceMapApi.get().then(setResonanceMap).catch(() => {});
+  }, []);
+
+  const openDiagnosis = async (draftId: number, topic: string) => {
+    setDiagnosisPanel({ draftId, topic, diagnosis: null, loading: true });
+    try {
+      const result = await diagnosisApi.get(draftId);
+      setDiagnosisPanel((prev) => prev ? { ...prev, diagnosis: result.diagnosis, loading: false } : null);
+    } catch {
+      setDiagnosisPanel((prev) => prev ? { ...prev, loading: false } : null);
+    }
+  };
   const { mutate: deleteDraft, isPending: isDeleting } = useDeleteDraft();
   const { mutate: updateDraft } = useUpdateDraft();
 
@@ -184,7 +200,20 @@ export default function Library() {
                         <span className="text-[10px] text-gray-300">
                           {new Date(draft.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         </span>
+                        {resonanceMap[String(draft.id)] !== undefined && (
+                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", resonanceMap[String(draft.id)] >= 60 ? "bg-violet-50 text-violet-700" : "bg-gray-50 text-gray-500")}>
+                            ◈ {resonanceMap[String(draft.id)]} resonance
+                          </span>
+                        )}
                       </div>
+                      {(resonanceMap[String(draft.id)] ?? 0) >= 60 && (
+                        <button
+                          onClick={() => void openDiagnosis(draft.id, topic)}
+                          className="mt-2 flex items-center gap-1 text-xs text-violet-600 font-semibold hover:text-violet-800 transition-colors"
+                        >
+                          <Sparkles className="w-3 h-3" /> Why it worked →
+                        </button>
+                      )}
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -240,6 +269,58 @@ export default function Library() {
             modal={perfModal}
             onClose={() => setPerfModal(null)}
           />
+        )}
+
+        {diagnosisPanel && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDiagnosisPanel(null)} />
+            <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <Sparkles className="w-4 h-4 text-violet-500" />
+                    <h3 className="font-extrabold text-gray-900">Why It Worked</h3>
+                  </div>
+                  <p className="text-xs text-gray-400 ml-6 truncate max-w-[280px]">{diagnosisPanel.topic}</p>
+                </div>
+                <button onClick={() => setDiagnosisPanel(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {diagnosisPanel.loading ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                  <p className="text-sm text-gray-500">Analysing your post...</p>
+                </div>
+              ) : diagnosisPanel.diagnosis ? (
+                <div className="space-y-4">
+                  <div className="bg-violet-50 rounded-2xl p-4">
+                    <p className="text-sm font-bold text-violet-800 leading-relaxed">{diagnosisPanel.diagnosis.headline}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">What made it click</p>
+                    <div className="space-y-2">
+                      {diagnosisPanel.diagnosis.reasons.map((reason, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                          <p className="text-sm text-gray-700 leading-relaxed">{reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Replicate this</p>
+                    <p className="text-sm text-emerald-800 leading-relaxed">{diagnosisPanel.diagnosis.replicateTip}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-500">Could not generate diagnosis. Try again later.</p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
     </AppShell>
   );

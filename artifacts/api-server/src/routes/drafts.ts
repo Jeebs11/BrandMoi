@@ -388,4 +388,40 @@ router.get("/drafts/:id/performance", requireAuth, async (req, res): Promise<voi
   res.json(signal ?? null);
 });
 
+router.get("/analytics/resonance-map", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+
+  const publishedDrafts = await db
+    .select({ id: draftsTable.id })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
+
+  if (publishedDrafts.length === 0) {
+    res.json({});
+    return;
+  }
+
+  const draftIds = publishedDrafts.map((d) => d.id);
+  const signals = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(inArray(performanceSignalsTable.draftId, draftIds));
+
+  const map: Record<number, number> = {};
+  for (const s of signals) {
+    const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4;
+    let score: number;
+    if (s.impressions > 0) {
+      score = Math.min(100, Math.round((w / s.impressions) * 1000));
+    } else if (w === 0) {
+      score = 0;
+    } else {
+      score = Math.min(100, Math.round(Math.log2(1 + w) * 12));
+    }
+    map[s.draftId] = score;
+  }
+
+  res.json(map);
+});
+
 export default router;

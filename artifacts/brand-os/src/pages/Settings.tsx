@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { voiceApi, accountApi, linkedinApi, type VoiceSummaryResult, type LinkedinStatus } from "@/lib/api";
+import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryResult, type LinkedinStatus } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
@@ -40,6 +40,7 @@ export default function Settings() {
   const [voiceData, setVoiceData] = useState<VoiceSummaryResult | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(true);
   const [voiceRefreshing, setVoiceRefreshing] = useState(false);
+  const [insightRefreshing, setInsightRefreshing] = useState(false);
 
   const [linkedinStatus, setLinkedinStatus] = useState<LinkedinStatus | null>(null);
   const [linkedinSyncing, setLinkedinSyncing] = useState(false);
@@ -151,6 +152,24 @@ export default function Settings() {
       toast({ title: "Could not refresh voice analysis.", variant: "destructive" });
     } finally {
       setVoiceRefreshing(false);
+    }
+  };
+
+  const handleRefreshInsights = async () => {
+    setInsightRefreshing(true);
+    try {
+      const result = await voiceInsightsApi.generate();
+      if (result.status === "insufficient") {
+        toast({ title: `Need ${5 - result.count} more performance-logged posts to unlock insights.` });
+      } else if (result.suggestions.length === 0) {
+        toast({ title: "Your settings already match your top posts — no changes suggested." });
+      } else {
+        toast({ title: `${result.suggestions.length} new voice insight${result.suggestions.length !== 1 ? "s" : ""} generated. Check the Dashboard.` });
+      }
+    } catch {
+      toast({ title: "Could not generate insights.", variant: "destructive" });
+    } finally {
+      setInsightRefreshing(false);
     }
   };
 
@@ -479,16 +498,26 @@ export default function Settings() {
                 <Brain className="w-4 h-4 text-violet-500" />
                 <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Voice DNA Analysis</h2>
               </div>
-              {voiceData && voiceData.draftCount > 0 && (
+              <div className="flex items-center gap-3">
+                {voiceData && voiceData.draftCount > 0 && (
+                  <button
+                    onClick={() => void handleRefreshVoice()}
+                    disabled={voiceRefreshing}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
+                  >
+                    <RefreshCw className={cn("w-3.5 h-3.5", voiceRefreshing && "animate-spin")} />
+                    Refresh
+                  </button>
+                )}
                 <button
-                  onClick={() => void handleRefreshVoice()}
-                  disabled={voiceRefreshing}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
+                  onClick={() => void handleRefreshInsights()}
+                  disabled={insightRefreshing}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
                 >
-                  <RefreshCw className={cn("w-3.5 h-3.5", voiceRefreshing && "animate-spin")} />
-                  Refresh
+                  {insightRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Get Insights
                 </button>
-              )}
+              </div>
             </div>
 
             {voiceLoading ? (

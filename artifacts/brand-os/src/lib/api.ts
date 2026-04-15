@@ -237,6 +237,46 @@ export const analyticsApi = {
   overview: () => apiFetch<AnalyticsOverview>("/analytics/overview"),
 };
 
+export type VoiceSuggestion = {
+  id: number;
+  userId: number;
+  field: string;
+  currentValue: string;
+  suggestedValue: string;
+  rationale: string;
+  status: string;
+  createdAt: string;
+};
+
+export type VoiceInsightsResult =
+  | { status: "insufficient"; count: number; suggestions: [] }
+  | { status: "ok"; suggestions: VoiceSuggestion[] };
+
+export type PostDiagnosis = {
+  headline: string;
+  reasons: string[];
+  replicateTip: string;
+};
+
+export const voiceInsightsApi = {
+  generate: () =>
+    apiFetch<VoiceInsightsResult>("/ai/voice-insights", { method: "POST" }),
+  list: () => apiFetch<VoiceSuggestion[]>("/voice-suggestions"),
+  accept: (id: number) =>
+    apiFetch<VoiceSuggestion>(`/voice-suggestions/${id}/accept`, { method: "PATCH" }),
+  dismiss: (id: number) =>
+    apiFetch<VoiceSuggestion>(`/voice-suggestions/${id}/dismiss`, { method: "PATCH" }),
+};
+
+export const diagnosisApi = {
+  get: (draftId: number) =>
+    apiFetch<{ diagnosis: PostDiagnosis }>(`/ai/post-diagnosis/${draftId}`, { method: "POST" }),
+};
+
+export const resonanceMapApi = {
+  get: () => apiFetch<Record<string, number>>("/analytics/resonance-map"),
+};
+
 export type LinkedinStatus =
   | { configured: false; connected: false }
   | { configured: true; connected: false }
