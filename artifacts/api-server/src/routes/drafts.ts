@@ -204,21 +204,26 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
 
   // Fetch performance signals for these drafts
   const draftIds = allDrafts.map(d => d.id);
-  const perfMap = new Map<number, { impressions: number; reactions: number; comments: number }>();
+  const perfMap = new Map<number, { impressions: number; reactions: number; comments: number; reposts: number }>();
   if (draftIds.length > 0) {
     const signals = await db
       .select()
       .from(performanceSignalsTable)
       .where(inArray(performanceSignalsTable.draftId, draftIds));
     for (const s of signals) {
-      perfMap.set(s.draftId, { impressions: s.impressions, reactions: s.reactions, comments: s.comments });
+      perfMap.set(s.draftId, { impressions: s.impressions, reactions: s.reactions, comments: s.comments, reposts: s.reposts });
     }
   }
 
-  const resonanceOf = (draftId: number) => {
+  const resonanceOf = (draftId: number): number | null => {
     const p = perfMap.get(draftId);
-    if (!p || p.impressions === 0) return null;
-    return Math.min(100, Math.round(((p.reactions * 3 + p.comments * 5) / p.impressions) * 1000));
+    if (!p) return null;
+    const engagementWeight = p.reactions * 3 + p.comments * 5 + p.reposts * 4;
+    if (p.impressions > 0) {
+      return Math.min(100, Math.round((engagementWeight / p.impressions) * 1000));
+    }
+    if (engagementWeight === 0) return null;
+    return Math.min(100, Math.round(Math.log2(1 + engagementWeight) * 12));
   };
 
   // Avg resonance across all published with perf data
