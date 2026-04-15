@@ -249,6 +249,8 @@ export const ListDraftsResponseItem = zod.object({
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
+  externalId: zod.string().nullish(),
+  postType: zod.string().nullish(),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });

@@ -176,6 +176,11 @@ export default function Library() {
                             ⚡ Short
                           </span>
                         )}
+                        {draft.externalId && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                            via LinkedIn {draft.postType === "article" ? "· Article" : "· Post"}
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-300">
                           {new Date(draft.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         </span>

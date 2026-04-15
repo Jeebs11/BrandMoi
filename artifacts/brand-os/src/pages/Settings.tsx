@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info } from "lucide-react";
+import { useLocation, useSearch } from "wouter";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { voiceApi, accountApi, type VoiceSummaryResult } from "@/lib/api";
+import { voiceApi, accountApi, linkedinApi, type VoiceSummaryResult, type LinkedinStatus } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
@@ -40,6 +40,13 @@ export default function Settings() {
   const [voiceData, setVoiceData] = useState<VoiceSummaryResult | null>(null);
   const [voiceLoading, setVoiceLoading] = useState(true);
   const [voiceRefreshing, setVoiceRefreshing] = useState(false);
+
+  const [linkedinStatus, setLinkedinStatus] = useState<LinkedinStatus | null>(null);
+  const [linkedinSyncing, setLinkedinSyncing] = useState(false);
+  const [linkedinDisconnecting, setLinkedinDisconnecting] = useState(false);
+
+  const search = useSearch();
+  const linkedinParam = new URLSearchParams(search).get("linkedin");
 
   // Account editing
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
@@ -77,6 +84,53 @@ export default function Settings() {
       .catch(() => {})
       .finally(() => setVoiceLoading(false));
   }, []);
+
+  useEffect(() => {
+    linkedinApi.status().then(setLinkedinStatus).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (linkedinParam === "connected") {
+      toast({ title: "LinkedIn connected successfully." });
+      linkedinApi.status().then(setLinkedinStatus).catch(() => {});
+    } else if (linkedinParam === "error") {
+      toast({ title: "LinkedIn connection failed. Please try again.", variant: "destructive" });
+    }
+  }, [linkedinParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLinkedinConnect = () => {
+    window.location.href = linkedinApi.authUrl();
+  };
+
+  const handleLinkedinDisconnect = async () => {
+    setLinkedinDisconnecting(true);
+    try {
+      await linkedinApi.disconnect();
+      setLinkedinStatus({ configured: true, connected: false });
+      toast({ title: "LinkedIn disconnected." });
+    } catch {
+      toast({ title: "Could not disconnect LinkedIn.", variant: "destructive" });
+    } finally {
+      setLinkedinDisconnecting(false);
+    }
+  };
+
+  const handleLinkedinSync = async () => {
+    setLinkedinSyncing(true);
+    try {
+      const result = await linkedinApi.sync();
+      const msg = result.imported > 0
+        ? `Synced ${result.imported} post${result.imported !== 1 ? "s" : ""} from LinkedIn.`
+        : "No new posts to import.";
+      toast({ title: msg });
+      linkedinApi.status().then(setLinkedinStatus).catch(() => {});
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setLinkedinSyncing(false);
+    }
+  };
 
   const handleSmartImport = (extracted: ExtractedBrandVoice) => {
     if (extracted.brandRole) setBrandRole(extracted.brandRole);
@@ -335,6 +389,78 @@ export default function Settings() {
                   </div>
                 </label>
               </div>
+            </div>
+          </section>
+
+          {/* LinkedIn */}
+          <section>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">LinkedIn</h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              {linkedinStatus === null ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking connection…
+                </div>
+              ) : !linkedinStatus.configured ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500 font-medium">LinkedIn integration not configured</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    To enable LinkedIn sync, add <code className="bg-gray-100 px-1 rounded">LINKEDIN_CLIENT_ID</code> and{" "}
+                    <code className="bg-gray-100 px-1 rounded">LINKEDIN_CLIENT_SECRET</code> environment variables.
+                  </p>
+                </div>
+              ) : linkedinStatus.connected ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Connected as {linkedinStatus.displayName}</p>
+                      {linkedinStatus.lastSyncedAt && (
+                        <p className="text-xs text-gray-400">
+                          Last synced {new Date(linkedinStatus.lastSyncedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    We only import posts and articles you authored — never reposts or comments, and never anything posted on your behalf.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void handleLinkedinSync()}
+                      disabled={linkedinSyncing}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {linkedinSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+                      {linkedinSyncing ? "Syncing…" : "Sync Posts"}
+                    </button>
+                    <button
+                      onClick={() => void handleLinkedinDisconnect()}
+                      disabled={linkedinDisconnecting}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                    >
+                      {linkedinDisconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlink className="w-3.5 h-3.5" />}
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    Connect your LinkedIn account to automatically import your posts and their engagement data.
+                  </p>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    We only import posts and articles you authored — never reposts or comments, and never anything posted on your behalf.
+                  </p>
+                  <button
+                    onClick={handleLinkedinConnect}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Link2 className="w-4 h-4" />
+                    Connect LinkedIn
+                  </button>
+                </div>
+              )}
             </div>
           </section>
 

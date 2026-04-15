@@ -17,6 +17,8 @@ tags:
     description: Draft content operations
   - name: ai
     description: AI generation operations
+  - name: linkedin
+    description: LinkedIn OAuth and sync operations
 paths:
   /healthz:
     get:
@@ -267,6 +269,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /linkedin/status:
+    get:
+      operationId: getLinkedinStatus
+      tags: [linkedin]
+      summary: Get LinkedIn connection status for the current user
+      responses:
+        "200":
+          description: LinkedIn connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkedinStatusResponse"
+
+  /linkedin/auth:
+    get:
+      operationId: linkedinAuth
+      tags: [linkedin]
+      summary: Redirect to LinkedIn OAuth authorization screen
+      responses:
+        "302":
+          description: Redirect to LinkedIn OAuth
+
+  /linkedin/callback:
+    get:
+      operationId: linkedinCallback
+      tags: [linkedin]
+      summary: LinkedIn OAuth callback — exchanges code, stores token, redirects to Settings
+      responses:
+        "302":
+          description: Redirect to Settings page
+
+  /linkedin/disconnect:
+    delete:
+      operationId: linkedinDisconnect
+      tags: [linkedin]
+      summary: Disconnect LinkedIn account
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                required: [ok]
+
+  /linkedin/sync:
+    post:
+      operationId: linkedinSync
+      tags: [linkedin]
+      summary: Sync original posts from LinkedIn into the Library
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkedinSyncResponse"
 
   /analytics/overview:
     get:
@@ -770,6 +832,24 @@ components:
         visualType:
           type: string
           enum: [none, card, carousel, infographic, art]
+
+    LinkedinStatusResponse:
+      type: object
+      properties:
+        configured: { type: boolean }
+        connected: { type: boolean }
+        displayName: { type: string }
+        memberUrn: { type: string }
+        lastSyncedAt: { type: ["string", "null"] }
+      required: [configured, connected]
+
+    LinkedinSyncResponse:
+      type: object
+      properties:
+        imported: { type: integer }
+        skipped: { type: integer }
+        total: { type: integer }
+      required: [imported, skipped, total]
 
     AgentBriefResponse:
       type: object

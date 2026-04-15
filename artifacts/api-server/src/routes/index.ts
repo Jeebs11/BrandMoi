@@ -9,6 +9,7 @@ import momentumRouter from "./momentum.js";
 import smartImportRouter from "./smart-import.js";
 import aiImageRouter from "./ai-image.js";
 import agentRouter from "./agent.js";
+import linkedinRouter from "./linkedin.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(thoughtsRouter);
 router.use(momentumRouter);
 router.use(smartImportRouter);
 router.use(agentRouter);
+router.use(linkedinRouter);
 
 export default router;

@@ -193,6 +193,10 @@ export interface Draft {
   /** @nullable */
   visualOutput?: string | null;
   status: DraftStatus;
+  /** @nullable */
+  externalId?: string | null;
+  /** @nullable */
+  postType?: string | null;
   createdAt: string;
   updatedAt: string;
 }

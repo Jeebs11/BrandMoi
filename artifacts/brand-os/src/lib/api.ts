@@ -236,3 +236,21 @@ export type AnalyticsOverview = {
 export const analyticsApi = {
   overview: () => apiFetch<AnalyticsOverview>("/analytics/overview"),
 };
+
+export type LinkedinStatus =
+  | { configured: false; connected: false }
+  | { configured: true; connected: false }
+  | { configured: true; connected: true; displayName: string; memberUrn: string; lastSyncedAt: string | null };
+
+export type LinkedinSyncResult = {
+  imported: number;
+  skipped: number;
+  total: number;
+};
+
+export const linkedinApi = {
+  status: () => apiFetch<LinkedinStatus>("/linkedin/status"),
+  authUrl: () => "/api/linkedin/auth",
+  disconnect: () => apiFetch<{ ok: boolean }>("/linkedin/disconnect", { method: "DELETE" }),
+  sync: () => apiFetch<LinkedinSyncResult>("/linkedin/sync", { method: "POST" }),
+};
