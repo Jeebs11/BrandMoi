@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -168,8 +169,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-      <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200">
+    <AppShell>
         <header className="px-6 pt-12 pb-5 bg-white border-b border-gray-100 sticky top-0 z-10">
           <div className="flex items-center gap-3 mb-1">
             <button onClick={() => navigate("/")} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
@@ -473,8 +473,7 @@ export default function Settings() {
             {isLoggingOut ? "Logging out..." : "Log out"}
           </button>
         </main>
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

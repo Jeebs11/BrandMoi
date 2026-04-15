@@ -15,7 +15,7 @@ import {
 import type { HookItem, StructuredBreakdown, StructureIdeaResponse, GeneratedContent, CarouselSlide, Draft, InfographicData } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -2616,8 +2616,7 @@ export default function Capture() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-      <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl relative flex flex-col border-x border-gray-200 pb-20">
+    <AppShell contentClassName="relative">
         <header className="px-6 py-5 bg-gray-50 z-20 sticky top-0">
           <ProgressBar step={Math.min(state.step, 6)} totalSteps={6} />
           {draftId && state.step >= 4 && state.step < 6 && (
@@ -2723,9 +2722,7 @@ export default function Capture() {
           )}
         </AnimatePresence>
 
-        <BottomNav />
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

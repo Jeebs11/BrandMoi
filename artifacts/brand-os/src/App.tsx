@@ -40,8 +40,8 @@ function AuthGuard({ children, requireOnboarded = true }: { children: React.Reac
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-        <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl border-x border-gray-200 animate-pulse" />
+      <div className="min-h-screen bg-[#EDEDEE] flex justify-center md:ml-[220px]">
+        <div className="w-full max-w-[430px] md:max-w-[700px] bg-gray-50 min-h-screen shadow-2xl border-x border-gray-200 animate-pulse" />
       </div>
     );
   }

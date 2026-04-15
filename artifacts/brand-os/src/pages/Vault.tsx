@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Lightbulb, Plus, Trash2, ArrowRight, CheckCircle2, ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, type Thought } from "@/lib/api";
 
@@ -65,8 +65,7 @@ export default function Vault() {
   const developed = thoughts.filter((t) => t.developed);
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-      <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200 pb-20">
+    <AppShell>
         <header className="px-6 pt-12 pb-5 bg-white border-b border-gray-100 sticky top-0 z-10">
           <div className="flex items-center gap-3 mb-1">
             <button onClick={() => navigate("/")} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
@@ -176,9 +175,7 @@ export default function Vault() {
           )}
         </main>
 
-        <BottomNav />
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

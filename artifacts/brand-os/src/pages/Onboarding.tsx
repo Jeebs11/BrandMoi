@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, ChevronLeft, Check, Loader2 } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -287,8 +288,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-      <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200">
+    <AppShell noNav>
         <header className="px-6 py-5 sticky top-0 bg-gray-50 z-10">
           <div className="flex gap-1.5 w-full items-center mb-1">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -307,8 +307,7 @@ export default function Onboarding() {
         <main className="flex-1 px-6 pb-6 overflow-hidden flex flex-col relative">
           <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
         </main>
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

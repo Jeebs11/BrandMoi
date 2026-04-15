@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { performanceApi, type PerformanceSignal } from "@/lib/api";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
@@ -87,8 +87,7 @@ export default function Library() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-      <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200 pb-20">
+    <AppShell>
         <header className="px-6 pt-12 pb-4 bg-white border-b border-gray-100 sticky top-0 z-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -217,16 +216,13 @@ export default function Library() {
           )}
         </main>
 
-        <BottomNav />
-
         {perfModal && (
           <PerformanceModal
             modal={perfModal}
             onClose={() => setPerfModal(null)}
           />
         )}
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BottomNav } from "@/components/BottomNav";
+import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, momentumApi, agentApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme } from "@/lib/api";
@@ -203,8 +203,7 @@ export default function Dashboard() {
   ) ?? [];
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center">
-      <div className="w-full max-w-[430px] bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200 pb-20">
+    <AppShell>
         {/* Header */}
         <header className="px-6 pt-12 pb-6 bg-white border-b border-gray-100 sticky top-0 z-10">
           <div className="flex items-center justify-between">
@@ -644,15 +643,12 @@ export default function Dashboard() {
           </section>
         </main>
 
-        <BottomNav />
-
         <LengthPicker
           open={lengthPickerOpen}
           onClose={() => setLengthPickerOpen(false)}
           onSelect={handleLengthSelect}
           title={pendingRaw ? "How long should this be?" : "Choose post length"}
         />
-      </div>
-    </div>
+    </AppShell>
   );
 }
