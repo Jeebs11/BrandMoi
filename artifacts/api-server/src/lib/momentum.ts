@@ -59,20 +59,22 @@ export async function computeMomentum(userId: number): Promise<{
       impressions: performanceSignalsTable.impressions,
       reactions: performanceSignalsTable.reactions,
       comments: performanceSignalsTable.comments,
+      reposts: performanceSignalsTable.reposts,
     })
     .from(performanceSignalsTable)
     .innerJoin(draftsTable, eq(performanceSignalsTable.draftId, draftsTable.id))
     .where(eq(draftsTable.userId, userId));
 
   if (signals.length > 0) {
-    const scored = signals
-      .filter((s) => s.impressions > 0)
-      .map((s) =>
-        Math.min(100, Math.round(((s.reactions * 3 + s.comments * 5) / s.impressions) * 1000))
-      );
-    if (scored.length > 0) {
-      resonanceScore = Math.round(scored.reduce((a, b) => a + b, 0) / scored.length);
-    }
+    const scored = signals.map((s) => {
+      const engagementWeight = s.reactions * 3 + s.comments * 5 + s.reposts * 4;
+      if (s.impressions > 0) {
+        return Math.min(100, Math.round((engagementWeight / s.impressions) * 1000));
+      }
+      if (engagementWeight === 0) return 0;
+      return Math.min(100, Math.round(Math.log2(1 + engagementWeight) * 12));
+    });
+    resonanceScore = Math.round(scored.reduce((a, b) => a + b, 0) / scored.length);
   }
 
   const score = Math.round(

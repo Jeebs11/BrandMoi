@@ -22,3 +22,4 @@ ALTER TABLE "drafts" ADD COLUMN IF NOT EXISTS "post_type" text;
 
 -- Index to speed up deduplication queries during sync
 CREATE INDEX IF NOT EXISTS "drafts_external_id_idx" ON "drafts" ("external_id");
+ALTER TABLE "performance_signals" ADD COLUMN IF NOT EXISTS "reposts" integer NOT NULL DEFAULT 0;

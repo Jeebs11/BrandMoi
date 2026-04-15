@@ -293,38 +293,30 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
 
     for (const post of originalPosts) {
       const externalId = post.id;
-
-      const existing = await db
-        .select({ id: draftsTable.id })
-        .from(draftsTable)
-        .where(and(eq(draftsTable.userId, userId), eq(draftsTable.externalId, externalId)))
-        .limit(1);
-
-      if (existing.length > 0) {
-        skipped++;
-        continue;
-      }
-
       const content = post.specificContent?.["com.linkedin.ugc.ShareContent"];
       const postText = content?.shareCommentary?.text ?? "";
       const mediaCategory = content?.shareMediaCategory ?? "NONE";
       const postType = mediaCategory === "ARTICLE" ? "article" : "post";
-
       const publishedMs = post.firstPublishedAt ?? post.created?.time ?? Date.now();
       const publishedAt = new Date(publishedMs);
 
       let reactions = 0;
       let comments = 0;
+      let reposts = 0;
 
       try {
         const encodedId = encodeURIComponent(externalId);
-        const [reactRes, commentRes] = await Promise.all([
+        const [reactRes, commentRes, repostRes] = await Promise.all([
           fetch(
             `https://api.linkedin.com/v2/reactions/(entity:${encodedId})?q=entity&count=0`,
             { headers: { Authorization: `Bearer ${accessToken}`, "X-Restli-Protocol-Version": "2.0.0" } }
           ),
           fetch(
             `https://api.linkedin.com/v2/comments?q=ugcPost&ugcPost=${encodedId}&count=0`,
+            { headers: { Authorization: `Bearer ${accessToken}`, "X-Restli-Protocol-Version": "2.0.0" } }
+          ),
+          fetch(
+            `https://api.linkedin.com/v2/socialActions/${encodedId}/reshares?count=0`,
             { headers: { Authorization: `Bearer ${accessToken}`, "X-Restli-Protocol-Version": "2.0.0" } }
           ),
         ]);
@@ -336,47 +328,61 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
           const cData = await commentRes.json() as { paging?: { total?: number } };
           comments = cData.paging?.total ?? 0;
         }
+        if (repostRes.ok) {
+          const rpData = await repostRes.json() as { paging?: { total?: number } };
+          reposts = rpData.paging?.total ?? 0;
+        }
       } catch {
       }
 
-      const topic = postText.split("\n")[0]?.slice(0, 80) ?? "LinkedIn Post";
+      const existing = await db
+        .select({ id: draftsTable.id })
+        .from(draftsTable)
+        .where(and(eq(draftsTable.userId, userId), eq(draftsTable.externalId, externalId)))
+        .limit(1);
 
-      const [draft] = await db
-        .insert(draftsTable)
-        .values({
-          userId,
-          rawInput: postText,
-          objective: "Authority",
-          persona: "Founder",
-          tone: "Direct",
-          structuredBreakdown: {
-            topic,
-            angle: "Original LinkedIn post",
-            coreMessage: postText.slice(0, 200),
-            whyItMatters: "Imported from LinkedIn",
-            hooks: [{ text: topic }],
-            narrativeFlow: [],
-          },
-          postOutput: postText,
-          status: "published",
-          contentSource: "linkedin",
-          externalId,
-          postType,
-          createdAt: publishedAt,
-        })
-        .returning();
+      let draftId: number;
 
-      await db
-        .insert(performanceSignalsTable)
-        .values({
-          draftId: draft.id,
-          reactions,
-          comments,
-          impressions: 0,
-        })
-        .onConflictDoNothing();
-
-      imported++;
+      if (existing.length > 0) {
+        draftId = existing[0].id;
+        await db
+          .update(performanceSignalsTable)
+          .set({ reactions, comments, reposts, loggedAt: new Date() })
+          .where(eq(performanceSignalsTable.draftId, draftId));
+        skipped++;
+      } else {
+        const topic = postText.split("\n")[0]?.slice(0, 80) ?? "LinkedIn Post";
+        const [draft] = await db
+          .insert(draftsTable)
+          .values({
+            userId,
+            rawInput: postText,
+            objective: "Authority",
+            persona: "Founder",
+            tone: "Direct",
+            structuredBreakdown: {
+              topic,
+              angle: "Original LinkedIn post",
+              coreMessage: postText.slice(0, 200),
+              whyItMatters: "Imported from LinkedIn",
+              hooks: [{ text: topic }],
+              narrativeFlow: [],
+            },
+            postOutput: postText,
+            status: "published",
+            contentSource: "linkedin",
+            externalId,
+            postType,
+            createdAt: publishedAt,
+          })
+          .returning();
+        draftId = draft.id;
+        await db
+          .insert(performanceSignalsTable)
+          .values({ draftId, reactions, comments, reposts, impressions: 0 })
+          .onConflictDoNothing();
+        imported++;
+      }
     }
 
     await db

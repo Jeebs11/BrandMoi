@@ -7,6 +7,7 @@ export const performanceSignalsTable = pgTable("performance_signals", {
   impressions: integer("impressions").notNull().default(0),
   reactions: integer("reactions").notNull().default(0),
   comments: integer("comments").notNull().default(0),
+  reposts: integer("reposts").notNull().default(0),
   loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
