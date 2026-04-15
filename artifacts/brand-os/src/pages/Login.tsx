@@ -4,6 +4,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { AppShell } from "@/components/AppShell";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -34,7 +35,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] flex justify-center items-center px-4">
+    <AppShell auth>
       <div className="w-full max-w-[430px] md:max-w-[480px] bg-white rounded-3xl shadow-2xl p-8">
         <div className="mb-8">
           <div className="w-10 h-10 bg-primary rounded-2xl mb-5" />
@@ -100,6 +101,6 @@ export default function Login() {
           Demo: demo@brandos.app / demo1234
         </p>
       </div>
-    </div>
+    </AppShell>
   );
 }

@@ -4,11 +4,22 @@ import { SideNav } from "@/components/SideNav";
 
 interface AppShellProps {
   children: React.ReactNode;
+  /** Hides sidebar + bottom nav, keeps full-height column (for Onboarding wizard) */
   noNav?: boolean;
+  /** Auth card mode: centers children vertically, no sidebar/nav (for Login/Signup/404) */
+  auth?: boolean;
   contentClassName?: string;
 }
 
-export function AppShell({ children, noNav = false, contentClassName }: AppShellProps) {
+export function AppShell({ children, noNav = false, auth = false, contentClassName }: AppShellProps) {
+  if (auth) {
+    return (
+      <div className="min-h-screen bg-[#EDEDEE] flex justify-center items-center px-4">
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#EDEDEE]">
       {!noNav && <SideNav />}
