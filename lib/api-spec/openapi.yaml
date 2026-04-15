@@ -268,6 +268,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /analytics/overview:
+    get:
+      operationId: getAnalyticsOverview
+      tags: [drafts]
+      summary: Analytics overview response
+      responses:
+        "200":
+          description: Analytics overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverviewResponse"
+
   /drafts:
     get:
       operationId: listDrafts
@@ -725,6 +738,12 @@ components:
         status:
           type: string
           enum: [draft, ready, published]
+        contentSource:
+          type: string
+          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea]
+        visualType:
+          type: string
+          enum: [none, card, carousel, infographic, art]
       required:
         - rawInput
         - objective
@@ -745,6 +764,12 @@ components:
         status:
           type: string
           enum: [draft, ready, published]
+        contentSource:
+          type: string
+          enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea]
+        visualType:
+          type: string
+          enum: [none, card, carousel, infographic, art]
 
     AgentBriefResponse:
       type: object
@@ -778,3 +803,105 @@ components:
         - insight
         - angles
         - teachAngles
+
+    AnalyticsOverviewResponse:
+      type: object
+      summary: Analytics overview response
+      properties:
+        totalPublished:
+          type: integer
+        avgResonance:
+          type: integer
+        loggedPerformanceCount:
+          type: integer
+        byTone:
+          type: array
+          items:
+            type: object
+            properties:
+              tone: { type: string }
+              count: { type: integer }
+              sampledCount: { type: integer }
+              avgResonance: { type: ["integer", "null"] }
+            required: [tone, count, sampledCount, avgResonance]
+        byContentSource:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                type: string
+                enum: [capture, news_reaction, teach_audience, story_mode, brand_voice_idea]
+              count: { type: integer }
+              sampledCount: { type: integer }
+              avgResonance: { type: ["integer", "null"] }
+            required: [source, count, sampledCount, avgResonance]
+        byVisualType:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [none, card, carousel, infographic, art]
+              count: { type: integer }
+              sampledCount: { type: integer }
+              avgResonance: { type: ["integer", "null"] }
+            required: [type, count, sampledCount, avgResonance]
+        byObjective:
+          type: array
+          items:
+            type: object
+            properties:
+              objective: { type: string }
+              count: { type: integer }
+              sampledCount: { type: integer }
+              avgResonance: { type: ["integer", "null"] }
+            required: [objective, count, sampledCount, avgResonance]
+        topPosts:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              topic: { type: string }
+              resonance: { type: integer }
+              tone: { type: ["string", "null"] }
+              contentSource: { type: string }
+              visualType: { type: string }
+              publishedAt: { type: string }
+            required: [id, topic, resonance, tone, contentSource, visualType, publishedAt]
+        weeklyTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              week: { type: string }
+              count: { type: integer }
+            required: [week, count]
+        weeklyResonanceTrend:
+          type: array
+          items:
+            type: object
+            properties:
+              week: { type: string }
+              avgResonance: { type: integer }
+              sampleCount: { type: integer }
+            required: [week, avgResonance, sampleCount]
+        last30: { type: integer }
+        last60: { type: integer }
+        last90: { type: integer }
+      required:
+        - totalPublished
+        - avgResonance
+        - loggedPerformanceCount
+        - byTone
+        - byContentSource
+        - byVisualType
+        - byObjective
+        - topPosts
+        - weeklyTrend
+        - weeklyResonanceTrend
+        - last30
+        - last60
+        - last90
