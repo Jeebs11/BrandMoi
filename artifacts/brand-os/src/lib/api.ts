@@ -216,3 +216,18 @@ export const aiApi = {
       body: JSON.stringify(payload),
     }),
 };
+
+export type AnalyticsOverview = {
+  totalPublished: number;
+  avgResonance: number;
+  byTone: { tone: string; count: number; avgResonance: number }[];
+  byContentSource: { source: string; count: number }[];
+  byVisualType: { type: string; count: number }[];
+  byObjective: { objective: string; count: number }[];
+  topPosts: { id: number; topic: string; resonance: number; tone: string; publishedAt: string }[];
+  weeklyTrend: { week: string; count: number }[];
+};
+
+export const analyticsApi = {
+  overview: () => apiFetch<AnalyticsOverview>("/analytics/overview"),
+};

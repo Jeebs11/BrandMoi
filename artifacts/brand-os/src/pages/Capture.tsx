@@ -124,6 +124,7 @@ export default function Capture() {
   };
 
   const [state, setState] = useState<WorkflowState>(initialState);
+  const downloadedVisualTypeRef = useRef<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [angleResult, setAngleResult] = useState<AngleCheckResult | null>(null);
   const [angleChecking, setAngleChecking] = useState(false);
@@ -451,6 +452,7 @@ export default function Capture() {
         accentColor,
         textColor
       );
+      downloadedVisualTypeRef.current = "carousel";
     } catch {
       toast({ title: "PDF export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -463,6 +465,7 @@ export default function Capture() {
     setIsExportingCard(true);
     try {
       await downloadVisualCard(state.content.visual, state.structure?.topic ?? "visual", bgColor, accentColor, textColor);
+      downloadedVisualTypeRef.current = "card";
     } catch {
       toast({ title: "Card export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -483,6 +486,7 @@ export default function Capture() {
         textColor,
         Math.round(CARD_BASE_DURATIONS[preset] * animSpeedMult)
       );
+      downloadedVisualTypeRef.current = "card";
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -505,6 +509,7 @@ export default function Capture() {
         Math.round(holdMs * animSpeedMult),
         Math.round(transMs * animSpeedMult)
       );
+      downloadedVisualTypeRef.current = "carousel";
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -518,6 +523,7 @@ export default function Capture() {
     setIsExportingInfographic(true);
     try {
       await downloadInfographic(info.headline, info.bullets, state.structure?.topic ?? "infographic", bgColor, accentColor, textColor);
+      downloadedVisualTypeRef.current = "infographic";
     } catch {
       toast({ title: "Infographic export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -540,6 +546,7 @@ export default function Capture() {
         preset,
         Math.round(INFOGRAPHIC_BASE_DURATIONS[preset] * animSpeedMult)
       );
+      downloadedVisualTypeRef.current = "infographic";
     } catch {
       toast({ title: "Animated export failed. Please try again.", variant: "destructive" });
     } finally {
@@ -642,6 +649,7 @@ export default function Capture() {
     a.download = `${safeName}-generated.png`;
     a.href = `data:image/png;base64,${generatedImageBase64}`;
     a.click();
+    downloadedVisualTypeRef.current = "art";
   };
 
   // ── Illustration handlers ──────────────────────────────────────────────────
@@ -711,6 +719,7 @@ export default function Capture() {
     setIsExportingIllust(true);
     try {
       await downloadIllustrationCard(illustImageBase64, illustCaption, `illustration-${illustStyle}`);
+      downloadedVisualTypeRef.current = "art";
     } finally {
       setIsExportingIllust(false);
     }
@@ -727,6 +736,7 @@ export default function Capture() {
         `illustration-${illustStyle}`,
         Math.round(ILLUS_BASE_DURATIONS[preset] * animSpeedMult)
       );
+      downloadedVisualTypeRef.current = "art";
     } finally {
       setIsAnimatingIllust(null);
     }
@@ -981,6 +991,16 @@ export default function Capture() {
 
   const executeSave = (postOverride?: string) => {
     if (!state.structure) return;
+    // Infer content source from URL params and current state
+    const derivedContentSource = newsUrlParam
+      ? "news_reaction"
+      : state.teacherMode
+        ? "teach_audience"
+        : state.storyMode
+          ? "story_mode"
+          : rawParam && !thoughtParam
+            ? "brand_voice_idea"
+            : "capture";
     const draftData = {
       rawInput: state.rawInput,
       objective: state.objective,
@@ -993,6 +1013,8 @@ export default function Capture() {
       carouselOutput: state.content ? JSON.stringify(state.content.carousel) : null,
       visualOutput: state.content?.visual ?? null,
       status: "draft" as const,
+      contentSource: derivedContentSource,
+      visualType: downloadedVisualTypeRef.current ?? undefined,
     };
 
     const afterSave = () => {
@@ -1004,7 +1026,7 @@ export default function Capture() {
 
     if (draftId) {
       updateDraft(
-        { id: draftId!, data: { postOutput: draftData.postOutput, shortPost: draftData.shortPost, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown } },
+        { id: draftId!, data: { postOutput: draftData.postOutput, shortPost: draftData.shortPost, carouselOutput: draftData.carouselOutput, visualOutput: draftData.visualOutput, structuredBreakdown: draftData.structuredBreakdown, contentSource: draftData.contentSource, visualType: draftData.visualType } },
         {
           onSuccess: (saved: Draft) => {
             // Populate the cache so Library → "Edit and continue" always sees the latest content

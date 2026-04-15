@@ -17,6 +17,8 @@ export const draftsTable = pgTable("drafts", {
   carouselOutput: text("carousel_output"),
   visualOutput: text("visual_output"),
   status: text("status").notNull().default("draft"),
+  contentSource: text("content_source"),
+  visualType: text("visual_type"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

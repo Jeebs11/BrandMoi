@@ -12,6 +12,7 @@ import Capture from "@/pages/Capture";
 import Library from "@/pages/Library";
 import Settings from "@/pages/Settings";
 import Vault from "@/pages/Vault";
+import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -105,6 +106,11 @@ function Router() {
       <Route path="/vault">
         <AuthGuard>
           <Vault />
+        </AuthGuard>
+      </Route>
+      <Route path="/analytics">
+        <AuthGuard>
+          <Analytics />
         </AuthGuard>
       </Route>
       <Route path="/">

@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, Lightbulb, Settings } from "lucide-react";
+import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useListDrafts } from "@workspace/api-client-react";
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/capture", label: "Capture", icon: PenSquare },
   { href: "/vault", label: "Vault", icon: Lightbulb },
@@ -13,6 +14,12 @@ const NAV_ITEMS = [
 export function SideNav() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { data: drafts } = useListDrafts();
+  const hasPublished = (drafts ?? []).some(d => d.status === "published");
+  const NAV_ITEMS = [
+    ...BASE_NAV_ITEMS,
+    ...(hasPublished ? [{ href: "/analytics", label: "Analytics", icon: BarChart2 }] : []),
+  ];
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-[220px] flex-col bg-white border-r border-gray-200 z-50">

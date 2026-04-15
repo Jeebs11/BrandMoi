@@ -1,16 +1,20 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, Lightbulb } from "lucide-react";
+import { Home, PenSquare, BookOpen, Lightbulb, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const ITEMS = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/capture", label: "Capture", icon: PenSquare },
-  { href: "/vault", label: "Vault", icon: Lightbulb },
-  { href: "/library", label: "Library", icon: BookOpen },
-];
+import { useListDrafts } from "@workspace/api-client-react";
 
 export function BottomNav() {
   const [location] = useLocation();
+  const { data: drafts } = useListDrafts();
+  const hasPublished = (drafts ?? []).some(d => d.status === "published");
+
+  const ITEMS = [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/capture", label: "Capture", icon: PenSquare },
+    { href: "/vault", label: "Vault", icon: Lightbulb },
+    { href: "/library", label: "Library", icon: BookOpen },
+    ...(hasPublished ? [{ href: "/analytics", label: "Analytics", icon: BarChart2 }] : []),
+  ];
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">

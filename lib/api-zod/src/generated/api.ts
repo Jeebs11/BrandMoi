@@ -269,6 +269,8 @@ export const CreateDraftBody = zod.object({
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]),
+  contentSource: zod.string().optional(),
+  visualType: zod.string().optional(),
 });
 
 /**
@@ -308,6 +310,8 @@ export const UpdateDraftBody = zod.object({
   visualOutput: zod.string().nullish(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
   structuredBreakdown: StructuredBreakdownSchema.optional(),
+  contentSource: zod.string().optional(),
+  visualType: zod.string().optional(),
 });
 
 export const UpdateDraftResponse = zod.object({
@@ -347,4 +351,18 @@ export const AgentBriefResponse = zod.object({
   newsPublishedAt: zod.string().optional(),
   newsSourceDomain: zod.string().optional(),
   newsDescription: zod.string().optional(),
+});
+
+/**
+ * @summary Analytics overview response
+ */
+export const AnalyticsOverviewResponse = zod.object({
+  totalPublished: zod.number(),
+  avgResonance: zod.number(),
+  byTone: zod.array(zod.object({ tone: zod.string(), count: zod.number(), avgResonance: zod.number() })),
+  byContentSource: zod.array(zod.object({ source: zod.string(), count: zod.number() })),
+  byVisualType: zod.array(zod.object({ type: zod.string(), count: zod.number() })),
+  byObjective: zod.array(zod.object({ objective: zod.string(), count: zod.number() })),
+  topPosts: zod.array(zod.object({ id: zod.number(), topic: zod.string(), resonance: zod.number(), tone: zod.string(), publishedAt: zod.string() })),
+  weeklyTrend: zod.array(zod.object({ week: zod.string(), count: zod.number() })),
 });

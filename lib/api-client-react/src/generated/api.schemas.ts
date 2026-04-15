@@ -223,6 +223,8 @@ export interface CreateDraftBody {
   /** @nullable */
   visualOutput?: string | null;
   status: CreateDraftBodyStatus;
+  contentSource?: string;
+  visualType?: string;
 }
 
 export type UpdateDraftBodyStatus =
@@ -245,6 +247,8 @@ export interface UpdateDraftBody {
   visualOutput?: string | null;
   status?: UpdateDraftBodyStatus;
   structuredBreakdown?: StructuredBreakdown;
+  contentSource?: string;
+  visualType?: string;
 }
 
 export interface AgentBriefResponse {
@@ -258,4 +262,49 @@ export interface AgentBriefResponse {
   newsPublishedAt?: string;
   newsSourceDomain?: string;
   newsDescription?: string;
+}
+
+export interface AnalyticsToneBreakdown {
+  tone: string;
+  count: number;
+  avgResonance: number;
+}
+
+export interface AnalyticsSourceBreakdown {
+  source: string;
+  count: number;
+}
+
+export interface AnalyticsVisualBreakdown {
+  type: string;
+  count: number;
+}
+
+export interface AnalyticsObjectiveBreakdown {
+  objective: string;
+  count: number;
+}
+
+export interface AnalyticsTopPost {
+  id: number;
+  topic: string;
+  resonance: number;
+  tone: string;
+  publishedAt: string;
+}
+
+export interface AnalyticsWeeklyTrend {
+  week: string;
+  count: number;
+}
+
+export interface AnalyticsOverview {
+  totalPublished: number;
+  avgResonance: number;
+  byTone: AnalyticsToneBreakdown[];
+  byContentSource: AnalyticsSourceBreakdown[];
+  byVisualType: AnalyticsVisualBreakdown[];
+  byObjective: AnalyticsObjectiveBreakdown[];
+  topPosts: AnalyticsTopPost[];
+  weeklyTrend: AnalyticsWeeklyTrend[];
 }

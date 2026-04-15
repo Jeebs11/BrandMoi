@@ -61,6 +61,14 @@ A mobile-first web app (max-width 430px) for AI-powered LinkedIn content creatio
 - **Export**: On Capture step 6 (save confirmation), "Copy post" copies to clipboard and "Export .txt" downloads the post as a plain text file.
 - **Production hardening**: Rate limiting on AI endpoints (10 req/min per user via in-memory map), React `ErrorBoundary` wrapping the full app, clean 404/error pages.
 
+**Task #29: Analytics Page** ✅
+- **DB schema**: Added `content_source` and `visual_type` columns to `drafts` table (both nullable text)
+- **Content source tracking**: Captured at draft save time — "news_reaction", "teach_audience", "story_mode", "brand_voice_idea", or "capture" (inferred from URL params and workflow state)
+- **Visual type tracking**: Tracked via `downloadedVisualTypeRef` in Capture — set to "card", "carousel", "infographic", or "art" when user downloads a visual; stored at save time
+- **Analytics API**: `GET /api/analytics/overview` (authenticated) aggregates published drafts + performance signals; returns totalPublished, avgResonance, byTone (with resonance), byContentSource, byVisualType, byObjective, topPosts (top 5 by resonance), weeklyTrend (13-week publishing trend)
+- **Analytics page**: `/analytics` with AppShell layout; overview stat cards, line chart (weekly trend), bar chart (by tone with resonance bars), horizontal bars (content source, visual format, objective), ranked top-5 list; empty state if no published posts
+- **Conditional nav**: "Analytics" item shows in BottomNav and SideNav only when ≥1 published post exists; uses `useListDrafts` to check status
+
 **Phase 3: Agentic Intelligence Layer** ✅
 - **Brand Voice DNA**: Automatically extracts voice signals (sentence style, tone markers, vocabulary) from published/ready drafts via Claude. Signals stored in `brand_voice_signals` table and injected into future AI prompts for personalised output.
 - **Angle Freshness Guard**: POST `/api/ai/check-angle` computes Jaccard similarity between new topic+angle and last 20 drafts. If >15% overlap, an amber warning banner shows in step 3 with 2 Claude-generated fresh angle alternatives the user can click to apply.
