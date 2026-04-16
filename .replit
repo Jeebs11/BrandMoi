@@ -9,7 +9,7 @@ id = "artifacts/mockup-sandbox"
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
-run = ["sh", "-c", "node api-server/dist/index.cjs"]
+run = ["sh", "-c", "node artifacts/api-server/dist/index.cjs"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
@@ -28,3 +28,9 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.production]
+JWT_SECRET = "0c4da0468f58b748ea212a042d47110a945d8e74bfa331ddce52837fc4bc320867de4b5fb915cd4c7ee99be02a31c5f2"
+NODE_ENV = "production"
