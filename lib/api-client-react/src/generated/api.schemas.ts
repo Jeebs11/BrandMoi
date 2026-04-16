@@ -86,8 +86,15 @@ export const HookItemType = {
   "how-i": "how-i",
   contrarian: "contrarian",
   number: "number",
+  question: "question",
+  "scene-setter": "scene-setter",
+  prediction: "prediction",
+  analogy: "analogy",
   "how-to": "how-to",
   story: "story",
+  "disarming-joke": "disarming-joke",
+  "tension-setter": "tension-setter",
+  confession: "confession",
 } as const;
 
 export interface HookItem {
@@ -128,6 +135,17 @@ export interface InfographicData {
   bullets: string[];
 }
 
+export type GenerateContentBodyPostFormat =
+  | (typeof GenerateContentBodyPostFormat)[keyof typeof GenerateContentBodyPostFormat]
+  | null;
+
+export const GenerateContentBodyPostFormat = {
+  standard: "standard",
+  "frustrated-expert": "frustrated-expert",
+  "lived-lesson": "lived-lesson",
+  "clean-breakdown": "clean-breakdown",
+} as const;
+
 export interface GenerateContentBody {
   rawInput: string;
   objective: string;
@@ -140,6 +158,7 @@ export interface GenerateContentBody {
   postTone?: string;
   teacherMode?: boolean;
   newsUrl?: string | null;
+  postFormat?: GenerateContentBodyPostFormat;
 }
 
 export interface GeneratedContent {
@@ -455,6 +474,8 @@ export type AnalyticsOverviewResponseTopPostsItem = {
   topic: string;
   resonance: number;
   /** @nullable */
+  engagementRate: number | null;
+  /** @nullable */
   tone: string | null;
   contentSource: string;
   visualType: string;
@@ -470,6 +491,101 @@ export type AnalyticsOverviewResponseWeeklyResonanceTrendItem = {
   week: string;
   avgResonance: number;
   sampleCount: number;
+};
+
+/**
+ * @nullable
+ */
+export type KpiTrendItemTrend =
+  | (typeof KpiTrendItemTrend)[keyof typeof KpiTrendItemTrend]
+  | null;
+
+export const KpiTrendItemTrend = {
+  up: "up",
+  down: "down",
+  flat: "flat",
+} as const;
+
+export interface KpiTrendItem {
+  /** @nullable */
+  current: number | null;
+  /** @nullable */
+  prior: number | null;
+  /** @nullable */
+  trend: KpiTrendItemTrend;
+}
+
+export type AnalyticsOverviewResponseKpiTrends = {
+  avgResonance: KpiTrendItem;
+  totalPublished: KpiTrendItem;
+  avgEngagementRate: KpiTrendItem;
+};
+
+/**
+ * @nullable
+ */
+export type AnalyticsOverviewResponsePostingConsistencyTrend =
+  | (typeof AnalyticsOverviewResponsePostingConsistencyTrend)[keyof typeof AnalyticsOverviewResponsePostingConsistencyTrend]
+  | null;
+
+export const AnalyticsOverviewResponsePostingConsistencyTrend = {
+  up: "up",
+  down: "down",
+  flat: "flat",
+} as const;
+
+export type AnalyticsOverviewResponsePostingConsistency = {
+  /** @nullable */
+  avgDaysBetweenPosts: number | null;
+  /** @nullable */
+  prior: number | null;
+  /** @nullable */
+  trend: AnalyticsOverviewResponsePostingConsistencyTrend;
+};
+
+export type AnalyticsOverviewResponseBestTimeToPostByDayOfWeekItem = {
+  day: string;
+  count: number;
+  /** @nullable */
+  avgResonance: number | null;
+};
+
+export type AnalyticsOverviewResponseBestTimeToPostByTimeBlockItem = {
+  block: string;
+  count: number;
+  /** @nullable */
+  avgResonance: number | null;
+};
+
+/**
+ * @nullable
+ */
+export type AnalyticsOverviewResponseBestTimeToPostTopCombination = {
+  day: string;
+  block: string;
+  avgResonance: number;
+} | null;
+
+export type AnalyticsOverviewResponseBestTimeToPost = {
+  byDayOfWeek: AnalyticsOverviewResponseBestTimeToPostByDayOfWeekItem[];
+  byTimeBlock: AnalyticsOverviewResponseBestTimeToPostByTimeBlockItem[];
+  /** @nullable */
+  topCombination: AnalyticsOverviewResponseBestTimeToPostTopCombination;
+};
+
+export type AnalyticsOverviewResponseHashtagPerformanceItem = {
+  hashtag: string;
+  count: number;
+  /** @nullable */
+  avgResonance: number | null;
+};
+
+export type AnalyticsOverviewResponseByMediaFormatItem = {
+  format: string;
+  count: number;
+  /** @nullable */
+  avgResonance: number | null;
+  sampledCount: number;
 };
 
 /**
@@ -489,6 +605,13 @@ export interface AnalyticsOverviewResponse {
   last30: number;
   last60: number;
   last90: number;
+  kpiTrends: AnalyticsOverviewResponseKpiTrends;
+  /** @nullable */
+  avgEngagementRate: number | null;
+  postingConsistency: AnalyticsOverviewResponsePostingConsistency;
+  bestTimeToPost: AnalyticsOverviewResponseBestTimeToPost;
+  hashtagPerformance: AnalyticsOverviewResponseHashtagPerformanceItem[];
+  byMediaFormat: AnalyticsOverviewResponseByMediaFormatItem[];
 }
 
 export type VoiceSuggestionStatus =

@@ -45,18 +45,30 @@ const POST_TONES = [
 type PostToneKey = typeof POST_TONES[number]["key"];
 
 const HOOK_TYPES_META = [
-  { key: "how-i",        label: "How I",       emoji: "🙋", color: "bg-violet-100 text-violet-700", border: "border-violet-200" },
-  { key: "contrarian",   label: "Contrarian",  emoji: "⚡", color: "bg-rose-100 text-rose-700",     border: "border-rose-200" },
-  { key: "number",       label: "Numbers",     emoji: "📊", color: "bg-amber-100 text-amber-700",   border: "border-amber-200" },
-  { key: "question",     label: "Question",    emoji: "❓", color: "bg-blue-100 text-blue-700",     border: "border-blue-200" },
-  { key: "scene-setter", label: "Scene",       emoji: "🎬", color: "bg-teal-100 text-teal-700",     border: "border-teal-200" },
-  { key: "prediction",   label: "Prediction",  emoji: "🔮", color: "bg-purple-100 text-purple-700", border: "border-purple-200" },
-  { key: "analogy",      label: "Analogy",     emoji: "🔗", color: "bg-orange-100 text-orange-700", border: "border-orange-200" },
+  { key: "how-i",          label: "How I",       emoji: "🙋", color: "bg-violet-100 text-violet-700",  border: "border-violet-200" },
+  { key: "contrarian",     label: "Contrarian",  emoji: "⚡", color: "bg-rose-100 text-rose-700",      border: "border-rose-200" },
+  { key: "number",         label: "Numbers",     emoji: "📊", color: "bg-amber-100 text-amber-700",    border: "border-amber-200" },
+  { key: "question",       label: "Question",    emoji: "❓", color: "bg-blue-100 text-blue-700",      border: "border-blue-200" },
+  { key: "scene-setter",   label: "Scene",       emoji: "🎬", color: "bg-teal-100 text-teal-700",      border: "border-teal-200" },
+  { key: "prediction",     label: "Prediction",  emoji: "🔮", color: "bg-purple-100 text-purple-700",  border: "border-purple-200" },
+  { key: "analogy",        label: "Analogy",     emoji: "🔗", color: "bg-orange-100 text-orange-700",  border: "border-orange-200" },
+  { key: "disarming-joke", label: "Joke",        emoji: "😄", color: "bg-yellow-100 text-yellow-700",  border: "border-yellow-200" },
+  { key: "tension-setter", label: "Tension",     emoji: "😬", color: "bg-red-100 text-red-700",        border: "border-red-200" },
+  { key: "confession",     label: "Confession",  emoji: "🤍", color: "bg-pink-100 text-pink-700",      border: "border-pink-200" },
 ] as const;
 
 const ALL_HOOK_TYPE_KEYS = HOOK_TYPES_META.map(t => t.key);
 
 type TabType = "post" | "short" | "carousel" | "visual" | "infographic" | "illustration";
+
+type PostFormatKey = "standard" | "frustrated-expert" | "lived-lesson" | "clean-breakdown";
+
+const POST_FORMATS: Array<{ key: PostFormatKey; emoji: string; label: string; desc: string }> = [
+  { key: "standard",          emoji: "✍️",  label: "Standard",          desc: "Your natural voice" },
+  { key: "frustrated-expert", emoji: "🔥",  label: "Frustrated Expert", desc: "Earned rant, disarming opener" },
+  { key: "lived-lesson",      emoji: "📚",  label: "Lived Lesson",      desc: "Personal transformation story" },
+  { key: "clean-breakdown",   emoji: "🗂️",  label: "Clean Breakdown",   desc: "Step-by-step clarity" },
+];
 
 type WorkflowState = {
   step: number;
@@ -69,6 +81,7 @@ type WorkflowState = {
   structure: StructuredBreakdown | null;
   selectedHook: string | null;
   postTone: PostToneKey;
+  postFormat: PostFormatKey;
   content: GeneratedContent | null;
   activeTab: TabType;
   storyMode: boolean;
@@ -117,6 +130,7 @@ export default function Capture() {
     structure: null,
     selectedHook: null,
     postTone: lengthInitialTone,
+    postFormat: "standard",
     content: null,
     activeTab: "post",
     storyMode: lengthInitialStoryMode,
@@ -163,6 +177,7 @@ export default function Capture() {
         persona: existingDraft.persona,
         tone: existingDraft.tone,
         postTone: draftAutoTone,
+        postFormat: "standard",
         structureResult: null,
         selectedLane: "evergreen",
         structure,
@@ -884,6 +899,7 @@ export default function Capture() {
           tone: state.tone, structure: state.structure, selectedHook: state.selectedHook,
           includeCta, storyMode: state.storyMode, postTone: state.postTone,
           teacherMode: state.teacherMode, newsUrl: newsUrlParam || undefined,
+          postFormat: state.postFormat !== "standard" ? state.postFormat : undefined,
         },
       },
       {
@@ -1458,15 +1474,18 @@ export default function Capture() {
                 </div>
                 {(() => {
                   const HOOK_TYPE_LABELS: Record<string, { label: string; color: string }> = {
-                    "how-i":        { label: "How I",       color: "bg-violet-100 text-violet-700" },
-                    "contrarian":   { label: "Contrarian",  color: "bg-rose-100 text-rose-700" },
-                    "number":       { label: "Numbers",     color: "bg-amber-100 text-amber-700" },
-                    "question":     { label: "Question",    color: "bg-blue-100 text-blue-700" },
-                    "scene-setter": { label: "Scene",       color: "bg-teal-100 text-teal-700" },
-                    "prediction":   { label: "Prediction",  color: "bg-purple-100 text-purple-700" },
-                    "analogy":      { label: "Analogy",     color: "bg-orange-100 text-orange-700" },
-                    "how-to":       { label: "How To",      color: "bg-sky-100 text-sky-700" },
-                    "story":        { label: "Story",       color: "bg-emerald-100 text-emerald-700" },
+                    "how-i":          { label: "How I",       color: "bg-violet-100 text-violet-700" },
+                    "contrarian":     { label: "Contrarian",  color: "bg-rose-100 text-rose-700" },
+                    "number":         { label: "Numbers",     color: "bg-amber-100 text-amber-700" },
+                    "question":       { label: "Question",    color: "bg-blue-100 text-blue-700" },
+                    "scene-setter":   { label: "Scene",       color: "bg-teal-100 text-teal-700" },
+                    "prediction":     { label: "Prediction",  color: "bg-purple-100 text-purple-700" },
+                    "analogy":        { label: "Analogy",     color: "bg-orange-100 text-orange-700" },
+                    "how-to":         { label: "How To",      color: "bg-sky-100 text-sky-700" },
+                    "story":          { label: "Story",       color: "bg-emerald-100 text-emerald-700" },
+                    "disarming-joke": { label: "Joke",        color: "bg-yellow-100 text-yellow-700" },
+                    "tension-setter": { label: "Tension",     color: "bg-red-100 text-red-700" },
+                    "confession":     { label: "Confession",  color: "bg-pink-100 text-pink-700" },
                   };
                   const renderHook = (hook: HookItem, idx: number, lane: "evergreen" | "trending") => {
                     const hookMeta = hook.type ? HOOK_TYPE_LABELS[hook.type] : null;
@@ -1604,6 +1623,29 @@ export default function Capture() {
                   ))}
                 </div>
               </div>
+              {/* Post Format picker — hidden when Story Mode or Teacher Mode are active */}
+              {!state.storyMode && !state.teacherMode && (
+                <div>
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Post format</p>
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {POST_FORMATS.map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setState(s => ({ ...s, postFormat: f.key }))}
+                        title={f.desc}
+                        className={cn(
+                          "flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                          state.postFormat === f.key
+                            ? "bg-primary text-white border-primary shadow-sm"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-primary/40"
+                        )}
+                      >
+                        <span>{f.emoji}</span> {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {!state.selectedHook && <p className="text-center text-xs text-gray-400 font-medium">← Tap a hook above to continue</p>}
               <label className="flex items-center gap-2.5 cursor-pointer group">
                 <div className={cn(

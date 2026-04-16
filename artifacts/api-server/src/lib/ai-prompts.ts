@@ -44,7 +44,7 @@ STEP 1 — Choose an archetype for each lane. Match the raw thought to exactly o
 - "data-insight": A surprising statistic, research finding, or pattern that reframes how people think.
 - "framework": A structured process, system, or repeatable method with clear steps or pillars.
 
-STEP 2 — For the EVERGREEN lane, generate exactly 7 hooks, one per type in this order:
+STEP 2 — For the EVERGREEN lane, generate exactly 10 hooks, one per type in this order:
 1. "how-i" — A personal "How I [achieved X]" opener. Must NOT start with "I". Implies you've done it.
 2. "contrarian" — Bold claim challenging the obvious take. Must NOT start with "I" or "You".
 3. "number" — Leads with a specific number or timeframe (e.g. "After 3 years…", "47% of…").
@@ -52,11 +52,14 @@ STEP 2 — For the EVERGREEN lane, generate exactly 7 hooks, one per type in thi
 5. "scene-setter" — Drops the reader into a specific micro-moment with concrete sensory detail. Past or present tense.
 6. "prediction" — A bold, specific claim about what will happen. Must start with a timeframe or "By [year]".
 7. "analogy" — Uses a surprising comparison or metaphor to reframe the topic in an unexpected way.
+8. "disarming-joke" — Earns the reader's trust with dry, self-aware humour before delivering the real point. Not cringe — genuinely funny or wry. Under 140 chars.
+9. "tension-setter" — Opens mid-conflict. The reader is dropped into an uncomfortable situation before any resolution is offered. Creates immediate forward momentum. Under 140 chars.
+10. "confession" — A frank admission of something the author got wrong, was naive about, or believed for too long. Disarming and specific. Under 140 chars.
 Evergreen hooks must NOT include a "sourceLine" field.
 
 STEP 3 — For the TRENDING lane, generate exactly 2 hooks tied to recent context. Each hook MUST include:
 - "text": the hook opener (under 140 chars)
-- "type": one of how-i | contrarian | number | how-to | story
+- "type": one of how-i | contrarian | number | question | scene-setter | prediction | analogy | disarming-joke | tension-setter | confession
 - "sourceLine": one sentence ≤20 words naming the specific news event, study, or discussion this hook references. If no real news is available, use: "Based on recent discussions in your field."
 
 CRITICAL HOOK RULE: Every hook must be under 140 characters. This is the mobile LinkedIn "see more" cutoff — anything beyond 140 characters is hidden from the reader's first glance.`;
@@ -86,14 +89,15 @@ RULES FOR THE POST:
 
 STORY MODE POST RULES (apply ONLY when storyMode is true — overrides standard post rules):
 - Structure the post as exactly 5 beats, each beat in its own paragraph group separated by a blank line:
-  Beat 1 (Scene): Drop the reader into the specific moment. Concrete sensory detail. Under 140 chars for the first line.
-  Beat 2 (Tension): The struggle, conflict, or thing that went wrong. Show don't tell.
-  Beat 3 (Turn): The insight, realization, or change in perspective. The pivot point.
-  Beat 4 (Lesson): What this means for the reader — the transferable takeaway.
+  Beat 1 (Scene): Drop the reader into the specific moment. Concrete sensory detail. Under 140 chars for the first line. Use a disarming or self-aware opener that signals "I'm going to be honest with you."
+  Beat 2 (Tension): The struggle, conflict, or thing that went wrong. Show don't tell. Resist resolution — stay in the discomfort.
+  Beat 3 (Turn — Pivot Move): The exact moment of realisation or change. Be specific — name the conversation, the sentence, the object. Write the pivot with disarming self-awareness: "I was wrong about [X]" or "I'd been looking at it backwards."
+  Beat 4 (Lesson): What this means for the reader — the transferable takeaway. Write it as a universal truth, not a summary.
   Beat 5 (CTA): One CTA from the approved list above that fits the story.
 - Do NOT use explicit beat labels like "Beat 1" or "Scene:" in the post text.
 - Keep each beat tight: 1–3 sentences. Total post 150–280 words.
 - Write in first person past tense for beats 1–3, then shift to second person or universal truth for beat 4.
+- Tension must be felt before the turn arrives — never jump from setup directly to lesson.
 
 RULES FOR THE CAROUSEL:
 - 5–8 slides total.
@@ -104,8 +108,8 @@ RULES FOR THE CAROUSEL:
 STORY MODE CAROUSEL RULES (apply ONLY when storyMode is true — overrides standard carousel rules):
 - Exactly 5 slides. Do NOT number them. Use chapter-style titles.
 - Slide 1 (Opening scene): Hook title only. Set description to "". Something that makes the reader stop scrolling.
-- Slide 2 (The struggle): Title + 1-2 sentences on the conflict, failure, or tension.
-- Slide 3 (The turn): Title + 1-2 sentences on the insight or change that happened.
+- Slide 2 (The struggle): Title + 1-2 sentences on the conflict, failure, or tension. Stay in the discomfort — no resolution yet.
+- Slide 3 (The turn — pivot move): Title + 1-2 sentences on the specific pivot moment. Name it exactly: the sentence, the call, the realisation.
 - Slide 4 (The lesson): Title + 1-2 sentences on the transferable takeaway for the reader.
 - Slide 5 (CTA): Title = the call to action. Description must include "Save this to remember it next time you're in this situation."
 
@@ -165,5 +169,82 @@ CAROUSEL (teacher mode):
 VISUAL (teacher mode): Use the analogy from line 2 of the hook as the visual quote card (15–30 words).
 
 INFOGRAPHIC (teacher mode): Headline is the question ("What is [X]?"). Bullets are 3–4 bite-sized facts or comparisons that answer it simply.`;
+
+const FRUSTRATED_EXPERT_OPENERS = [
+  "Let me be honest about something.",
+  "Okay, I've been sitting on this for a while.",
+  "I'm going to say something unpopular.",
+  "Nobody talks about this part.",
+  "This one still frustrates me.",
+  "I've watched this happen too many times.",
+  "Can we have an honest conversation about this?",
+  "Here's what the polished version leaves out.",
+  "I kept quiet about this for too long.",
+  "Something I wish someone had told me earlier:",
+  "The version everyone shares is missing something.",
+  "I've been on the wrong side of this argument. Here's what changed.",
+];
+
+export const POST_FORMAT_INSTRUCTIONS: Record<string, string> = {
+  "frustrated-expert": `
+## POST FORMAT: FRUSTRATED EXPERT
+This format channels the specific frustration of someone who knows an industry deeply and is tired of watching the same avoidable mistakes play out. The key is earning the reader's trust through disarming honesty before delivering the real point.
+
+Structure (4 parts, each a paragraph separated by a blank line):
+
+1. DISARMING OPENER (1 sentence, first line — under 140 chars): Use one of these openers as inspiration — adapt it to the person's specific voice, don't copy verbatim:
+${FRUSTRATED_EXPERT_OPENERS.map(o => `   - "${o}"`).join("\n")}
+   The opener must feel specific and earned — not theatrical. The reader should sense the author has been in the trenches.
+
+2. THE OBSERVATION (2–3 sentences): Name the specific thing that keeps happening. Be concrete — not "people make this mistake" but "I watched three separate teams do exactly this in the past month." Make it real.
+
+3. THE ACTUAL POINT (2–3 sentences): What's really going on underneath. The insight only someone with genuine experience would have. This is the earned authority. Cut any hedging — the frustration is the proof.
+
+4. THE HONEST CLOSE (1–2 sentences + CTA): What the reader can do differently. End with a question or CTA that invites the honest conversation the post started.
+
+SHORT POST (frustrated-expert): Opener sentence → the specific frustration in 1–2 sentences → the actual insight in 1 sentence. Under 100 words.
+CAROUSEL: Slide 1 = disarming opener hook. Slide 2–N-1 = the pattern + the underlying cause. Final slide = what to do about it.`,
+
+  "lived-lesson": `
+## POST FORMAT: LIVED LESSON
+This format works because it's anchored in a specific personal moment — not a polished anecdote, but the raw shape of something that actually happened. The reader should feel like they're being given something the author had to earn.
+
+Structure (5 parts, each a paragraph separated by a blank line):
+
+1. THE BEFORE (1–2 sentences): Where the author was — their assumption, their confidence, their naivety. Name it simply. No drama.
+
+2. THE MOMENT (1–2 sentences): The specific thing that happened — a conversation, a number, a mistake, a realisation. Name it exactly. The more concrete, the better.
+
+3. THE SHIFT (1–2 sentences): What changed in how they saw things. Write this as disarming self-awareness, not a triumph. "I'd been completely wrong about this." is more powerful than "I learned a valuable lesson."
+
+4. THE LESSON (1–2 sentences): The transferable insight. Write it for the reader, not about the author. Second person or universal truth.
+
+5. CTA: One natural question or save prompt from the approved list.
+
+SHORT POST (lived-lesson): Before → moment → shift, compressed into 3–4 sentences. End with a question. Under 100 words.
+CAROUSEL: Slide 1 = the before (hook). Slide 2 = the moment. Slide 3 = the shift. Slide 4 = the lesson. Slide 5 = CTA.`,
+
+  "clean-breakdown": `
+## POST FORMAT: CLEAN BREAKDOWN
+This format makes complex things immediately legible. It's for people who have figured something out and want to give the reader a reusable map — not a list of tips, but a clear mental model they'll actually remember.
+
+Structure:
+
+1. HOOK (1 sentence, under 140 chars): State the core claim or promise. Something worth the reader's next 3 minutes.
+
+2. THE SETUP (1–2 sentences): Why this matters right now. What happens without the clarity this post is about to give.
+
+3. THE BREAKDOWN (a numbered list or clearly separated paragraphs — 3–5 items):
+   - Each item: one crisp label + 1 sentence of substance. Not tips — components of a system.
+   - Titles MUST be numbered if using bullets: "1. [Label]", "2. [Label]", etc.
+   - Each item should work as a standalone insight, not just a step.
+
+4. THE PAYOFF (1–2 sentences): The thing the reader should walk away with — one principle or one action.
+
+5. CTA: "Save this for next time you're working through [topic]." or another appropriate CTA from the approved list.
+
+SHORT POST (clean-breakdown): Hook → 2–3 key items as compact lines (no formal list formatting) → one payoff sentence. Under 100 words.
+CAROUSEL: Slide 1 = hook. Slide 2–N-1 = one item per slide (numbered titles). Final slide = payoff + CTA.`,
+};
 
 export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely. Maintain the same formatting discipline as the original: short 1–2 sentence paragraphs separated by blank lines, no dense walls of text. Return only valid JSON, no markdown fences.`;

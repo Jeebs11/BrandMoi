@@ -731,7 +731,7 @@ components:
           type: string
         type:
           type: string
-          enum: [how-i, contrarian, number, how-to, story]
+          enum: [how-i, contrarian, number, question, scene-setter, prediction, analogy, how-to, story, disarming-joke, tension-setter, confession]
         usedBefore:
           type: boolean
           nullable: true
@@ -841,6 +841,10 @@ components:
           type: boolean
         newsUrl:
           type: string
+          nullable: true
+        postFormat:
+          type: string
+          enum: [standard, frustrated-expert, lived-lesson, clean-breakdown]
           nullable: true
       required:
         - rawInput

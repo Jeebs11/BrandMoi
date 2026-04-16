@@ -17,6 +17,7 @@ import {
   STRUCTURE_SYSTEM_PROMPT,
   GENERATE_SYSTEM_PROMPT,
   TEACHER_MODE_INSTRUCTION,
+  POST_FORMAT_INSTRUCTIONS,
   REFINE_SYSTEM_PROMPT,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -278,7 +279,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, postTone, newsUrl } = parsed.data;
+  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, postTone, newsUrl, postFormat } = parsed.data;
   // teacherMode takes precedence; when both arrive, teacher mode wins
   const teacherMode = parsed.data.teacherMode ?? false;
   const storyMode = !teacherMode && (parsed.data.storyMode ?? false);
@@ -352,10 +353,15 @@ Return this exact JSON shape (no markdown fences):
   }
 }`;
 
+  const formatInstruction = (postFormat && postFormat !== "standard" && !teacherMode && !storyMode)
+    ? (POST_FORMAT_INSTRUCTIONS[postFormat] ?? "")
+    : "";
+
   const generateSystemPrompt = [
     GENERATE_SYSTEM_PROMPT,
     toneInstruction || "",
     teacherMode ? TEACHER_MODE_INSTRUCTION : "",
+    formatInstruction,
     newsReactionInstruction,
   ].filter(Boolean).join("");
 

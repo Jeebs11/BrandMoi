@@ -12,7 +12,7 @@ import {
   UpdateDraftResponse,
   DeleteDraftParams,
   ListDraftsResponse,
-  AnalyticsOverviewResponse,
+  GetAnalyticsOverviewResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth.js";
 import { extractVoiceDNA } from "./ai.js";
@@ -511,7 +511,7 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .map(([format, drafts]) => ({ format, count: drafts.length, ...avgResForDrafts(drafts) }))
     .sort((a, b) => b.count - a.count);
 
-  const result = AnalyticsOverviewResponse.parse({
+  const result = GetAnalyticsOverviewResponse.parse({
     totalPublished,
     avgResonance,
     loggedPerformanceCount,
