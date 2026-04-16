@@ -70,7 +70,13 @@ RULES FOR THE POST:
 - 150–300 words total.
 - Hook (first line): must be under 140 characters — this is the mobile "see more" cutoff. Nothing beyond 140 chars is visible without a tap. The hook can start with "I" if it's the most natural and authentic opener.
 - FORMAT: Write in short 1–2 sentence paragraphs separated by a blank line. Do NOT write long dense paragraphs. Every paragraph break creates white space that keeps readers scrolling.
-- Max 3 hashtags at the very end only. No hashtags anywhere else in the post.
+- Exactly 3 hashtags at the very end only. No hashtags anywhere else in the post.
+- HASHTAG STRATEGY — the goal is to reach the RIGHT audience, not the biggest one. Use this 3-tier model:
+  • Tier 1 (1 tag — broad reach, 500K+ followers): Match to the creator's objective and persona. Examples by objective: Clients → #B2BSales | Authority → #ThoughtLeadership or the creator's specific industry tag | Job → #CareerAdvice | Hiring → #Recruiting. Pick the tag the creator's TARGET AUDIENCE actually follows, not just a big number.
+  • Tier 2 (1 tag — niche topic, 50K–500K followers): Specific to the post's exact topic. Not the broad industry — the specific subject. If the post is about sales discovery calls, use #SalesDiscovery not #Sales. If it's about AI in hiring, use #AIRecruiting not #ArtificialIntelligence.
+  • Tier 3 (1 tag — hyper-specific, <50K followers): The exact community where this post will resonate most. These are small, high-engagement communities where people care deeply. Examples: #PLGFounders, #BootstrappedSaaS, #SoloFounder, #EarlyStageStartup, #B2BMarketing.
+- BANNED HASHTAGS — never use any of these regardless of topic: #Hustle, #Mindset, #Motivation, #Success, #Entrepreneur, #GrowthHacking, #PersonalDevelopment, #Networking, #Leadership (too generic unless the post is specifically about leadership), #Innovation, #FutureOfWork (overused, zero engagement signal).
+- Match the archetype: contrarian/frustrated-expert posts → use tags that signal debate and strong takes; storytelling/lived-lesson → community tags where personal stories thrive; framework/breakdown → professional development tags; data-insight → research and analytics tags.
 - Bullet lists are allowed for framework, list-type, or educational posts. Avoid them for personal, story, or opinion posts.
 - BANNED WORDS — never use any of these: game-changer, disruptive, passionate, excited to share, leverage, synergy, holistic, thought leader, value-add, circle back, move the needle, crush it, hustle, grind, impactful, bleeding edge, scalable, ecosystem, seamless, journey
 - End with a natural CTA that fits the topic. Choose from these options (pick the one that fits most naturally — do not force it):
