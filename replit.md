@@ -53,6 +53,31 @@ The frontend is mobile-first, utilizing TailwindCSS and shadcn/ui for a consiste
 ### System Robustness
 Includes rate limiting on AI endpoints, React `ErrorBoundary` for app-wide error handling, and dedicated 404/error pages.
 
+# Deployment Architecture
+
+## Single-Process Model
+The production deployment uses a single Express process (api-server) that serves **both** the React frontend (as static files) and the API. This is required for Replit Autoscale (`router = "application"`) which bundles ONE container from the primary artifact.
+
+- **api-server** is the primary artifact at `"/"` (`kind = "api"`) — Replit bundles it as a server container with a run command
+- **brand-os** is a dev-only artifact at `"/brand-os"` — runs the Vite dev server for local development
+
+## Dev vs Production Routing
+| Mode | `/` requests | `/api/*` requests |
+|------|-------------|------------------|
+| **Dev** | Proxied from api-server Express → brand-os Vite at `:18565` | Handled by Express |
+| **Production** | Express serves static files from `artifacts/brand-os/dist/public` | Handled by Express |
+
+## Production Build Command
+```
+sh -c "pnpm --filter @workspace/brand-os run build && pnpm --filter @workspace/api-server run build"
+```
+Brand-os builds first (outputs to `artifacts/brand-os/dist/public`), then api-server bundles both into `dist/index.cjs`.
+
+## Production Run Command
+```
+node artifacts/api-server/dist/index.cjs
+```
+
 # External Dependencies
 
 - **Database**: PostgreSQL

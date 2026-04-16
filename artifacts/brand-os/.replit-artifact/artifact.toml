@@ -1,5 +1,5 @@
 kind = "web"
-  previewPath = "/"
+  previewPath = "/brand-os"
   title = "Brand OS"
   version = "1.0.0"
   id = "artifacts/brand-os"
@@ -11,7 +11,7 @@ kind = "web"
   [[services]]
   localPort = 18565
   name = "web"
-  paths = ["/"]
+  paths = ["/brand-os"]
 
   [services.development]
   run = "pnpm --filter @workspace/brand-os run dev"
@@ -19,8 +19,4 @@ kind = "web"
   [services.env]
   PORT = "18565"
   BASE_PATH = "/"
-
-  [services.production]
-  build = ["sh", "-c", "pnpm --filter @workspace/brand-os run build && pnpm --filter @workspace/api-server run build"]
-  run = ["node", "artifacts/api-server/dist/index.cjs"]
   
