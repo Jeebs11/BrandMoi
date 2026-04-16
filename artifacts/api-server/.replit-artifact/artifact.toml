@@ -1,13 +1,13 @@
 kind = "api"
-  previewPath = "/"
-  title = "Brand OS"
+  previewPath = "/api"
+  title = "Brand OS API"
   version = "1.0.0"
   id = "3B4_FFSkEVBkAeYMFRJ2e"
 
   [[services]]
   localPort = 8080
   name = "API Server"
-  paths = ["/"]
+  paths = ["/api"]
 
   [services.env]
   PORT = "8080"

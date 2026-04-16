@@ -1,5 +1,5 @@
 kind = "web"
-  previewPath = "/brand-os"
+  previewPath = "/"
   title = "Brand OS"
   version = "1.0.0"
   id = "artifacts/brand-os"
@@ -11,7 +11,7 @@ kind = "web"
   [[services]]
   localPort = 18565
   name = "web"
-  paths = ["/brand-os"]
+  paths = ["/"]
 
   [services.development]
   run = "pnpm --filter @workspace/brand-os run dev"
