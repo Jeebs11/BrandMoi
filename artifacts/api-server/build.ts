@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp, access } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +67,21 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Copy brand-os frontend build into dist/public
+  const brandOsDist = path.resolve(__dirname, "../brand-os/dist/public");
+  const destDir = path.resolve(distDir, "public");
+
+  try {
+    await access(brandOsDist);
+    await cp(brandOsDist, destDir, { recursive: true });
+    console.log(`[build] Frontend copied from ${brandOsDist} to ${destDir}`);
+  } catch (err: any) {
+    console.error(`[build] WARNING: Could not copy frontend: ${err.message}`);
+    console.error(`[build] brandOsDist: ${brandOsDist}`);
+    console.error(`[build] destDir: ${destDir}`);
+    // Don't fail the build — server can still start without frontend files
+  }
 }
 
 buildAll().catch((err) => {

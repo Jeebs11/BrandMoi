@@ -16,7 +16,7 @@ kind = "api"
   run = "pnpm --filter @workspace/api-server run dev"
 
   [services.production]
-  build = "pnpm --filter @workspace/brand-os run build && pnpm --filter @workspace/api-server run build && cp -r artifacts/brand-os/dist/public artifacts/api-server/dist/public"
+  build = "pnpm --filter @workspace/brand-os run build && pnpm --filter @workspace/api-server run build"
   run = "node artifacts/api-server/dist/index.cjs"
 
   [services.production.health.startup]
