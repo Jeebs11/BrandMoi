@@ -170,6 +170,12 @@ export default function Capture() {
         existingDraft.tone === "Bold" ? "Contrarian" :
         existingDraft.tone === "Story" ? "Story" :
         "Direct";
+      const savedFormat = (structure as unknown as { postFormat?: string })?.postFormat;
+      const restoredFormat: PostFormatKey =
+        savedFormat === "frustrated-expert" ? "frustrated-expert" :
+        savedFormat === "lived-lesson" ? "lived-lesson" :
+        savedFormat === "clean-breakdown" ? "clean-breakdown" :
+        "standard";
       setState({
         step: content ? 4 : 3,
         rawInput: existingDraft.rawInput,
@@ -177,7 +183,7 @@ export default function Capture() {
         persona: existingDraft.persona,
         tone: existingDraft.tone,
         postTone: draftAutoTone,
-        postFormat: "standard",
+        postFormat: restoredFormat,
         structureResult: null,
         selectedLane: "evergreen",
         structure,
@@ -1022,7 +1028,7 @@ export default function Capture() {
       objective: state.objective,
       persona: state.persona,
       tone: state.tone,
-      structuredBreakdown: { ...state.structure, storyMode: state.storyMode, teacherMode: state.teacherMode },
+      structuredBreakdown: { ...state.structure, storyMode: state.storyMode, teacherMode: state.teacherMode, postFormat: state.postFormat !== "standard" ? state.postFormat : undefined },
       selectedHook: state.selectedHook ?? null,
       postOutput: postOverride ?? state.content?.post ?? null,
       shortPost: state.content?.shortPost ?? null,
@@ -1632,7 +1638,6 @@ export default function Capture() {
                       <button
                         key={f.key}
                         onClick={() => setState(s => ({ ...s, postFormat: f.key }))}
-                        title={f.desc}
                         className={cn(
                           "flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border-2",
                           state.postFormat === f.key
@@ -1644,6 +1649,11 @@ export default function Capture() {
                       </button>
                     ))}
                   </div>
+                  {state.postFormat !== "standard" && (
+                    <p className="mt-1.5 text-[11px] text-gray-500 leading-snug">
+                      {POST_FORMATS.find(f => f.key === state.postFormat)?.desc}
+                    </p>
+                  )}
                 </div>
               )}
               {!state.selectedHook && <p className="text-center text-xs text-gray-400 font-medium">← Tap a hook above to continue</p>}
