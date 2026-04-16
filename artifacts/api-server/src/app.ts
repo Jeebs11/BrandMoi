@@ -21,7 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 if (process.env.NODE_ENV === "production") {
-  const frontendDist = path.resolve(process.cwd(), "artifacts/brand-os/dist/public");
+  const frontendDist = path.resolve(__dirname, "../../brand-os/dist/public");
   if (fs.existsSync(frontendDist)) {
     app.use(express.static(frontendDist));
     app.get("/{*splat}", (_req, res) => {

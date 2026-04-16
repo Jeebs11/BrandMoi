@@ -16,8 +16,8 @@ kind = "api"
   run = "pnpm --filter @workspace/api-server run dev"
 
   [services.production]
-  build = ["sh", "-c", "pnpm --filter @workspace/brand-os run build && pnpm --filter @workspace/api-server run build"]
-  run = ["node", "artifacts/api-server/dist/index.cjs"]
+  build = "pnpm --filter @workspace/brand-os run build && pnpm --filter @workspace/api-server run build"
+  run = "pnpm --filter @workspace/api-server start"
 
   [services.production.health.startup]
   path = "/api/healthz"
