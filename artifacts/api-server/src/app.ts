@@ -21,12 +21,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 if (process.env.NODE_ENV === "production") {
-  const frontendDist = path.resolve(__dirname, "../../brand-os/dist/public");
-  if (fs.existsSync(frontendDist)) {
+  const candidates = [
+    path.resolve(__dirname, "../../brand-os/dist/public"),
+    path.resolve(process.cwd(), "brand-os/dist/public"),
+    path.resolve(process.cwd(), "artifacts/brand-os/dist/public"),
+  ];
+  const frontendDist = candidates.find((p) => fs.existsSync(p));
+  if (frontendDist) {
     app.use(express.static(frontendDist));
     app.get("/{*splat}", (_req, res) => {
       res.sendFile(path.join(frontendDist, "index.html"));
     });
+  } else {
+    console.warn("Frontend dist not found. Tried:", candidates);
   }
 } else {
   const BRAND_OS_PORT = process.env.BRAND_OS_DEV_PORT ?? "18565";
