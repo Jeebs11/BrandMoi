@@ -20,13 +20,40 @@ import { upsertDailyActivity } from "../lib/momentum.js";
 
 const router: IRouter = Router();
 
+function normalizeDraft<T extends { structuredBreakdown: unknown }>(draft: T): T {
+  if (!draft.structuredBreakdown || typeof draft.structuredBreakdown !== "object") return draft;
+  const sb = draft.structuredBreakdown as Record<string, unknown>;
+  if (Array.isArray(sb.hooks)) {
+    sb.hooks = sb.hooks.map((h: unknown) =>
+      typeof h === "string" ? { text: h } : h
+    );
+  }
+  if (Array.isArray(sb.narrativeFlow)) {
+    sb.narrativeFlow = sb.narrativeFlow.map((n: unknown) =>
+      typeof n === "string" ? n : String(n)
+    );
+  }
+  return draft;
+}
+
 router.get("/drafts", requireAuth, async (req, res): Promise<void> => {
   const drafts = await db
     .select()
     .from(draftsTable)
     .where(eq(draftsTable.userId, req.user!.userId))
     .orderBy(desc(draftsTable.createdAt));
-  res.json(ListDraftsResponse.parse(drafts));
+
+  const normalized = drafts.map(normalizeDraft);
+  const parsed: unknown[] = [];
+  for (const draft of normalized) {
+    const result = ListDraftsResponse.element.safeParse(draft);
+    if (result.success) {
+      parsed.push(result.data);
+    } else {
+      console.warn(`Skipping malformed draft id=${draft.id}:`, result.error.issues.map(i => i.message).join(", "));
+    }
+  }
+  res.json(parsed);
 });
 
 router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
@@ -81,7 +108,7 @@ router.get("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetDraftResponse.parse(draft));
+  res.json(GetDraftResponse.parse(normalizeDraft(draft)));
 });
 
 router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
@@ -118,7 +145,7 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(UpdateDraftResponse.parse(draft));
+  res.json(UpdateDraftResponse.parse(normalizeDraft(draft)));
 
   if ((parsed.data.status === "ready" || parsed.data.status === "published") && draft.postOutput) {
     void extractVoiceDNA(req.user!.userId, draft.id, draft.postOutput);
