@@ -1028,7 +1028,7 @@ export default function Capture() {
       objective: state.objective,
       persona: state.persona,
       tone: state.tone,
-      structuredBreakdown: { ...state.structure, storyMode: state.storyMode, teacherMode: state.teacherMode, postFormat: state.postFormat !== "standard" ? state.postFormat : undefined },
+      structuredBreakdown: { ...state.structure, storyMode: state.storyMode, teacherMode: state.teacherMode, postFormat: state.postFormat },
       selectedHook: state.selectedHook ?? null,
       postOutput: postOverride ?? state.content?.post ?? null,
       shortPost: state.content?.shortPost ?? null,
