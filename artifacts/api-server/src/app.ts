@@ -22,16 +22,24 @@ app.use("/api", router);
 
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path.resolve(__dirname, "public");
-  console.log("[startup] frontendDist:", frontendDist, "exists:", fs.existsSync(frontendDist));
-  if (fs.existsSync(frontendDist)) {
+  const indexPath = path.join(frontendDist, "index.html");
+  const dirExists = fs.existsSync(frontendDist);
+  const indexExists = fs.existsSync(indexPath);
+  console.log("[startup] __dirname:", __dirname);
+  console.log("[startup] frontendDist:", frontendDist, "exists:", dirExists);
+  console.log("[startup] index.html:", indexPath, "exists:", indexExists);
+
+  if (indexExists) {
+    const indexHtml = fs.readFileSync(indexPath, "utf-8");
+    console.log("[startup] index.html loaded, size:", indexHtml.length, "bytes");
     app.use(express.static(frontendDist));
     app.get("/{*splat}", (_req, res) => {
-      res.sendFile(path.join(frontendDist, "index.html"));
+      res.type("html").send(indexHtml);
     });
   } else {
-    console.warn("[startup] Frontend dist not found at:", frontendDist);
+    console.warn("[startup] index.html not found — serving 503 for all frontend routes");
     app.get("/{*splat}", (_req, res) => {
-      res.status(503).send("Frontend not available — build may have failed");
+      res.status(503).send(`Frontend unavailable. Dir exists: ${dirExists}, index exists: ${indexExists}, path: ${indexPath}`);
     });
   }
 } else {
@@ -54,5 +62,12 @@ if (process.env.NODE_ENV === "production") {
     });
   });
 }
+
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[unhandled-error]", err?.code, err?.status, err?.message);
+  if (!res.headersSent) {
+    res.status(err?.status || 500).send(err?.message || "Internal Server Error");
+  }
+});
 
 export default app;
