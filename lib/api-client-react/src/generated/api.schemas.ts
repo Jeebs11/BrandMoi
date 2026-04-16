@@ -104,6 +104,17 @@ export interface HookItem {
   sourceLine?: string | null;
 }
 
+export type StructuredBreakdownPostFormat =
+  | (typeof StructuredBreakdownPostFormat)[keyof typeof StructuredBreakdownPostFormat]
+  | null;
+
+export const StructuredBreakdownPostFormat = {
+  standard: "standard",
+  "frustrated-expert": "frustrated-expert",
+  "lived-lesson": "lived-lesson",
+  "clean-breakdown": "clean-breakdown",
+} as const;
+
 export interface StructuredBreakdown {
   topic: string;
   angle: string;
@@ -114,6 +125,7 @@ export interface StructuredBreakdown {
   narrativeFlow: string[];
   storyMode?: boolean;
   teacherMode?: boolean;
+  postFormat?: StructuredBreakdownPostFormat;
 }
 
 export type StructureIdeaResponseHookUsage = { [key: string]: number };

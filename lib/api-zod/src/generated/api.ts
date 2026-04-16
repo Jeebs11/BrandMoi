@@ -172,6 +172,14 @@ export const StructureIdeaResponse = zod.object({
     narrativeFlow: zod.array(zod.string()),
     storyMode: zod.boolean().optional(),
     teacherMode: zod.boolean().optional(),
+    postFormat: zod
+      .enum([
+        "standard",
+        "frustrated-expert",
+        "lived-lesson",
+        "clean-breakdown",
+      ])
+      .nullish(),
   }),
   trending: zod
     .object({
@@ -206,6 +214,14 @@ export const StructureIdeaResponse = zod.object({
       narrativeFlow: zod.array(zod.string()),
       storyMode: zod.boolean().optional(),
       teacherMode: zod.boolean().optional(),
+      postFormat: zod
+        .enum([
+          "standard",
+          "frustrated-expert",
+          "lived-lesson",
+          "clean-breakdown",
+        ])
+        .nullish(),
     })
     .nullish(),
   hookUsage: zod.record(zod.string(), zod.number()).optional(),
@@ -267,6 +283,14 @@ export const GenerateContentBody = zod.object({
     narrativeFlow: zod.array(zod.string()),
     storyMode: zod.boolean().optional(),
     teacherMode: zod.boolean().optional(),
+    postFormat: zod
+      .enum([
+        "standard",
+        "frustrated-expert",
+        "lived-lesson",
+        "clean-breakdown",
+      ])
+      .nullish(),
   }),
   selectedHook: zod.string(),
   includeCta: zod.boolean().optional(),
@@ -708,6 +732,14 @@ export const ListDraftsResponseItem = zod.object({
     narrativeFlow: zod.array(zod.string()),
     storyMode: zod.boolean().optional(),
     teacherMode: zod.boolean().optional(),
+    postFormat: zod
+      .enum([
+        "standard",
+        "frustrated-expert",
+        "lived-lesson",
+        "clean-breakdown",
+      ])
+      .nullish(),
   }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
@@ -839,6 +871,14 @@ export const CreateDraftBody = zod.object({
     narrativeFlow: zod.array(zod.string()),
     storyMode: zod.boolean().optional(),
     teacherMode: zod.boolean().optional(),
+    postFormat: zod
+      .enum([
+        "standard",
+        "frustrated-expert",
+        "lived-lesson",
+        "clean-breakdown",
+      ])
+      .nullish(),
   }),
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
@@ -906,6 +946,14 @@ export const GetDraftResponse = zod.object({
     narrativeFlow: zod.array(zod.string()),
     storyMode: zod.boolean().optional(),
     teacherMode: zod.boolean().optional(),
+    postFormat: zod
+      .enum([
+        "standard",
+        "frustrated-expert",
+        "lived-lesson",
+        "clean-breakdown",
+      ])
+      .nullish(),
   }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
@@ -1041,6 +1089,14 @@ export const UpdateDraftBody = zod.object({
       narrativeFlow: zod.array(zod.string()),
       storyMode: zod.boolean().optional(),
       teacherMode: zod.boolean().optional(),
+      postFormat: zod
+        .enum([
+          "standard",
+          "frustrated-expert",
+          "lived-lesson",
+          "clean-breakdown",
+        ])
+        .nullish(),
     })
     .optional(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
@@ -1097,6 +1153,14 @@ export const UpdateDraftResponse = zod.object({
     narrativeFlow: zod.array(zod.string()),
     storyMode: zod.boolean().optional(),
     teacherMode: zod.boolean().optional(),
+    postFormat: zod
+      .enum([
+        "standard",
+        "frustrated-expert",
+        "lived-lesson",
+        "clean-breakdown",
+      ])
+      .nullish(),
   }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),

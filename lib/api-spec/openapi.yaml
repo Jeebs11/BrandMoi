@@ -766,6 +766,10 @@ components:
           type: boolean
         teacherMode:
           type: boolean
+        postFormat:
+          type: string
+          enum: [standard, frustrated-expert, lived-lesson, clean-breakdown]
+          nullable: true
       required:
         - topic
         - angle

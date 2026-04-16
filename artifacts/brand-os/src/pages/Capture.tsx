@@ -170,11 +170,11 @@ export default function Capture() {
         existingDraft.tone === "Bold" ? "Contrarian" :
         existingDraft.tone === "Story" ? "Story" :
         "Direct";
-      const savedFormat = (structure as unknown as { postFormat?: string })?.postFormat;
+      const sf = (structure as { postFormat?: string | null })?.postFormat;
       const restoredFormat: PostFormatKey =
-        savedFormat === "frustrated-expert" ? "frustrated-expert" :
-        savedFormat === "lived-lesson" ? "lived-lesson" :
-        savedFormat === "clean-breakdown" ? "clean-breakdown" :
+        sf === "frustrated-expert" ? "frustrated-expert" :
+        sf === "lived-lesson" ? "lived-lesson" :
+        sf === "clean-breakdown" ? "clean-breakdown" :
         "standard";
       setState({
         step: content ? 4 : 3,
@@ -1633,27 +1633,23 @@ export default function Capture() {
               {!state.storyMode && !state.teacherMode && (
                 <div>
                   <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Post format</p>
-                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  <div className="grid grid-cols-2 gap-2">
                     {POST_FORMATS.map(f => (
                       <button
                         key={f.key}
                         onClick={() => setState(s => ({ ...s, postFormat: f.key }))}
                         className={cn(
-                          "flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border-2",
+                          "flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl text-left transition-all border-2",
                           state.postFormat === f.key
                             ? "bg-primary text-white border-primary shadow-sm"
                             : "bg-white text-gray-600 border-gray-200 hover:border-primary/40"
                         )}
                       >
-                        <span>{f.emoji}</span> {f.label}
+                        <span className="text-xs font-bold flex items-center gap-1"><span>{f.emoji}</span> {f.label}</span>
+                        <span className={cn("text-[10px] leading-tight", state.postFormat === f.key ? "text-white/80" : "text-gray-400")}>{f.desc}</span>
                       </button>
                     ))}
                   </div>
-                  {state.postFormat !== "standard" && (
-                    <p className="mt-1.5 text-[11px] text-gray-500 leading-snug">
-                      {POST_FORMATS.find(f => f.key === state.postFormat)?.desc}
-                    </p>
-                  )}
                 </div>
               )}
               {!state.selectedHook && <p className="text-center text-xs text-gray-400 font-medium">← Tap a hook above to continue</p>}

@@ -188,41 +188,50 @@ const FRUSTRATED_EXPERT_OPENERS = [
 export const POST_FORMAT_INSTRUCTIONS: Record<string, string> = {
   "frustrated-expert": `
 ## POST FORMAT: FRUSTRATED EXPERT
-This format channels the specific frustration of someone who knows an industry deeply and is tired of watching the same avoidable mistakes play out. The key is earning the reader's trust through disarming honesty before delivering the real point.
+This format is for the earned rant. The author has deep expertise and has watched the same avoidable mistake play out too many times. The power comes from the disarming opener — acknowledging the frustration honestly before delivering the real insight.
 
-Structure (4 parts, each a paragraph separated by a blank line):
+MANDATORY STRUCTURE — 4 beats, each in its own paragraph separated by a blank line:
 
-1. DISARMING OPENER (1 sentence, first line — under 140 chars): Use one of these openers as inspiration — adapt it to the person's specific voice, don't copy verbatim:
-${FRUSTRATED_EXPERT_OPENERS.map(o => `   - "${o}"`).join("\n")}
-   The opener must feel specific and earned — not theatrical. The reader should sense the author has been in the trenches.
+BEAT 1 — DISARMING OPENER (first line, under 140 chars):
+Use one of these openers as a starting point — adapt it to the person's specific voice, do NOT copy verbatim:
+${FRUSTRATED_EXPERT_OPENERS.map(o => `   • "${o}"`).join("\n")}
+The opener must name a UNIVERSAL PAIN POINT that the reader immediately recognises — something they've seen, felt, or lived through. It should feel like the author is finally saying what everyone is already thinking.
 
-2. THE OBSERVATION (2–3 sentences): Name the specific thing that keeps happening. Be concrete — not "people make this mistake" but "I watched three separate teams do exactly this in the past month." Make it real.
+BEAT 2 — THE OBSERVATION (2–3 sentences):
+Name the specific, concrete pattern that keeps happening. NOT "people often make this mistake" — instead: "I watched three separate teams do exactly this in Q1." Specific industry, specific scenario, specific consequence. Earned from real experience.
 
-3. THE ACTUAL POINT (2–3 sentences): What's really going on underneath. The insight only someone with genuine experience would have. This is the earned authority. Cut any hedging — the frustration is the proof.
+BEAT 3 — THE CONTRARIAN CLOSE / REAL INSIGHT (2–3 sentences):
+Challenge the conventional take. What is most people's assumption? What does the author — from hard experience — know to be true instead? This is the contrarian payload. Write it without hedging: "The real problem isn't X. It's Y." The frustration is the proof.
 
-4. THE HONEST CLOSE (1–2 sentences + CTA): What the reader can do differently. End with a question or CTA that invites the honest conversation the post started.
+BEAT 4 — PERSONAL STAKE + CTA (1–2 sentences):
+Why does the author care enough to post this? Make the personal stake clear — what they've seen, lost, or built. End with a CTA from the approved list that invites real conversation.
 
-SHORT POST (frustrated-expert): Opener sentence → the specific frustration in 1–2 sentences → the actual insight in 1 sentence. Under 100 words.
-CAROUSEL: Slide 1 = disarming opener hook. Slide 2–N-1 = the pattern + the underlying cause. Final slide = what to do about it.`,
+SHORT POST (frustrated-expert): Opener (universal pain point) → the specific observation in 1 sentence → the contrarian insight in 1 sentence. Under 100 words.
+CAROUSEL: Slide 1 = disarming opener (hook). Slide 2 = the pattern (observation). Slide 3 = why it keeps happening. Slide 4 = the real insight (contrarian close). Slide 5 = what to do instead (CTA).`,
 
   "lived-lesson": `
 ## POST FORMAT: LIVED LESSON
-This format works because it's anchored in a specific personal moment — not a polished anecdote, but the raw shape of something that actually happened. The reader should feel like they're being given something the author had to earn.
+This format is a personal transformation story anchored in a specific moment. NOT a polished anecdote — the raw, honest shape of something that actually happened. The reader must feel the author earned this.
 
-Structure (5 parts, each a paragraph separated by a blank line):
+MANDATORY STRUCTURE — 5 beats, each in its own paragraph separated by a blank line:
 
-1. THE BEFORE (1–2 sentences): Where the author was — their assumption, their confidence, their naivety. Name it simply. No drama.
+BEAT 1 — SCENE (1–2 sentences, first line under 140 chars):
+Drop the reader into the specific moment BEFORE the lesson arrived. Name the exact setting — the room, the situation, the author's state of mind. What did they believe, assume, or feel confident about? Concrete sensory or situational detail.
 
-2. THE MOMENT (1–2 sentences): The specific thing that happened — a conversation, a number, a mistake, a realisation. Name it exactly. The more concrete, the better.
+BEAT 2 — TENSION (1–2 sentences):
+The thing that went wrong, broke down, or blindsided them. Stay in the discomfort — do NOT offer any resolution yet. Show what it felt like to be wrong. The reader should feel the impact of the problem before any insight arrives.
 
-3. THE SHIFT (1–2 sentences): What changed in how they saw things. Write this as disarming self-awareness, not a triumph. "I'd been completely wrong about this." is more powerful than "I learned a valuable lesson."
+BEAT 3 — PIVOT (1–2 sentences):
+The exact moment of realisation. Name it precisely — a specific conversation, sentence, number, or observation that changed how the author saw it. Write with disarming self-awareness: "I'd been looking at this backwards." or "That sentence undid three years of assumptions." Not a triumph — a pivot.
 
-4. THE LESSON (1–2 sentences): The transferable insight. Write it for the reader, not about the author. Second person or universal truth.
+BEAT 4 — LESSON (1–2 sentences):
+The transferable insight — written for the READER, not about the author. Use second person ("You'll notice…", "If you've ever…") or universal truth. One clean insight they'll carry away.
 
-5. CTA: One natural question or save prompt from the approved list.
+BEAT 5 — CTA:
+One natural question or save prompt from the approved list. Must fit the emotional tone of the story — not generic.
 
-SHORT POST (lived-lesson): Before → moment → shift, compressed into 3–4 sentences. End with a question. Under 100 words.
-CAROUSEL: Slide 1 = the before (hook). Slide 2 = the moment. Slide 3 = the shift. Slide 4 = the lesson. Slide 5 = CTA.`,
+SHORT POST (lived-lesson): Scene (where they were, what they believed) → tension (what broke) → pivot (the exact moment) → lesson (one line for the reader). Compressed into 4–5 sentences. Under 100 words.
+CAROUSEL: Slide 1 = scene (hook). Slide 2 = tension (what broke). Slide 3 = pivot (the exact moment). Slide 4 = lesson (for the reader). Slide 5 = CTA.`,
 
   "clean-breakdown": `
 ## POST FORMAT: CLEAN BREAKDOWN
