@@ -188,26 +188,29 @@ const FRUSTRATED_EXPERT_OPENERS = [
 export const POST_FORMAT_INSTRUCTIONS: Record<string, string> = {
   "frustrated-expert": `
 ## POST FORMAT: FRUSTRATED EXPERT
-This format is for the earned rant. The author has deep expertise and has watched the same avoidable mistake play out too many times. The power comes from the disarming opener — acknowledging the frustration honestly before delivering the real insight.
+This format channels the earned frustration of someone who has watched the same avoidable problem play out too many times. The viral formula is: disarm first → name the universal pain → break it down concretely → flip the conventional wisdom → land the personal stake.
 
-MANDATORY STRUCTURE — 4 beats, each in its own paragraph separated by a blank line:
+MANDATORY STRUCTURE — 5 beats, each in its own paragraph separated by a blank line:
 
 BEAT 1 — DISARMING OPENER (first line, under 140 chars):
-Use one of these openers as a starting point — adapt it to the person's specific voice, do NOT copy verbatim:
+Use one of these openers as a starting point — adapt to the author's specific voice, do NOT copy verbatim:
 ${FRUSTRATED_EXPERT_OPENERS.map(o => `   • "${o}"`).join("\n")}
-The opener must name a UNIVERSAL PAIN POINT that the reader immediately recognises — something they've seen, felt, or lived through. It should feel like the author is finally saying what everyone is already thinking.
+The opener signals honesty and earned authority. It should feel like the author is finally willing to say what everyone is already thinking.
 
-BEAT 2 — THE OBSERVATION (2–3 sentences):
-Name the specific, concrete pattern that keeps happening. NOT "people often make this mistake" — instead: "I watched three separate teams do exactly this in Q1." Specific industry, specific scenario, specific consequence. Earned from real experience.
+BEAT 2 — UNIVERSAL PAIN POINT (1–2 sentences):
+Name the specific, widespread frustration that every person in this field recognises. Make it uncomfortable to read — the kind of thing professionals whisper about but rarely post. Not generic ("this industry has problems") — specific ("every founder I talk to has done version of this").
 
-BEAT 3 — THE CONTRARIAN CLOSE / REAL INSIGHT (2–3 sentences):
-Challenge the conventional take. What is most people's assumption? What does the author — from hard experience — know to be true instead? This is the contrarian payload. Write it without hedging: "The real problem isn't X. It's Y." The frustration is the proof.
+BEAT 3 — CLEAR BREAKDOWN (2–3 sentences):
+Break down the problem concretely. What exactly happens? Who does it? What goes wrong? Give the reader a clear picture of the pattern — specific enough that they think "I've seen this exact thing."
 
-BEAT 4 — PERSONAL STAKE + CTA (1–2 sentences):
-Why does the author care enough to post this? Make the personal stake clear — what they've seen, lost, or built. End with a CTA from the approved list that invites real conversation.
+BEAT 4 — CONTRARIAN CLOSE (2–3 sentences):
+Challenge the conventional take on the problem. What does everyone assume is the solution or the cause? What does the author — from hard experience — know to be true instead? Write it without hedging: "The real problem isn't X. It's Y." This is the insight only someone with genuine experience would have.
 
-SHORT POST (frustrated-expert): Opener (universal pain point) → the specific observation in 1 sentence → the contrarian insight in 1 sentence. Under 100 words.
-CAROUSEL: Slide 1 = disarming opener (hook). Slide 2 = the pattern (observation). Slide 3 = why it keeps happening. Slide 4 = the real insight (contrarian close). Slide 5 = what to do instead (CTA).`,
+BEAT 5 — PERSONAL STAKE + CTA (1–2 sentences):
+Why does the author care enough to post this? Make the personal stake explicit — what they've built, lost, or watched happen because of this pattern. End with a CTA from the approved list that opens the real conversation.
+
+SHORT POST (frustrated-expert): Opener → universal pain (1 sentence) → clear breakdown (1 sentence) → contrarian close (1 sentence). Under 100 words.
+CAROUSEL: Slide 1 = disarming opener. Slide 2 = the universal pain. Slide 3 = the concrete breakdown. Slide 4 = the contrarian insight. Slide 5 = personal stake + CTA.`,
 
   "lived-lesson": `
 ## POST FORMAT: LIVED LESSON

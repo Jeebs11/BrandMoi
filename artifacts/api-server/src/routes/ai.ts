@@ -164,7 +164,10 @@ Return this exact JSON shape (no markdown fences):
       { "text": "question hook under 140 chars ending with ?", "type": "question" },
       { "text": "scene-setter hook under 140 chars", "type": "scene-setter" },
       { "text": "prediction hook under 140 chars", "type": "prediction" },
-      { "text": "analogy hook under 140 chars", "type": "analogy" }
+      { "text": "analogy hook under 140 chars", "type": "analogy" },
+      { "text": "disarming-joke hook under 140 chars — dry, wry, earns trust through humour", "type": "disarming-joke" },
+      { "text": "tension-setter hook under 140 chars — drop reader into a conflict mid-scene", "type": "tension-setter" },
+      { "text": "confession hook under 140 chars — frank admission of something the author got wrong", "type": "confession" }
     ],
     "narrativeFlow": ["", "", "", ""]
   },
