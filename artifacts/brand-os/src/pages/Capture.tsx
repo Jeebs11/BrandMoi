@@ -1269,7 +1269,7 @@ export default function Capture() {
               </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10 space-y-2.5">
-              {lengthParam === "short" && state.rawInput.trim() && (
+              {lengthParam === "short" && state.rawInput.trim() && !state.structure && (
                 <Button
                   variant="outline"
                   className="w-full h-12 text-sm font-semibold border-2 border-primary/30 text-primary group"
@@ -1278,9 +1278,23 @@ export default function Capture() {
                   ⚡ Quick generate short post
                 </Button>
               )}
-              <Button className="w-full h-14 text-base font-semibold group" onClick={handleStructure}>
-                Structure this idea <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
+              {state.structure ? (
+                <>
+                  <Button className="w-full h-14 text-base font-semibold group" onClick={handleGenerate}>
+                    <RefreshCw className="mr-2 w-4 h-4 group-hover:rotate-180 transition-transform duration-500" /> Regenerate with new settings
+                  </Button>
+                  <button
+                    onClick={handleStructure}
+                    className="w-full text-center text-sm text-gray-400 hover:text-gray-600 font-medium transition-colors py-1"
+                  >
+                    Re-analyze from scratch →
+                  </button>
+                </>
+              ) : (
+                <Button className="w-full h-14 text-base font-semibold group" onClick={handleStructure}>
+                  Structure this idea <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              )}
             </div>
           </motion.div>
         );
@@ -1677,6 +1691,9 @@ export default function Capture() {
         if (!state.content) return null;
         return (
           <motion.div key="s45" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full">
+            <div className="mb-3">
+              <BackBtn onClick={() => setState(s => ({ ...s, step: 3 }))} />
+            </div>
             <div className="flex p-1 bg-gray-100 rounded-xl mb-5 gap-1">
               {([
                 ["post", "Post", <PenTool className="w-3 h-3" />],
