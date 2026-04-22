@@ -14,18 +14,34 @@ const GenerateImagePromptBody = z.object({
 
 const STYLE_WRAPPERS: Record<string, string> = {
   cartoon:
-    "Traditional Saturday-morning cartoon illustration, bold thick black outlines, vibrant saturated flat colours (bright reds, blues, yellows, greens), classic comic-strip energy, cheerful and expressive characters, colourful background, no text or lettering in the image",
+    "Traditional Saturday-morning cartoon illustration, bold thick black outlines, vibrant saturated flat colours (bright reds, blues, yellows, greens), classic comic-strip energy, cheerful and expressive characters, colourful background",
   "new-yorker":
-    "Classic New Yorker magazine single-panel cartoon, pure black-and-white pen-and-ink illustration, expressive fine-line cross-hatching, white paper background, no colour, no grey tones, no text or lettering anywhere in the image, witty editorial scene composition",
+    "Classic New Yorker magazine single-panel cartoon, pure black-and-white pen-and-ink illustration, expressive fine-line cross-hatching, white paper background, no colour, no grey tones, witty editorial scene composition",
   isometric:
-    "3D isometric illustration, flat vibrant colours, clean geometric shapes, modern professional style, light background, no text in the image",
+    "3D isometric illustration, flat vibrant colours, clean geometric shapes, modern professional style, light background",
   sketch:
-    "Hand-drawn whiteboard sketch, rough expressive pencil-marker lines, monochrome, white background, thought-leadership illustration, no text in the image",
+    "Detailed pencil sketch illustration, expressive fine-line crosshatch shading, black-and-white on white paper, realistic scene composition, accurate character count and placement, clear perspective, high detail",
   blueprint:
-    "Technical blueprint illustration, precise white line art on deep blue background (#0a2a5e), architectural drawing style, clean geometric forms, no text in the image",
+    "Technical blueprint illustration, precise white line art on deep blue background (#0a2a5e), architectural drawing style, clean geometric forms",
   vintage:
-    "Vintage 1950s mid-century editorial poster illustration, bold graphic shapes, limited warm colour palette, retro print style, no text in the image",
+    "Vintage 1950s mid-century editorial poster illustration, bold graphic shapes, limited warm colour palette, retro print style",
 };
+
+function sceneContainsText(scene: string): boolean {
+  const lower = scene.toLowerCase();
+  return (
+    lower.includes("speech bubble") ||
+    lower.includes("speech-bubble") ||
+    lower.includes("saying") ||
+    lower.includes(" says ") ||
+    lower.includes("caption") ||
+    lower.includes("label") ||
+    lower.includes("sign saying") ||
+    lower.includes("text saying") ||
+    lower.includes("words ") ||
+    /['"]/.test(scene)
+  );
+}
 
 const ILLUSTRATION_CONCEPT_SYSTEM = `You are a creative director specialising in single-panel editorial illustrations for LinkedIn. Given a LinkedIn post, you will:
 1. Devise a strong visual metaphor or scene that captures the post's core insight — think New Yorker cartoon energy.
@@ -39,7 +55,7 @@ CRITICAL SCENE RULES — follow these strictly:
 
 Return ONLY valid JSON, no markdown fences, no explanation:
 {
-  "scenePrompt": "Concise DALL-E 3 scene description — max 200 characters, describes ONLY the visual. NO text, letters, or words should appear in the image.",
+  "scenePrompt": "Concise DALL-E 3 scene description — max 200 characters, describes ONLY the visual. If the scene naturally includes a speech bubble or sign with short text (e.g. a quote or dialogue), include the exact words in quotes. Otherwise specify NO text, letters, or words in the image.",
   "caption": "The witty 1–2 line caption displayed BELOW the illustration.",
   "chosenStyle": "Name of the illustration style used."
 }`;
@@ -153,8 +169,12 @@ router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Pr
     };
     const styleKey = resolveStyleKey(illustrationStyle ?? "");
     const stylePrefix = STYLE_WRAPPERS[styleKey]
-      ?? "Creative editorial illustration, professional quality, white background, no text in the image";
-    imagePrompt = `${stylePrefix}. Scene: ${prompt}. Absolutely no text, words, or letters visible in the image.`;
+      ?? "Creative editorial illustration, professional quality, white background";
+    const hasText = sceneContainsText(prompt);
+    const noTextSuffix = hasText
+      ? "Render any speech bubbles or labels exactly as described. No extra unspecified text."
+      : "Absolutely no text, words, or letters visible in the image.";
+    imagePrompt = `${stylePrefix}. Scene: ${prompt}. ${noTextSuffix}`;
   } else {
     imagePrompt = `Professional LinkedIn visual for this concept: ${prompt}. Clean, modern, high-quality. No text overlays. No watermarks.`;
   }
