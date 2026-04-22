@@ -204,4 +204,41 @@ router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Pr
   }
 });
 
+const EditSceneBody = z.object({
+  currentScene: z.string().min(5).max(1000),
+  editRequest: z.string().min(3).max(500),
+});
+
+router.post("/ai/edit-scene", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = EditSceneBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Current scene and edit request are required." });
+    return;
+  }
+
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 300,
+      system: `You are editing a DALL-E 3 image scene description.
+Apply the user's requested change to the scene while preserving all other elements exactly as they are.
+Keep the revised scene concise (max 220 characters if possible).
+If the change mentions speech bubbles or specific text to be rendered in the image, include the exact quoted words.
+Return ONLY the revised scene description — no explanation, no surrounding quotes.`,
+      messages: [{ role: "user", content: `Current scene: ${parsed.data.currentScene}\n\nChange to apply: ${parsed.data.editRequest}` }],
+    });
+
+    const text = message.content[0];
+    if (text.type !== "text") {
+      res.status(500).json({ error: "Unexpected AI response." });
+      return;
+    }
+
+    res.json({ revisedScene: text.text.trim() });
+  } catch (err: unknown) {
+    console.error("[ai-edit-scene] failed:", err);
+    res.status(500).json({ error: "Failed to apply edit. Please try again." });
+  }
+});
+
 export default router;

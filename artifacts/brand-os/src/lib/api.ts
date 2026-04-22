@@ -141,6 +141,11 @@ export const illustrationConceptApi = {
       method: "POST",
       body: JSON.stringify({ postContent, style }),
     }),
+  editScene: (currentScene: string, editRequest: string) =>
+    apiFetch<{ revisedScene: string }>("/ai/edit-scene", {
+      method: "POST",
+      body: JSON.stringify({ currentScene, editRequest }),
+    }),
 };
 
 export const imagePromptApi = {

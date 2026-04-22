@@ -267,6 +267,8 @@ export default function Capture() {
   const [isExportingIllust, setIsExportingIllust] = useState(false);
   const [isAnimatingIllust, setIsAnimatingIllust] = useState<IllustrationAnimPreset | null>(null);
   const illustPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [illustEditRequest, setIllustEditRequest] = useState("");
+  const [isApplyingEdit, setIsApplyingEdit] = useState(false);
 
   // Image prompt (two-step)
   const [imagePrompt, setImagePrompt] = useState("");
@@ -760,6 +762,32 @@ export default function Capture() {
       patchVisualType("art");
     } finally {
       setIsAnimatingIllust(null);
+    }
+  };
+
+  const handleApplyIllustEdit = async () => {
+    if (!illustEditRequest.trim() || !illustScenePrompt) return;
+    setIsApplyingEdit(true);
+    try {
+      const { revisedScene } = await illustrationConceptApi.editScene(illustScenePrompt, illustEditRequest);
+      setIllustScenePrompt(revisedScene);
+      setIllustEditRequest("");
+      setIsGeneratingIllustImage(true);
+      setIllustImageBase64(null);
+      setIllustPreviewUrl(null);
+      const style = illustConcept?.chosenStyle ?? illustStyle;
+      const { imageBase64 } = await imageGenApi.generate(revisedScene, "illustration", style);
+      setIllustImageBase64(imageBase64);
+      setIsPreviewingIllustration(true);
+      const previewUrl = await previewIllustrationCard(imageBase64, illustCaption);
+      setIllustPreviewUrl(previewUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Edit failed.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setIsApplyingEdit(false);
+      setIsGeneratingIllustImage(false);
+      setIsPreviewingIllustration(false);
     }
   };
 
@@ -2519,6 +2547,31 @@ export default function Capture() {
                       {/* Download + animate (only after image exists) */}
                       {illustPreviewUrl && !isGeneratingIllustImage && !isPreviewingIllustration && (
                         <>
+                          {/* Describe a change */}
+                          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-2">Describe a change</p>
+                            <div className="flex gap-2 items-start">
+                              <textarea
+                                value={illustEditRequest}
+                                onChange={e => setIllustEditRequest(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && illustEditRequest.trim()) { e.preventDefault(); void handleApplyIllustEdit(); } }}
+                                placeholder="e.g. make the middle person's hair curly, change the speech bubble to say 'You're promoted!'"
+                                rows={2}
+                                className="flex-1 text-sm text-gray-800 bg-transparent outline-none resize-none leading-relaxed placeholder:text-amber-300"
+                              />
+                              <button
+                                onClick={() => void handleApplyIllustEdit()}
+                                disabled={!illustEditRequest.trim() || isApplyingEdit}
+                                className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 disabled:opacity-40 transition-all"
+                              >
+                                {isApplyingEdit
+                                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                                  : <Wand2 className="w-4 h-4" />
+                                }
+                              </button>
+                            </div>
+                          </div>
+
                           <div className="flex gap-2">
                             <button onClick={handleDownloadIllustrationCard}
                               disabled={isExportingIllust || isAnimatingIllust !== null}
