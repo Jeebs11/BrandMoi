@@ -432,6 +432,13 @@ export default function Capture() {
             onRefine={runRefine}
             onTryAgain={() => runGenerate({ extraInstruction: "Take a completely different angle on the same idea." })}
             onChangeFeeling={(newFeeling) => { setFeeling(newFeeling); runGenerate({ feeling: newFeeling }); }}
+            onChangeVisualStyle={(newStyle) => {
+              if (newStyle === visualStyle) return;
+              setVisualStyle(newStyle);
+              setIllustrationImage(null);
+              setIllustrationCaption("");
+              setIllustrationScene("");
+            }}
             onSave={handleSave}
             onCopy={copy}
           />
@@ -580,6 +587,7 @@ interface ResultViewProps {
   onRefine: (instruction: string, tab?: TabType) => void;
   onTryAgain: () => void;
   onChangeFeeling: (newFeeling: string) => void;
+  onChangeVisualStyle: (newStyle: string) => void;
   onSave: () => void;
   onCopy: (text: string, label?: string) => void;
 }
@@ -591,7 +599,7 @@ function ResultView(props: ResultViewProps) {
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
     fullPost, audience, feeling, isRefining, isSaving,
-    onSwapHook, onRefine, onTryAgain, onChangeFeeling, onSave, onCopy,
+    onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle, onSave, onCopy,
   } = props;
 
   return (
@@ -796,15 +804,7 @@ function ResultView(props: ResultViewProps) {
             {VISUAL_STYLES.map((s) => (
               <button
                 key={s.key}
-                onClick={() => {
-                  if (s.key === visualStyle) return;
-                  setVisualStyle(s.key);
-                  // Clear cached illustration so the lazy-load effect re-runs
-                  // with the newly chosen style.
-                  setIllustrationImage(null);
-                  setIllustrationCaption("");
-                  setIllustrationScene("");
-                }}
+                onClick={() => onChangeVisualStyle(s.key)}
                 className={cn(
                   "px-3 py-1.5 rounded-full border text-xs transition",
                   visualStyle === s.key
