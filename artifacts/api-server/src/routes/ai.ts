@@ -20,6 +20,7 @@ import {
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
+import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 
 const InfographicDataSchema = z.object({
   headline: z.string(),
@@ -70,12 +71,10 @@ const NEW_FLOW_AUDIENCES = new Set(["Clients", "Peers", "Recruiters & Headhunter
 const NEWS_FALLBACK_MESSAGE = "No fresh news matched today — generating evergreen.";
 
 /**
- * Fetch a fresh news anchor using the same Momentum brief signal — a brand-keyword
- * search driven by the user's stored brand role + audience (the same query shape
- * /agent/brief uses), not the raw input. This keeps the news the post is tied to
- * consistent with the user's daily Momentum feed and prevents drifting into
- * arbitrary topics. When no genuinely fresh article comes back, return a fallback
- * message the UI surfaces so the user knows the post is evergreen, not stale.
+ * News anchor for the generate flow. Delegates to the shared Momentum signal
+ * fetcher (lib/momentum.ts) so the article surfaced here matches the daily
+ * Momentum feed at /agent/brief. We only adapt the result shape and emit the
+ * fallback message the UI shows when nothing fresh matches.
  */
 async function fetchNewsAnchorForGenerate(
   userId: number,
@@ -86,64 +85,23 @@ async function fetchNewsAnchorForGenerate(
   anchor: { headline: string; url?: string | null; sourceLine?: string | null } | null;
   fallback: string | null;
 }> {
-  if (!process.env.OPENAI_API_KEY) {
+  const { context, url } = await fetchMomentumNewsAnchor(userId, {
+    topicHint: rawInput,
+    audience,
+  });
+
+  const trimmed = context.trim();
+  if (!trimmed || trimmed.length < 30) {
     return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
   }
 
-  const [prefs] = await db
-    .select({
-      brandRole: preferencesTable.brandRole,
-      brandAudience: preferencesTable.brandAudience,
-    })
-    .from(preferencesTable)
-    .where(eq(preferencesTable.userId, userId))
-    .limit(1);
-
-  const roleContext = [prefs?.brandRole, prefs?.brandAudience].filter(Boolean).join(" working with ");
-  const audienceLine = audience ? ` The post will be aimed at ${audience}.` : "";
-  const topicHint = rawInput.trim().slice(0, 240);
-  const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${
-    roleContext || "LinkedIn professional"
-  } that connects to this idea: "${topicHint}".${audienceLine} The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
-
-  try {
-    const { default: OpenAI } = await import("openai");
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const searchResp = await openai.chat.completions.create({
-      model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
-      messages: [{ role: "user" as const, content: searchQuery }],
-      max_tokens: 350,
-    });
-    const context = searchResp.choices[0]?.message?.content ?? "";
-
-    let url: string | null = null;
-    const annotations = (searchResp.choices[0]?.message as Record<string, unknown>)?.annotations;
-    if (Array.isArray(annotations)) {
-      for (const ann of annotations) {
-        const a = ann as Record<string, unknown>;
-        if (a.type === "url_citation") {
-          const citation = a.url_citation as Record<string, unknown> | undefined;
-          const u = citation?.url ?? a.url;
-          if (typeof u === "string" && u.startsWith("http")) { url = u; break; }
-        }
-      }
-    }
-
-    const trimmed = context.trim();
-    if (!trimmed || trimmed.length < 30) {
-      return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
-    }
-
-    const firstLine = trimmed.split("\n").map(l => l.trim()).find(l => l.length > 10) ?? "";
-    const headline = firstLine.replace(/^["\-*\d.)\s]+/, "").slice(0, 160);
-    if (!headline) {
-      return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
-    }
-
-    return { context: trimmed, anchor: { headline, url, sourceLine: "" }, fallback: null };
-  } catch {
+  const firstLine = trimmed.split("\n").map((l) => l.trim()).find((l) => l.length > 10) ?? "";
+  const headline = firstLine.replace(/^["\-*\d.)\s]+/, "").slice(0, 160);
+  if (!headline) {
     return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
   }
+
+  return { context: trimmed, anchor: { headline, url, sourceLine: "" }, fallback: null };
 }
 
 router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -153,13 +111,13 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, structure, selectedHook, postTone, newsUrl, extraInstruction } = parsed.data;
+  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction } = parsed.data;
   const userId = req.user!.userId;
   const voiceContext = await getUserBrandContext(userId);
   const fallbackBrand = buildBrandContext(objective ?? "", persona ?? "", tone ?? "");
 
   const audienceLabel = audience && NEW_FLOW_AUDIENCES.has(audience) ? audience : (audience ?? "My audience");
-  const feelingLabel = feeling ?? postTone ?? "Direct";
+  const feelingLabel = feeling ?? "Direct";
   const audienceOverlay = AUDIENCE_OVERLAYS[audienceLabel] ?? AUDIENCE_OVERLAYS["My audience"];
   const feelingOverlay = FEELING_INSTRUCTIONS[feelingLabel] ?? FEELING_INSTRUCTIONS["Direct"];
 
@@ -175,11 +133,6 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     newsContext = `News URL the author is reacting to: ${newsUrl}`;
   }
 
-  const legacyHints: string[] = [];
-  if (structure?.topic) legacyHints.push(`Topic hint: ${structure.topic}`);
-  if (structure?.angle) legacyHints.push(`Angle hint: ${structure.angle}`);
-  if (selectedHook) legacyHints.push(`Suggested opening hook (use as-is or rework): ${selectedHook}`);
-
   const userMessage = [
     "## RAW THOUGHT (primary source — write from this, stay close to the words):",
     rawInput,
@@ -192,7 +145,6 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "",
     "## FEELING OVERLAY (mandatory):",
     feelingOverlay,
-    legacyHints.length ? `\n## OPTIONAL HINTS:\n${legacyHints.join("\n")}` : "",
     newsContext ? `\n## TODAY'S NEWS CONTEXT (weave the headline naturally — never paste a URL):\n${newsContext}` : "",
     extraInstruction ? `\n## EXTRA INSTRUCTION (apply on top of everything else, this is the user's refine ask):\n${extraInstruction}` : "",
     "",

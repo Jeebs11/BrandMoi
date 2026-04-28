@@ -166,38 +166,24 @@ export interface InfographicData {
   bullets: string[];
 }
 
-export type GenerateContentBodyPostFormat =
-  | (typeof GenerateContentBodyPostFormat)[keyof typeof GenerateContentBodyPostFormat]
-  | null;
-
-export const GenerateContentBodyPostFormat = {
-  standard: "standard",
-  "frustrated-expert": "frustrated-expert",
-  "lived-lesson": "lived-lesson",
-  "clean-breakdown": "clean-breakdown",
-} as const;
-
 export interface GenerateContentBody {
   rawInput: string;
-  /** New 3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience) */
+  /** 3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience) */
   audience?: string;
-  /** New 3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian) */
+  /** 3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian) */
   feeling?: string;
   /** When true, perform a fresh web search and weave a relevant headline into the post */
   tieToNews?: boolean;
-  objective?: string;
-  persona?: string;
-  tone?: string;
-  structure?: StructuredBreakdown;
-  selectedHook?: string;
-  includeCta?: boolean;
-  storyMode?: boolean;
-  postTone?: string;
-  teacherMode?: boolean;
+  /** Optional URL of an article the author is reacting to (LinkedIn-import flow) */
   newsUrl?: string | null;
-  postFormat?: GenerateContentBodyPostFormat;
   /** Additional refinement instruction appended to the generation prompt (used by "Try a different angle" and similar refine actions in Capture) */
   extraInstruction?: string;
+  /** Legacy back-compat — derivable from audience; the server prefers `audience` when both are set */
+  objective?: string;
+  /** Legacy back-compat — kept so older callers/saved drafts still work */
+  persona?: string;
+  /** Legacy back-compat — derivable from feeling; the server prefers `feeling` when both are set */
+  tone?: string;
 }
 
 export interface NewsAnchor {

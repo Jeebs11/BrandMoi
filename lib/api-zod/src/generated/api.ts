@@ -154,13 +154,13 @@ export const GenerateContentBody = zod.object({
     .string()
     .optional()
     .describe(
-      "New 3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+      "3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
     ),
   feeling: zod
     .string()
     .optional()
     .describe(
-      "New 3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian)",
+      "3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian)",
     ),
   tieToNews: zod
     .boolean()
@@ -168,98 +168,35 @@ export const GenerateContentBody = zod.object({
     .describe(
       "When true, perform a fresh web search and weave a relevant headline into the post",
     ),
-  objective: zod.string().optional(),
-  persona: zod.string().optional(),
-  tone: zod.string().optional(),
-  structure: zod
-    .object({
-      topic: zod.string(),
-      angle: zod.string(),
-      coreMessage: zod.string(),
-      whyItMatters: zod.string(),
-      archetype: zod.string().optional(),
-      hooks: zod.array(
-        zod.object({
-          text: zod.string(),
-          type: zod
-            .enum([
-              "how-i",
-              "contrarian",
-              "number",
-              "question",
-              "scene-setter",
-              "prediction",
-              "analogy",
-              "how-to",
-              "story",
-              "disarming-joke",
-              "tension-setter",
-              "confession",
-            ])
-            .optional(),
-          usedBefore: zod.boolean().nullish(),
-          sourceLine: zod.string().nullish(),
-        }),
-      ),
-      narrativeFlow: zod.array(zod.string()),
-      storyMode: zod.boolean().optional(),
-      teacherMode: zod.boolean().optional(),
-      postFormat: zod
-        .enum([
-          "standard",
-          "frustrated-expert",
-          "lived-lesson",
-          "clean-breakdown",
-        ])
-        .nullish(),
-      audience: zod
-        .string()
-        .optional()
-        .describe(
-          "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
-        ),
-      feeling: zod
-        .string()
-        .optional()
-        .describe(
-          "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
-        ),
-      hashtags: zod
-        .string()
-        .optional()
-        .describe(
-          "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
-        ),
-      alternativeHooks: zod
-        .array(zod.string())
-        .optional()
-        .describe("Alternative opener lines the user can swap into the post"),
-      newsAnchor: zod
-        .object({
-          headline: zod.string().optional(),
-          url: zod.string().optional(),
-          sourceLine: zod.string().optional(),
-        })
-        .nullish()
-        .describe(
-          "When tieToNews=true, the news headline anchor used in the post",
-        ),
-    })
-    .optional(),
-  selectedHook: zod.string().optional(),
-  includeCta: zod.boolean().optional(),
-  storyMode: zod.boolean().optional(),
-  postTone: zod.string().optional(),
-  teacherMode: zod.boolean().optional(),
-  newsUrl: zod.string().nullish(),
-  postFormat: zod
-    .enum(["standard", "frustrated-expert", "lived-lesson", "clean-breakdown"])
-    .nullish(),
+  newsUrl: zod
+    .string()
+    .nullish()
+    .describe(
+      "Optional URL of an article the author is reacting to (LinkedIn-import flow)",
+    ),
   extraInstruction: zod
     .string()
     .optional()
     .describe(
       'Additional refinement instruction appended to the generation prompt (used by \"Try a different angle\" and similar refine actions in Capture)',
+    ),
+  objective: zod
+    .string()
+    .optional()
+    .describe(
+      "Legacy back-compat — derivable from audience; the server prefers `audience` when both are set",
+    ),
+  persona: zod
+    .string()
+    .optional()
+    .describe(
+      "Legacy back-compat — kept so older callers\/saved drafts still work",
+    ),
+  tone: zod
+    .string()
+    .optional()
+    .describe(
+      "Legacy back-compat — derivable from feeling; the server prefers `feeling` when both are set",
     ),
 });
 

@@ -1,8 +1,83 @@
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { draftsTable, performanceSignalsTable, dailyActivityTable } from "@workspace/db";
+import { draftsTable, performanceSignalsTable, dailyActivityTable, preferencesTable } from "@workspace/db";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
+
+/**
+ * Shared Momentum news-anchor signal. Used by both /agent/brief (the daily
+ * Momentum feed) and /ai/generate (when the user toggles "Tie to news" while
+ * generating a post). Centralising this keeps the news the user sees in their
+ * Momentum feed consistent with the news a tied post weaves in.
+ *
+ * `topicHint` is an optional bias for the search — when generating a post, we
+ * pass the user's raw idea so the chosen article relates to it. When called
+ * for the daily brief, we omit it and search broadly across the user's role.
+ */
+export async function fetchMomentumNewsAnchor(
+  userId: number,
+  opts?: { topicHint?: string; audience?: string },
+): Promise<{
+  context: string;
+  url: string | null;
+}> {
+  if (!process.env.OPENAI_API_KEY) return { context: "", url: null };
+
+  const [prefs] = await db
+    .select({
+      brandRole: preferencesTable.brandRole,
+      brandAudience: preferencesTable.brandAudience,
+    })
+    .from(preferencesTable)
+    .where(eq(preferencesTable.userId, userId))
+    .limit(1);
+
+  const roleContext = [prefs?.brandRole, prefs?.brandAudience]
+    .filter(Boolean)
+    .join(" working with ");
+  const persona = roleContext || "LinkedIn professional";
+
+  const topicTail = opts?.topicHint
+    ? ` that connects to this idea: "${opts.topicHint.trim().slice(0, 240)}".${
+        opts.audience ? ` The post will be aimed at ${opts.audience}.` : ""
+      }`
+    : ".";
+
+  const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${persona}${topicTail} The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
+
+  try {
+    const { default: OpenAI } = await import("openai");
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const searchResp = await openai.chat.completions.create({
+      model: "gpt-4o-search-preview" as Parameters<
+        typeof openai.chat.completions.create
+      >[0]["model"],
+      messages: [{ role: "user" as const, content: searchQuery }],
+      max_tokens: 350,
+    });
+    const context = searchResp.choices[0]?.message?.content ?? "";
+
+    let url: string | null = null;
+    const annotations = (searchResp.choices[0]?.message as unknown as Record<string, unknown>)
+      ?.annotations;
+    if (Array.isArray(annotations)) {
+      for (const ann of annotations) {
+        const a = ann as Record<string, unknown>;
+        if (a.type === "url_citation") {
+          const citation = a.url_citation as Record<string, unknown> | undefined;
+          const u = citation?.url ?? a.url;
+          if (typeof u === "string" && u.startsWith("http")) {
+            url = u;
+            break;
+          }
+        }
+      }
+    }
+    return { context, url };
+  } catch {
+    return { context: "", url: null };
+  }
+}
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);

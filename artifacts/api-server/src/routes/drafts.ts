@@ -30,7 +30,10 @@ function deriveAudience(objective: unknown): string | undefined {
   if (typeof objective !== "string") return undefined;
   const o = objective.toLowerCase();
   if (o.includes("client")) return "Clients";
-  if (o.includes("job") || o.includes("recruit") || o.includes("hire")) return "Recruiters & Headhunters";
+  // Per spec: "Hiring" (the user is recruiting) → My audience (their followers).
+  // Only "Job"/"recruit" map to Recruiters & Headhunters.
+  if (o === "hiring") return "My audience";
+  if (o.includes("job") || o.includes("recruit")) return "Recruiters & Headhunters";
   if (o.includes("invest")) return "Investors";
   if (o.includes("authority") || o.includes("expert") || o.includes("peer")) return "Peers";
   return "My audience";
