@@ -354,9 +354,9 @@ export default function Capture() {
       .finally(() => setIsLoadingVisual(false));
   }, [activeTab, content?.visual, visualImage, isLoadingVisual, toast]);
 
-  // ── Lazy-load illustration when Illustration tab opens ───────────────
-  useEffect(() => {
-    if (activeTab !== "illustration" || !content || illustrationImage || isLoadingIllustration) return;
+  // ── Generate illustration on demand (triggered by user, not auto-fired) ─
+  const generateIllustration = () => {
+    if (!content || isLoadingIllustration) return;
     setIsLoadingIllustration(true);
     (async () => {
       try {
@@ -371,7 +371,7 @@ export default function Capture() {
         setIsLoadingIllustration(false);
       }
     })();
-  }, [activeTab, content, illustrationImage, isLoadingIllustration, editedPost, visualStyle, toast]);
+  };
 
   // ── Regen illustration with a custom scene (skips concept generation) ─
   const regenIllustrationWithScene = (scene: string) => {
@@ -451,6 +451,7 @@ export default function Capture() {
             }}
             setIllustrationCaption={setIllustrationCaption}
             setIllustrationScene={setIllustrationScene}
+            onGenerateIllustration={generateIllustration}
             onRegenIllustration={regenIllustrationWithScene}
             onSave={handleSave}
             onCopy={copy}
@@ -603,6 +604,7 @@ interface ResultViewProps {
   onChangeVisualStyle: (newStyle: string) => void;
   setIllustrationCaption: (v: string) => void;
   setIllustrationScene: (v: string) => void;
+  onGenerateIllustration: () => void;
   onRegenIllustration: (scene: string) => void;
   onSave: () => void;
   onCopy: (text: string, label?: string) => void;
@@ -616,7 +618,7 @@ function ResultView(props: ResultViewProps) {
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
     fullPost, audience, feeling, isRefining, isSaving,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
-    setIllustrationCaption, setIllustrationScene, onRegenIllustration,
+    setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration,
     onSave, onCopy,
   } = props;
 
@@ -834,6 +836,16 @@ function ResultView(props: ResultViewProps) {
               </button>
             ))}
           </div>
+          {/* Idle state — user picks style first, then generates */}
+          {!illustrationImage && !isLoadingIllustration && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <p className="text-sm text-gray-500 text-center">Pick a style above, then generate your illustration.</p>
+              <Button onClick={onGenerateIllustration} className="px-6">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate illustration
+              </Button>
+            </div>
+          )}
           {isLoadingIllustration && <p className="text-sm text-gray-500 text-center py-8">Generating illustration…</p>}
           {illustrationImage && (
             <>
