@@ -19,12 +19,15 @@ const STYLE_WRAPPERS: Record<string, string> = {
     "Classic New Yorker magazine single-panel cartoon, pure black-and-white pen-and-ink illustration, expressive fine-line cross-hatching, white paper background, no colour, no grey tones, witty editorial scene composition",
   isometric:
     "3D isometric illustration, flat vibrant colours, clean geometric shapes, modern professional style, light background",
-  sketch:
-    "Detailed pencil sketch illustration, expressive fine-line crosshatch shading, black-and-white on white paper, realistic scene composition, accurate character count and placement, clear perspective, high detail",
-  blueprint:
-    "Technical blueprint illustration, precise white line art on deep blue background (#0a2a5e), architectural drawing style, clean geometric forms",
-  vintage:
-    "Vintage 1950s mid-century editorial poster illustration, bold graphic shapes, limited warm colour palette, retro print style",
+  "loose-pencil":
+    "Loose, expressive hand-drawn pencil illustration on off-white paper, confident sketchy line work with visible graphite texture, occasional warm accent wash (single muted colour), soft handwritten signage and labels welcome — render any text in a casual handwritten serif",
+};
+
+// Backwards-compatibility map for legacy persisted styles.
+const LEGACY_STYLE_REMAP: Record<string, string> = {
+  sketch: "loose-pencil",
+  blueprint: "new-yorker",
+  vintage: "new-yorker",
 };
 
 function sceneContainsText(scene: string): boolean {
@@ -43,26 +46,32 @@ function sceneContainsText(scene: string): boolean {
   );
 }
 
-const ILLUSTRATION_CONCEPT_SYSTEM = `You are a creative director specialising in single-panel editorial illustrations for LinkedIn. Given a LinkedIn post, you will:
-1. Devise a strong visual metaphor or scene that captures the post's core insight — think New Yorker cartoon energy.
-2. Write a witty 1–2 line caption (can be dialogue between two characters, or a single sharp observation).
+const ILLUSTRATION_CONCEPT_SYSTEM = `You are a creative director making the single visual that will stop a feed for this LinkedIn post.
+
+What you do:
+1. Devise the strongest possible scene to carry the post's core insight — pick whichever angle gives the highest stopping power.
+2. Write a 1–2 line caption that lands the punchline (single observation, dialogue, or sign text — your call).
 3. Follow the style instruction provided.
 
-CRITICAL SCENE RULES — follow these strictly:
-- NEVER illustrate business or leadership metaphors literally. If the post mentions "building a team", "foundations", "pillars", "scaffolding", "structure", "construction", or "architecture" as METAPHORS for business concepts, DO NOT draw builders, scaffolding, cranes, blueprints, or construction sites. Instead, depict the underlying human situation: a meeting room, a kitchen, a sports team, a garden, an office, vehicles, animals, or any everyday scene that conveys the idea without literal bricks and mortar.
-- Use HUMAN CHARACTERS in relatable settings whenever possible (offices, homes, cafes, nature, transport).
-- Prefer surprising, witty visual analogies over the obvious literal interpretation.
+CLICHÉ-TROPE BAN — these are off-limits regardless of the topic:
+- No cranes, scaffolding, hard hats, blueprints, cardboard boxes labelled "team", brick walls being built.
+- No light bulbs as ideas, no chess pieces as strategy, no jigsaw puzzles being completed, no rocket launches, no mountain summits with flags, no handshakes over conference tables.
+- No glossy stock-photo polish — these are illustrations, not corporate photography. No suits in boardrooms unless the post is literally about a boardroom.
+
+Beyond that: literal scenes are fine. If the strongest visual IS a builder fixing a roof, a kitchen at 3am, or a single sign on a roadside — go with it. Surprise and specificity win over cleverness for its own sake.
 
 Return ONLY valid JSON, no markdown fences, no explanation:
 {
-  "scenePrompt": "Concise DALL-E 3 scene description — max 200 characters, describes ONLY the visual. If the scene naturally includes a speech bubble or sign with short text (e.g. a quote or dialogue), include the exact words in quotes. Otherwise specify NO text, letters, or words in the image.",
-  "caption": "The witty 1–2 line caption displayed BELOW the illustration.",
+  "scenePrompt": "Concise DALL-E 3 scene description — max 220 characters, describes ONLY the visual. If the scene benefits from a speech bubble, sign, or label with short text, include the exact words in quotes. Otherwise specify NO text, letters, or words in the image.",
+  "caption": "The 1–2 line caption displayed BELOW the illustration.",
   "chosenStyle": "Name of the illustration style used."
 }`;
 
 const GenerateIllustrationConceptBody = z.object({
   postContent: z.string().min(10).max(5000),
   style: z.string().min(1).max(50),
+  audience: z.string().optional(),
+  feeling: z.string().optional(),
 });
 
 router.post("/ai/generate-illustration-concept", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -72,18 +81,21 @@ router.post("/ai/generate-illustration-concept", requireAuth, aiRateLimit, async
     return;
   }
 
-  const { postContent, style } = parsed.data;
+  const { postContent, style, audience, feeling } = parsed.data;
 
   const styleInstruction =
     style === "surprise"
-      ? "Choose the most creative and impactful illustration style for this post. You may pick from: New Yorker (classic black-and-white pen-and-ink), Editorial Cartoon, Isometric, Whiteboard Sketch, Blueprint, Vintage Poster — or invent a completely different style if it better suits the content."
+      ? "Choose the most impactful illustration style for this post from: Cartoon (bold flat colour Saturday-morning energy), New Yorker (black-and-white pen-and-ink), Isometric (3D flat-colour technical), Loose Pencil (sketchy hand-drawn graphite with handwritten signage)."
       : `Use this illustration style: ${style}. Match the scenePrompt description to that style.`;
+
+  const audienceLine = audience ? `\nThis post is aimed at: ${audience}. The visual must speak to that exact audience.` : "";
+  const feelingLine = feeling ? `\nThe post's feeling is: ${feeling}. The image should land with the same emotional register.` : "";
 
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 600,
-      system: `${ILLUSTRATION_CONCEPT_SYSTEM}\n\nStyle instruction: ${styleInstruction}`,
+      system: `${ILLUSTRATION_CONCEPT_SYSTEM}\n\nStyle instruction: ${styleInstruction}${audienceLine}${feelingLine}`,
       messages: [{ role: "user", content: `LinkedIn post:\n\n${postContent}` }],
     });
 
@@ -158,8 +170,11 @@ router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Pr
   if (mode === "illustration") {
     const resolveStyleKey = (style: string): string => {
       const lower = style.toLowerCase().trim();
+      const remapped = LEGACY_STYLE_REMAP[lower];
+      if (remapped) return remapped;
       if (STYLE_WRAPPERS[lower]) return lower;
       for (const word of lower.split(/[\s_-]+/)) {
+        if (LEGACY_STYLE_REMAP[word]) return LEGACY_STYLE_REMAP[word];
         if (STYLE_WRAPPERS[word]) return word;
       }
       for (const key of Object.keys(STYLE_WRAPPERS)) {

@@ -20,18 +20,59 @@ import { upsertDailyActivity } from "../lib/momentum.js";
 
 const router: IRouter = Router();
 
-function normalizeDraft<T extends { structuredBreakdown: unknown }>(draft: T): T {
-  if (!draft.structuredBreakdown || typeof draft.structuredBreakdown !== "object") return draft;
-  const sb = draft.structuredBreakdown as Record<string, unknown>;
-  if (Array.isArray(sb.hooks)) {
-    sb.hooks = sb.hooks.map((h: unknown) =>
-      typeof h === "string" ? { text: h } : h
-    );
+const LEGACY_STYLE_REMAP: Record<string, string> = {
+  sketch: "loose-pencil",
+  blueprint: "new-yorker",
+  vintage: "new-yorker",
+};
+
+function deriveAudience(objective: unknown): string | undefined {
+  if (typeof objective !== "string") return undefined;
+  const o = objective.toLowerCase();
+  if (o.includes("client")) return "Clients";
+  if (o.includes("job") || o.includes("recruit") || o.includes("hire")) return "Recruiters & Headhunters";
+  if (o.includes("invest")) return "Investors";
+  if (o.includes("authority") || o.includes("expert") || o.includes("peer")) return "Peers";
+  return "My audience";
+}
+
+function deriveFeeling(tone: unknown, storyMode: unknown): string | undefined {
+  if (storyMode === true) return "Story";
+  if (typeof tone !== "string") return undefined;
+  const t = tone.toLowerCase();
+  if (t.includes("playful") || t.includes("witty")) return "Witty";
+  if (t.includes("vulnerab")) return "Vulnerable";
+  if (t.includes("contrarian")) return "Contrarian";
+  if (t.includes("story")) return "Story";
+  return "Direct";
+}
+
+function normalizeDraft<T extends { structuredBreakdown: unknown; objective?: unknown; tone?: unknown; visualStyle?: unknown }>(draft: T): T {
+  if (draft.structuredBreakdown && typeof draft.structuredBreakdown === "object") {
+    const sb = draft.structuredBreakdown as Record<string, unknown>;
+    if (Array.isArray(sb.hooks)) {
+      sb.hooks = sb.hooks.map((h: unknown) =>
+        typeof h === "string" ? { text: h } : h
+      );
+    }
+    if (Array.isArray(sb.narrativeFlow)) {
+      sb.narrativeFlow = sb.narrativeFlow.map((n: unknown) =>
+        typeof n === "string" ? n : String(n)
+      );
+    }
+    // Derive audience/feeling from top-level draft.objective/tone (legacy fields)
+    // when the new structuredBreakdown.audience/feeling fields are missing.
+    if (typeof sb.audience !== "string" || !sb.audience) {
+      const derived = deriveAudience(draft.objective);
+      if (derived) sb.audience = derived;
+    }
+    if (typeof sb.feeling !== "string" || !sb.feeling) {
+      const derived = deriveFeeling(draft.tone, sb.storyMode);
+      if (derived) sb.feeling = derived;
+    }
   }
-  if (Array.isArray(sb.narrativeFlow)) {
-    sb.narrativeFlow = sb.narrativeFlow.map((n: unknown) =>
-      typeof n === "string" ? n : String(n)
-    );
+  if (typeof draft.visualStyle === "string" && LEGACY_STYLE_REMAP[draft.visualStyle]) {
+    (draft as { visualStyle?: string }).visualStyle = LEGACY_STYLE_REMAP[draft.visualStyle];
   }
   return draft;
 }

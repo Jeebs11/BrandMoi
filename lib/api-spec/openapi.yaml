@@ -162,37 +162,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/SuggestionItem"
 
-  /ai/structure:
-    post:
-      operationId: structureIdea
-      tags: [ai]
-      summary: Extract structured breakdown from a raw thought
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/StructureIdeaBody"
-      responses:
-        "200":
-          description: Structured breakdown (evergreen + optional trending lane)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StructureIdeaResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: AI error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
   /agent/brief:
     get:
       operationId: getAgentBrief
@@ -770,6 +739,31 @@ components:
           type: string
           enum: [standard, frustrated-expert, lived-lesson, clean-breakdown]
           nullable: true
+        audience:
+          type: string
+          description: New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)
+        feeling:
+          type: string
+          description: New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)
+        hashtags:
+          type: string
+          description: 3-tier hashtag block (newline- or space-separated; user-editable as one string)
+        alternativeHooks:
+          type: array
+          items:
+            type: string
+          description: Alternative opener lines the user can swap into the post
+        newsAnchor:
+          type: object
+          nullable: true
+          description: When tieToNews=true, the news headline anchor used in the post
+          properties:
+            headline:
+              type: string
+            url:
+              type: string
+            sourceLine:
+              type: string
       required:
         - topic
         - angle
@@ -825,6 +819,15 @@ components:
       properties:
         rawInput:
           type: string
+        audience:
+          type: string
+          description: New 3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience)
+        feeling:
+          type: string
+          description: New 3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian)
+        tieToNews:
+          type: boolean
+          description: When true, perform a fresh web search and weave a relevant headline into the post
         objective:
           type: string
         persona:
@@ -850,19 +853,36 @@ components:
           type: string
           enum: [standard, frustrated-expert, lived-lesson, clean-breakdown]
           nullable: true
+        extraInstruction:
+          type: string
+          description: Additional refinement instruction appended to the generation prompt (used by "Try a different angle" and similar refine actions in Capture)
       required:
         - rawInput
-        - objective
-        - persona
-        - tone
-        - structure
-        - selectedHook
+
+    NewsAnchor:
+      type: object
+      properties:
+        headline:
+          type: string
+        url:
+          type: string
+          nullable: true
+        sourceLine:
+          type: string
+          nullable: true
+      required:
+        - headline
 
     GeneratedContent:
       type: object
       properties:
         post:
           type: string
+        alternativeHooks:
+          type: array
+          items:
+            type: string
+          description: Two alternative opening lines the user can swap in
         shortPost:
           type: string
           nullable: true
@@ -876,6 +896,15 @@ components:
           $ref: "#/components/schemas/InfographicData"
           nullable: true
         hashtags:
+          type: string
+          nullable: true
+        newsAnchor:
+          $ref: "#/components/schemas/NewsAnchor"
+          nullable: true
+        audience:
+          type: string
+          nullable: true
+        feeling:
           type: string
           nullable: true
       required:

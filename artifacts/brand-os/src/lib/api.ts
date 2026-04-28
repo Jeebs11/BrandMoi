@@ -222,14 +222,6 @@ export const agentApi = {
     }),
 };
 
-export const aiApi = {
-  generateHooks: (payload: { rawInput: string; topic: string; angle: string; hookTypes: string[] }) =>
-    apiFetch<{ hooks: Array<{ text: string; type: string }> }>("/ai/hooks", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-};
-
 export type KpiTrend = { current: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };
 
 export type AnalyticsOverview = {

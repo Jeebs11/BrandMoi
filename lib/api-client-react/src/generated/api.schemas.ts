@@ -115,6 +115,15 @@ export const StructuredBreakdownPostFormat = {
   "clean-breakdown": "clean-breakdown",
 } as const;
 
+/**
+ * When tieToNews=true, the news headline anchor used in the post
+ */
+export type StructuredBreakdownNewsAnchor = {
+  headline?: string;
+  url?: string;
+  sourceLine?: string;
+} | null;
+
 export interface StructuredBreakdown {
   topic: string;
   angle: string;
@@ -126,6 +135,16 @@ export interface StructuredBreakdown {
   storyMode?: boolean;
   teacherMode?: boolean;
   postFormat?: StructuredBreakdownPostFormat;
+  /** New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience) */
+  audience?: string;
+  /** New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian) */
+  feeling?: string;
+  /** 3-tier hashtag block (newline- or space-separated; user-editable as one string) */
+  hashtags?: string;
+  /** Alternative opener lines the user can swap into the post */
+  alternativeHooks?: string[];
+  /** When tieToNews=true, the news headline anchor used in the post */
+  newsAnchor?: StructuredBreakdownNewsAnchor;
 }
 
 export type StructureIdeaResponseHookUsage = { [key: string]: number };
@@ -160,26 +179,45 @@ export const GenerateContentBodyPostFormat = {
 
 export interface GenerateContentBody {
   rawInput: string;
-  objective: string;
-  persona: string;
-  tone: string;
-  structure: StructuredBreakdown;
-  selectedHook: string;
+  /** New 3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience) */
+  audience?: string;
+  /** New 3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian) */
+  feeling?: string;
+  /** When true, perform a fresh web search and weave a relevant headline into the post */
+  tieToNews?: boolean;
+  objective?: string;
+  persona?: string;
+  tone?: string;
+  structure?: StructuredBreakdown;
+  selectedHook?: string;
   includeCta?: boolean;
   storyMode?: boolean;
   postTone?: string;
   teacherMode?: boolean;
   newsUrl?: string | null;
   postFormat?: GenerateContentBodyPostFormat;
+  /** Additional refinement instruction appended to the generation prompt (used by "Try a different angle" and similar refine actions in Capture) */
+  extraInstruction?: string;
+}
+
+export interface NewsAnchor {
+  headline: string;
+  url?: string | null;
+  sourceLine?: string | null;
 }
 
 export interface GeneratedContent {
   post: string;
+  /** Two alternative opening lines the user can swap in */
+  alternativeHooks?: string[];
   shortPost?: string | null;
   carousel: CarouselSlide[];
   visual: string;
   infographic?: InfographicData | null;
   hashtags?: string | null;
+  newsAnchor?: NewsAnchor | null;
+  audience?: string | null;
+  feeling?: string | null;
 }
 
 export type RefineContentBodyTab =

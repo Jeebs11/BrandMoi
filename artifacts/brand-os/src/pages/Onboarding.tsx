@@ -10,32 +10,25 @@ import { useAuth } from "@/hooks/use-auth";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
-const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
-const TONES = ["Direct", "Story", "Educational", "Bold"];
+// Audience replaces the legacy Objective field. Stored in preferences.objective for back-compat.
+const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
+// Feelings replace the legacy Tone field. Stored in preferences.tone.
+const FEELINGS = ["Direct", "Witty", "Vulnerable", "Story", "Contrarian"];
 
-const OBJECTIVE_DESC: Record<string, string> = {
-  Clients: "Attract better clients and showcase your expertise",
-  Job: "Build visibility and credibility in your field",
-  Authority: "Become the go-to voice in your industry",
-  Documenting: "Share your journey and lessons in real time",
-  Expert: "Share industry analysis and trend commentary",
-  Hiring: "Attract great people with employer brand content",
+const AUDIENCE_DESC: Record<string, string> = {
+  "Clients": "Future buyers and prospects",
+  "Peers": "Other operators in your field",
+  "Recruiters & Headhunters": "Hiring managers and recruiters",
+  "Investors": "VCs, angels, capital allocators",
+  "My audience": "Mixed crowd already following you",
 };
 
-const PERSONA_DESC: Record<string, string> = {
-  Operator: "You run the day-to-day and make things work",
-  Founder: "You're building a company from scratch",
-  Career: "You're growing your professional reputation",
-  Technical: "You go deep on craft, engineering, or data",
-  Sales: "You build relationships and close deals",
-};
-
-const TONE_DESC: Record<string, string> = {
-  Direct: "Clear, confident, no fluff",
-  Story: "Narrative-driven, personal, human",
-  Educational: "Structured, instructive, value-first",
-  Bold: "Strong opinions, sharp contrasts, memorable",
+const FEELING_DESC: Record<string, string> = {
+  Direct: "Clear, authoritative, no fluff",
+  Witty: "Dry, self-aware humour",
+  Vulnerable: "Personal, honest, open",
+  Story: "Opens with a vivid scene",
+  Contrarian: "Challenges conventional wisdom",
 };
 
 type OnboardingState = {
@@ -52,7 +45,7 @@ export default function Onboarding() {
   const { invalidate } = useAuth();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingState>({
-    objective: "Authority",
+    objective: "My audience",
     persona: "Founder",
     tone: "Direct",
     brandRole: "",
@@ -105,24 +98,24 @@ export default function Onboarding() {
         return (
           <motion.div key="ob1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
             <div className="flex-1 pt-4 pb-32 overflow-y-auto no-scrollbar">
-              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">What's your main goal?</h2>
-              <p className="text-gray-500 text-sm mb-7">This shapes every piece of content we create with you.</p>
+              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Who are you writing for?</h2>
+              <p className="text-gray-500 text-sm mb-7">Your default audience. You can swap it on any post.</p>
               <div className="space-y-3">
-                {OBJECTIVES.map((obj) => (
+                {AUDIENCES.map((a) => (
                   <button
-                    key={obj}
-                    onClick={() => set("objective", obj)}
+                    key={a}
+                    onClick={() => set("objective", a)}
                     className={cn(
                       "w-full text-left p-5 rounded-2xl border-2 transition-all",
-                      data.objective === obj ? "border-primary bg-primary/5" : "border-gray-100 bg-white hover:border-primary/30"
+                      data.objective === a ? "border-primary bg-primary/5" : "border-gray-100 bg-white hover:border-primary/30"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className={cn("font-bold mb-0.5", data.objective === obj ? "text-primary" : "text-gray-800")}>{obj}</p>
-                        <p className="text-xs text-gray-500">{OBJECTIVE_DESC[obj]}</p>
+                        <p className={cn("font-bold mb-0.5", data.objective === a ? "text-primary" : "text-gray-800")}>{a}</p>
+                        <p className="text-xs text-gray-500">{AUDIENCE_DESC[a]}</p>
                       </div>
-                      {data.objective === obj && (
+                      {data.objective === a && (
                         <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0 ml-3">
                           <Check className="w-3 h-3 text-white" strokeWidth={3} />
                         </div>
@@ -141,24 +134,24 @@ export default function Onboarding() {
           <motion.div key="ob2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
             <BackButton onClick={() => setStep(1)} />
             <div className="flex-1 pt-4 pb-32 overflow-y-auto no-scrollbar">
-              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">How do you see yourself?</h2>
-              <p className="text-gray-500 text-sm mb-7">Your persona shapes who you're writing for.</p>
+              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">How should it feel?</h2>
+              <p className="text-gray-500 text-sm mb-7">Your default writing energy. Swap it on any post.</p>
               <div className="space-y-3">
-                {PERSONAS.map((p) => (
+                {FEELINGS.map((f) => (
                   <button
-                    key={p}
-                    onClick={() => set("persona", p)}
+                    key={f}
+                    onClick={() => set("tone", f)}
                     className={cn(
                       "w-full text-left p-5 rounded-2xl border-2 transition-all",
-                      data.persona === p ? "border-primary bg-primary/5" : "border-gray-100 bg-white hover:border-primary/30"
+                      data.tone === f ? "border-primary bg-primary/5" : "border-gray-100 bg-white hover:border-primary/30"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className={cn("font-bold mb-0.5", data.persona === p ? "text-primary" : "text-gray-800")}>{p}</p>
-                        <p className="text-xs text-gray-500">{PERSONA_DESC[p]}</p>
+                        <p className={cn("font-bold mb-0.5", data.tone === f ? "text-primary" : "text-gray-800")}>{f}</p>
+                        <p className="text-xs text-gray-500">{FEELING_DESC[f]}</p>
                       </div>
-                      {data.persona === p && (
+                      {data.tone === f && (
                         <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0 ml-3">
                           <Check className="w-3 h-3 text-white" strokeWidth={3} />
                         </div>
@@ -176,42 +169,6 @@ export default function Onboarding() {
         return (
           <motion.div key="ob3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
             <BackButton onClick={() => setStep(2)} />
-            <div className="flex-1 pt-4 pb-32 overflow-y-auto no-scrollbar">
-              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">How do you sound?</h2>
-              <p className="text-gray-500 text-sm mb-7">Your writing tone sets the feeling of your content.</p>
-              <div className="space-y-3">
-                {TONES.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => set("tone", t)}
-                    className={cn(
-                      "w-full text-left p-5 rounded-2xl border-2 transition-all",
-                      data.tone === t ? "border-primary bg-primary/5" : "border-gray-100 bg-white hover:border-primary/30"
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className={cn("font-bold mb-0.5", data.tone === t ? "text-primary" : "text-gray-800")}>{t}</p>
-                        <p className="text-xs text-gray-500">{TONE_DESC[t]}</p>
-                      </div>
-                      {data.tone === t && (
-                        <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0 ml-3">
-                          <Check className="w-3 h-3 text-white" strokeWidth={3} />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <NextButton onClick={() => setStep(4)} />
-          </motion.div>
-        );
-
-      case 4:
-        return (
-          <motion.div key="ob4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
-            <BackButton onClick={() => setStep(3)} />
             <div className="flex-1 pt-4 pb-32 overflow-y-auto no-scrollbar">
               <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Define your voice</h2>
               <p className="text-gray-500 text-sm mb-5">This gives the AI the depth to write content that sounds like you — not anyone else.</p>
@@ -247,13 +204,13 @@ export default function Onboarding() {
                 />
               </div>
             </div>
-            <NextButton onClick={() => setStep(5)} label="Continue" />
+            <NextButton onClick={() => setStep(4)} label="Continue" />
           </motion.div>
         );
 
-      case 5:
+      case 4:
         return (
-          <motion.div key="ob5" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full items-center justify-center text-center gap-6">
+          <motion.div key="ob4" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-full items-center justify-center text-center gap-6">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
               <Check className="w-10 h-10 text-primary" strokeWidth={2.5} />
             </div>
@@ -265,9 +222,8 @@ export default function Onboarding() {
             </div>
 
             <div className="w-full bg-gray-50 rounded-2xl p-4 text-left space-y-2 border border-gray-100">
-              <SummaryRow label="Objective" value={data.objective} />
-              <SummaryRow label="Persona" value={data.persona} />
-              <SummaryRow label="Tone" value={data.tone} />
+              <SummaryRow label="Audience" value={data.objective} />
+              <SummaryRow label="Feeling" value={data.tone} />
               {data.brandRole && <SummaryRow label="Role" value={data.brandRole} />}
             </div>
 
@@ -275,7 +231,7 @@ export default function Onboarding() {
               <Button className="w-full h-14 text-base font-semibold" onClick={handleFinish} disabled={isPending}>
                 {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Start creating"}
               </Button>
-              <button onClick={() => setStep(4)} className="text-sm text-gray-400 hover:text-gray-600">
+              <button onClick={() => setStep(3)} className="text-sm text-gray-400 hover:text-gray-600">
                 ← Go back and edit
               </button>
             </div>
@@ -291,7 +247,7 @@ export default function Onboarding() {
     <AppShell noNav>
         <header className="px-6 py-5 sticky top-0 bg-gray-50 z-10">
           <div className="flex gap-1.5 w-full items-center mb-1">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-1 flex-1 rounded-full bg-gray-200 overflow-hidden">
                 <motion.div
                   className="h-full bg-primary rounded-full"
@@ -301,7 +257,7 @@ export default function Onboarding() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 font-medium mt-1">Step {step} of 5</p>
+          <p className="text-xs text-gray-400 font-medium mt-1">Step {step} of 4</p>
         </header>
 
         <main className="flex-1 px-6 pb-6 overflow-hidden flex flex-col relative">

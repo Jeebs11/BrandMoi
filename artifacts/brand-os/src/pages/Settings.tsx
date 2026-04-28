@@ -12,9 +12,12 @@ import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryR
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 
-const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
+// Audience replaces legacy Objective. Stored in preferences.objective for back-compat.
+const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
+// Feeling replaces legacy Tone. Stored in preferences.tone.
+const FEELINGS = ["Direct", "Witty", "Vulnerable", "Story", "Contrarian"];
+// Persona kept hidden — defaults to "Founder" backend-side; existing values preserved.
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
-const TONES = ["Executive", "Direct", "Story", "Contrarian", "Witty", "Vulnerable", "Playful", "Snappy"];
 
 export default function Settings() {
   const [, navigate] = useLocation();
@@ -278,64 +281,42 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Content Settings */}
+          {/* Default Audience + Feeling — used as defaults in the Capture flow */}
           <section>
-            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Writing Tone</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Default Feeling</h2>
             <div className="space-y-5">
               <SelRow
-                label="Tone" options={TONES} selected={tone} onSelect={setTone}
+                label="Feeling" options={FEELINGS} selected={tone} onSelect={setTone}
                 panelId="tone" openPanelId={openPanelId} onTogglePanel={togglePanel}
-                info="The default writing energy applied to every post. You can override this per post."
+                info="The default emotional register for every post. You can swap it on any post."
                 optionInfo={{
-                  "Executive": "Polished, measured, authoritative — warm and human, never cold. Reads like a considered keynote.",
-                  "Direct": "Punchy and efficient — no warm-up, straight to the point.",
-                  "Story": "Opens with a scene or moment that pulls the reader in.",
-                  "Contrarian": "Challenges the dominant assumption head-on — sparks debate and earns attention.",
-                  "Witty": "Dry, self-aware humour — clever without being cynical, warm without being soft.",
-                  "Vulnerable": "Personal and honest — shares what was learned the hard way, no performance.",
-                  "Playful": "Light wordplay and warm professional humour — personality-forward without being cringe.",
-                  "Snappy": "Under 150 words, 3–5 punchy lines — no buildup, straight to the sharpest point.",
+                  "Direct": "Clear, authoritative, no fluff — straight to the point.",
+                  "Witty": "Dry, self-aware humour — clever without cynicism.",
+                  "Vulnerable": "Personal and honest — what you learned the hard way.",
+                  "Story": "Opens with a vivid scene or moment that pulls the reader in.",
+                  "Contrarian": "Challenges the dominant assumption head-on.",
                 }}
               />
             </div>
           </section>
 
-          {/* Legacy Objective + Persona — only shown when About Me is empty */}
-          {!aboutMe.trim() && (
-            <section>
-              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">Content Labels</h2>
-              <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
-                Fill in "About You" above to replace these with real context. These are only used as fallback.
-              </p>
-              <div className="space-y-5">
-                <SelRow
-                  label="Default Objective" options={OBJECTIVES} selected={objective} onSelect={setObjective}
-                  panelId="objective" openPanelId={openPanelId} onTogglePanel={togglePanel}
-                  info="Sets the LinkedIn goal shaping every post you generate."
-                  optionInfo={{
-                    "Clients": "Positions you as the solution enterprise buyers are looking for.",
-                    "Job": "Signals career momentum and the value you bring to a new role.",
-                    "Authority": "Produces opinion-led content that builds long-term credibility.",
-                    "Documenting": "Shows the real work — builds trust through transparency.",
-                    "Expert": "Deep technical content that earns respect from peers.",
-                    "Hiring": "Attracts talent by showcasing culture, mission, and opportunity.",
-                  }}
-                />
-                <SelRow
-                  label="Persona" options={PERSONAS} selected={persona} onSelect={setPersona}
-                  panelId="persona" openPanelId={openPanelId} onTogglePanel={togglePanel}
-                  info="Frames your point of view and what you optimise for."
-                  optionInfo={{
-                    "Founder": "Assumes vision and leadership language.",
-                    "Operator": "Assumes systems, execution, and measurable outcomes.",
-                    "Career": "Focuses on professional growth, credibility, and opportunities.",
-                    "Technical": "Leads with depth, precision, and craft.",
-                    "Sales": "Focuses on value, trust, and closing the gap.",
-                  }}
-                />
-              </div>
-            </section>
-          )}
+          <section>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Default Audience</h2>
+            <div className="space-y-5">
+              <SelRow
+                label="Audience" options={AUDIENCES} selected={objective} onSelect={setObjective}
+                panelId="objective" openPanelId={openPanelId} onTogglePanel={togglePanel}
+                info="Who you're writing for by default. Swap on any post."
+                optionInfo={{
+                  "Clients": "Future buyers and prospects — positions you as the answer.",
+                  "Peers": "Operators in your field — earns respect through specificity.",
+                  "Recruiters & Headhunters": "Hiring managers and recruiters — signals you're hireable.",
+                  "Investors": "VCs, angels, capital allocators — speaks to ambition and traction.",
+                  "My audience": "Mixed crowd already following you — broad relatability.",
+                }}
+              />
+            </div>
+          </section>
 
           {/* Brand Voice */}
           <section>

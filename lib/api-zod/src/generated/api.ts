@@ -130,58 +130,48 @@ export const GetSuggestionsResponseItem = zod.object({
 export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 
 /**
- * @summary Extract structured breakdown from a raw thought
+ * @summary Get AI-generated daily brief with content angles and teach ideas
  */
-export const StructureIdeaBody = zod.object({
-  rawInput: zod.string(),
-  objective: zod.string(),
-  persona: zod.string(),
-  tone: zod.string(),
+export const GetAgentBriefResponse = zod.object({
+  headline: zod.string(),
+  insight: zod.string(),
+  angles: zod.array(zod.string()),
+  teachAngles: zod.array(zod.string()),
+  newsHeadline: zod.string().optional(),
+  newsSourceLine: zod.string().optional(),
+  newsUrl: zod.string().optional(),
+  newsPublishedAt: zod.string().optional(),
+  newsSourceDomain: zod.string().optional(),
+  newsDescription: zod.string().optional(),
 });
 
-export const StructureIdeaResponse = zod.object({
-  evergreen: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    archetype: zod.string().optional(),
-    hooks: zod.array(
-      zod.object({
-        text: zod.string(),
-        type: zod
-          .enum([
-            "how-i",
-            "contrarian",
-            "number",
-            "question",
-            "scene-setter",
-            "prediction",
-            "analogy",
-            "how-to",
-            "story",
-            "disarming-joke",
-            "tension-setter",
-            "confession",
-          ])
-          .optional(),
-        usedBefore: zod.boolean().nullish(),
-        sourceLine: zod.string().nullish(),
-      }),
+/**
+ * @summary Generate LinkedIn content from confirmed structure
+ */
+export const GenerateContentBody = zod.object({
+  rawInput: zod.string(),
+  audience: zod
+    .string()
+    .optional()
+    .describe(
+      "New 3-input flow — target audience chip (Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
     ),
-    narrativeFlow: zod.array(zod.string()),
-    storyMode: zod.boolean().optional(),
-    teacherMode: zod.boolean().optional(),
-    postFormat: zod
-      .enum([
-        "standard",
-        "frustrated-expert",
-        "lived-lesson",
-        "clean-breakdown",
-      ])
-      .nullish(),
-  }),
-  trending: zod
+  feeling: zod
+    .string()
+    .optional()
+    .describe(
+      "New 3-input flow — feeling chip (Direct, Witty, Vulnerable, Story, Contrarian)",
+    ),
+  tieToNews: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, perform a fresh web search and weave a relevant headline into the post",
+    ),
+  objective: zod.string().optional(),
+  persona: zod.string().optional(),
+  tone: zod.string().optional(),
+  structure: zod
     .object({
       topic: zod.string(),
       angle: zod.string(),
@@ -222,77 +212,41 @@ export const StructureIdeaResponse = zod.object({
           "clean-breakdown",
         ])
         .nullish(),
+      audience: zod
+        .string()
+        .optional()
+        .describe(
+          "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+        ),
+      feeling: zod
+        .string()
+        .optional()
+        .describe(
+          "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
+        ),
+      hashtags: zod
+        .string()
+        .optional()
+        .describe(
+          "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
+        ),
+      alternativeHooks: zod
+        .array(zod.string())
+        .optional()
+        .describe("Alternative opener lines the user can swap into the post"),
+      newsAnchor: zod
+        .object({
+          headline: zod.string().optional(),
+          url: zod.string().optional(),
+          sourceLine: zod.string().optional(),
+        })
+        .nullish()
+        .describe(
+          "When tieToNews=true, the news headline anchor used in the post",
+        ),
     })
-    .nullish(),
-  hookUsage: zod.record(zod.string(), zod.number()).optional(),
-});
-
-/**
- * @summary Get AI-generated daily brief with content angles and teach ideas
- */
-export const GetAgentBriefResponse = zod.object({
-  headline: zod.string(),
-  insight: zod.string(),
-  angles: zod.array(zod.string()),
-  teachAngles: zod.array(zod.string()),
-  newsHeadline: zod.string().optional(),
-  newsSourceLine: zod.string().optional(),
-  newsUrl: zod.string().optional(),
-  newsPublishedAt: zod.string().optional(),
-  newsSourceDomain: zod.string().optional(),
-  newsDescription: zod.string().optional(),
-});
-
-/**
- * @summary Generate LinkedIn content from confirmed structure
- */
-export const GenerateContentBody = zod.object({
-  rawInput: zod.string(),
-  objective: zod.string(),
-  persona: zod.string(),
-  tone: zod.string(),
-  structure: zod.object({
-    topic: zod.string(),
-    angle: zod.string(),
-    coreMessage: zod.string(),
-    whyItMatters: zod.string(),
-    archetype: zod.string().optional(),
-    hooks: zod.array(
-      zod.object({
-        text: zod.string(),
-        type: zod
-          .enum([
-            "how-i",
-            "contrarian",
-            "number",
-            "question",
-            "scene-setter",
-            "prediction",
-            "analogy",
-            "how-to",
-            "story",
-            "disarming-joke",
-            "tension-setter",
-            "confession",
-          ])
-          .optional(),
-        usedBefore: zod.boolean().nullish(),
-        sourceLine: zod.string().nullish(),
-      }),
-    ),
-    narrativeFlow: zod.array(zod.string()),
-    storyMode: zod.boolean().optional(),
-    teacherMode: zod.boolean().optional(),
-    postFormat: zod
-      .enum([
-        "standard",
-        "frustrated-expert",
-        "lived-lesson",
-        "clean-breakdown",
-      ])
-      .nullish(),
-  }),
-  selectedHook: zod.string(),
+    .optional(),
+  selectedHook: zod.string().optional(),
   includeCta: zod.boolean().optional(),
   storyMode: zod.boolean().optional(),
   postTone: zod.string().optional(),
@@ -301,10 +255,20 @@ export const GenerateContentBody = zod.object({
   postFormat: zod
     .enum(["standard", "frustrated-expert", "lived-lesson", "clean-breakdown"])
     .nullish(),
+  extraInstruction: zod
+    .string()
+    .optional()
+    .describe(
+      'Additional refinement instruction appended to the generation prompt (used by \"Try a different angle\" and similar refine actions in Capture)',
+    ),
 });
 
 export const GenerateContentResponse = zod.object({
   post: zod.string(),
+  alternativeHooks: zod
+    .array(zod.string())
+    .optional()
+    .describe("Two alternative opening lines the user can swap in"),
   shortPost: zod.string().nullish(),
   carousel: zod.array(
     zod.object({
@@ -321,6 +285,15 @@ export const GenerateContentResponse = zod.object({
     })
     .nullish(),
   hashtags: zod.string().nullish(),
+  newsAnchor: zod
+    .object({
+      headline: zod.string(),
+      url: zod.string().nullish(),
+      sourceLine: zod.string().nullish(),
+    })
+    .nullish(),
+  audience: zod.string().nullish(),
+  feeling: zod.string().nullish(),
 });
 
 /**
@@ -740,6 +713,38 @@ export const ListDraftsResponseItem = zod.object({
         "clean-breakdown",
       ])
       .nullish(),
+    audience: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+      ),
+    feeling: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
+      ),
+    hashtags: zod
+      .string()
+      .optional()
+      .describe(
+        "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
+      ),
+    alternativeHooks: zod
+      .array(zod.string())
+      .optional()
+      .describe("Alternative opener lines the user can swap into the post"),
+    newsAnchor: zod
+      .object({
+        headline: zod.string().optional(),
+        url: zod.string().optional(),
+        sourceLine: zod.string().optional(),
+      })
+      .nullish()
+      .describe(
+        "When tieToNews=true, the news headline anchor used in the post",
+      ),
   }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
@@ -879,6 +884,38 @@ export const CreateDraftBody = zod.object({
         "clean-breakdown",
       ])
       .nullish(),
+    audience: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+      ),
+    feeling: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
+      ),
+    hashtags: zod
+      .string()
+      .optional()
+      .describe(
+        "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
+      ),
+    alternativeHooks: zod
+      .array(zod.string())
+      .optional()
+      .describe("Alternative opener lines the user can swap into the post"),
+    newsAnchor: zod
+      .object({
+        headline: zod.string().optional(),
+        url: zod.string().optional(),
+        sourceLine: zod.string().optional(),
+      })
+      .nullish()
+      .describe(
+        "When tieToNews=true, the news headline anchor used in the post",
+      ),
   }),
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
@@ -954,6 +991,38 @@ export const GetDraftResponse = zod.object({
         "clean-breakdown",
       ])
       .nullish(),
+    audience: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+      ),
+    feeling: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
+      ),
+    hashtags: zod
+      .string()
+      .optional()
+      .describe(
+        "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
+      ),
+    alternativeHooks: zod
+      .array(zod.string())
+      .optional()
+      .describe("Alternative opener lines the user can swap into the post"),
+    newsAnchor: zod
+      .object({
+        headline: zod.string().optional(),
+        url: zod.string().optional(),
+        sourceLine: zod.string().optional(),
+      })
+      .nullish()
+      .describe(
+        "When tieToNews=true, the news headline anchor used in the post",
+      ),
   }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
@@ -1097,6 +1166,38 @@ export const UpdateDraftBody = zod.object({
           "clean-breakdown",
         ])
         .nullish(),
+      audience: zod
+        .string()
+        .optional()
+        .describe(
+          "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+        ),
+      feeling: zod
+        .string()
+        .optional()
+        .describe(
+          "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
+        ),
+      hashtags: zod
+        .string()
+        .optional()
+        .describe(
+          "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
+        ),
+      alternativeHooks: zod
+        .array(zod.string())
+        .optional()
+        .describe("Alternative opener lines the user can swap into the post"),
+      newsAnchor: zod
+        .object({
+          headline: zod.string().optional(),
+          url: zod.string().optional(),
+          sourceLine: zod.string().optional(),
+        })
+        .nullish()
+        .describe(
+          "When tieToNews=true, the news headline anchor used in the post",
+        ),
     })
     .optional(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
@@ -1161,6 +1262,38 @@ export const UpdateDraftResponse = zod.object({
         "clean-breakdown",
       ])
       .nullish(),
+    audience: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow audience (e.g. Clients, Peers, Recruiters & Headhunters, Investors, My audience)",
+      ),
+    feeling: zod
+      .string()
+      .optional()
+      .describe(
+        "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
+      ),
+    hashtags: zod
+      .string()
+      .optional()
+      .describe(
+        "3-tier hashtag block (newline- or space-separated; user-editable as one string)",
+      ),
+    alternativeHooks: zod
+      .array(zod.string())
+      .optional()
+      .describe("Alternative opener lines the user can swap into the post"),
+    newsAnchor: zod
+      .object({
+        headline: zod.string().optional(),
+        url: zod.string().optional(),
+        sourceLine: zod.string().optional(),
+      })
+      .nullish()
+      .describe(
+        "When tieToNews=true, the news headline anchor used in the post",
+      ),
   }),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),

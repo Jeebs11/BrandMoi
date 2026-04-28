@@ -15,16 +15,34 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const OBJECTIVES = ["All", "Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
+const AUDIENCE_FILTERS = ["All", "Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
 const STATUSES = ["All", "draft", "ready", "published"];
 
+// Maps both legacy Objective values AND new Audience values to chip colours.
 const OBJECTIVE_COLORS: Record<string, string> = {
   Clients: "bg-amber-50 text-amber-700",
+  Peers: "bg-violet-50 text-violet-700",
+  "Recruiters & Headhunters": "bg-sky-50 text-sky-700",
+  Investors: "bg-emerald-50 text-emerald-700",
+  "My audience": "bg-orange-50 text-orange-700",
   Job: "bg-sky-50 text-sky-700",
   Authority: "bg-violet-50 text-violet-700",
   Documenting: "bg-emerald-50 text-emerald-700",
   Expert: "bg-orange-50 text-orange-700",
   Hiring: "bg-teal-50 text-teal-700",
+};
+
+// Old objective → new audience mapping for filter matching.
+// Authority/Expert/Documenting collapse into Peers/My audience by intent;
+// Investors is a brand-new audience with no legacy equivalent and is matched
+// only via persisted structuredBreakdown.audience.
+const OBJECTIVE_TO_AUDIENCE: Record<string, string> = {
+  Clients: "Clients",
+  Job: "Recruiters & Headhunters",
+  Hiring: "Recruiters & Headhunters",
+  Authority: "Peers",
+  Expert: "Peers",
+  Documenting: "My audience",
 };
 
 const STATUS_ICONS: Record<string, typeof FileText> = {
@@ -50,7 +68,7 @@ export default function Library() {
   const search = useSearch();
   const highlightId = (() => { const m = new URLSearchParams(search).get("highlight"); return m ? Number(m) : null; })();
   const highlightRef = useRef<HTMLDivElement | null>(null);
-  const [objFilter, setObjFilter] = useState("All");
+  const [audienceFilter, setAudienceFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
@@ -87,7 +105,12 @@ export default function Library() {
   const { mutate: updateDraft } = useUpdateDraft();
 
   const filtered = (drafts ?? []).filter((d) => {
-    if (objFilter !== "All" && d.objective !== objFilter) return false;
+    if (audienceFilter !== "All") {
+      // Match against either the new audience field (from normaliser) or legacy objective.
+      const sb = (d.structuredBreakdown ?? {}) as { audience?: string };
+      const draftAudience = sb.audience ?? OBJECTIVE_TO_AUDIENCE[d.objective] ?? d.objective;
+      if (draftAudience !== audienceFilter) return false;
+    }
     if (statusFilter !== "All" && d.status !== statusFilter) return false;
     return true;
   });
@@ -134,11 +157,11 @@ export default function Library() {
           </div>
           <div className="space-y-2">
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-              {OBJECTIVES.map((o) => (
-                <button key={o} onClick={() => setObjFilter(o)}
+              {AUDIENCE_FILTERS.map((a) => (
+                <button key={a} onClick={() => setAudienceFilter(a)}
                   className={cn("px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border",
-                    objFilter === o ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40")}
-                >{o}</button>
+                    audienceFilter === a ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40")}
+                >{a}</button>
               ))}
             </div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -165,7 +188,7 @@ export default function Library() {
               <BookOpen className="w-12 h-12 text-gray-200 mb-4" />
               <p className="font-bold text-gray-600 mb-1">Nothing here yet</p>
               <p className="text-sm text-gray-400">
-                {objFilter !== "All" || statusFilter !== "All" ? "Try adjusting your filters." : "Capture an idea to get started."}
+                {audienceFilter !== "All" || statusFilter !== "All" ? "Try adjusting your filters." : "Capture an idea to get started."}
               </p>
             </div>
           ) : (

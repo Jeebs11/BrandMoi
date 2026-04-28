@@ -5,8 +5,6 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, brandVoiceSignalsTable, performanceSignalsTable, voiceSuggestionsTable } from "@workspace/db";
 import {
-  StructureIdeaBody,
-  StructureIdeaResponse,
   GenerateContentBody,
   GenerateContentResponse,
   RefineContentBody,
@@ -14,10 +12,9 @@ import {
 } from "@workspace/api-zod";
 import {
   buildBrandContext,
-  STRUCTURE_SYSTEM_PROMPT,
   GENERATE_SYSTEM_PROMPT,
-  TEACHER_MODE_INSTRUCTION,
-  POST_FORMAT_INSTRUCTIONS,
+  AUDIENCE_OVERLAYS,
+  FEELING_INSTRUCTIONS,
   REFINE_SYSTEM_PROMPT,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -28,6 +25,12 @@ const InfographicDataSchema = z.object({
   headline: z.string(),
   bullets: z.array(z.string()),
 });
+
+const CarouselSlideSchema = z.array(z.object({
+  slide: z.coerce.number(),
+  title: z.string(),
+  description: z.string(),
+}));
 
 const router: IRouter = Router();
 
@@ -62,218 +65,40 @@ async function getUserBrandContext(userId: number): Promise<string> {
   return parts.join("\n\n");
 }
 
-router.post("/ai/structure", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
-  const parsed = StructureIdeaBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+const NEW_FLOW_AUDIENCES = new Set(["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"]);
 
-  const { rawInput, objective, persona, tone } = parsed.data;
-  const userId = req.user!.userId;
-  const brandContext = buildBrandContext(objective, persona, tone);
-  const voiceContext = await getUserBrandContext(userId);
-
-  // 1. Compute hook usage from last 10 drafts
-  const hookUsage: Record<string, number> = {};
-  try {
-    const recentForHooks = await db
-      .select()
-      .from(draftsTable)
-      .where(eq(draftsTable.userId, userId))
-      .orderBy(desc(draftsTable.createdAt))
-      .limit(10);
-    for (const draft of recentForHooks) {
-      const bd = draft.structuredBreakdown as {
-        hookTypes?: string[];
-        hooks?: (string | { text: string; type?: string })[];
-      } | null;
-      // Legacy format: flat hookTypes array
-      if (bd?.hookTypes) {
-        for (const ht of bd.hookTypes) {
-          hookUsage[ht] = (hookUsage[ht] ?? 0) + 1;
-        }
-      }
-      // New format: hooks[].type
-      if (bd?.hooks) {
-        for (const h of bd.hooks) {
-          if (typeof h === "object" && h.type) {
-            hookUsage[h.type] = (hookUsage[h.type] ?? 0) + 1;
-          }
-        }
-      }
-    }
-  } catch {
-    // non-critical — continue without usage data
-  }
-
-  // 2. Compute usedBefore for each hook via Jaccard similarity against last 50 selectedHooks
-  const recentSelectedHooks: string[] = [];
-  try {
-    const recentWithHooks = await db
-      .select({ selectedHook: draftsTable.selectedHook })
-      .from(draftsTable)
-      .where(eq(draftsTable.userId, userId))
-      .orderBy(desc(draftsTable.createdAt))
-      .limit(50);
-    for (const d of recentWithHooks) {
-      if (d.selectedHook) recentSelectedHooks.push(d.selectedHook);
-    }
-  } catch {
-    // non-critical
-  }
-
-  // 3. Web search for trending context — targeted on persona + objective + topic
-  let trendingContext = "";
+async function fetchNewsAnchorForGenerate(rawInput: string, audience: string | undefined): Promise<{ context: string; anchor: { headline: string; url?: string | null; sourceLine?: string | null } | null }> {
+  if (!process.env.OPENAI_API_KEY) return { context: "", anchor: null };
   try {
     const { default: OpenAI } = await import("openai");
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const searchQuery = `Recent news, studies, or developments relevant to "${rawInput}" for a ${persona} focused on ${objective}. Extract 1-2 specific headline + brief snippet (date if known).`;
-    const searchResponse = await openai.chat.completions.create({
+    const audienceLine = audience ? ` relevant to a post aimed at ${audience}` : "";
+    const searchQuery = `Find the single most relevant news article published in the last 7 days about: ${rawInput}${audienceLine}. Return the exact headline, the publication name, and a 2-3 sentence summary of the key finding.`;
+    const searchResp = await openai.chat.completions.create({
       model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
       messages: [{ role: "user" as const, content: searchQuery }],
-      max_tokens: 300,
+      max_tokens: 320,
     });
-    trendingContext = searchResponse.choices[0]?.message?.content ?? "";
-  } catch {
-    trendingContext = "";
-  }
-
-  // 4. Single Claude call — ALWAYS generates both lanes; trending is synthesized if no real news
-  const trendingInstruction = trendingContext
-    ? `\nRecent context from the web:\n${trendingContext}\n\nGenerate BOTH an "evergreen" breakdown (timeless angle) AND a "trending" breakdown tied to the recent context above. For each trending hook include a "sourceLine" field (≤20 words naming the specific news/study). Trending sourceLine should reference the actual event/study from the web context.`
-    : `\nNo real-time news was found. Generate BOTH an "evergreen" breakdown AND a "trending" breakdown based on a plausible emerging discussion or recent development in the user's field (synthesized — not invented facts). For each trending hook, set "sourceLine" to "Based on recent discussions in your field."`;
-
-  const userMessage = `Raw thought: ${rawInput}
-
-${voiceContext || brandContext}
-${trendingInstruction}
-
-Return this exact JSON shape (no markdown fences):
-{
-  "evergreen": {
-    "topic": "",
-    "angle": "",
-    "coreMessage": "",
-    "whyItMatters": "",
-    "archetype": "storytelling|lesson-learned|contrarian|data-insight|framework",
-    "hooks": [
-      { "text": "how-i hook under 140 chars", "type": "how-i" },
-      { "text": "contrarian hook under 140 chars", "type": "contrarian" },
-      { "text": "number hook under 140 chars", "type": "number" },
-      { "text": "question hook under 140 chars ending with ?", "type": "question" },
-      { "text": "scene-setter hook under 140 chars", "type": "scene-setter" },
-      { "text": "prediction hook under 140 chars", "type": "prediction" },
-      { "text": "analogy hook under 140 chars", "type": "analogy" },
-      { "text": "disarming-joke hook under 140 chars — dry, wry, earns trust through humour", "type": "disarming-joke" },
-      { "text": "tension-setter hook under 140 chars — drop reader into a conflict mid-scene", "type": "tension-setter" },
-      { "text": "confession hook under 140 chars — frank admission of something the author got wrong", "type": "confession" }
-    ],
-    "narrativeFlow": ["", "", "", ""]
-  },
-  "trending": {
-    "topic": "",
-    "angle": "",
-    "coreMessage": "",
-    "whyItMatters": "",
-    "archetype": "storytelling|lesson-learned|contrarian|data-insight|framework",
-    "hooks": [
-      { "text": "hook under 140 chars", "type": "how-i", "sourceLine": "One sentence ≤20 words naming the news/discussion." },
-      { "text": "hook under 140 chars", "type": "contrarian", "sourceLine": "One sentence ≤20 words naming the news/discussion." }
-    ],
-    "narrativeFlow": ["", "", "", ""]
-  }
-}
-
-IMPORTANT: "trending" must NEVER be null. Always generate the trending lane. If no real news exists, synthesise a plausible emerging discussion and set each trending hook's "sourceLine" to "Based on recent discussions in your field."
-Evergreen hooks must NOT have a "sourceLine" field.`;
-
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8192,
-    system: STRUCTURE_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  const text = message.content[0];
-  if (text.type !== "text") {
-    res.status(500).json({ error: "Unexpected AI response type" });
-    return;
-  }
-
-  let parsed2: unknown;
-  try {
-    const stripped = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    parsed2 = JSON.parse(stripped);
-  } catch {
-    res.status(500).json({ error: "AI returned invalid JSON" });
-    return;
-  }
-
-  // Enforce strict two-lane schema. If trending is missing/null, synthesize a fallback lane.
-  const rawParsed = parsed2 as Record<string, unknown>;
-  if (!rawParsed.trending || typeof rawParsed.trending !== "object") {
-    const evergreen = rawParsed.evergreen as Record<string, unknown> | undefined;
-    const evergreenHooks = evergreen && Array.isArray((evergreen as Record<string, unknown>).hooks)
-      ? (evergreen as Record<string, unknown[]>).hooks as Array<{ text: string; type?: string }>
-      : [];
-    rawParsed.trending = {
-      topic: evergreen?.topic ?? "",
-      angle: "Timely perspective tied to recent conversations",
-      coreMessage: evergreen?.coreMessage ?? "",
-      whyItMatters: evergreen?.whyItMatters ?? "",
-      archetype: evergreen?.archetype ?? "lesson-learned",
-      hooks: [
-        { text: evergreenHooks[0]?.text ?? "What the latest conversations in your field reveal", type: evergreenHooks[0]?.type ?? "how-i", sourceLine: "Based on recent discussions in your field." },
-        { text: evergreenHooks[1]?.text ?? "The emerging shift that most professionals are ignoring", type: "contrarian", sourceLine: "Based on recent discussions in your field." },
-      ],
-      narrativeFlow: evergreen?.narrativeFlow ?? [],
-    };
-  }
-  // Ensure all trending hooks have a sourceLine, and pad to at least 2 hooks
-  if (Array.isArray((rawParsed.trending as Record<string, unknown>).hooks)) {
-    const trendingHooks = ((rawParsed.trending as Record<string, unknown[]>).hooks as Array<Record<string, unknown>>).map(h => ({
-      ...h,
-      sourceLine: h.sourceLine && String(h.sourceLine).trim() ? h.sourceLine : "Based on recent discussions in your field.",
-    }));
-    if (trendingHooks.length < 2) {
-      const evergreenHooks = Array.isArray((rawParsed.evergreen as Record<string, unknown[]>)?.hooks)
-        ? (rawParsed.evergreen as Record<string, unknown[]>).hooks as Array<Record<string, unknown>>
-        : [];
-      while (trendingHooks.length < 2) {
-        const fallbackIdx = trendingHooks.length;
-        trendingHooks.push({
-          text: (evergreenHooks[fallbackIdx] as Record<string, unknown>)?.text ?? "The emerging shift most professionals are ignoring",
-          type: fallbackIdx === 0 ? "how-i" : "contrarian",
-          sourceLine: "Based on recent discussions in your field.",
-        });
+    const context = searchResp.choices[0]?.message?.content ?? "";
+    let url: string | null = null;
+    const annotations = (searchResp.choices[0]?.message as Record<string, unknown>)?.annotations;
+    if (Array.isArray(annotations)) {
+      for (const ann of annotations) {
+        const a = ann as Record<string, unknown>;
+        if (a.type === "url_citation") {
+          const citation = a.url_citation as Record<string, unknown> | undefined;
+          const u = citation?.url ?? a.url;
+          if (typeof u === "string" && u.startsWith("http")) { url = u; break; }
+        }
       }
     }
-    (rawParsed.trending as Record<string, unknown[]>).hooks = trendingHooks;
+    const firstLine = context.split("\n").map(l => l.trim()).find(l => l.length > 10) ?? "";
+    const headline = firstLine.replace(/^["\-*\d.)\s]+/, "").slice(0, 160) || "Recent development in your field";
+    return { context, anchor: context ? { headline, url, sourceLine: "" } : null };
+  } catch {
+    return { context: "", anchor: null };
   }
-  const payload = { ...rawParsed, hookUsage: Object.keys(hookUsage).length > 0 ? hookUsage : undefined };
-  const validated = StructureIdeaResponse.safeParse(payload);
-  if (!validated.success) {
-    res.status(500).json({ error: "AI response did not match expected shape" });
-    return;
-  }
-
-  // Inject usedBefore flags via Jaccard similarity against recently selected hook texts
-  const JACCARD_THRESHOLD = 0.6;
-  const tagUsedBefore = <T extends { text: string; usedBefore?: boolean }>(hooks: T[]): T[] =>
-    hooks.map(h => ({
-      ...h,
-      usedBefore: recentSelectedHooks.some(prev => computeJaccard(h.text, prev) >= JACCARD_THRESHOLD),
-    }));
-
-  const result = { ...validated.data };
-  result.evergreen = { ...result.evergreen, hooks: tagUsedBefore(result.evergreen.hooks) };
-  if (result.trending) {
-    result.trending = { ...result.trending, hooks: tagUsedBefore(result.trending.hooks) };
-  }
-
-  res.json(result);
-});
+}
 
 router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = GenerateContentBody.safeParse(req.body);
@@ -282,128 +107,91 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, objective, persona, tone, structure, selectedHook, includeCta, postTone, newsUrl, postFormat } = parsed.data;
-  // teacherMode takes precedence; when both arrive, teacher mode wins
-  const teacherMode = parsed.data.teacherMode ?? false;
-  const storyMode = !teacherMode && (parsed.data.storyMode ?? false);
-  const brandContext = buildBrandContext(objective, persona, tone);
-  const voiceContext = await getUserBrandContext(req.user!.userId);
+  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, structure, selectedHook, postTone, newsUrl, extraInstruction } = parsed.data;
+  const userId = req.user!.userId;
+  const voiceContext = await getUserBrandContext(userId);
+  const fallbackBrand = buildBrandContext(objective ?? "", persona ?? "", tone ?? "");
 
-  const TONE_INSTRUCTIONS: Record<string, string> = {
-    "Direct":     "Write with authority and precision. Short sentences. No hedging. Every word earns its place. No filler phrases or wind-ups.",
-    "Story":      "Open with a vivid scene that drops the reader into a specific moment. Build tension before the insight lands. Write like you're talking to one person who needs this.",
-    "Contrarian": "Challenge the dominant assumption head-on in the first line. Use 'Everyone says X. Here's what they're missing.' structure. Provide the evidence or argument that flips the conventional take.",
-    "Witty":      "Write with dry wit and self-awareness — like someone who's been in the trenches long enough to laugh at the absurdity of it. Clever without being cynical. Warm without being soft.",
-    "Vulnerable": "Write like you're sharing something you learned the hard way. Specific, honest, emotionally open. No performance of vulnerability — just the real observation or mistake.",
-    "Snappy":     "Write your actual gut reaction — the real, unfiltered take you'd say to someone in person. Don't polish it into a 'LinkedIn post'. Lead with your opinion, not a summary of the topic. Emoji is fine if it genuinely fits. Under 120 words. No wind-up, no filler, no hedging. Stop the moment the point is made. The test: would you actually say this out loud?",
-    "Executive":  "Write with the measured authority of a senior leader addressing a room that already respects them. Precise, considered language — no slang, no shortcuts, no rhetorical tricks. Every sentence feels deliberate. The tone is warm and human, never cold or corporate. Think polished keynote, not press release.",
-    "Playful":    "Write with light, warm humour — the kind that makes someone smile and feel like they're talking to a real person. Wordplay is welcome. Gentle self-awareness about industry absurdity is great. Never cringe, never over-explain the joke. Stays clearly professional but lets personality shine through. Think: the smartest person in the room who also happens to be fun at dinner.",
-  };
-  const toneInstruction = postTone && TONE_INSTRUCTIONS[postTone]
-    ? `\n\n## TONE OVERRIDE FOR THIS POST\n${TONE_INSTRUCTIONS[postTone]}`
-    : "";
+  const audienceLabel = audience && NEW_FLOW_AUDIENCES.has(audience) ? audience : (audience ?? "My audience");
+  const feelingLabel = feeling ?? postTone ?? "Direct";
+  const audienceOverlay = AUDIENCE_OVERLAYS[audienceLabel] ?? AUDIENCE_OVERLAYS["My audience"];
+  const feelingOverlay = FEELING_INSTRUCTIONS[feelingLabel] ?? FEELING_INSTRUCTIONS["Direct"];
 
-  const ctaInstruction = includeCta
-    ? `\nCTA requirement: End the LinkedIn post with a specific, natural call-to-action that fits the topic (e.g. "Follow for more on [topic]", "Save this if you want to remember [key point]", or "Tag someone who needs to hear this"). Avoid generic CTAs like "What do you think?" or "Drop a comment". For the carousel, make the final slide a strong CTA slide that prompts a specific action.`
-    : "";
-
-  const storyModeInstruction = storyMode
-    ? `\nSTORY MODE IS ACTIVE. Follow the STORY MODE POST RULES and STORY MODE CAROUSEL RULES from the system prompt exactly. The post must use the 5-beat narrative arc (Scene → Tension → Turn → Lesson → CTA). The carousel must use exactly 5 chapter-format slides (Opening scene → Struggle → Turn → Lesson → CTA). Do not use numbered slide titles.`
-    : "";
-
-  const newsReactionInstruction = newsUrl
-    ? `\n\n## NEWS-REACTION MODE — OVERRIDES ALL DEFAULT SHORT-POST RULES
-This post is triggered from a news article. The following instructions completely replace the standard "RULES FOR THE SHORT POST" section for the shortPost field only.
-
-DO NOT use "same hook as the main post" — ignore that rule entirely for shortPost.
-Instead, write a fresh reactive opener specific to the news.
-
-shortPost structure (strict):
-Line 1: Your immediate gut reaction to the news — provocative, personality-forward, emoji welcome (e.g. "Nobody is safe 😅" or "This changes things." or "Well. That escalated quickly 👀"). Under 100 characters.
-1–2 sentences: The single most surprising stat, implication, or insight from the article. Be specific — name the number or the finding if available.
-1–2 sentences: Your personal take — what does this mean for your audience? A genuine question or challenge to the conventional view.
-
-Keep shortPost under 75 words total. The article URL and hashtags are appended below the body — do NOT include them in shortPost.
-
-For the "hashtags" field: generate 6–8 targeted hashtags relevant to this article's topic and the user's professional field. Format as a single space-separated string: "#Tag1 #Tag2 #Tag3 #Tag4 #Tag5 #Tag6". Capitalise each word for readability.`
-    : "";
-
-  const userMessage = `Your job is to write LinkedIn content that sounds exactly like the person below — their rhythm, their phrasing, their specific way of seeing the world. Stay as close to their raw thought as possible. Do NOT paraphrase their voice into polished LinkedIn language. Keep it human and specific.
-
-## THE RAW THOUGHT (primary source — write from this):
-${rawInput}
-
-${voiceContext ? `## WHO THIS PERSON IS:\n${voiceContext}` : brandContext}
-
-## CONTENT STRUCTURE (context to guide the angle — the raw thought is still the primary source):
-- Start with this hook: ${selectedHook}
-- Topic: ${structure.topic}
-- Angle: ${structure.angle}
-- Core message: ${structure.coreMessage}
-- Why it matters: ${structure.whyItMatters}
-- Narrative arc: ${structure.narrativeFlow.join(" → ")}
-${ctaInstruction}${storyModeInstruction}
-Return this exact JSON shape (no markdown fences):
-{
-  "post": "",
-  "shortPost": "",
-  "hashtags": "",
-  "carousel": [{"slide": 1, "title": "", "description": ""}],
-  "visual": "",
-  "infographic": {
-    "headline": "Bold 6-10 word statement capturing the core message",
-    "bullets": ["Key insight 1", "Key insight 2", "Key insight 3", "Key insight 4"]
-  }
-}`;
-
-  const formatInstruction = (postFormat && postFormat !== "standard" && !teacherMode && !storyMode)
-    ? (POST_FORMAT_INSTRUCTIONS[postFormat] ?? "")
-    : "";
-
-  const generateSystemPrompt = [
-    GENERATE_SYSTEM_PROMPT,
-    toneInstruction || "",
-    teacherMode ? TEACHER_MODE_INSTRUCTION : "",
-    formatInstruction,
-    newsReactionInstruction,
-  ].filter(Boolean).join("");
-
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 8192,
-    system: generateSystemPrompt,
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  const text = message.content[0];
-  if (text.type !== "text") {
-    res.status(500).json({ error: "Unexpected AI response type" });
-    return;
+  let newsContext = "";
+  let newsAnchor: { headline: string; url?: string | null; sourceLine?: string | null } | null = null;
+  if (tieToNews) {
+    const fetched = await fetchNewsAnchorForGenerate(rawInput, audienceLabel);
+    newsContext = fetched.context;
+    newsAnchor = fetched.anchor;
+  } else if (newsUrl) {
+    newsContext = `News URL the author is reacting to: ${newsUrl}`;
   }
 
-  let parsed2: unknown;
+  const legacyHints: string[] = [];
+  if (structure?.topic) legacyHints.push(`Topic hint: ${structure.topic}`);
+  if (structure?.angle) legacyHints.push(`Angle hint: ${structure.angle}`);
+  if (selectedHook) legacyHints.push(`Suggested opening hook (use as-is or rework): ${selectedHook}`);
+
+  const userMessage = [
+    "## RAW THOUGHT (primary source — write from this, stay close to the words):",
+    rawInput,
+    "",
+    "## WHO THIS PERSON IS:",
+    voiceContext || fallbackBrand,
+    "",
+    "## AUDIENCE OVERLAY (mandatory):",
+    audienceOverlay,
+    "",
+    "## FEELING OVERLAY (mandatory):",
+    feelingOverlay,
+    legacyHints.length ? `\n## OPTIONAL HINTS:\n${legacyHints.join("\n")}` : "",
+    newsContext ? `\n## TODAY'S NEWS CONTEXT (weave the headline naturally — never paste a URL):\n${newsContext}` : "",
+    extraInstruction ? `\n## EXTRA INSTRUCTION (apply on top of everything else, this is the user's refine ask):\n${extraInstruction}` : "",
+    "",
+    "Return ONLY valid JSON, no markdown fences, with the exact shape from the system prompt.",
+  ].filter(Boolean).join("\n");
+
   try {
-    const stripped = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    parsed2 = JSON.parse(stripped);
-  } catch {
-    res.status(500).json({ error: "AI returned invalid JSON" });
-    return;
-  }
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8192,
+      system: GENERATE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
+    });
 
-  const validated = GenerateContentResponse.safeParse(parsed2);
-  if (!validated.success) {
-    res.status(500).json({ error: "AI response did not match expected shape" });
-    return;
-  }
+    const text = message.content[0];
+    if (text.type !== "text") {
+      res.status(500).json({ error: "Unexpected AI response type" });
+      return;
+    }
 
-  res.json(validated.data);
+    let parsedJson: Record<string, unknown>;
+    try {
+      const stripped = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      parsedJson = JSON.parse(stripped) as Record<string, unknown>;
+    } catch {
+      res.status(500).json({ error: "AI returned invalid JSON" });
+      return;
+    }
+
+    if (newsAnchor && !parsedJson.newsAnchor) {
+      parsedJson.newsAnchor = newsAnchor;
+    }
+    if (audienceLabel && !parsedJson.audience) parsedJson.audience = audienceLabel;
+    if (feelingLabel && !parsedJson.feeling) parsedJson.feeling = feelingLabel;
+
+    const validated = GenerateContentResponse.safeParse(parsedJson);
+    if (!validated.success) {
+      console.error("[ai-generate] schema mismatch", validated.error.message);
+      res.status(500).json({ error: "AI response did not match expected shape" });
+      return;
+    }
+    res.json(validated.data);
+  } catch (err) {
+    console.error("[ai-generate] failed", err);
+    res.status(500).json({ error: "Failed to generate content" });
+  }
 });
-
-const CarouselSlideSchema = z.array(z.object({
-  slide: z.coerce.number(),
-  title: z.string(),
-  description: z.string(),
-}));
 
 router.post("/ai/refine", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = RefineContentBody.safeParse(req.body);
@@ -951,70 +739,5 @@ export async function extractVoiceDNA(userId: number, draftId: number, postOutpu
     // Non-critical — fail silently
   }
 }
-
-const HOOK_TYPE_DESCRIPTIONS: Record<string, string> = {
-  "how-i":        'Personal "How I [achieved X]" opener. Must NOT start with "I".',
-  "contrarian":   'Bold claim challenging the obvious take. Must NOT start with "I" or "You".',
-  "number":       'Leads with a specific number, stat, or timeframe.',
-  "question":     'A specific uncomfortable question. Must end with "?".',
-  "scene-setter": 'Drops the reader into a specific micro-moment (time + place + action).',
-  "prediction":   'Bold future claim. Must start with a timeframe like "By [year]" or "Within".',
-  "analogy":      'A surprising comparison or metaphor reframing the topic.',
-};
-
-const GenerateHooksBody = z.object({
-  rawInput: z.string().min(1),
-  topic: z.string().min(1),
-  angle: z.string().min(1),
-  hookTypes: z.array(z.string()).min(1).max(7),
-});
-
-router.post("/ai/hooks", requireAuth, aiRateLimit, async (req, res) => {
-  const parsed = GenerateHooksBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  const { rawInput, topic, angle, hookTypes } = parsed.data;
-
-  const validTypes = hookTypes.filter(t => HOOK_TYPE_DESCRIPTIONS[t]);
-  const hookInstructions = validTypes
-    .map((t, i) => `${i + 1}. type="${t}" — ${HOOK_TYPE_DESCRIPTIONS[t]}`)
-    .join("\n");
-
-  const userMessage = `Topic: ${topic}
-Angle: ${angle}
-Raw thought: ${rawInput}
-
-Generate exactly ${validTypes.length} hooks, one per type listed below. Each hook must be under 140 characters and be a strong LinkedIn opener.
-
-${hookInstructions}
-
-Return only valid JSON, no markdown:
-{"hooks":[{"text":"...","type":"..."},...]}`;
-
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 500,
-      system:
-        "You are an expert LinkedIn hook writer. Generate only the opening line for a LinkedIn post — no body, no hashtags. Every hook must be under 140 characters. Return only valid JSON with no markdown fences.",
-      messages: [{ role: "user", content: userMessage }],
-    });
-
-    const t = message.content[0];
-    if (t.type !== "text") {
-      res.status(500).json({ error: "Unexpected AI response type" });
-      return;
-    }
-
-    const cleaned = t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    const result = JSON.parse(cleaned) as { hooks: Array<{ text: string; type: string }> };
-    res.json({ hooks: result.hooks ?? [] });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to generate hooks" });
-  }
-});
 
 export default router;

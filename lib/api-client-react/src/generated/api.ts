@@ -35,8 +35,6 @@ import type {
   RefineContentBody,
   RefinedContent,
   RegisterBody,
-  StructureIdeaBody,
-  StructureIdeaResponse,
   SuggestionItem,
   UpdateDraftBody,
   UpdatePreferencesBody,
@@ -678,92 +676,6 @@ export function useGetSuggestions<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-/**
- * @summary Extract structured breakdown from a raw thought
- */
-export const getStructureIdeaUrl = () => {
-  return `/api/ai/structure`;
-};
-
-export const structureIdea = async (
-  structureIdeaBody: StructureIdeaBody,
-  options?: RequestInit,
-): Promise<StructureIdeaResponse> => {
-  return customFetch<StructureIdeaResponse>(getStructureIdeaUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(structureIdeaBody),
-  });
-};
-
-export const getStructureIdeaMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof structureIdea>>,
-    TError,
-    { data: BodyType<StructureIdeaBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof structureIdea>>,
-  TError,
-  { data: BodyType<StructureIdeaBody> },
-  TContext
-> => {
-  const mutationKey = ["structureIdea"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof structureIdea>>,
-    { data: BodyType<StructureIdeaBody> }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return structureIdea(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type StructureIdeaMutationResult = NonNullable<
-  Awaited<ReturnType<typeof structureIdea>>
->;
-export type StructureIdeaMutationBody = BodyType<StructureIdeaBody>;
-export type StructureIdeaMutationError = ErrorType<ErrorResponse>;
-
-/**
- * @summary Extract structured breakdown from a raw thought
- */
-export const useStructureIdea = <
-  TError = ErrorType<ErrorResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof structureIdea>>,
-    TError,
-    { data: BodyType<StructureIdeaBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof structureIdea>>,
-  TError,
-  { data: BodyType<StructureIdeaBody> },
-  TContext
-> => {
-  return useMutation(getStructureIdeaMutationOptions(options));
-};
 
 /**
  * @summary Get AI-generated daily brief with content angles and teach ideas
