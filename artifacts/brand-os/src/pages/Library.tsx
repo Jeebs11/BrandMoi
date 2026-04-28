@@ -55,7 +55,7 @@ const OBJECTIVE_COLORS: Record<string, string> = {
 const OBJECTIVE_TO_AUDIENCE: Record<string, string> = {
   Clients: "Clients",
   Job: "Recruiters & Headhunters",
-  Hiring: "Recruiters & Headhunters",
+  Hiring: "My audience",
   Authority: "Peers",
   Expert: "Peers",
   Documenting: "My audience",
