@@ -373,6 +373,16 @@ export default function Capture() {
     })();
   }, [activeTab, content, illustrationImage, isLoadingIllustration, editedPost, visualStyle, toast]);
 
+  // ── Regen illustration with a custom scene (skips concept generation) ─
+  const regenIllustrationWithScene = (scene: string) => {
+    if (!scene.trim() || isLoadingIllustration) return;
+    setIsLoadingIllustration(true);
+    imageGenApi.generate(scene, "illustration", visualStyle)
+      .then(({ imageBase64 }) => setIllustrationImage(imageBase64))
+      .catch((err) => toast({ title: "Illustration failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }))
+      .finally(() => setIsLoadingIllustration(false));
+  };
+
   // ── Copy helper ──────────────────────────────────────────────────────
   const copy = (text: string, label = "Copied") => {
     void navigator.clipboard.writeText(text);
@@ -439,6 +449,9 @@ export default function Capture() {
               setIllustrationCaption("");
               setIllustrationScene("");
             }}
+            setIllustrationCaption={setIllustrationCaption}
+            setIllustrationScene={setIllustrationScene}
+            onRegenIllustration={regenIllustrationWithScene}
             onSave={handleSave}
             onCopy={copy}
           />
@@ -588,6 +601,9 @@ interface ResultViewProps {
   onTryAgain: () => void;
   onChangeFeeling: (newFeeling: string) => void;
   onChangeVisualStyle: (newStyle: string) => void;
+  setIllustrationCaption: (v: string) => void;
+  setIllustrationScene: (v: string) => void;
+  onRegenIllustration: (scene: string) => void;
   onSave: () => void;
   onCopy: (text: string, label?: string) => void;
 }
@@ -599,7 +615,9 @@ function ResultView(props: ResultViewProps) {
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
     fullPost, audience, feeling, isRefining, isSaving,
-    onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle, onSave, onCopy,
+    onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
+    setIllustrationCaption, setIllustrationScene, onRegenIllustration,
+    onSave, onCopy,
   } = props;
 
   return (
@@ -820,12 +838,41 @@ function ResultView(props: ResultViewProps) {
           {illustrationImage && (
             <>
               <img src={`data:image/png;base64,${illustrationImage}`} alt="Illustration" className="w-full rounded-xl" />
-              {illustrationCaption && (
-                <p className="text-sm text-center italic text-gray-700">{illustrationCaption}</p>
-              )}
-              {illustrationScene && (
-                <p className="text-[10px] text-gray-400 text-center">Scene: {illustrationScene}</p>
-              )}
+
+              {/* Editable caption */}
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Caption</p>
+                <textarea
+                  rows={2}
+                  value={illustrationCaption}
+                  onChange={(e) => setIllustrationCaption(e.target.value)}
+                  placeholder="Add a caption…"
+                  className="w-full text-sm italic text-gray-700 text-center bg-transparent border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+
+              {/* Editable scene prompt */}
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Scene prompt — edit and regenerate</p>
+                <textarea
+                  rows={3}
+                  value={illustrationScene}
+                  onChange={(e) => setIllustrationScene(e.target.value)}
+                  placeholder="Describe the scene…"
+                  className="w-full text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full"
+                  disabled={isLoadingIllustration || !illustrationScene.trim()}
+                  onClick={() => onRegenIllustration(illustrationScene)}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  Regenerate with this scene
+                </Button>
+              </div>
+
               <Button variant="outline" onClick={() => downloadIllustrationCard(illustrationImage, illustrationCaption)}>
                 Download illustration
               </Button>
