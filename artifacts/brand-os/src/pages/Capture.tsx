@@ -183,24 +183,26 @@ export default function Capture() {
   }, [existingDraft, initialized]);
 
   // ── Generate (initial Make-it / Try a different angle) ─────────────────
-  const runGenerate = (overrides?: { extraInstruction?: string }) => {
+  const runGenerate = (overrides?: { extraInstruction?: string; feeling?: string; audience?: string }) => {
     if (!rawInput.trim()) {
       toast({ title: "Add an idea first", description: "Tell us what you want to say.", variant: "destructive" });
       return;
     }
+    const effectiveAudience = overrides?.audience ?? audience;
+    const effectiveFeeling = overrides?.feeling ?? feeling;
     generateContent(
       {
         data: {
           rawInput,
-          audience,
-          feeling,
+          audience: effectiveAudience,
+          feeling: effectiveFeeling,
           tieToNews,
           ...(newsUrlParam ? { newsUrl: newsUrlParam } : {}),
           ...(overrides?.extraInstruction ? { extraInstruction: overrides.extraInstruction } : {}),
           // legacy fields kept for backend safety
-          objective: objectiveFromAudience(audience),
+          objective: objectiveFromAudience(effectiveAudience),
           persona: preferences?.persona ?? "Founder",
-          tone: toneFromFeeling(feeling),
+          tone: toneFromFeeling(effectiveFeeling),
         },
       },
       {
@@ -429,6 +431,7 @@ export default function Capture() {
             onSwapHook={swapHook}
             onRefine={runRefine}
             onTryAgain={() => runGenerate({ extraInstruction: "Take a completely different angle on the same idea." })}
+            onChangeFeeling={(newFeeling) => { setFeeling(newFeeling); runGenerate({ feeling: newFeeling }); }}
             onSave={handleSave}
             onCopy={copy}
           />
@@ -576,6 +579,7 @@ interface ResultViewProps {
   onSwapHook: (hook: string) => void;
   onRefine: (instruction: string, tab?: TabType) => void;
   onTryAgain: () => void;
+  onChangeFeeling: (newFeeling: string) => void;
   onSave: () => void;
   onCopy: (text: string, label?: string) => void;
 }
@@ -587,21 +591,53 @@ function ResultView(props: ResultViewProps) {
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
     fullPost, audience, feeling, isRefining, isSaving,
-    onSwapHook, onRefine, onTryAgain, onSave, onCopy,
+    onSwapHook, onRefine, onTryAgain, onChangeFeeling, onSave, onCopy,
   } = props;
 
   return (
     <div className="space-y-4">
-      {/* Audience + feeling badge */}
-      <div className="flex items-center gap-2 text-xs text-gray-500">
+      {/* Audience badge + News pill */}
+      <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
         <span className="px-2 py-1 bg-gray-100 rounded-full">{audience}</span>
-        <span className="px-2 py-1 bg-gray-100 rounded-full">{feeling}</span>
         {content.newsAnchor && (
           <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full flex items-center gap-1">
             <Newspaper className="w-3 h-3" />News
           </span>
         )}
       </div>
+
+      {/* Feeling chips — tap to re-generate the post in a different feeling */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Feeling — tap to re-generate</p>
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          {FEELINGS.map((f) => {
+            const active = feeling === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => { if (!active && !isRefining) onChangeFeeling(f.key); }}
+                disabled={isRefining}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition",
+                  active
+                    ? "bg-violet-600 text-white border-violet-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-violet-400 disabled:opacity-50"
+                )}
+              >
+                {f.key}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* News fallback note (tieToNews ON but no fresh article matched) */}
+      {content.newsFallback && !content.newsAnchor && (
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 flex items-start gap-2">
+          <Newspaper className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" />
+          <span>{content.newsFallback}</span>
+        </div>
+      )}
 
       {/* News anchor (if tied) */}
       {content.newsAnchor && (

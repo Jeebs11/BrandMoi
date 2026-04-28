@@ -21,7 +21,7 @@ import { upsertDailyActivity } from "../lib/momentum.js";
 const router: IRouter = Router();
 
 const LEGACY_STYLE_REMAP: Record<string, string> = {
-  sketch: "loose-pencil",
+  sketch: "new-yorker",
   blueprint: "new-yorker",
   vintage: "new-yorker",
 };

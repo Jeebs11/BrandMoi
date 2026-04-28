@@ -25,7 +25,7 @@ const STYLE_WRAPPERS: Record<string, string> = {
 
 // Backwards-compatibility map for legacy persisted styles.
 const LEGACY_STYLE_REMAP: Record<string, string> = {
-  sketch: "loose-pencil",
+  sketch: "new-yorker",
   blueprint: "new-yorker",
   vintage: "new-yorker",
 };

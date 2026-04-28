@@ -16,7 +16,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const AUDIENCE_FILTERS = ["All", "Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
+const FEELING_FILTERS = ["All", "Direct", "Witty", "Vulnerable", "Story", "Contrarian"];
 const STATUSES = ["All", "draft", "ready", "published"];
+
+// Map legacy tone values onto the new Feeling chips so historical drafts
+// still get matched by the feeling filter.
+const TONE_TO_FEELING: Record<string, string> = {
+  Direct: "Direct",
+  Witty: "Witty",
+  Vulnerable: "Vulnerable",
+  Story: "Story",
+  Contrarian: "Contrarian",
+  Bold: "Direct",
+  Warm: "Vulnerable",
+  Reflective: "Vulnerable",
+  Playful: "Witty",
+  Authoritative: "Direct",
+};
 
 // Maps both legacy Objective values AND new Audience values to chip colours.
 const OBJECTIVE_COLORS: Record<string, string> = {
@@ -69,6 +85,7 @@ export default function Library() {
   const highlightId = (() => { const m = new URLSearchParams(search).get("highlight"); return m ? Number(m) : null; })();
   const highlightRef = useRef<HTMLDivElement | null>(null);
   const [audienceFilter, setAudienceFilter] = useState("All");
+  const [feelingFilter, setFeelingFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
@@ -110,6 +127,11 @@ export default function Library() {
       const sb = (d.structuredBreakdown ?? {}) as { audience?: string };
       const draftAudience = sb.audience ?? OBJECTIVE_TO_AUDIENCE[d.objective] ?? d.objective;
       if (draftAudience !== audienceFilter) return false;
+    }
+    if (feelingFilter !== "All") {
+      const sb = (d.structuredBreakdown ?? {}) as { feeling?: string };
+      const draftFeeling = sb.feeling ?? TONE_TO_FEELING[d.tone] ?? d.tone;
+      if (draftFeeling !== feelingFilter) return false;
     }
     if (statusFilter !== "All" && d.status !== statusFilter) return false;
     return true;
@@ -162,6 +184,14 @@ export default function Library() {
                   className={cn("px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border",
                     audienceFilter === a ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40")}
                 >{a}</button>
+              ))}
+            </div>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {FEELING_FILTERS.map((f) => (
+                <button key={f} onClick={() => setFeelingFilter(f)}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border",
+                    feelingFilter === f ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-500 border-gray-200 hover:border-violet-400")}
+                >{f}</button>
               ))}
             </div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
