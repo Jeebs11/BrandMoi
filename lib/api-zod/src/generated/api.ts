@@ -292,6 +292,12 @@ export const GenerateContentResponse = zod.object({
       sourceLine: zod.string().nullish(),
     })
     .nullish(),
+  newsFallback: zod
+    .string()
+    .nullish()
+    .describe(
+      'When tieToNews=true and no fresh matching article was found, a short message the UI surfaces (e.g. \"No fresh news matched today — generating evergreen.\")',
+    ),
   audience: zod.string().nullish(),
   feeling: zod.string().nullish(),
 });

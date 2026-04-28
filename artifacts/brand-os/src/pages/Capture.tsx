@@ -149,11 +149,9 @@ export default function Capture() {
   const isSaving = isCreating || isUpdating;
 
   // ── Load draft if ?draftId= ─────────────────────────────────────────────
-  const { data: existingDraft } = useGetDraft(
-    draftId!,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    { query: { queryKey: getGetDraftQueryKey(draftId!), enabled: !!draftId, staleTime: 0 } as any }
-  );
+  const { data: existingDraft } = useGetDraft(draftId ?? 0, {
+    query: { enabled: !!draftId, staleTime: 0 },
+  });
 
   useEffect(() => {
     if (existingDraft && !initialized) {
@@ -360,7 +358,7 @@ export default function Capture() {
     setIsLoadingIllustration(true);
     (async () => {
       try {
-        const concept = await illustrationConceptApi.generate(editedPost, visualStyle);
+        const concept = await illustrationConceptApi.generate(editedPost, visualStyle, audience, feeling);
         setIllustrationCaption(concept.caption);
         setIllustrationScene(concept.scenePrompt);
         const { imageBase64 } = await imageGenApi.generate(concept.scenePrompt, "illustration", visualStyle);
@@ -453,7 +451,6 @@ export default function Capture() {
     </AppShell>
   );
 
-  void navigate;
 }
 
 // ── CaptureForm ────────────────────────────────────────────────────────────

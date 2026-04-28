@@ -42,7 +42,7 @@ export const FEELING_INSTRUCTIONS: Record<string, string> = {
   "Direct": "Feeling — Direct: short sentences, no warm-up, no caveats. Say the thing on line 1. No 'I think' or 'arguably'. Land each paragraph like a verdict.",
   "Witty": "Feeling — Witty: dry, observational humour. The hook should make the reader exhale a small laugh before they realise it's also true. No exclamation marks, no setup-punchline jokes — wit comes from the angle, not the delivery.",
   "Vulnerable": "Feeling — Vulnerable: name something the author got wrong, was scared of, or kept quiet about for too long. Stay in the discomfort for at least one paragraph before any insight arrives. No false modesty, no humble-brags.",
-  "Story": "Feeling — Story: structure as a 5-beat arc — Scene → Tension → Turn (a specific pivot moment, named exactly) → Lesson (for the reader, not the author) → CTA. Each beat in its own paragraph. First person past tense for beats 1–3, second person or universal truth for beat 4. No labels in the post text.",
+  "Story": "Feeling — Story: tell it as a real story — open in a specific scene, name the moment of tension exactly, land the turn, then leave the reader with what it meant. Use first person past tense for the lived part. No bullet points, no labels in the post text. The shape can flex — what matters is that it reads like a story, not a framework.",
   "Contrarian": "Feeling — Contrarian: open by naming the conventional wisdom, then break it on line 2. The whole post must defend the counter-position with concrete evidence, not vibes. Avoid 'unpopular opinion:' — show, don't announce.",
 };
 
@@ -66,7 +66,7 @@ OUTPUT — return only valid JSON, no markdown fences, with these fields:
 }
 
 POST RULES:
-- 150–300 words.
+- Aim for ~150–300 words. Go shorter if the idea is sharper that way; go longer only if the idea genuinely needs the room.
 - First line (hook) under 140 characters — this is the mobile "see more" cutoff. The hook is the most important line you will write.
 - Short 1–2 sentence paragraphs separated by a blank line. No dense walls of text.
 - alternativeHooks: TWO swap-in opening lines that open the same post from a sharply different angle (different feeling-flavour, different image, different first move). Each under 140 characters. They must work as a drop-in replacement for the first line of "post".

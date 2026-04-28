@@ -216,6 +216,8 @@ export interface GeneratedContent {
   infographic?: InfographicData | null;
   hashtags?: string | null;
   newsAnchor?: NewsAnchor | null;
+  /** When tieToNews=true and no fresh matching article was found, a short message the UI surfaces (e.g. "No fresh news matched today — generating evergreen.") */
+  newsFallback?: string | null;
   audience?: string | null;
   feeling?: string | null;
 }

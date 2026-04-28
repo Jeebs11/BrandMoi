@@ -901,6 +901,10 @@ components:
         newsAnchor:
           $ref: "#/components/schemas/NewsAnchor"
           nullable: true
+        newsFallback:
+          type: string
+          nullable: true
+          description: When tieToNews=true and no fresh matching article was found, a short message the UI surfaces (e.g. "No fresh news matched today — generating evergreen.")
         audience:
           type: string
           nullable: true

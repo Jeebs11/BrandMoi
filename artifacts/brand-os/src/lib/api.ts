@@ -136,10 +136,10 @@ export const imageGenApi = {
 };
 
 export const illustrationConceptApi = {
-  generate: (postContent: string, style: string) =>
+  generate: (postContent: string, style: string, audience?: string, feeling?: string) =>
     apiFetch<{ scenePrompt: string; caption: string; chosenStyle: string }>("/ai/generate-illustration-concept", {
       method: "POST",
-      body: JSON.stringify({ postContent, style }),
+      body: JSON.stringify({ postContent, style, audience, feeling }),
     }),
   editScene: (currentScene: string, editRequest: string) =>
     apiFetch<{ revisedScene: string }>("/ai/edit-scene", {

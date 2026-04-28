@@ -67,19 +67,55 @@ async function getUserBrandContext(userId: number): Promise<string> {
 
 const NEW_FLOW_AUDIENCES = new Set(["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"]);
 
-async function fetchNewsAnchorForGenerate(rawInput: string, audience: string | undefined): Promise<{ context: string; anchor: { headline: string; url?: string | null; sourceLine?: string | null } | null }> {
-  if (!process.env.OPENAI_API_KEY) return { context: "", anchor: null };
+const NEWS_FALLBACK_MESSAGE = "No fresh news matched today — generating evergreen.";
+
+/**
+ * Fetch a fresh news anchor using the same Momentum brief signal — a brand-keyword
+ * search driven by the user's stored brand role + audience (the same query shape
+ * /agent/brief uses), not the raw input. This keeps the news the post is tied to
+ * consistent with the user's daily Momentum feed and prevents drifting into
+ * arbitrary topics. When no genuinely fresh article comes back, return a fallback
+ * message the UI surfaces so the user knows the post is evergreen, not stale.
+ */
+async function fetchNewsAnchorForGenerate(
+  userId: number,
+  rawInput: string,
+  audience: string | undefined,
+): Promise<{
+  context: string;
+  anchor: { headline: string; url?: string | null; sourceLine?: string | null } | null;
+  fallback: string | null;
+}> {
+  if (!process.env.OPENAI_API_KEY) {
+    return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
+  }
+
+  const [prefs] = await db
+    .select({
+      brandRole: preferencesTable.brandRole,
+      brandAudience: preferencesTable.brandAudience,
+    })
+    .from(preferencesTable)
+    .where(eq(preferencesTable.userId, userId))
+    .limit(1);
+
+  const roleContext = [prefs?.brandRole, prefs?.brandAudience].filter(Boolean).join(" working with ");
+  const audienceLine = audience ? ` The post will be aimed at ${audience}.` : "";
+  const topicHint = rawInput.trim().slice(0, 240);
+  const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${
+    roleContext || "LinkedIn professional"
+  } that connects to this idea: "${topicHint}".${audienceLine} The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
+
   try {
     const { default: OpenAI } = await import("openai");
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const audienceLine = audience ? ` relevant to a post aimed at ${audience}` : "";
-    const searchQuery = `Find the single most relevant news article published in the last 7 days about: ${rawInput}${audienceLine}. Return the exact headline, the publication name, and a 2-3 sentence summary of the key finding.`;
     const searchResp = await openai.chat.completions.create({
       model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
       messages: [{ role: "user" as const, content: searchQuery }],
-      max_tokens: 320,
+      max_tokens: 350,
     });
     const context = searchResp.choices[0]?.message?.content ?? "";
+
     let url: string | null = null;
     const annotations = (searchResp.choices[0]?.message as Record<string, unknown>)?.annotations;
     if (Array.isArray(annotations)) {
@@ -92,11 +128,21 @@ async function fetchNewsAnchorForGenerate(rawInput: string, audience: string | u
         }
       }
     }
-    const firstLine = context.split("\n").map(l => l.trim()).find(l => l.length > 10) ?? "";
-    const headline = firstLine.replace(/^["\-*\d.)\s]+/, "").slice(0, 160) || "Recent development in your field";
-    return { context, anchor: context ? { headline, url, sourceLine: "" } : null };
+
+    const trimmed = context.trim();
+    if (!trimmed || trimmed.length < 30) {
+      return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
+    }
+
+    const firstLine = trimmed.split("\n").map(l => l.trim()).find(l => l.length > 10) ?? "";
+    const headline = firstLine.replace(/^["\-*\d.)\s]+/, "").slice(0, 160);
+    if (!headline) {
+      return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
+    }
+
+    return { context: trimmed, anchor: { headline, url, sourceLine: "" }, fallback: null };
   } catch {
-    return { context: "", anchor: null };
+    return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
   }
 }
 
@@ -119,10 +165,12 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
 
   let newsContext = "";
   let newsAnchor: { headline: string; url?: string | null; sourceLine?: string | null } | null = null;
+  let newsFallback: string | null = null;
   if (tieToNews) {
-    const fetched = await fetchNewsAnchorForGenerate(rawInput, audienceLabel);
+    const fetched = await fetchNewsAnchorForGenerate(userId, rawInput, audienceLabel);
     newsContext = fetched.context;
     newsAnchor = fetched.anchor;
+    newsFallback = fetched.fallback;
   } else if (newsUrl) {
     newsContext = `News URL the author is reacting to: ${newsUrl}`;
   }
@@ -176,6 +224,9 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
 
     if (newsAnchor && !parsedJson.newsAnchor) {
       parsedJson.newsAnchor = newsAnchor;
+    }
+    if (newsFallback && !parsedJson.newsFallback) {
+      parsedJson.newsFallback = newsFallback;
     }
     if (audienceLabel && !parsedJson.audience) parsedJson.audience = audienceLabel;
     if (feelingLabel && !parsedJson.feeling) parsedJson.feeling = feelingLabel;
