@@ -204,15 +204,19 @@ function UsersTab() {
   const [requestingToken, setRequestingToken] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async (p: number, q: string, col: SortCol, ord: "asc" | "desc") => {
-    setLoading(true);
+    setLoading(true); setListError(null);
     try {
       const params = new URLSearchParams({ page: String(p), sort: col, order: ord, ...(q ? { search: q } : {}) });
       const res = await adminFetch<{ users: AdminUser[]; total: number }>(`/users?${params}`);
       setUsers(res.users);
       setTotal(res.total);
-    } catch { /* ignore */ }
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : "Failed to load users");
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -228,22 +232,27 @@ function UsersTab() {
   };
 
   const handleRequestDelete = async (id: number) => {
-    setRequestingToken(true);
+    setRequestingToken(true); setActionError(null);
     try {
       const res = await fetch(`/api/admin/users/${id}/delete-request`, {
         method: "POST", credentials: "include",
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setActionError(body.error ?? "Failed to request deletion token");
+        return;
+      }
       const data = await res.json() as { token: string };
       setDeleteToken(data.token);
       setDeleteConfirmId(id);
-    } catch { /* ignore */ }
-    finally { setRequestingToken(false); }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Network error");
+    } finally { setRequestingToken(false); }
   };
 
   const handleDelete = async (id: number) => {
     if (!deleteToken) return;
-    setDeleting(true);
+    setDeleting(true); setActionError(null);
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
         method: "DELETE", credentials: "include",
@@ -256,9 +265,13 @@ function UsersTab() {
         setDeleteConfirmId(null);
         setDeleteToken(null);
         setExpandedId(null);
+      } else {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setActionError(body.error ?? "Delete failed");
       }
-    } catch { /* ignore */ }
-    finally { setDeleting(false); }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Network error");
+    } finally { setDeleting(false); }
   };
 
   const totalPages = Math.ceil(total / 20);
@@ -284,8 +297,17 @@ function UsersTab() {
         />
       </div>
 
+      {listError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-2 rounded-xl">{listError}</div>
+      )}
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-2 rounded-xl flex items-center justify-between">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} className="ml-3 font-bold">✕</button>
+        </div>
+      )}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        {loading ? <Spinner /> : users.length === 0 ? (
+        {loading ? <Spinner /> : listError ? null : users.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-300">No users found</div>
         ) : (
           <div className="overflow-x-auto">
@@ -364,6 +386,12 @@ function UsersTab() {
                                   ["Published", u.publishedCount],
                                 ].map(([k, v]) => (
                                   <p key={String(k)}><span className="text-gray-400 text-xs">{k}: </span><span className="font-semibold text-gray-800">{v}</span></p>
+                                ))}
+                              </div>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 mt-3">Theme</p>
+                              <div className="space-y-1.5">
+                                {[["Background", u.backgroundTheme], ["Site Color", u.siteTheme]].map(([k, v]) => (
+                                  <p key={k}><span className="text-gray-400 text-xs">{k}: </span><span className="font-semibold text-gray-800">{v || "—"}</span></p>
                                 ))}
                               </div>
                             </div>
