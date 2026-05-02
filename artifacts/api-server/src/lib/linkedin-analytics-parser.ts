@@ -58,11 +58,17 @@ const SECTION_HEADERS = new Set([
 function extractDemoRows(strings: string[], sectionLabel: string): { value: string; pct: string }[] {
   const idx = strings.findIndex(s => s?.toLowerCase() === sectionLabel.toLowerCase());
   if (idx === -1) return [];
+  const labelLower = sectionLabel.toLowerCase();
   const rows: { value: string; pct: string }[] = [];
   let i = idx + 1;
   while (i < strings.length) {
     const val = strings[i];
     if (!val) { i++; continue; }
+    // LinkedIn repeats the category name on every row in some export formats — skip it
+    if (val.toLowerCase() === labelLower) { i++; continue; }
+    // Also skip generic column headers like "Category", "Value", "%"
+    if (val.toLowerCase() === "category" || val.toLowerCase() === "value" || val === "%") { i++; continue; }
+    // Stop at any OTHER section header
     if (SECTION_HEADERS.has(val.toLowerCase())) break;
     const pct = strings[i + 1] ?? "";
     const isPct = pct.includes("%") || pct === "< 1%";
@@ -74,7 +80,7 @@ function extractDemoRows(strings: string[], sectionLabel: string): { value: stri
       rows.push({ value: val, pct: "< 1%" });
       i++;
     }
-    if (rows.length >= 10) break;
+    if (rows.length >= 20) break;
   }
   return rows;
 }

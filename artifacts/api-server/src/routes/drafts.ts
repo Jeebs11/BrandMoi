@@ -292,6 +292,14 @@ router.post("/drafts/:id/performance", requireAuth, async (req, res): Promise<vo
     signal = created;
   }
 
+  // Persist LinkedIn URL to the draft itself so it surfaces in the card/list
+  if (parsed.data.linkedinUrl) {
+    await db
+      .update(draftsTable)
+      .set({ linkedinUrl: parsed.data.linkedinUrl })
+      .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+  }
+
   res.json(signal);
 });
 
