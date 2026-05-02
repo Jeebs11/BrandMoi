@@ -20,6 +20,8 @@ export const preferencesTable = pgTable("preferences", {
   brandAccentColor: text("brand_accent_color").notNull().default("#6366f1"),
   brandTextColor: text("brand_text_color").notNull().default("#ffffff"),
   backgroundTheme: text("background_theme").default("none"),
+  bgSpeed: text("bg_speed").default("normal"),
+  siteTheme: text("site_theme").default("indigo"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

@@ -621,6 +621,14 @@ components:
           type: string
           nullable: true
           description: Animated background theme key; "none" means default gray.
+        bgSpeed:
+          type: string
+          nullable: true
+          description: Animation speed; slow | normal | fast
+        siteTheme:
+          type: string
+          nullable: true
+          description: App colour theme preset; indigo | violet | sky | emerald | rose | amber
       required:
         - id
         - userId
@@ -666,6 +674,14 @@ components:
           type: string
           nullable: true
           description: Animated background theme key; "none" means default gray.
+        bgSpeed:
+          type: string
+          nullable: true
+          description: Animation speed; slow | normal | fast
+        siteTheme:
+          type: string
+          nullable: true
+          description: App colour theme preset; indigo | violet | sky | emerald | rose | amber
 
     SuggestionItem:
       type: object

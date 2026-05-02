@@ -131,9 +131,17 @@ function Router() {
  */
 function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
   const { preferences } = useAuth();
-  const prefs = preferences as (typeof preferences & { backgroundTheme?: string | null }) | undefined;
+  const prefs = preferences as (typeof preferences & {
+    backgroundTheme?: string | null;
+    bgSpeed?: string | null;
+    siteTheme?: string | null;
+  }) | undefined;
   return (
-    <BackgroundProvider initialTheme={prefs?.backgroundTheme ?? "none"}>
+    <BackgroundProvider
+      initialTheme={prefs?.backgroundTheme ?? "none"}
+      initialSpeed={prefs?.bgSpeed ?? "normal"}
+      initialSiteTheme={prefs?.siteTheme ?? "indigo"}
+    >
       {children}
     </BackgroundProvider>
   );

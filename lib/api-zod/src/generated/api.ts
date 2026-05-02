@@ -74,6 +74,16 @@ export const GetPreferencesResponse = zod.object({
     .string()
     .nullish()
     .describe('Animated background theme key; \"none\" means default gray.'),
+  bgSpeed: zod
+    .string()
+    .nullish()
+    .describe("Animation speed; slow | normal | fast"),
+  siteTheme: zod
+    .string()
+    .nullish()
+    .describe(
+      "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
+    ),
 });
 
 /**
@@ -103,6 +113,16 @@ export const UpdatePreferencesBody = zod.object({
     .string()
     .nullish()
     .describe('Animated background theme key; \"none\" means default gray.'),
+  bgSpeed: zod
+    .string()
+    .nullish()
+    .describe("Animation speed; slow | normal | fast"),
+  siteTheme: zod
+    .string()
+    .nullish()
+    .describe(
+      "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
+    ),
 });
 
 export const UpdatePreferencesResponse = zod.object({
@@ -128,6 +148,16 @@ export const UpdatePreferencesResponse = zod.object({
     .string()
     .nullish()
     .describe('Animated background theme key; \"none\" means default gray.'),
+  bgSpeed: zod
+    .string()
+    .nullish()
+    .describe("Animation speed; slow | normal | fast"),
+  siteTheme: zod
+    .string()
+    .nullish()
+    .describe(
+      "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
+    ),
 });
 
 /**

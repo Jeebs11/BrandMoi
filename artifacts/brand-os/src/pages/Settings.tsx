@@ -12,7 +12,7 @@ import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryR
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 import { BACKGROUNDS } from "@/lib/backgrounds";
-import { useBackgroundTheme } from "@/lib/background-context";
+import { useBackgroundTheme, SITE_THEMES, type BgSpeed, type SiteTheme } from "@/lib/background-context";
 
 // Audience replaces legacy Objective. Stored in preferences.objective for back-compat.
 const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
@@ -56,7 +56,7 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
   const { toast } = useToast();
-  const { activeTheme, setActiveTheme } = useBackgroundTheme();
+  const { activeTheme, setActiveTheme, speed, setSpeed, siteTheme: activeSiteTheme, setSiteTheme } = useBackgroundTheme();
 
   const [objective, setObjective] = useState(preferences?.objective ?? "Authority");
   const [persona, setPersona] = useState(preferences?.persona ?? "Founder");
@@ -66,7 +66,14 @@ export default function Settings() {
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
   const [aboutMe, setAboutMe] = useState((preferences as typeof preferences & { aboutMe?: string })?.aboutMe ?? "");
 
-  const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string; brandTextColor?: string; backgroundTheme?: string });
+  const prefs = preferences as (typeof preferences & {
+    brandBgColor?: string;
+    brandAccentColor?: string;
+    brandTextColor?: string;
+    backgroundTheme?: string;
+    bgSpeed?: string;
+    siteTheme?: string;
+  });
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
   const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
   const [brandTextColor, setBrandTextColor] = useState(prefs?.brandTextColor ?? "#ffffff");
@@ -218,6 +225,22 @@ export default function Settings() {
     updatePreferences(
       { data: { backgroundTheme: key } },
       { onError: () => toast({ title: "Could not save theme.", variant: "destructive" }) }
+    );
+  };
+
+  const handleSpeedSelect = (s: BgSpeed) => {
+    setSpeed(s);
+    updatePreferences(
+      { data: { bgSpeed: s } },
+      { onError: () => toast({ title: "Could not save speed.", variant: "destructive" }) }
+    );
+  };
+
+  const handleSiteThemeSelect = (t: SiteTheme) => {
+    setSiteTheme(t);
+    updatePreferences(
+      { data: { siteTheme: t } },
+      { onError: () => toast({ title: "Could not save colour theme.", variant: "destructive" }) }
     );
   };
 
@@ -440,9 +463,64 @@ export default function Settings() {
               <Sparkles className="w-4 h-4 text-violet-400" />
               <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Appearance</h2>
             </div>
-            <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
-              Pick an animated background for the app shell. Changes apply instantly.
+            <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
+              Pick an animated background, control its speed, and set your app colour theme. All changes apply instantly.
             </p>
+
+            {/* App colour theme */}
+            <div className="mb-5">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2.5">App Colour Theme</p>
+              <div className="flex gap-2.5 flex-wrap">
+                {(Object.entries(SITE_THEMES) as [SiteTheme, typeof SITE_THEMES[SiteTheme]][]).map(([key, t]) => {
+                  const isActive = activeSiteTheme === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      title={t.label}
+                      onClick={() => handleSiteThemeSelect(key)}
+                      className={cn(
+                        "w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center",
+                        isActive ? "border-gray-700 ring-2 ring-offset-1 ring-gray-400 scale-110" : "border-transparent hover:scale-105"
+                      )}
+                      style={{ background: t.hex }}
+                    >
+                      {isActive && (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke={t.foreground === "0 0% 100%" ? "white" : "#111"} strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">
+                {SITE_THEMES[activeSiteTheme]?.label ?? "Indigo"} — changes buttons, links and highlights across the app.
+              </p>
+            </div>
+
+            {/* Animation speed */}
+            <div className="mb-5">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2.5">Animation Speed</p>
+              <div className="flex gap-2">
+                {(["slow", "normal", "fast"] as BgSpeed[]).map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleSpeedSelect(s)}
+                    className={cn(
+                      "flex-1 py-1.5 rounded-xl text-[11px] font-bold border transition-all capitalize",
+                      speed === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                    )}
+                  >
+                    {s === "slow" ? "🐢 Slow" : s === "normal" ? "⚡ Normal" : "🔥 Fast"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* None — always first */}
             <div className="mb-4">
               <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2">Default</p>

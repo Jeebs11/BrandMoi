@@ -48,6 +48,10 @@ export interface PreferencesResponse {
   brandTextColor?: string | null;
   /** Animated background theme key; "none" means default gray. */
   backgroundTheme?: string | null;
+  /** Animation speed; slow | normal | fast */
+  bgSpeed?: string | null;
+  /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
+  siteTheme?: string | null;
 }
 
 export interface UpdatePreferencesBody {
@@ -68,6 +72,10 @@ export interface UpdatePreferencesBody {
   brandTextColor?: string | null;
   /** Animated background theme key; "none" means default gray. */
   backgroundTheme?: string | null;
+  /** Animation speed; slow | normal | fast */
+  bgSpeed?: string | null;
+  /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
+  siteTheme?: string | null;
 }
 
 export interface SuggestionItem {
