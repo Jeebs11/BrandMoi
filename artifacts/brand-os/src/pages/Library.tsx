@@ -431,12 +431,23 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
   const [reposts, setReposts] = useState(modal.existing?.reposts ?? 0);
   const [saves, setSaves] = useState(modal.existing?.saves ?? 0);
   const [linkedinUrl, setLinkedinUrl] = useState(modal.existing?.linkedinUrl ?? "");
+  const [parsedLinkedinUrl, setParsedLinkedinUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploadState, setUploadState] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSummary, setUploadSummary] = useState<{ impressions: number; reactions: number; saves: number; membersReached: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const normalizeUrl = (u: string) => u.trim().replace(/\/$/, "").toLowerCase();
+  const urlMatchStatus: "match" | "mismatch" | "parsed-only" | "typed-only" | null = (() => {
+    const typed = linkedinUrl.trim();
+    const parsed = parsedLinkedinUrl;
+    if (!typed && !parsed) return null;
+    if (typed && !parsed) return "typed-only";
+    if (!typed && parsed) return "parsed-only";
+    return normalizeUrl(typed) === normalizeUrl(parsed!) ? "match" : "mismatch";
+  })();
 
   const resonanceScore = (() => {
     const reach = (modal.existing?.membersReached ?? 0) > 0 ? (modal.existing?.membersReached ?? 0) : impressions;
@@ -461,7 +472,11 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
       setComments(signal.comments);
       setReposts(signal.reposts);
       setSaves(signal.saves);
-      if (signal.linkedinUrl) setLinkedinUrl(signal.linkedinUrl);
+      // Store parsed URL separately for match-check; only auto-fill if user left it blank
+      if (signal.linkedinUrl) {
+        setParsedLinkedinUrl(signal.linkedinUrl);
+        if (!linkedinUrl.trim()) setLinkedinUrl(signal.linkedinUrl);
+      }
       void parsed;
       setUploadState("success");
       onSuccess();
@@ -524,6 +539,28 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
             <p className="text-xs text-gray-500 mb-3 leading-relaxed">
               Export your post's analytics from LinkedIn (Content → Post → Export) and upload the <strong>.xlsx</strong> file. The AI will learn what content works best for your audience.
             </p>
+
+            {/* URL input — always visible so user can paste before or after upload */}
+            <div className="mb-3">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">LinkedIn post URL</p>
+              <input
+                type="url"
+                placeholder="https://www.linkedin.com/posts/..."
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors placeholder:font-normal placeholder:text-gray-300"
+              />
+              {/* URL match indicator — shown after a file is uploaded */}
+              {parsedLinkedinUrl && (
+                <div className={cn("flex items-center gap-1.5 mt-1.5 text-xs font-semibold",
+                  urlMatchStatus === "match" ? "text-emerald-600" : urlMatchStatus === "mismatch" ? "text-amber-600" : "text-gray-400"
+                )}>
+                  {urlMatchStatus === "match" && <><span>✓</span> URL matches the file</>}
+                  {urlMatchStatus === "mismatch" && <><span>⚠</span> URL in file differs — check you chose the right post</>}
+                  {urlMatchStatus === "parsed-only" && <><span>→</span> URL auto-filled from file</>}
+                </div>
+              )}
+            </div>
 
             {uploadState === "success" && uploadSummary ? (
               <div className="p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
