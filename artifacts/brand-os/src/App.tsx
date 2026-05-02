@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { BackgroundProvider } from "@/lib/background-context";
+import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Onboarding from "@/pages/Onboarding";
@@ -79,6 +80,35 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RootRoute() {
+  const { user, preferences, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && user && preferences && !preferences.onboarded) {
+      navigate("/onboarding");
+    }
+  }, [user, preferences, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F7F8FA] flex justify-center">
+        <div className="w-full max-w-[430px] md:max-w-[700px] bg-gray-50 min-h-screen animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!user) return <Landing />;
+
+  if (preferences && !preferences.onboarded) return null;
+
+  return (
+    <AuthGuard>
+      <Dashboard />
+    </AuthGuard>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -115,9 +145,7 @@ function Router() {
         </AuthGuard>
       </Route>
       <Route path="/">
-        <AuthGuard>
-          <Dashboard />
-        </AuthGuard>
+        <RootRoute />
       </Route>
       <Route component={NotFound} />
     </Switch>

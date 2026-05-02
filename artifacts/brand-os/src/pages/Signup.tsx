@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useRegister } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,10 @@ import { AppShell } from "@/components/AppShell";
 export default function Signup() {
   const [, navigate] = useLocation();
   const { invalidate } = useAuth();
+  const search = useSearch();
+  const prefillEmail = new URLSearchParams(search).get("email") ?? "";
   const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
