@@ -96,24 +96,6 @@ export function VariantD() {
           </div>
         </section>
 
-        {/* Footer CTA */}
-        <section className="bg-[#6056FA] py-32 px-6 text-center scroll-reveal opacity-0-init">
-          <div className="max-w-3xl mx-auto text-white">
-            <h2 className="text-4xl md:text-6xl font-bold mb-8">Ready to find your voice?</h2>
-            <p className="text-xl text-white/80 mb-12 font-light">Join the private beta. Spots are extremely limited as we train the early models.</p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-lg mx-auto">
-              <input 
-                type="email" 
-                placeholder="your@email.com" 
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-5 py-4 text-base text-white placeholder:text-white/50 focus:outline-none focus:bg-white/20 transition-colors"
-              />
-              <button className="w-full sm:w-auto bg-white text-[#6056FA] px-8 py-4 rounded-xl font-bold text-base hover:bg-[#FAFAFA] transition-all transform hover:-translate-y-0.5">
-                Join Waitlist
-              </button>
-            </div>
-          </div>
-        </section>
       </main>
 
       <footer className="py-8 text-center text-sm text-[#A3A3A3] bg-[#FAFAFA] border-t border-[#E5E5E5]">
