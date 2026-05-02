@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2, ExternalLink, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2, ExternalLink, ChevronDown, ChevronUp, Sparkles, ImagePlus, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,8 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
   const { toast } = useToast();
-  const { activeTheme, setActiveTheme, speed, setSpeed, siteTheme: activeSiteTheme, setSiteTheme } = useBackgroundTheme();
+  const { activeTheme, setActiveTheme, speed, setSpeed, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl } = useBackgroundTheme();
+  const uploadRef = useRef<HTMLInputElement>(null);
 
   const [objective, setObjective] = useState(preferences?.objective ?? "Authority");
   const [persona, setPersona] = useState(preferences?.persona ?? "Founder");
@@ -73,6 +74,7 @@ export default function Settings() {
     backgroundTheme?: string;
     bgSpeed?: string;
     siteTheme?: string;
+    bgCustomImageUrl?: string | null;
   });
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
   const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
@@ -225,6 +227,41 @@ export default function Settings() {
     updatePreferences(
       { data: { backgroundTheme: key } },
       { onError: () => toast({ title: "Could not save theme.", variant: "destructive" }) }
+    );
+  };
+
+  const handleCustomUpload = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please choose an image file.", variant: "destructive" });
+      return;
+    }
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1200;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+      setCustomImageUrl(dataUrl);
+      setActiveTheme("custom");
+      updatePreferences(
+        { data: { bgCustomImageUrl: dataUrl, backgroundTheme: "custom" } as Parameters<typeof updatePreferences>[0]["data"] },
+        { onError: () => toast({ title: "Could not save background.", variant: "destructive" }) }
+      );
+    };
+    img.src = objectUrl;
+  };
+
+  const handleRemoveCustomBg = () => {
+    setCustomImageUrl(null);
+    setActiveTheme("none");
+    updatePreferences(
+      { data: { bgCustomImageUrl: null, backgroundTheme: "none" } as Parameters<typeof updatePreferences>[0]["data"] },
+      { onError: () => toast({ title: "Could not remove background.", variant: "destructive" }) }
     );
   };
 
@@ -521,7 +558,7 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* None — always first */}
+            {/* None + My Photo — always first */}
             <div className="mb-4">
               <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2">Default</p>
               <div className="grid grid-cols-3 gap-2.5">
@@ -530,12 +567,58 @@ export default function Settings() {
                     <span className="text-[10px] font-bold text-gray-400">None</span>
                   </div>
                 </ThumbBtn>
+
+                {/* My Photo — custom upload tile */}
+                <button
+                  type="button"
+                  onClick={() => uploadRef.current?.click()}
+                  className={cn(
+                    "relative rounded-xl overflow-hidden border-2 transition-all aspect-[8/5]",
+                    activeTheme === "custom" ? "border-primary ring-2 ring-primary/30" : "border-gray-200 hover:border-gray-300"
+                  )}
+                  title="My Photo"
+                >
+                  {customImageUrl ? (
+                    <>
+                      <img src={customImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-between">
+                        <p className="text-[9px] font-bold text-white leading-tight">My Photo</p>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); handleRemoveCustomBg(); }}
+                          className="w-4 h-4 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-red-500 transition-colors"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center gap-1">
+                      <ImagePlus className="w-4 h-4 text-gray-400" />
+                      <span className="text-[9px] font-bold text-gray-400">My Photo</span>
+                    </div>
+                  )}
+                  {activeTheme === "custom" && (
+                    <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
+                      <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
               </div>
+              <input
+                ref={uploadRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleCustomUpload(f); e.target.value = ""; }}
+              />
             </div>
 
-            {/* Grouped by category — derived dynamically so adding a theme to backgrounds.tsx is all that's needed */}
-            {Array.from(new Set(BACKGROUNDS.map(b => b.category))).map(cat => {
-              const items = BACKGROUNDS.filter(b => b.category === cat);
+            {/* Grouped by category — custom is handled above, skip it here */}
+            {Array.from(new Set(BACKGROUNDS.filter(b => b.key !== "custom").map(b => b.category))).map(cat => {
+              const items = BACKGROUNDS.filter(b => b.category === cat && b.key !== "custom");
               if (items.length === 0) return null;
               return (
                 <div key={cat} className="mb-4">
