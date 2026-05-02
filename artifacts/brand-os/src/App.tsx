@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { BackgroundProvider } from "@/lib/background-context";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Onboarding from "@/pages/Onboarding";
@@ -123,15 +124,32 @@ function Router() {
   );
 }
 
+/**
+ * Reads backgroundTheme from preferences (inside AuthProvider) and provides
+ * BackgroundContext to the entire app so any page (including Settings) can
+ * call useBackgroundTheme() without being a direct child of AppShell.
+ */
+function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
+  const { preferences } = useAuth();
+  const prefs = preferences as (typeof preferences & { backgroundTheme?: string | null }) | undefined;
+  return (
+    <BackgroundProvider initialTheme={prefs?.backgroundTheme ?? "none"}>
+      {children}
+    </BackgroundProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <ErrorBoundary>
-              <Router />
-            </ErrorBoundary>
+            <RootBackgroundProvider>
+              <ErrorBoundary>
+                <Router />
+              </ErrorBoundary>
+            </RootBackgroundProvider>
           </AuthProvider>
         </WouterRouter>
         <Toaster />

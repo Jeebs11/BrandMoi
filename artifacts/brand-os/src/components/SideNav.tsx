@@ -107,14 +107,6 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
           </div>
         )}
 
-        {user && collapsed && (
-          <div title={user.displayName || user.email} className="flex justify-center py-2">
-            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-extrabold uppercase select-none">
-              {(user.displayName || user.email).charAt(0)}
-            </div>
-          </div>
-        )}
-
         {/* Collapse toggle */}
         <button
           onClick={onToggle}

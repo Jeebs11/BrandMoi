@@ -2,9 +2,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { SideNav } from "@/components/SideNav";
-import { BackgroundProvider, useBackgroundTheme } from "@/lib/background-context";
+import { useBackgroundTheme } from "@/lib/background-context";
 import { getBackground } from "@/lib/backgrounds";
-import { useAuth } from "@/hooks/use-auth";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -15,7 +14,7 @@ interface AppShellProps {
   contentClassName?: string;
 }
 
-function AppShellInner({ children, noNav = false, auth = false, contentClassName }: AppShellProps) {
+export function AppShell({ children, noNav = false, auth = false, contentClassName }: AppShellProps) {
   const { activeTheme } = useBackgroundTheme();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -82,16 +81,5 @@ function AppShellInner({ children, noNav = false, auth = false, contentClassName
 
       {!noNav && <BottomNav />}
     </div>
-  );
-}
-
-export function AppShell(props: AppShellProps) {
-  const { preferences } = useAuth();
-  const prefs = preferences as (typeof preferences & { backgroundTheme?: string | null }) | undefined;
-
-  return (
-    <BackgroundProvider initialTheme={prefs?.backgroundTheme ?? "none"}>
-      <AppShellInner {...props} />
-    </BackgroundProvider>
   );
 }

@@ -21,6 +21,37 @@ const FEELINGS = ["Direct", "Witty", "Vulnerable", "Story", "Contrarian"];
 // Persona kept hidden — defaults to "Founder" backend-side; existing values preserved.
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
 
+function ThumbBtn({
+  bgKey, label, isActive, onSelect, children,
+}: {
+  bgKey: string;
+  label: string;
+  isActive: boolean;
+  onSelect: (key: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(bgKey)}
+      className={cn(
+        "relative rounded-xl overflow-hidden border-2 transition-all aspect-[8/5]",
+        isActive ? "border-primary ring-2 ring-primary/30" : "border-gray-200 hover:border-gray-300"
+      )}
+      title={label}
+    >
+      {children}
+      {isActive && (
+        <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
+          <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      )}
+    </button>
+  );
+}
+
 export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
@@ -412,74 +443,43 @@ export default function Settings() {
             <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
               Pick an animated background for the app shell. Changes apply instantly.
             </p>
-            <div className="grid grid-cols-3 gap-2.5">
-              {/* None option */}
-              <button
-                type="button"
-                onClick={() => handleThemeSelect("none")}
-                className={cn(
-                  "relative rounded-xl overflow-hidden border-2 transition-all aspect-[8/5]",
-                  activeTheme === "none"
-                    ? "border-primary ring-2 ring-primary/30"
-                    : "border-gray-200 hover:border-gray-300"
-                )}
-                title="None"
-              >
-                <div className="absolute inset-0 bg-[#EDEDEE] flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-gray-400">None</span>
-                </div>
-                {activeTheme === "none" && (
-                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
-                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
+            {/* None — always first */}
+            <div className="mb-4">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2">Default</p>
+              <div className="grid grid-cols-3 gap-2.5">
+                <ThumbBtn bgKey="none" label="None" isActive={activeTheme === "none"} onSelect={handleThemeSelect}>
+                  <div className="absolute inset-0 bg-[#EDEDEE] flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-gray-400">None</span>
                   </div>
-                )}
-              </button>
+                </ThumbBtn>
+              </div>
+            </div>
 
-              {BACKGROUNDS.map(bg => {
-                const BgComp = bg.component;
-                const isActive = activeTheme === bg.key;
-                return (
-                  <button
-                    key={bg.key}
-                    type="button"
-                    onClick={() => handleThemeSelect(bg.key)}
-                    className={cn(
-                      "relative rounded-xl overflow-hidden border-2 transition-all aspect-[8/5]",
-                      isActive
-                        ? "border-primary ring-2 ring-primary/30"
-                        : "border-gray-200 hover:border-gray-300"
-                    )}
-                    title={bg.label}
-                  >
-                    <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
-                      <BgComp />
-                    </div>
-                    <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/60 to-transparent">
-                      <p className="text-[9px] font-bold text-white leading-tight truncate">{bg.label}</p>
-                    </div>
-                    {isActive && (
-                      <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
-                        <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {(["Minimal", "Professional", "Technical", "Creative", "Playful"] as const).map(cat => {
-                const count = BACKGROUNDS.filter(b => b.category === cat).length;
-                return count > 0 ? (
-                  <span key={cat} className="px-2 py-0.5 rounded-full bg-gray-100 text-[10px] font-semibold text-gray-500">
-                    {cat} ({count})
-                  </span>
-                ) : null;
-              })}
-            </div>
+            {/* Grouped by category */}
+            {(["Minimal", "Professional", "Technical", "Creative", "Playful"] as const).map(cat => {
+              const items = BACKGROUNDS.filter(b => b.category === cat);
+              if (items.length === 0) return null;
+              return (
+                <div key={cat} className="mb-4">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2">{cat}</p>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {items.map(bg => {
+                      const BgComp = bg.component;
+                      return (
+                        <ThumbBtn key={bg.key} bgKey={bg.key} label={bg.label} isActive={activeTheme === bg.key} onSelect={handleThemeSelect}>
+                          <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
+                            <BgComp />
+                          </div>
+                          <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/60 to-transparent">
+                            <p className="text-[9px] font-bold text-white leading-tight truncate">{bg.label}</p>
+                          </div>
+                        </ThumbBtn>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </section>
 
           {/* LinkedIn */}
