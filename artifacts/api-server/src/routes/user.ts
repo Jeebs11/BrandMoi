@@ -32,6 +32,7 @@ const UpdatePreferencesBody = z.object({
   backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave", "stars", "shooting-stars", "custom"]).optional(),
   bgCustomImageUrl: z.string().max(1_000_000).optional().nullable(),
   bgSpeed: z.enum(["slow", "normal", "fast"]).optional(),
+  bgDensity: z.enum(["low", "normal", "high"]).optional(),
   siteTheme: z.enum(["indigo", "violet", "sky", "emerald", "rose", "amber"]).optional(),
 });
 
@@ -76,6 +77,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.backgroundTheme !== undefined) updateData.backgroundTheme = parsed.data.backgroundTheme;
   if (parsed.data.bgCustomImageUrl !== undefined) updateData.bgCustomImageUrl = parsed.data.bgCustomImageUrl;
   if (parsed.data.bgSpeed !== undefined) updateData.bgSpeed = parsed.data.bgSpeed;
+  if (parsed.data.bgDensity !== undefined) updateData.bgDensity = parsed.data.bgDensity;
   if (parsed.data.siteTheme !== undefined) updateData.siteTheme = parsed.data.siteTheme;
 
   const [prefs] = await db

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useBackgroundTheme, SPEED_MULT } from "@/lib/background-context";
+import { useBackgroundTheme, SPEED_MULT, DENSITY_MULT } from "@/lib/background-context";
 
 export interface BackgroundEntry {
   key: string;
@@ -52,7 +52,7 @@ function Aurora() {
 
 // ── Matrix (interactive: column under cursor brightens & speeds up) ───────────
 function Matrix() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
   const mouseRef = useWindowMouse(canvasRef);
@@ -66,7 +66,7 @@ function Matrix() {
     let raf: number;
     const CHARS = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF";
     let cols: number[] = [];
-    const COL_W = 14;
+    const COL_W = density === "high" ? 9 : density === "low" ? 22 : 14;
 
     const resize = () => {
       canvas.width = canvas.offsetWidth;
@@ -98,14 +98,14 @@ function Matrix() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     draw();
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
-  }, [mouseRef]);
+  }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#000" }} />;
 }
 
 // ── Neural (interactive: nodes drift toward cursor, click = burst) ─────────────
 function Neural() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
   const mouseRef = useWindowMouse(canvasRef);
@@ -123,7 +123,7 @@ function Neural() {
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      nodes = Array.from({ length: 40 }, () => ({
+      nodes = Array.from({ length: Math.round(40 * (DENSITY_MULT[density] ?? 1)) }, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         vx: (Math.random() - 0.5) * 0.4,
@@ -199,7 +199,7 @@ function Neural() {
       window.removeEventListener("resize", init);
       window.removeEventListener("click", onClick);
     };
-  }, [mouseRef]);
+  }, [mouseRef, density]);
 
   return (
     <div style={{ position:"absolute",inset:0,background:"#0d1117" }}>
@@ -210,7 +210,7 @@ function Neural() {
 
 // ── Particles (interactive: drift toward cursor, click = scatter) ──────────────
 function Particles() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
   const mouseRef = useWindowMouse(canvasRef);
@@ -228,7 +228,7 @@ function Particles() {
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      pts = Array.from({ length: 90 }, () => ({
+      pts = Array.from({ length: Math.round(90 * (DENSITY_MULT[density] ?? 1)) }, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         r: Math.random() * 2 + 0.5,
@@ -291,24 +291,27 @@ function Particles() {
       window.removeEventListener("resize", init);
       window.removeEventListener("click", onClick);
     };
-  }, [mouseRef]);
+  }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#111827" }} />;
 }
 
 // ── Grid Pulse ────────────────────────────────────────────────────────────────
 function GridPulse() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const m = SPEED_MULT[speed] ?? 1;
+  const COLS = density === "high" ? 10 : density === "low" ? 6 : 8;
+  const total = COLS * COLS;
+  const step = 100 / COLS;
   return (
     <div style={{ position:"absolute",inset:0,background:"#0f172a",overflow:"hidden" }}>
       <style>{`@keyframes gpulse { 0%,100%{opacity:0.12} 50%{opacity:0.6} }`}</style>
       <div style={{ position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(99,102,241,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.08) 1px,transparent 1px)",backgroundSize:"40px 40px" }} />
-      {Array.from({ length: 64 }, (_, i) => (
+      {Array.from({ length: total }, (_, i) => (
         <div key={i} style={{
           position:"absolute",
-          left:`${(i % 8) * 12.5 + 6}%`,
-          top:`${Math.floor(i / 8) * 12.5 + 6}%`,
+          left:`${(i % COLS) * step + step * 0.5}%`,
+          top:`${Math.floor(i / COLS) * step + step * 0.5}%`,
           width:3,height:3,borderRadius:"50%",background:"#6366f1",
           animation:`gpulse ${(2 + (i*0.11)%3)/m}s ease-in-out ${-(i*0.07)%3}s infinite`,
         }} />
@@ -319,7 +322,7 @@ function GridPulse() {
 
 // ── Constellation (interactive: cursor = bright star + connections) ────────────
 function Constellation() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
   const mouseRef = useWindowMouse(canvasRef);
@@ -337,7 +340,7 @@ function Constellation() {
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      stars = Array.from({ length: 140 }, () => ({
+      stars = Array.from({ length: Math.round(140 * (DENSITY_MULT[density] ?? 1)) }, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         r: Math.random() * 1.5 + 0.4,
@@ -393,7 +396,7 @@ function Constellation() {
     };
     draw();
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
-  }, [mouseRef]);
+  }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#060b18" }} />;
 }
@@ -491,7 +494,7 @@ function Wave() {
 
 // ── Stars (interactive: mouse parallax across 3 depth layers) ─────────────────
 function Stars() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
   const mouseRef = useWindowMouse(canvasRef);
@@ -509,7 +512,7 @@ function Stars() {
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      stars = Array.from({ length: 280 }, () => {
+      stars = Array.from({ length: Math.round(280 * (DENSITY_MULT[density] ?? 1)) }, () => {
         const layer = Math.floor(Math.random() * 3);
         return {
           x: Math.random() * canvas.width,
@@ -556,7 +559,7 @@ function Stars() {
     };
     draw();
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
-  }, [mouseRef]);
+  }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#040812" }} />;
 }
@@ -578,7 +581,7 @@ function CustomBg() {
 
 // ── Shooting Stars (night sky + streaking comets + mouse parallax) ─────────────
 function ShootingStars() {
-  const { speed } = useBackgroundTheme();
+  const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
   const mouseRef = useWindowMouse(canvasRef);
@@ -599,7 +602,7 @@ function ShootingStars() {
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      stars = Array.from({ length: 210 }, () => ({
+      stars = Array.from({ length: Math.round(210 * (DENSITY_MULT[density] ?? 1)) }, () => ({
         x: Math.random() * canvas.width, y: Math.random() * canvas.height,
         r: Math.random() * 1.1 + 0.3,
         alpha: Math.random() * 0.65 + 0.2,
@@ -636,7 +639,7 @@ function ShootingStars() {
       if (nextComet <= 0) {
         spawnComet();
         if (Math.random() < 0.25) { setTimeout(spawnComet, 300); }
-        nextComet = Math.floor((200 + Math.random()*220) / Math.max(0.5, sp));
+        nextComet = Math.floor((200 + Math.random()*220) / Math.max(0.5, sp) / (DENSITY_MULT[density] ?? 1));
       }
 
       // Stars with parallax
@@ -678,7 +681,7 @@ function ShootingStars() {
     };
     draw();
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
-  }, [mouseRef]);
+  }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030614" }} />;
 }

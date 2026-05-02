@@ -12,7 +12,7 @@ import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryR
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 import { BACKGROUNDS } from "@/lib/backgrounds";
-import { useBackgroundTheme, SITE_THEMES, type BgSpeed, type SiteTheme } from "@/lib/background-context";
+import { useBackgroundTheme, SITE_THEMES, type BgSpeed, type BgDensity, type SiteTheme } from "@/lib/background-context";
 
 // Audience replaces legacy Objective. Stored in preferences.objective for back-compat.
 const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
@@ -56,7 +56,7 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
   const { toast } = useToast();
-  const { activeTheme, setActiveTheme, speed, setSpeed, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl } = useBackgroundTheme();
+  const { activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl } = useBackgroundTheme();
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const [objective, setObjective] = useState(preferences?.objective ?? "Authority");
@@ -73,6 +73,7 @@ export default function Settings() {
     brandTextColor?: string;
     backgroundTheme?: string;
     bgSpeed?: string;
+    bgDensity?: string;
     siteTheme?: string;
     bgCustomImageUrl?: string | null;
   });
@@ -270,6 +271,14 @@ export default function Settings() {
     updatePreferences(
       { data: { bgSpeed: s } },
       { onError: () => toast({ title: "Could not save speed.", variant: "destructive" }) }
+    );
+  };
+
+  const handleDensitySelect = (d: BgDensity) => {
+    setDensity(d);
+    updatePreferences(
+      { data: { bgDensity: d } },
+      { onError: () => toast({ title: "Could not save detail level.", variant: "destructive" }) }
     );
   };
 
@@ -556,6 +565,29 @@ export default function Settings() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Detail level / density */}
+            <div className="mb-5">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2.5">Detail Level</p>
+              <div className="flex gap-2">
+                {(["low", "normal", "high"] as BgDensity[]).map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handleDensitySelect(d)}
+                    className={cn(
+                      "flex-1 py-1.5 rounded-xl text-[11px] font-bold border transition-all",
+                      density === d
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                    )}
+                  >
+                    {d === "low" ? "✦ Sparse" : d === "normal" ? "— Normal" : "✦✦✦ Dense"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">Scales stars, particles and node counts.</p>
             </div>
 
             {/* None + My Photo — always first */}

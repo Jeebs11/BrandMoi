@@ -1,12 +1,19 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 export type BgSpeed = "slow" | "normal" | "fast";
+export type BgDensity = "low" | "normal" | "high";
 export type SiteTheme = "indigo" | "violet" | "sky" | "emerald" | "rose" | "amber";
 
 export const SPEED_MULT: Record<BgSpeed, number> = {
   slow: 0.35,
   normal: 1.0,
   fast: 2.8,
+};
+
+export const DENSITY_MULT: Record<BgDensity, number> = {
+  low: 0.45,
+  normal: 1.0,
+  high: 1.8,
 };
 
 export const SITE_THEMES: Record<SiteTheme, { label: string; primary: string; foreground: string; hex: string }> = {
@@ -23,6 +30,8 @@ interface BackgroundContextType {
   setActiveTheme: (key: string) => void;
   speed: BgSpeed;
   setSpeed: (s: BgSpeed) => void;
+  density: BgDensity;
+  setDensity: (d: BgDensity) => void;
   siteTheme: SiteTheme;
   setSiteTheme: (t: SiteTheme) => void;
   customImageUrl: string | null;
@@ -34,6 +43,8 @@ const BackgroundContext = createContext<BackgroundContextType>({
   setActiveTheme: () => {},
   speed: "normal",
   setSpeed: () => {},
+  density: "normal",
+  setDensity: () => {},
   siteTheme: "indigo",
   setSiteTheme: () => {},
   customImageUrl: null,
@@ -44,17 +55,20 @@ export function BackgroundProvider({
   children,
   initialTheme,
   initialSpeed,
+  initialDensity,
   initialSiteTheme,
   initialCustomImageUrl,
 }: {
   children: ReactNode;
   initialTheme?: string | null;
   initialSpeed?: string | null;
+  initialDensity?: string | null;
   initialSiteTheme?: string | null;
   initialCustomImageUrl?: string | null;
 }) {
   const [activeTheme, setActiveTheme] = useState(initialTheme ?? "none");
   const [speed, setSpeed] = useState<BgSpeed>((initialSpeed as BgSpeed) ?? "normal");
+  const [density, setDensity] = useState<BgDensity>((initialDensity as BgDensity) ?? "normal");
   const [siteTheme, setSiteTheme] = useState<SiteTheme>((initialSiteTheme as SiteTheme) ?? "indigo");
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(initialCustomImageUrl ?? null);
 
@@ -67,6 +81,11 @@ export function BackgroundProvider({
     if (initialSpeed && initialSpeed !== speed) setSpeed(initialSpeed as BgSpeed);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSpeed]);
+
+  useEffect(() => {
+    if (initialDensity && initialDensity !== density) setDensity(initialDensity as BgDensity);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDensity]);
 
   useEffect(() => {
     if (initialSiteTheme && initialSiteTheme !== siteTheme) setSiteTheme(initialSiteTheme as SiteTheme);
@@ -91,7 +110,7 @@ export function BackgroundProvider({
   }, [siteTheme]);
 
   return (
-    <BackgroundContext.Provider value={{ activeTheme, setActiveTheme, speed, setSpeed, siteTheme, setSiteTheme, customImageUrl, setCustomImageUrl }}>
+    <BackgroundContext.Provider value={{ activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, siteTheme, setSiteTheme, customImageUrl, setCustomImageUrl }}>
       {children}
     </BackgroundContext.Provider>
   );

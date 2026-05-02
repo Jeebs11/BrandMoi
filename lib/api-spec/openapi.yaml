@@ -181,7 +181,7 @@ paths:
     post:
       operationId: generateContent
       tags: [ai]
-      summary: Generate LinkedIn content from confirmed structure
+      summary: Generate LinkedIn content from raw idea with audience and feeling
       requestBody:
         required: true
         content:

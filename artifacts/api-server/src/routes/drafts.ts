@@ -51,29 +51,35 @@ function deriveFeeling(tone: unknown, storyMode: unknown): string | undefined {
 }
 
 function normalizeDraft<T extends { structuredBreakdown: unknown; objective?: unknown; tone?: unknown; visualStyle?: unknown }>(draft: T): T {
-  if (draft.structuredBreakdown && typeof draft.structuredBreakdown === "object") {
-    const sb = draft.structuredBreakdown as Record<string, unknown>;
-    if (Array.isArray(sb.hooks)) {
-      sb.hooks = sb.hooks.map((h: unknown) =>
-        typeof h === "string" ? { text: h } : h
-      );
-    }
-    if (Array.isArray(sb.narrativeFlow)) {
-      sb.narrativeFlow = sb.narrativeFlow.map((n: unknown) =>
-        typeof n === "string" ? n : String(n)
-      );
-    }
-    // Derive audience/feeling from top-level draft.objective/tone (legacy fields)
-    // when the new structuredBreakdown.audience/feeling fields are missing.
-    if (typeof sb.audience !== "string" || !sb.audience) {
-      const derived = deriveAudience(draft.objective);
-      if (derived) sb.audience = derived;
-    }
-    if (typeof sb.feeling !== "string" || !sb.feeling) {
-      const derived = deriveFeeling(draft.tone, sb.storyMode);
-      if (derived) sb.feeling = derived;
-    }
+  // Always ensure structuredBreakdown is a plain object so audience/feeling
+  // derivation runs even for legacy drafts with a null breakdown.
+  if (!draft.structuredBreakdown || typeof draft.structuredBreakdown !== "object" || Array.isArray(draft.structuredBreakdown)) {
+    (draft as { structuredBreakdown: unknown }).structuredBreakdown = {};
   }
+  const sb = draft.structuredBreakdown as Record<string, unknown>;
+
+  if (Array.isArray(sb.hooks)) {
+    sb.hooks = sb.hooks.map((h: unknown) =>
+      typeof h === "string" ? { text: h } : h
+    );
+  }
+  if (Array.isArray(sb.narrativeFlow)) {
+    sb.narrativeFlow = sb.narrativeFlow.map((n: unknown) =>
+      typeof n === "string" ? n : String(n)
+    );
+  }
+
+  // Derive audience/feeling from top-level draft.objective/tone (legacy fields)
+  // when the new structuredBreakdown.audience/feeling fields are missing.
+  if (typeof sb.audience !== "string" || !sb.audience) {
+    const derived = deriveAudience(draft.objective);
+    if (derived) sb.audience = derived;
+  }
+  if (typeof sb.feeling !== "string" || !sb.feeling) {
+    const derived = deriveFeeling(draft.tone, sb.storyMode);
+    if (derived) sb.feeling = derived;
+  }
+
   if (typeof draft.visualStyle === "string" && LEGACY_STYLE_REMAP[draft.visualStyle]) {
     (draft as { visualStyle?: string }).visualStyle = LEGACY_STYLE_REMAP[draft.visualStyle];
   }

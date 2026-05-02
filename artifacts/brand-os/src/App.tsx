@@ -134,6 +134,7 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
   const prefs = preferences as (typeof preferences & {
     backgroundTheme?: string | null;
     bgSpeed?: string | null;
+    bgDensity?: string | null;
     siteTheme?: string | null;
     bgCustomImageUrl?: string | null;
   }) | undefined;
@@ -141,6 +142,7 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
     <BackgroundProvider
       initialTheme={prefs?.backgroundTheme ?? "none"}
       initialSpeed={prefs?.bgSpeed ?? "normal"}
+      initialDensity={prefs?.bgDensity ?? "normal"}
       initialSiteTheme={prefs?.siteTheme ?? "indigo"}
       initialCustomImageUrl={prefs?.bgCustomImageUrl ?? null}
     >
