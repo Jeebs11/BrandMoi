@@ -27,7 +27,7 @@ type AdminUser = {
   brandRole: string | null; brandAudience: string | null; brandBelief: string | null;
   backgroundTheme: string | null; siteTheme: string | null;
 };
-type FunnelData = { totalSignups: number; completedOnboarding: number; createdDraft: number; publishedDraft: number };
+type FunnelData = { totalSignups: number; completedOnboarding: number; createdDraft: number; publishedDraft: number; totalDraftsCreated: number; totalDraftsPublished: number };
 type RetentionData = { d1: number | null; d7: number | null; d30: number | null; d1Eligible: number; d7Eligible: number; d30Eligible: number };
 type Insights = {
   tones: { tone: string; count: number }[];
@@ -183,6 +183,7 @@ function GrowthTab() {
         <MiniBar data={data.signupsByDay} color="#0F1F3D" label="New Signups — Last 30 Days" />
         <MiniLine data={data.dauByDay} color="#0A66C2" label="Daily Active Users — Last 30 Days" />
       </div>
+      <MiniLine data={data.demoLoginsByDay} color="#8B5CF6" label="Demo Visitor Logins — Last 30 Days" />
     </div>
   );
 }
@@ -459,6 +460,33 @@ function FunnelTab() {
                 <span className="text-sm font-semibold text-gray-700">{step.label}</span>
                 <div className="flex items-center gap-3">
                   {drop !== null && drop > 0 && <span className="text-[11px] text-red-400">−{drop}% drop</span>}
+                  <span className="text-sm font-black text-[#0F1F3D]">{step.count.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-3">
+                <div className="h-3 rounded-full transition-all" style={{ width: `${pct}%`, background: step.color }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-wider mt-2">Draft Funnel</h2>
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+        {[
+          { label: "Total Drafts Created", count: funnel.totalDraftsCreated, color: "#8B5CF6" },
+          { label: "Total Drafts Published", count: funnel.totalDraftsPublished, color: "#10B981" },
+        ].map((step, i, arr) => {
+          const prev = arr[i - 1];
+          const base = arr[0]?.count || 1;
+          const pct = Math.round((step.count / base) * 100);
+          const drop = prev && prev.count > 0 ? Math.round(((prev.count - step.count) / prev.count) * 100) : null;
+          return (
+            <div key={step.label}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-sm font-semibold text-gray-700">{step.label}</span>
+                <div className="flex items-center gap-3">
+                  {drop !== null && drop > 0 && <span className="text-[11px] text-red-400">−{drop}% unpublished</span>}
                   <span className="text-sm font-black text-[#0F1F3D]">{step.count.toLocaleString()}</span>
                 </div>
               </div>

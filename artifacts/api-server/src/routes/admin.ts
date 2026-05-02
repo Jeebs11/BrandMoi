@@ -284,32 +284,46 @@ router.get("/admin/funnel", async (_req, res): Promise<void> => {
         (SELECT COUNT(*)::int FROM real_users) AS "totalSignups",
         (SELECT COUNT(*)::int FROM onboarded) AS "completedOnboarding",
         (SELECT COUNT(*)::int FROM has_draft) AS "createdDraft",
-        (SELECT COUNT(*)::int FROM has_published) AS "publishedDraft"
+        (SELECT COUNT(*)::int FROM has_published) AS "publishedDraft",
+        (SELECT COUNT(*)::int FROM drafts d INNER JOIN real_users ru ON ru.id = d.user_id) AS "totalDraftsCreated",
+        (SELECT COUNT(*)::int FROM drafts d INNER JOIN real_users ru ON ru.id = d.user_id WHERE d.status = 'published') AS "totalDraftsPublished"
     `, [DEMO_EMAIL, ADMIN_EMAIL])).rows[0];
 
     const retention = (await pool.query(`
       WITH real_users AS (SELECT id, created_at FROM users WHERE email NOT IN ($1, $2)),
-      d1_eligible AS (SELECT id, created_at FROM real_users WHERE created_at <= NOW() - INTERVAL '2 days'),
-      d7_eligible AS (SELECT id, created_at FROM real_users WHERE created_at <= NOW() - INTERVAL '8 days'),
-      d30_eligible AS (SELECT id, created_at FROM real_users WHERE created_at <= NOW() - INTERVAL '31 days'),
+      d1_cohort AS (
+        SELECT id, created_at FROM real_users
+        WHERE created_at >= NOW() - INTERVAL '2 days' AND created_at < NOW() - INTERVAL '1 day'
+      ),
+      d7_cohort AS (
+        SELECT id, created_at FROM real_users
+        WHERE created_at >= NOW() - INTERVAL '8 days' AND created_at < NOW() - INTERVAL '7 days'
+      ),
+      d30_cohort AS (
+        SELECT id, created_at FROM real_users
+        WHERE created_at >= NOW() - INTERVAL '31 days' AND created_at < NOW() - INTERVAL '30 days'
+      ),
       d1_ret AS (
-        SELECT DISTINCT le.user_id FROM login_events le INNER JOIN d1_eligible u ON u.id = le.user_id
+        SELECT DISTINCT le.user_id FROM login_events le
+        INNER JOIN d1_cohort u ON u.id = le.user_id
         WHERE le.created_at >= u.created_at + INTERVAL '1 day' AND le.created_at < u.created_at + INTERVAL '2 days'
       ),
       d7_ret AS (
-        SELECT DISTINCT le.user_id FROM login_events le INNER JOIN d7_eligible u ON u.id = le.user_id
+        SELECT DISTINCT le.user_id FROM login_events le
+        INNER JOIN d7_cohort u ON u.id = le.user_id
         WHERE le.created_at >= u.created_at + INTERVAL '7 days' AND le.created_at < u.created_at + INTERVAL '8 days'
       ),
       d30_ret AS (
-        SELECT DISTINCT le.user_id FROM login_events le INNER JOIN d30_eligible u ON u.id = le.user_id
+        SELECT DISTINCT le.user_id FROM login_events le
+        INNER JOIN d30_cohort u ON u.id = le.user_id
         WHERE le.created_at >= u.created_at + INTERVAL '30 days' AND le.created_at < u.created_at + INTERVAL '31 days'
       )
       SELECT
-        (SELECT COUNT(*)::int FROM d1_eligible) AS "d1Eligible",
+        (SELECT COUNT(*)::int FROM d1_cohort) AS "d1Eligible",
         (SELECT COUNT(*)::int FROM d1_ret) AS "d1Returned",
-        (SELECT COUNT(*)::int FROM d7_eligible) AS "d7Eligible",
+        (SELECT COUNT(*)::int FROM d7_cohort) AS "d7Eligible",
         (SELECT COUNT(*)::int FROM d7_ret) AS "d7Returned",
-        (SELECT COUNT(*)::int FROM d30_eligible) AS "d30Eligible",
+        (SELECT COUNT(*)::int FROM d30_cohort) AS "d30Eligible",
         (SELECT COUNT(*)::int FROM d30_ret) AS "d30Returned"
     `, [DEMO_EMAIL, ADMIN_EMAIL])).rows[0];
 
