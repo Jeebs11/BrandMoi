@@ -2,7 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { SideNav } from "@/components/SideNav";
-import { useBackgroundTheme } from "@/lib/background-context";
+import { useBackgroundTheme, PANEL_OPACITY_ALPHA } from "@/lib/background-context";
 import { getBackground } from "@/lib/backgrounds";
 
 interface AppShellProps {
@@ -15,7 +15,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, noNav = false, auth = false, contentClassName }: AppShellProps) {
-  const { activeTheme } = useBackgroundTheme();
+  const { activeTheme, panelOpacity } = useBackgroundTheme();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem("sidenav-collapsed") === "true"; } catch { return false; }
@@ -44,6 +44,18 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
   const marginClass = !noNav
     ? (sidebarCollapsed ? "md:ml-[56px]" : "md:ml-[220px]")
     : "";
+
+  // When an animated background is active, apply the user-chosen translucency
+  // to the content panel. Gray-50 is rgb(249,250,251).
+  const alpha = BgComponent ? (PANEL_OPACITY_ALPHA[panelOpacity] ?? 1) : 1;
+  const panelStyle = alpha < 1
+    ? {
+        backgroundColor: `rgba(249,250,251,${alpha})`,
+        borderColor: `rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
+        backdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(2px)",
+      } as React.CSSProperties
+    : undefined;
 
   return (
     <div className="min-h-screen bg-[#EDEDEE] relative">
@@ -74,6 +86,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
             !noNav && "pb-20 md:pb-8 md:max-w-[700px] md:shadow-xl",
             contentClassName
           )}
+          style={panelStyle}
         >
           {children}
         </div>

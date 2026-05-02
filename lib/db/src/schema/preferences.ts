@@ -23,6 +23,7 @@ export const preferencesTable = pgTable("preferences", {
   bgCustomImageUrl: text("bg_custom_image_url"),
   bgSpeed: text("bg_speed").default("normal"),
   bgDensity: text("bg_density").default("normal"),
+  bgPanelOpacity: text("bg_panel_opacity").default("solid"),
   siteTheme: text("site_theme").default("indigo"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

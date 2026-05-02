@@ -33,6 +33,7 @@ const UpdatePreferencesBody = z.object({
   bgCustomImageUrl: z.string().max(1_000_000).optional().nullable(),
   bgSpeed: z.enum(["slow", "normal", "fast"]).optional(),
   bgDensity: z.enum(["low", "normal", "high"]).optional(),
+  bgPanelOpacity: z.enum(["solid", "frosted", "semi", "glass"]).optional(),
   siteTheme: z.enum(["indigo", "violet", "sky", "emerald", "rose", "amber"]).optional(),
 });
 
@@ -78,6 +79,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.bgCustomImageUrl !== undefined) updateData.bgCustomImageUrl = parsed.data.bgCustomImageUrl;
   if (parsed.data.bgSpeed !== undefined) updateData.bgSpeed = parsed.data.bgSpeed;
   if (parsed.data.bgDensity !== undefined) updateData.bgDensity = parsed.data.bgDensity;
+  if (parsed.data.bgPanelOpacity !== undefined) updateData.bgPanelOpacity = parsed.data.bgPanelOpacity;
   if (parsed.data.siteTheme !== undefined) updateData.siteTheme = parsed.data.siteTheme;
 
   const [prefs] = await db

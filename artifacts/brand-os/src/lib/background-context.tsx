@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 
 export type BgSpeed = "slow" | "normal" | "fast";
 export type BgDensity = "low" | "normal" | "high";
+export type BgPanelOpacity = "solid" | "frosted" | "semi" | "glass";
 export type SiteTheme = "indigo" | "violet" | "sky" | "emerald" | "rose" | "amber";
 
 export const SPEED_MULT: Record<BgSpeed, number> = {
@@ -14,6 +15,14 @@ export const DENSITY_MULT: Record<BgDensity, number> = {
   low: 0.45,
   normal: 1.0,
   high: 1.8,
+};
+
+// Alpha values for the gray-50 content panel (rgb 249,250,251)
+export const PANEL_OPACITY_ALPHA: Record<BgPanelOpacity, number> = {
+  solid:   1.0,
+  frosted: 0.88,
+  semi:    0.70,
+  glass:   0.42,
 };
 
 export const SITE_THEMES: Record<SiteTheme, { label: string; primary: string; foreground: string; hex: string }> = {
@@ -32,6 +41,8 @@ interface BackgroundContextType {
   setSpeed: (s: BgSpeed) => void;
   density: BgDensity;
   setDensity: (d: BgDensity) => void;
+  panelOpacity: BgPanelOpacity;
+  setPanelOpacity: (o: BgPanelOpacity) => void;
   siteTheme: SiteTheme;
   setSiteTheme: (t: SiteTheme) => void;
   customImageUrl: string | null;
@@ -45,6 +56,8 @@ const BackgroundContext = createContext<BackgroundContextType>({
   setSpeed: () => {},
   density: "normal",
   setDensity: () => {},
+  panelOpacity: "solid",
+  setPanelOpacity: () => {},
   siteTheme: "indigo",
   setSiteTheme: () => {},
   customImageUrl: null,
@@ -56,6 +69,7 @@ export function BackgroundProvider({
   initialTheme,
   initialSpeed,
   initialDensity,
+  initialPanelOpacity,
   initialSiteTheme,
   initialCustomImageUrl,
 }: {
@@ -63,12 +77,14 @@ export function BackgroundProvider({
   initialTheme?: string | null;
   initialSpeed?: string | null;
   initialDensity?: string | null;
+  initialPanelOpacity?: string | null;
   initialSiteTheme?: string | null;
   initialCustomImageUrl?: string | null;
 }) {
   const [activeTheme, setActiveTheme] = useState(initialTheme ?? "none");
   const [speed, setSpeed] = useState<BgSpeed>((initialSpeed as BgSpeed) ?? "normal");
   const [density, setDensity] = useState<BgDensity>((initialDensity as BgDensity) ?? "normal");
+  const [panelOpacity, setPanelOpacity] = useState<BgPanelOpacity>((initialPanelOpacity as BgPanelOpacity) ?? "solid");
   const [siteTheme, setSiteTheme] = useState<SiteTheme>((initialSiteTheme as SiteTheme) ?? "indigo");
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(initialCustomImageUrl ?? null);
 
@@ -86,6 +102,11 @@ export function BackgroundProvider({
     if (initialDensity && initialDensity !== density) setDensity(initialDensity as BgDensity);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDensity]);
+
+  useEffect(() => {
+    if (initialPanelOpacity && initialPanelOpacity !== panelOpacity) setPanelOpacity(initialPanelOpacity as BgPanelOpacity);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPanelOpacity]);
 
   useEffect(() => {
     if (initialSiteTheme && initialSiteTheme !== siteTheme) setSiteTheme(initialSiteTheme as SiteTheme);
@@ -110,7 +131,7 @@ export function BackgroundProvider({
   }, [siteTheme]);
 
   return (
-    <BackgroundContext.Provider value={{ activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, siteTheme, setSiteTheme, customImageUrl, setCustomImageUrl }}>
+    <BackgroundContext.Provider value={{ activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, panelOpacity, setPanelOpacity, siteTheme, setSiteTheme, customImageUrl, setCustomImageUrl }}>
       {children}
     </BackgroundContext.Provider>
   );

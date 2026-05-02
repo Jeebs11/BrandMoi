@@ -135,6 +135,7 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
     backgroundTheme?: string | null;
     bgSpeed?: string | null;
     bgDensity?: string | null;
+    bgPanelOpacity?: string | null;
     siteTheme?: string | null;
     bgCustomImageUrl?: string | null;
   }) | undefined;
@@ -143,6 +144,7 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
       initialTheme={prefs?.backgroundTheme ?? "none"}
       initialSpeed={prefs?.bgSpeed ?? "normal"}
       initialDensity={prefs?.bgDensity ?? "normal"}
+      initialPanelOpacity={prefs?.bgPanelOpacity ?? "solid"}
       initialSiteTheme={prefs?.siteTheme ?? "indigo"}
       initialCustomImageUrl={prefs?.bgCustomImageUrl ?? null}
     >

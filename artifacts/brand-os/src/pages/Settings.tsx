@@ -12,7 +12,7 @@ import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryR
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 import { BACKGROUNDS } from "@/lib/backgrounds";
-import { useBackgroundTheme, SITE_THEMES, type BgSpeed, type BgDensity, type SiteTheme } from "@/lib/background-context";
+import { useBackgroundTheme, SITE_THEMES, type BgSpeed, type BgDensity, type BgPanelOpacity, type SiteTheme } from "@/lib/background-context";
 
 // Audience replaces legacy Objective. Stored in preferences.objective for back-compat.
 const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
@@ -56,7 +56,7 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
   const { toast } = useToast();
-  const { activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl } = useBackgroundTheme();
+  const { activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, panelOpacity, setPanelOpacity, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl } = useBackgroundTheme();
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const [objective, setObjective] = useState(preferences?.objective ?? "Authority");
@@ -279,6 +279,14 @@ export default function Settings() {
     updatePreferences(
       { data: { bgDensity: d } },
       { onError: () => toast({ title: "Could not save detail level.", variant: "destructive" }) }
+    );
+  };
+
+  const handlePanelOpacitySelect = (o: BgPanelOpacity) => {
+    setPanelOpacity(o);
+    updatePreferences(
+      { data: { bgPanelOpacity: o } },
+      { onError: () => toast({ title: "Could not save panel opacity.", variant: "destructive" }) }
     );
   };
 
@@ -588,6 +596,34 @@ export default function Settings() {
                 ))}
               </div>
               <p className="text-[10px] text-gray-400 mt-2">Scales stars, particles and node counts.</p>
+            </div>
+
+            {/* Panel opacity */}
+            <div className="mb-5">
+              <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2.5">Panel Opacity</p>
+              <div className="flex gap-2">
+                {([
+                  { key: "solid",   label: "■ Solid"   },
+                  { key: "frosted", label: "▨ Frosted" },
+                  { key: "semi",    label: "◫ Semi"    },
+                  { key: "glass",   label: "□ Glass"   },
+                ] as { key: BgPanelOpacity; label: string }[]).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handlePanelOpacitySelect(key)}
+                    className={cn(
+                      "flex-1 py-1.5 rounded-xl text-[11px] font-bold border transition-all",
+                      panelOpacity === key
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">How much of the animated background shows through the content panel.</p>
             </div>
 
             {/* None + My Photo — always first */}
