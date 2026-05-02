@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useSearch } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2, ExternalLink, ChevronDown, ChevronUp, Sparkles, ImagePlus, X } from "lucide-react";
+import { useLocation } from "wouter";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryResult, type LinkedinStatus } from "@/lib/api";
+import { voiceApi, accountApi, voiceInsightsApi, type VoiceSummaryResult } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 import { BACKGROUNDS } from "@/lib/backgrounds";
@@ -89,14 +89,6 @@ export default function Settings() {
   const [voiceRefreshing, setVoiceRefreshing] = useState(false);
   const [insightRefreshing, setInsightRefreshing] = useState(false);
 
-  const [linkedinStatus, setLinkedinStatus] = useState<LinkedinStatus | null>(null);
-  const [linkedinSyncing, setLinkedinSyncing] = useState(false);
-  const [linkedinDisconnecting, setLinkedinDisconnecting] = useState(false);
-  const [linkedinGuideOpen, setLinkedinGuideOpen] = useState(false);
-
-  const search = useSearch();
-  const linkedinParam = new URLSearchParams(search).get("linkedin");
-
   // Account editing
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -132,53 +124,6 @@ export default function Settings() {
       .catch(() => {})
       .finally(() => setVoiceLoading(false));
   }, []);
-
-  useEffect(() => {
-    linkedinApi.status().then(setLinkedinStatus).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (linkedinParam === "connected") {
-      toast({ title: "LinkedIn connected successfully." });
-      linkedinApi.status().then(setLinkedinStatus).catch(() => {});
-    } else if (linkedinParam === "error") {
-      toast({ title: "LinkedIn connection failed. Please try again.", variant: "destructive" });
-    }
-  }, [linkedinParam]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleLinkedinConnect = () => {
-    window.location.href = linkedinApi.authUrl();
-  };
-
-  const handleLinkedinDisconnect = async () => {
-    setLinkedinDisconnecting(true);
-    try {
-      await linkedinApi.disconnect();
-      setLinkedinStatus({ configured: true, connected: false });
-      toast({ title: "LinkedIn disconnected." });
-    } catch {
-      toast({ title: "Could not disconnect LinkedIn.", variant: "destructive" });
-    } finally {
-      setLinkedinDisconnecting(false);
-    }
-  };
-
-  const handleLinkedinSync = async () => {
-    setLinkedinSyncing(true);
-    try {
-      const result = await linkedinApi.sync();
-      const msg = result.imported > 0
-        ? `Synced ${result.imported} post${result.imported !== 1 ? "s" : ""} from LinkedIn.`
-        : "No new posts to import.";
-      toast({ title: msg });
-      linkedinApi.status().then(setLinkedinStatus).catch(() => {});
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Sync failed.";
-      toast({ title: msg, variant: "destructive" });
-    } finally {
-      setLinkedinSyncing(false);
-    }
-  };
 
   const handleSmartImport = (extracted: ExtractedBrandVoice) => {
     if (extracted.brandRole) setBrandRole(extracted.brandRole);
@@ -764,167 +709,6 @@ export default function Settings() {
                 </div>
               );
             })}
-          </section>
-
-          {/* LinkedIn */}
-          <section>
-            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">LinkedIn</h2>
-            <div className="bg-white rounded-2xl border border-gray-100 p-4">
-              {linkedinStatus === null ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Checking connection…
-                </div>
-              ) : !linkedinStatus.configured ? (
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Link2 className="w-4 h-4 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">LinkedIn not connected yet</p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                        Connecting LinkedIn lets you import your posts, track real engagement data, and get smarter AI suggestions based on what's actually working for you.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLinkedinGuideOpen(v => !v)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors"
-                  >
-                    <span>How to set this up (one-time, 5 min)</span>
-                    {linkedinGuideOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  {linkedinGuideOpen && (
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-4 text-xs text-gray-600 leading-relaxed">
-                      <div>
-                        <p className="font-semibold text-gray-800 text-sm">One-time setup — done by you as the app owner</p>
-                        <p className="text-gray-500 mt-1">Once done, all users just tap "Connect LinkedIn" — they never see any of this.</p>
-                      </div>
-                      <ol className="space-y-4 list-none">
-                        <li className="flex gap-3">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                          <span>
-                            Go to <a href="https://www.linkedin.com/developers/apps/new" target="_blank" rel="noreferrer" className="text-blue-600 font-semibold underline inline-flex items-center gap-0.5">LinkedIn Developer Portal <ExternalLink className="w-3 h-3" /></a> and create a new app. Use any name you like — "Brand OS" works.
-                          </span>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                          <div className="flex-1">
-                            <span>Inside your LinkedIn app, go to the <strong>Auth</strong> tab. Add <strong>both</strong> of these as Authorized Redirect URLs — one for testing, one for your live site:</span>
-                            <code className="mt-1.5 mb-1 flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[11px] break-all">
-                              <span className="text-gray-400 flex-shrink-0">DEV</span>
-                              <span className="select-all">{window.location.origin}/api/linkedin/callback</span>
-                            </code>
-                            <code className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[11px] break-all">
-                              <span className="text-gray-400 flex-shrink-0">LIVE</span>
-                              <span className="text-gray-400 select-all">https://your-published-app-url.replit.app/api/linkedin/callback</span>
-                            </code>
-                            <p className="mt-1.5 text-[10px] text-amber-600 font-medium">⚠ The redirect URL is shared — all users go through the same server endpoint (that's normal and secure). If you ever change your app's domain, you'll need to update this in your LinkedIn app too.</p>
-                          </div>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                          <span>
-                            On the <strong>Products</strong> tab, request access to <strong>"Share on LinkedIn"</strong> and <strong>"Sign In with LinkedIn using OpenID Connect"</strong>. LinkedIn may take a day or two to approve.
-                          </span>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
-                          <span>
-                            Back on the <strong>Auth</strong> tab, copy your <strong>Client ID</strong> and <strong>Client Secret</strong>. Keep these private — treat them like passwords.
-                          </span>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
-                          <div className="flex-1">
-                            <span>Open your <strong>Replit project</strong> in a separate tab. In the left sidebar, click the <strong>padlock icon</strong> (called Secrets). This is where your app stores private values — they're never visible to users or stored in your code.</span>
-                            <div className="mt-2 space-y-1.5">
-                              <div className="bg-white border border-gray-200 rounded-lg px-2 py-2">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Secret name</p>
-                                <code className="text-[11px] font-semibold">LINKEDIN_CLIENT_ID</code>
-                                <p className="text-[10px] text-gray-400 mt-0.5">Value: paste your Client ID here</p>
-                              </div>
-                              <div className="bg-white border border-gray-200 rounded-lg px-2 py-2">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Secret name</p>
-                                <code className="text-[11px] font-semibold">LINKEDIN_CLIENT_SECRET</code>
-                                <p className="text-[10px] text-gray-400 mt-0.5">Value: paste your Client Secret here</p>
-                              </div>
-                            </div>
-                          </div>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">6</span>
-                          <span>
-                            In Replit, restart the <strong>API Server</strong> workflow (Workflows panel → click the restart button next to it). Then refresh this page — a "Connect LinkedIn" button will appear here.
-                          </span>
-                        </li>
-                      </ol>
-                    </div>
-                  )}
-                </div>
-              ) : linkedinStatus.connected ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">Connected as {linkedinStatus.displayName}</p>
-                      {linkedinStatus.lastSyncedAt && (
-                        <p className="text-xs text-gray-400">
-                          Last synced {(() => {
-                            const diffMs = Date.now() - new Date(linkedinStatus.lastSyncedAt!).getTime();
-                            const mins = Math.floor(diffMs / 60000);
-                            if (mins < 1) return "just now";
-                            if (mins < 60) return `${mins}m ago`;
-                            const hrs = Math.floor(mins / 60);
-                            if (hrs < 24) return `${hrs}h ago`;
-                            return `${Math.floor(hrs / 24)}d ago`;
-                          })()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
-                    We only import posts and articles you authored — never reposts or comments, and never anything posted on your behalf.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => void handleLinkedinSync()}
-                      disabled={linkedinSyncing}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      {linkedinSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
-                      {linkedinSyncing ? "Syncing…" : "Sync Posts"}
-                    </button>
-                    <button
-                      onClick={() => void handleLinkedinDisconnect()}
-                      disabled={linkedinDisconnecting}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 transition-colors"
-                    >
-                      {linkedinDisconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlink className="w-3.5 h-3.5" />}
-                      Disconnect
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-500 leading-relaxed">
-                    Connect your LinkedIn account to automatically import your posts and their engagement data.
-                  </p>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
-                    We only import posts and articles you authored — never reposts or comments, and never anything posted on your behalf.
-                  </p>
-                  <button
-                    onClick={handleLinkedinConnect}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                  >
-                    <Link2 className="w-4 h-4" />
-                    Connect LinkedIn
-                  </button>
-                </div>
-              )}
-            </div>
           </section>
 
           {/* Voice Evolution Timeline */}

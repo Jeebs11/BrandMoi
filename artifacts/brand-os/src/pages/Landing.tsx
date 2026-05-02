@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import "@/landing.css";
 
 export default function Landing() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
-  const emailRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
@@ -27,17 +25,6 @@ export default function Landing() {
     return () => observerRef.current?.disconnect();
   }, []);
 
-  const handleRequestAccess = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params = email.trim() ? `?email=${encodeURIComponent(email.trim())}` : "";
-    navigate(`/signup${params}`);
-  };
-
-  const scrollToEmail = () => {
-    emailRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => emailRef.current?.focus(), 500);
-  };
-
   return (
     <div className="min-h-screen text-[#0F1F3D] selection:bg-[#0F1F3D] selection:text-white" style={{ background: "#F7F8FA", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
 
@@ -51,26 +38,15 @@ export default function Landing() {
               <span style={{ fontWeight: 300, color: "#0F1F3D", opacity: 0.45 }}>Me</span>
             </span>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/login")}
-              className="text-sm font-medium transition-colors duration-300"
-              style={{ color: "#8A97A8" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "#0F1F3D")}
-              onMouseLeave={e => (e.currentTarget.style.color = "#8A97A8")}
-            >
-              Log in
-            </button>
-            <button
-              onClick={scrollToEmail}
-              className="text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-300"
-              style={{ background: "#0F1F3D", color: "#fff" }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
-              onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-            >
-              Join Waitlist
-            </button>
-          </div>
+          <button
+            onClick={() => navigate("/login")}
+            className="text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-300"
+            style={{ background: "#0F1F3D", color: "#fff" }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
+            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          >
+            Log in
+          </button>
         </div>
       </nav>
 
@@ -93,31 +69,20 @@ export default function Landing() {
             Stop sounding like an AI generated your thoughts. BrandMe learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
           </p>
 
-          <form
-            onSubmit={handleRequestAccess}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 lp-hidden lp-animate-in lp-delay-300"
-          >
-            <div className="relative w-full sm:w-80">
-              <input
-                ref={emailRef}
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="Drop your email..."
-                className="w-full rounded-xl px-5 py-4 text-base focus:outline-none transition-all shadow-sm"
-                style={{ background: "#fff", border: "1px solid #D1D9E6", color: "#0F1F3D" }}
-              />
-            </div>
+          <div className="flex flex-col items-center gap-4 lp-hidden lp-animate-in lp-delay-300">
             <button
-              type="submit"
-              className="w-full sm:w-auto text-white px-8 py-4 rounded-xl font-semibold text-base transition-all duration-300 shadow-md"
+              onClick={() => navigate("/login")}
+              className="text-white px-10 py-4 rounded-xl font-semibold text-base transition-all duration-300 shadow-md"
               style={{ background: "#0F1F3D" }}
               onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
               onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
             >
-              Request Access
+              Log in to your account
             </button>
-          </form>
+            <p className="text-xs" style={{ color: "#8A97A8" }}>
+              Demo: demo@brandos.app / demo1234
+            </p>
+          </div>
         </section>
 
         {/* Philosophy */}
