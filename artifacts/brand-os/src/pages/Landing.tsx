@@ -118,7 +118,6 @@ export default function Landing() {
               Request Access
             </button>
           </form>
-          <p className="text-xs mt-4" style={{ color: "#8A97A8" }}>No credit card. No spam.</p>
         </section>
 
         {/* Philosophy */}
