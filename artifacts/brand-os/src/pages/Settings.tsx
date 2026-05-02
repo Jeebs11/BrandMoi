@@ -518,7 +518,7 @@ export default function Settings() {
               <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Appearance</h2>
             </div>
             <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
-              Pick an animated background, control its speed, and set your app colour theme. All changes apply instantly.
+              Pick an animated background, control its speed, and set your app colour theme. All changes apply instantly. Try <strong className="text-gray-300">Focus</strong> for distraction-free writing, or <strong className="text-gray-300">Solid</strong> for a clean flat backdrop.
             </p>
 
             {/* App colour theme */}
@@ -688,20 +688,48 @@ export default function Settings() {
             {Array.from(new Set(BACKGROUNDS.filter(b => b.key !== "custom").map(b => b.category))).map(cat => {
               const items = BACKGROUNDS.filter(b => b.category === cat && b.key !== "custom");
               if (items.length === 0) return null;
+              const isSolid = cat === "Solid";
+              const isFocus = cat === "Focus";
+              const CAT_META: Record<string, { icon: string; hint?: string }> = {
+                Focus:        { icon: "🌊", hint: "Calm & cool — great for deep-work sessions." },
+                Solid:        { icon: "▪", hint: "Clean flat colour. No movement, no distractions." },
+                Minimal:      { icon: "✦" },
+                Professional: { icon: "◈" },
+                Creative:     { icon: "✦✦" },
+                Technical:    { icon: "</>" },
+                Playful:      { icon: "★" },
+              };
+              const meta = CAT_META[cat] ?? { icon: "•" };
               return (
                 <div key={cat} className="mb-4">
-                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2">{cat}</p>
-                  <div className="grid grid-cols-3 gap-2.5">
+                  <div className="flex items-baseline gap-1.5 mb-1.5">
+                    <span className="text-[9px] text-gray-400">{meta.icon}</span>
+                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider">{cat}</p>
+                    {(isFocus || isSolid) && meta.hint && (
+                      <p className="text-[9px] text-gray-500 ml-1 normal-case font-normal tracking-normal">{meta.hint}</p>
+                    )}
+                  </div>
+                  <div className={cn("grid gap-2", isSolid ? "grid-cols-4" : "grid-cols-3")}>
                     {items.map(bg => {
                       const BgComp = bg.component;
+                      const isLight = isSolid && ["solid-cloud","solid-paper","solid-sage"].includes(bg.key);
+                      const isPrismatic = bg.key === "prismatic";
                       return (
                         <ThumbBtn key={bg.key} bgKey={bg.key} label={bg.label} isActive={activeTheme === bg.key} onSelect={handleThemeSelect}>
                           <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
                             <BgComp />
                           </div>
-                          <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/60 to-transparent">
-                            <p className="text-[9px] font-bold text-white leading-tight truncate">{bg.label}</p>
+                          <div className={cn(
+                            "absolute bottom-0 inset-x-0 px-1.5 py-1",
+                            isLight ? "bg-gradient-to-t from-white/80 to-transparent" : "bg-gradient-to-t from-black/60 to-transparent"
+                          )}>
+                            <p className={cn("text-[9px] font-bold leading-tight truncate", isLight ? "text-gray-600" : "text-white")}>{bg.label}</p>
                           </div>
+                          {isPrismatic && !isSolid && (
+                            <div className="absolute top-1 left-1">
+                              <span className="text-[7px] font-black text-white/70 bg-black/30 rounded px-0.5">mouse</span>
+                            </div>
+                          )}
                         </ThumbBtn>
                       );
                     })}

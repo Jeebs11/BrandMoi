@@ -4,7 +4,7 @@ import { useBackgroundTheme, SPEED_MULT, DENSITY_MULT } from "@/lib/background-c
 export interface BackgroundEntry {
   key: string;
   label: string;
-  category: "Minimal" | "Professional" | "Creative" | "Technical" | "Playful";
+  category: "Focus" | "Solid" | "Minimal" | "Professional" | "Creative" | "Technical" | "Playful";
   component: React.ComponentType;
   interactive?: boolean;
 }
@@ -685,6 +685,168 @@ function Plasma() {
   );
 }
 
+// ── Breathe (Focus: slow pulsing rings, cooling teal tones) ──────────────────
+function Breathe() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  const dur = 8 / Math.max(0.1, m);
+  return (
+    <div style={{ position:"absolute",inset:0,background:"#070c12",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center" }}>
+      <style>{`
+        @keyframes breathe-ring { 0%,100%{transform:scale(0.82);opacity:0.16} 50%{transform:scale(1.18);opacity:0.40} }
+        @keyframes breathe-core { 0%,100%{transform:scale(0.75);opacity:0.50} 50%{transform:scale(1.25);opacity:0.85} }
+      `}</style>
+      {[0,1,2,3].map(i => (
+        <div key={i} style={{
+          position:"absolute",
+          width:`${200 + i * 90}px`, height:`${200 + i * 90}px`,
+          borderRadius:"50%",
+          border:`${Math.max(0.4, 1.2 - i * 0.25)}px solid rgba(56,189,195,${0.22 - i * 0.045})`,
+          animation:`breathe-ring ${(dur + i * 1.6)}s ease-in-out ${-i * 1.8}s infinite`,
+        }} />
+      ))}
+      <div style={{
+        position:"absolute", width:"100px", height:"100px", borderRadius:"50%",
+        background:"radial-gradient(circle,rgba(56,189,195,0.30) 0%,transparent 70%)",
+        filter:"blur(20px)",
+        animation:`breathe-core ${dur}s ease-in-out infinite`,
+      }} />
+      <div style={{ position:"relative", animation:`breathe-core ${dur}s ease-in-out infinite` }}>
+        <div style={{ width:"6px",height:"6px",borderRadius:"50%",background:"rgba(56,195,195,0.9)",boxShadow:"0 0 14px rgba(56,195,195,0.75)" }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Zen Mist (Focus: ultra-slow drifting pale fog on deep slate) ──────────────
+function ZenMist() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"#070b11",overflow:"hidden" }}>
+      <style>{`
+        @keyframes mist1 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(4%,5%) scale(1.09)} }
+        @keyframes mist2 { 0%,100%{transform:translate(0%,0%) scale(1)} 60%{transform:translate(-5%,-4%) scale(1.11)} }
+        @keyframes mist3 { 0%,100%{transform:translate(0%,0%) scale(1)} 40%{transform:translate(3%,-6%) scale(1.07)} }
+      `}</style>
+      <div style={{ position:"absolute",width:"88%",height:"88%",top:"6%",left:"6%",
+        background:"radial-gradient(ellipse,rgba(90,140,175,0.14) 0%,transparent 70%)",
+        filter:"blur(65px)",animation:`mist1 ${26/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"70%",height:"70%",top:"18%",left:"18%",
+        background:"radial-gradient(ellipse,rgba(70,110,155,0.10) 0%,transparent 70%)",
+        filter:"blur(80px)",animation:`mist2 ${32/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"58%",height:"58%",top:"12%",left:"30%",
+        background:"radial-gradient(ellipse,rgba(50,95,140,0.08) 0%,transparent 70%)",
+        filter:"blur(55px)",animation:`mist3 ${22/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",inset:0,
+        backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(90,140,180,0.018) 40px)" }} />
+    </div>
+  );
+}
+
+// ── Still Aurora (Focus: very dim, very slow cool aurora — almost static) ─────
+function StillAurora() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"#050a10",overflow:"hidden" }}>
+      <style>{`
+        @keyframes saurora1 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(5%,4%) scale(1.10)} }
+        @keyframes saurora2 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(-6%,-5%) scale(1.12)} }
+        @keyframes saurora3 { 0%,100%{transform:translate(0%,0%) scale(1)} 60%{transform:translate(4%,-7%) scale(1.07)} }
+      `}</style>
+      <div style={{ position:"absolute",width:"82%",height:"82%",top:"4%",left:"9%",
+        background:"radial-gradient(ellipse,rgba(44,170,165,0.18) 0%,transparent 70%)",
+        borderRadius:"50%",filter:"blur(65px)",animation:`saurora1 ${20/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"66%",height:"66%",top:"24%",left:"24%",
+        background:"radial-gradient(ellipse,rgba(80,90,195,0.13) 0%,transparent 70%)",
+        borderRadius:"50%",filter:"blur(75px)",animation:`saurora2 ${25/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"55%",height:"55%",top:"7%",left:"36%",
+        background:"radial-gradient(ellipse,rgba(6,170,170,0.11) 0%,transparent 70%)",
+        borderRadius:"50%",filter:"blur(55px)",animation:`saurora3 ${17/m}s ease-in-out infinite` }} />
+    </div>
+  );
+}
+
+// ── Prismatic (interactive: mouse X maps to full hue spectrum, auto-cycles idle) ─
+function Prismatic() {
+  const { speed } = useBackgroundTheme();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hueRef = useRef(200);
+  const targetHueRef = useRef(200);
+  const mouseRef = useWindowMouse(canvasRef);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    let raf: number;
+    const m = SPEED_MULT[speed] ?? 1;
+    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const draw = () => {
+      const mouse = mouseRef.current;
+      if (mouse) {
+        targetHueRef.current = (mouse.x / Math.max(1, canvas.width)) * 360;
+      } else {
+        targetHueRef.current = (targetHueRef.current + 0.14 * m) % 360;
+      }
+      hueRef.current += (targetHueRef.current - hueRef.current) * 0.05;
+      const h = hueRef.current;
+
+      const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      g.addColorStop(0,   `hsl(${h},52%,7%)`);
+      g.addColorStop(0.4, `hsl(${(h + 22) % 360},56%,10%)`);
+      g.addColorStop(0.7, `hsl(${(h + 40) % 360},50%,9%)`);
+      g.addColorStop(1,   `hsl(${(h + 58) % 360},46%,7%)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const bloom = ctx.createRadialGradient(
+        canvas.width * 0.5, canvas.height * 0.42, 0,
+        canvas.width * 0.5, canvas.height * 0.42, canvas.width * 0.52,
+      );
+      bloom.addColorStop(0, `hsla(${(h + 15) % 360},75%,65%,0.13)`);
+      bloom.addColorStop(0.5, `hsla(${(h + 15) % 360},65%,52%,0.06)`);
+      bloom.addColorStop(1, "transparent");
+      ctx.fillStyle = bloom;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (mouse) {
+        const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 85);
+        mg.addColorStop(0, `hsla(${h},85%,72%,0.15)`);
+        mg.addColorStop(1, "transparent");
+        ctx.fillStyle = mg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mouseRef]);
+
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%" }} />;
+}
+
+// ── Solid colour factory ───────────────────────────────────────────────────────
+function makeSolid(hex: string, label: string) {
+  const Solid = () => <div style={{ position:"absolute",inset:0,background:hex }} />;
+  Solid.displayName = `Solid(${label})`;
+  return Solid;
+}
+
+const SolidCloud    = makeSolid("#FAFAFA", "Cloud");
+const SolidPaper    = makeSolid("#F5F0E8", "Paper");
+const SolidSage     = makeSolid("#E6EFE3", "Sage");
+const SolidSlate    = makeSolid("#1E293B", "Slate");
+const SolidNavy     = makeSolid("#0F172A", "Navy");
+const SolidCharcoal = makeSolid("#111111", "Charcoal");
+const SolidDusk     = makeSolid("#1A1030", "Dusk");
+const SolidForest   = makeSolid("#0D1F14", "Forest");
+
 // ── Custom (user-uploaded photo as cover) ─────────────────────────────────────
 function CustomBg() {
   const { customImageUrl } = useBackgroundTheme();
@@ -808,21 +970,46 @@ function ShootingStars() {
 }
 
 export const BACKGROUNDS: BackgroundEntry[] = [
-  { key: "aurora",          label: "Aurora",          category: "Creative",      component: Aurora },
-  { key: "matrix",          label: "Matrix",           category: "Technical",     component: Matrix,         interactive: true },
-  { key: "neural",          label: "Neural",           category: "Technical",     component: Neural,         interactive: true },
+  // ── Focus — calm, cool, distraction-free ──
+  { key: "breathe",         label: "Breathe",          category: "Focus",         component: Breathe },
+  { key: "zen-mist",        label: "Zen Mist",         category: "Focus",         component: ZenMist },
+  { key: "still-aurora",    label: "Still Aurora",     category: "Focus",         component: StillAurora },
+
+  // ── Solid — flat colour, no animation ──
+  { key: "solid-cloud",     label: "Cloud",            category: "Solid",         component: SolidCloud },
+  { key: "solid-paper",     label: "Paper",            category: "Solid",         component: SolidPaper },
+  { key: "solid-sage",      label: "Sage",             category: "Solid",         component: SolidSage },
+  { key: "solid-slate",     label: "Slate",            category: "Solid",         component: SolidSlate },
+  { key: "solid-navy",      label: "Navy",             category: "Solid",         component: SolidNavy },
+  { key: "solid-charcoal",  label: "Charcoal",         category: "Solid",         component: SolidCharcoal },
+  { key: "solid-dusk",      label: "Dusk",             category: "Solid",         component: SolidDusk },
+  { key: "solid-forest",    label: "Forest",           category: "Solid",         component: SolidForest },
+
+  // ── Minimal ──
   { key: "particles",       label: "Particles",        category: "Minimal",       component: Particles,      interactive: true },
-  { key: "grid-pulse",      label: "Grid Pulse",       category: "Professional",  component: GridPulse },
-  { key: "constellation",   label: "Constellation",    category: "Creative",      component: Constellation,  interactive: true },
-  { key: "topographic",     label: "Topographic",      category: "Professional",  component: Topographic },
   { key: "ink-wash",        label: "Ink Wash",         category: "Minimal",       component: InkWash },
-  { key: "neon-grid",       label: "Neon Grid",        category: "Playful",       component: NeonGrid },
-  { key: "wave",            label: "Ocean Wave",       category: "Playful",       component: Wave },
   { key: "fireflies",       label: "Fireflies",        category: "Minimal",       component: Fireflies,      interactive: true },
+  { key: "custom",          label: "My Photo",         category: "Minimal",       component: CustomBg },
+
+  // ── Professional ──
+  { key: "grid-pulse",      label: "Grid Pulse",       category: "Professional",  component: GridPulse },
+  { key: "topographic",     label: "Topographic",      category: "Professional",  component: Topographic },
+
+  // ── Creative ──
+  { key: "aurora",          label: "Aurora",           category: "Creative",      component: Aurora },
+  { key: "constellation",   label: "Constellation",    category: "Creative",      component: Constellation,  interactive: true },
   { key: "shooting-stars",  label: "Shooting Stars",   category: "Creative",      component: ShootingStars,  interactive: true },
   { key: "ripple",          label: "Ripple",           category: "Creative",      component: Ripple,         interactive: true },
   { key: "plasma",          label: "Plasma",           category: "Creative",      component: Plasma },
-  { key: "custom",          label: "My Photo",         category: "Minimal",       component: CustomBg },
+  { key: "prismatic",       label: "Prismatic",        category: "Creative",      component: Prismatic,      interactive: true },
+
+  // ── Technical ──
+  { key: "matrix",          label: "Matrix",           category: "Technical",     component: Matrix,         interactive: true },
+  { key: "neural",          label: "Neural",           category: "Technical",     component: Neural,         interactive: true },
+
+  // ── Playful ──
+  { key: "neon-grid",       label: "Neon Grid",        category: "Playful",       component: NeonGrid },
+  { key: "wave",            label: "Ocean Wave",       category: "Playful",       component: Wave },
 ];
 
 export function getBackground(key: string): BackgroundEntry | undefined {
