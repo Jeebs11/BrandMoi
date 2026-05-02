@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useBackgroundTheme, SPEED_MULT, DENSITY_MULT, BG_PALETTES } from "@/lib/background-context";
+import { useBackgroundTheme, usePageVisible, SPEED_MULT, DENSITY_MULT, BG_PALETTES } from "@/lib/background-context";
 
 export interface BackgroundEntry {
   key: string;
@@ -59,6 +59,7 @@ function Matrix() {
     window.addEventListener("resize", resize);
 
     const draw = () => {
+      if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
       const hotCol = mouse !== null ? Math.floor(mouse.x / COL_W) : null;
@@ -78,8 +79,10 @@ function Matrix() {
     };
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const onVisible_matrix = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_matrix);
     draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); document.removeEventListener('visibilitychange', onVisible_matrix); };
   }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#000" }} />;
@@ -127,6 +130,7 @@ function Neural() {
     window.addEventListener("click", onClick);
 
     const draw = () => {
+      if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
       ctx.fillStyle = "#0d1117";
@@ -175,11 +179,14 @@ function Neural() {
       });
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_neural = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_neural);
     draw();
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", init);
       window.removeEventListener("click", onClick);
+      document.removeEventListener('visibilitychange', onVisible_neural);
     };
   }, [mouseRef, density]);
 
@@ -235,6 +242,7 @@ function Particles() {
     window.addEventListener("click", onClick);
 
     const draw = () => {
+      if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
       ctx.fillStyle = "#111827";
@@ -267,11 +275,14 @@ function Particles() {
       }
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_particles = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_particles);
     draw();
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", init);
       window.removeEventListener("click", onClick);
+      document.removeEventListener('visibilitychange', onVisible_particles);
     };
   }, [mouseRef, density]);
 
@@ -310,6 +321,7 @@ function Constellation() {
     window.addEventListener("resize", init);
 
     const draw = () => {
+      if (document.hidden) return;
       const sp = Math.max(0.3, speedRef.current);
       const mouse = mouseRef.current;
       ctx.fillStyle = "#060b18";
@@ -352,8 +364,10 @@ function Constellation() {
       });
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_constellation = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_constellation);
     draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); document.removeEventListener('visibilitychange', onVisible_constellation); };
   }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#060b18" }} />;
@@ -467,6 +481,7 @@ function Fireflies() {
     window.addEventListener("resize", init);
 
     const draw = () => {
+      if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
       ctx.fillStyle = "rgba(4,8,3,0.87)";
@@ -508,8 +523,10 @@ function Fireflies() {
       });
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_fireflies = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_fireflies);
     draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); document.removeEventListener('visibilitychange', onVisible_fireflies); };
   }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#040803" }} />;
@@ -558,6 +575,7 @@ function Ripple() {
     window.addEventListener("click", onClick);
 
     const draw = () => {
+      if (document.hidden) return;
       const pal = palRef.current;
       const sp = Math.max(0.3, speedRef.current);
       const dMult = DENSITY_MULT[density] ?? 1;
@@ -598,11 +616,14 @@ function Ripple() {
       });
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_ripple = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_ripple);
     draw();
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("click", onClick);
+      document.removeEventListener('visibilitychange', onVisible_ripple);
     };
   }, [density]);
 
@@ -660,6 +681,7 @@ function Prismatic() {
     window.addEventListener("resize", resize);
 
     const draw = () => {
+      if (document.hidden) return;
       const pal = palRef.current;
       const mouse = mouseRef.current;
       if (mouse) {
@@ -699,8 +721,10 @@ function Prismatic() {
       }
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_prismatic = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_prismatic);
     draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); document.removeEventListener('visibilitychange', onVisible_prismatic); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mouseRef]);
 
@@ -769,6 +793,7 @@ function ShootingStars() {
     };
 
     const draw = () => {
+      if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
       const mx = mouse ? (mouse.x - canvas.width/2) * 0.007 : 0;
@@ -822,8 +847,10 @@ function ShootingStars() {
 
       raf = requestAnimationFrame(draw);
     };
+    const onVisible_shooting = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener('visibilitychange', onVisible_shooting);
     draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); document.removeEventListener('visibilitychange', onVisible_shooting); };
   }, [mouseRef, density]);
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030614" }} />;
