@@ -50,7 +50,7 @@ export function VariantD() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-8 max-w-4xl mx-auto opacity-0-init animate-fade-in-up delay-100" style={{ color: "#0F1F3D", letterSpacing: "-2px" }}>
-            Write for LinkedIn.<br/>
+            Write for <span style={{ color: "#0A66C2" }}>LinkedIn</span>.<br/>
             <span className="font-light italic" style={{ color: "#8A97A8" }}>Sound like yourself.</span>
           </h1>
           
