@@ -29,7 +29,7 @@ const UpdatePreferencesBody = z.object({
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave"]).optional(),
+  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave", "stars", "galaxy", "shooting-stars"]).optional(),
   bgSpeed: z.enum(["slow", "normal", "fast"]).optional(),
   siteTheme: z.enum(["indigo", "violet", "sky", "emerald", "rose", "amber"]).optional(),
 });
