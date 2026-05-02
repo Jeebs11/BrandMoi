@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { AppShell } from "@/components/AppShell";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import {
   Shield, TrendingUp, Users, BarChart2, Zap, Search, Trash2,
@@ -108,6 +108,26 @@ function MiniBar({ data, color, label }: { data: DayCount[]; color: string; labe
     </div>
   );
 }
+function MiniLine({ data, color, label }: { data: DayCount[]; color: string; label: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">{label}</p>
+      {data.length === 0 ? (
+        <div className="h-32 flex items-center justify-center text-sm text-gray-200">No data yet</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={130}>
+          <LineChart data={data} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+            <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 9, fill: "#9ca3af" }} interval="preserveStartEnd" axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip formatter={(v) => [v, "Active users"]} labelFormatter={fmtDate} contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} />
+            <Line type="monotone" dataKey="count" stroke={color} strokeWidth={2} dot={{ r: 3, fill: color }} activeDot={{ r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
 function DistBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
@@ -161,11 +181,13 @@ function GrowthTab() {
       </div>
       <div className="grid md:grid-cols-2 gap-4">
         <MiniBar data={data.signupsByDay} color="#0F1F3D" label="New Signups — Last 30 Days" />
-        <MiniBar data={data.dauByDay} color="#0A66C2" label="Daily Active Users — Last 30 Days" />
+        <MiniLine data={data.dauByDay} color="#0A66C2" label="Daily Active Users — Last 30 Days" />
       </div>
     </div>
   );
 }
+
+type SortCol = "email" | "createdAt" | "lastActive" | "draftCount";
 
 // ── Users tab ──────────────────────────────────────────────────────────────────
 function UsersTab() {
@@ -173,15 +195,19 @@ function UsersTab() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortCol>("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteToken, setDeleteToken] = useState<string | null>(null);
+  const [requestingToken, setRequestingToken] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (p: number, q: string) => {
+  const load = useCallback(async (p: number, q: string, col: SortCol, ord: "asc" | "desc") => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), ...(q ? { search: q } : {}) });
+      const params = new URLSearchParams({ page: String(p), sort: col, order: ord, ...(q ? { search: q } : {}) });
       const res = await adminFetch<{ users: AdminUser[]; total: number }>(`/users?${params}`);
       setUsers(res.users);
       setTotal(res.total);
@@ -189,24 +215,58 @@ function UsersTab() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void load(1, ""); }, [load]);
+  useEffect(() => { void load(1, "", "createdAt", "desc"); }, [load]);
 
-  const handleSearch = (q: string) => { setSearch(q); setPage(1); void load(1, q); };
-  const handlePage = (p: number) => { setPage(p); void load(p, search); };
+  const handleSearch = (q: string) => { setSearch(q); setPage(1); void load(1, q, sortBy, sortOrder); };
+  const handlePage = (p: number) => { setPage(p); void load(p, search, sortBy, sortOrder); };
+
+  const handleSort = (col: SortCol) => {
+    const nextOrder = sortBy === col && sortOrder === "desc" ? "asc" : "desc";
+    setSortBy(col); setSortOrder(nextOrder); setPage(1);
+    void load(1, search, col, nextOrder);
+  };
+
+  const handleRequestDelete = async (id: number) => {
+    setRequestingToken(true);
+    try {
+      const res = await fetch(`/api/admin/users/${id}/delete-request`, {
+        method: "POST", credentials: "include",
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { token: string };
+      setDeleteToken(data.token);
+      setDeleteConfirmId(id);
+    } catch { /* ignore */ }
+    finally { setRequestingToken(false); }
+  };
 
   const handleDelete = async (id: number) => {
+    if (!deleteToken) return;
     setDeleting(true);
     try {
-      await fetch(`/api/admin/users/${id}`, { method: "DELETE", credentials: "include" });
-      setUsers(prev => prev.filter(u => u.id !== id));
-      setTotal(prev => prev - 1);
-      setDeleteConfirmId(null);
-      setExpandedId(null);
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: deleteToken }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== id));
+        setTotal(prev => prev - 1);
+        setDeleteConfirmId(null);
+        setDeleteToken(null);
+        setExpandedId(null);
+      }
     } catch { /* ignore */ }
     finally { setDeleting(false); }
   };
 
   const totalPages = Math.ceil(total / 20);
+
+  const SortIcon = ({ col }: { col: SortCol }) => (
+    <span className={`ml-1 ${sortBy === col ? "text-[#0F1F3D]" : "text-gray-300"}`}>
+      {sortBy === col && sortOrder === "asc" ? "↑" : "↓"}
+    </span>
+  );
 
   return (
     <div className="space-y-4">
@@ -231,9 +291,21 @@ function UsersTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {["Email / Name", "Joined", "Last Active", "Onboarded", "Drafts", "Published", ""].map(h => (
-                    <th key={h} className={`px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider ${h === "" ? "" : "text-left"} ${["Joined", "Last Active"].includes(h) ? "hidden md:table-cell" : ""}`}>{h}</th>
-                  ))}
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort("email")}>
+                    Email / Name<SortIcon col="email" />
+                  </th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none" onClick={() => handleSort("createdAt")}>
+                    Joined<SortIcon col="createdAt" />
+                  </th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none" onClick={() => handleSort("lastActive")}>
+                    Last Active<SortIcon col="lastActive" />
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Onboarded</th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort("draftCount")}>
+                    Drafts<SortIcon col="draftCount" />
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Published</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -307,14 +379,19 @@ function UsersTab() {
                                   {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
                                   Confirm Delete
                                 </button>
-                                <button onClick={() => setDeleteConfirmId(null)} className="text-xs text-gray-400 hover:text-gray-700">Cancel</button>
+                                <button
+                                  onClick={() => { setDeleteConfirmId(null); setDeleteToken(null); }}
+                                  className="text-xs text-gray-400 hover:text-gray-700"
+                                >Cancel</button>
                               </>
                             ) : (
                               <button
-                                onClick={e => { e.stopPropagation(); setDeleteConfirmId(u.id); }}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600"
+                                onClick={e => { e.stopPropagation(); void handleRequestDelete(u.id); }}
+                                disabled={requestingToken}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-600 disabled:opacity-50"
                               >
-                                <Trash2 className="w-3 h-3" /> Delete account
+                                {requestingToken ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                Delete account
                               </button>
                             )}
                           </div>

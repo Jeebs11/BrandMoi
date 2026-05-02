@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Router, type IRouter } from "express";
 import { db, pool } from "@workspace/db";
 import { usersTable } from "@workspace/db";
@@ -7,6 +8,25 @@ import { eq } from "drizzle-orm";
 
 const DEMO_EMAIL = "demo@brandos.app";
 const ADMIN_EMAIL = "odmlawal@gmail.com";
+
+// ── Pending delete tokens (server-side confirmation) ───────────────────────────
+const pendingDeletes = new Map<string, { userId: number; expiresAt: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, entry] of pendingDeletes) {
+    if (entry.expiresAt < now) pendingDeletes.delete(token);
+  }
+}, 60_000).unref();
+
+// ── Sort helpers ───────────────────────────────────────────────────────────────
+const VALID_SORTS = ["email", "createdAt", "lastActive", "draftCount"] as const;
+type SortCol = (typeof VALID_SORTS)[number];
+const ORDER_EXPR: Record<SortCol, (dir: "ASC" | "DESC") => string> = {
+  email: (d) => `u.email ${d}`,
+  createdAt: (d) => `u.created_at ${d}`,
+  lastActive: (d) => `"lastActive" ${d} NULLS LAST`,
+  draftCount: (d) => `"draftCount" ${d}`,
+};
 
 const router: IRouter = Router();
 router.use(requireAuth, requireAdmin);
@@ -56,9 +76,10 @@ router.get("/admin/stats", async (_req, res): Promise<void> => {
     let demoLoginsToday = 0;
     let demoLoginsByDay: unknown[] = [];
     if (demoRow) {
-      demoLoginsToday = (await pool.query(`
-        SELECT COUNT(*)::int AS c FROM login_events WHERE user_id = $1 AND created_at >= CURRENT_DATE
-      `, [demoRow.id])).rows[0].c;
+      demoLoginsToday = (await pool.query(
+        `SELECT COUNT(*)::int AS c FROM login_events WHERE user_id = $1 AND created_at >= CURRENT_DATE`,
+        [demoRow.id]
+      )).rows[0].c;
       demoLoginsByDay = (await pool.query(`
         SELECT DATE(created_at AT TIME ZONE 'UTC')::text AS date, COUNT(*)::int AS count
         FROM login_events WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '30 days'
@@ -81,7 +102,26 @@ router.get("/admin/users", async (req, res): Promise<void> => {
     const limit = 20;
     const offset = (page - 1) * limit;
 
+    const rawSort = req.query.sort as string;
+    const rawOrder = req.query.order as string;
+    const sortCol: SortCol = VALID_SORTS.includes(rawSort as SortCol) ? (rawSort as SortCol) : "createdAt";
+    const sortDir: "ASC" | "DESC" = rawOrder === "asc" ? "ASC" : "DESC";
+    const orderClause = ORDER_EXPR[sortCol](sortDir);
+
     const baseExclude = [DEMO_EMAIL, ADMIN_EMAIL];
+
+    const userSelectCols = `
+      u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt",
+      COALESCE(p.onboarded, false) AS onboarded,
+      p.tone, p.persona, p.objective,
+      p.brand_role AS "brandRole", p.brand_audience AS "brandAudience", p.brand_belief AS "brandBelief",
+      p.background_theme AS "backgroundTheme", p.site_theme AS "siteTheme",
+      (SELECT MAX(date) FROM daily_activity da WHERE da.user_id = u.id) AS "lastActive",
+      (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id) AS "draftCount",
+      (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.status = 'published') AS "publishedCount",
+      (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.carousel_output IS NOT NULL) AS "carouselCount",
+      (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.visual_output IS NOT NULL) AS "visualCount"
+    `;
 
     let usersQuery: string;
     let countQuery: string;
@@ -91,41 +131,19 @@ router.get("/admin/users", async (req, res): Promise<void> => {
     if (search) {
       const like = `%${search}%`;
       usersQuery = `
-        SELECT
-          u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt",
-          COALESCE(p.onboarded, false) AS onboarded,
-          p.tone, p.persona, p.objective,
-          p.brand_role AS "brandRole", p.brand_audience AS "brandAudience", p.brand_belief AS "brandBelief",
-          p.background_theme AS "backgroundTheme", p.site_theme AS "siteTheme",
-          (SELECT MAX(date) FROM daily_activity da WHERE da.user_id = u.id) AS "lastActive",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id) AS "draftCount",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.status = 'published') AS "publishedCount",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.carousel_output IS NOT NULL) AS "carouselCount",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.visual_output IS NOT NULL) AS "visualCount"
-        FROM users u
-        LEFT JOIN preferences p ON p.user_id = u.id
+        SELECT ${userSelectCols}
+        FROM users u LEFT JOIN preferences p ON p.user_id = u.id
         WHERE u.email NOT IN ($1, $2) AND (u.email ILIKE $3 OR u.display_name ILIKE $3)
-        ORDER BY u.created_at DESC LIMIT $4 OFFSET $5`;
+        ORDER BY ${orderClause} LIMIT $4 OFFSET $5`;
       params = [...baseExclude, like, limit, offset];
       countQuery = `SELECT COUNT(*)::int AS total FROM users WHERE email NOT IN ($1, $2) AND (email ILIKE $3 OR display_name ILIKE $3)`;
       countParams = [...baseExclude, like];
     } else {
       usersQuery = `
-        SELECT
-          u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt",
-          COALESCE(p.onboarded, false) AS onboarded,
-          p.tone, p.persona, p.objective,
-          p.brand_role AS "brandRole", p.brand_audience AS "brandAudience", p.brand_belief AS "brandBelief",
-          p.background_theme AS "backgroundTheme", p.site_theme AS "siteTheme",
-          (SELECT MAX(date) FROM daily_activity da WHERE da.user_id = u.id) AS "lastActive",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id) AS "draftCount",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.status = 'published') AS "publishedCount",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.carousel_output IS NOT NULL) AS "carouselCount",
-          (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.visual_output IS NOT NULL) AS "visualCount"
-        FROM users u
-        LEFT JOIN preferences p ON p.user_id = u.id
+        SELECT ${userSelectCols}
+        FROM users u LEFT JOIN preferences p ON p.user_id = u.id
         WHERE u.email NOT IN ($1, $2)
-        ORDER BY u.created_at DESC LIMIT $3 OFFSET $4`;
+        ORDER BY ${orderClause} LIMIT $3 OFFSET $4`;
       params = [...baseExclude, limit, offset];
       countQuery = `SELECT COUNT(*)::int AS total FROM users WHERE email NOT IN ($1, $2)`;
       countParams = baseExclude;
@@ -143,11 +161,93 @@ router.get("/admin/users", async (req, res): Promise<void> => {
   }
 });
 
-// ── Delete user ───────────────────────────────────────────────────────────────
+// ── Single user detail ────────────────────────────────────────────────────────
+router.get("/admin/users/:id", async (req, res): Promise<void> => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
+
+    const user = (await pool.query(`
+      SELECT
+        u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt",
+        COALESCE(p.onboarded, false) AS onboarded,
+        p.tone, p.persona, p.objective,
+        p.brand_role AS "brandRole", p.brand_audience AS "brandAudience", p.brand_belief AS "brandBelief",
+        p.background_theme AS "backgroundTheme", p.site_theme AS "siteTheme",
+        (SELECT MAX(date) FROM daily_activity da WHERE da.user_id = u.id) AS "lastActive",
+        (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id) AS "draftCount",
+        (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.status = 'published') AS "publishedCount",
+        (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.carousel_output IS NOT NULL) AS "carouselCount",
+        (SELECT COUNT(*)::int FROM drafts d WHERE d.user_id = u.id AND d.visual_output IS NOT NULL) AS "visualCount",
+        (SELECT COUNT(*)::int FROM login_events le WHERE le.user_id = u.id) AS "totalLogins"
+      FROM users u
+      LEFT JOIN preferences p ON p.user_id = u.id
+      WHERE u.id = $1
+    `, [userId])).rows[0];
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+    const drafts = (await pool.query(`
+      SELECT id, raw_input, status, post_type, created_at FROM drafts
+      WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10
+    `, [userId])).rows;
+
+    res.json({ user, drafts });
+  } catch (err) {
+    console.error("[admin/users/:id]", err);
+    res.status(500).json({ error: "Failed to load user detail" });
+  }
+});
+
+// ── Request delete token ──────────────────────────────────────────────────────
+router.post("/admin/users/:id/delete-request", async (req, res): Promise<void> => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
+
+    const [user] = await db.select({ id: usersTable.id, email: usersTable.email })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.email === DEMO_EMAIL) { res.status(400).json({ error: "Cannot delete the demo account" }); return; }
+    if (user.email === ADMIN_EMAIL) { res.status(400).json({ error: "Cannot delete the admin account" }); return; }
+
+    // Revoke any existing token for this userId to prevent accumulation
+    for (const [tok, entry] of pendingDeletes) {
+      if (entry.userId === userId) pendingDeletes.delete(tok);
+    }
+
+    const token = crypto.randomUUID();
+    const expiresAt = Date.now() + 60_000; // 60 seconds
+    pendingDeletes.set(token, { userId, expiresAt });
+
+    res.json({ token, expiresAt: new Date(expiresAt).toISOString() });
+  } catch (err) {
+    console.error("[admin/delete-request]", err);
+    res.status(500).json({ error: "Failed to issue delete token" });
+  }
+});
+
+// ── Delete user (requires server-issued token) ────────────────────────────────
 router.delete("/admin/users/:id", async (req, res): Promise<void> => {
   try {
     const userId = parseInt(req.params.id, 10);
     if (isNaN(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
+
+    const { token } = req.body as { token?: string };
+    if (!token) { res.status(400).json({ error: "Confirmation token required" }); return; }
+
+    const pending = pendingDeletes.get(token);
+    if (!pending || pending.userId !== userId) {
+      res.status(400).json({ error: "Invalid confirmation token" });
+      return;
+    }
+    if (Date.now() > pending.expiresAt) {
+      pendingDeletes.delete(token);
+      res.status(400).json({ error: "Confirmation token expired — please try again" });
+      return;
+    }
+    pendingDeletes.delete(token);
 
     const [user] = await db.select({ id: usersTable.id, email: usersTable.email })
       .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
