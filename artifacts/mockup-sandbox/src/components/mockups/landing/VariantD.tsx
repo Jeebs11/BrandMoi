@@ -96,55 +96,6 @@ export function VariantD() {
           </div>
         </section>
 
-        {/* The Engine */}
-        <section className="py-32 px-6 scroll-reveal opacity-0-init">
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-20 items-center">
-            <div className="flex-1">
-              <h2 className="text-4xl font-semibold text-[#1A1A1A] mb-6">It gets better every time you use it.</h2>
-              <p className="text-[#666666] text-lg mb-8 leading-relaxed">
-                Brand OS isn't just a prompt wrapper. It's a living model of your professional voice. Every post you approve, edit, or reject helps refine your Voice DNA profile.
-              </p>
-              <ul className="space-y-4">
-                {[
-                  "Analyzes your best-performing past content",
-                  "Adapts to different audiences automatically",
-                  "Remembers your favorite hooks and transitions",
-                  "Suggests when to post based on momentum"
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 text-[#1A1A1A] font-medium">
-                    <span className="text-[#6056FA]">✦</span> {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex-1 w-full bg-[#FAFAFA] rounded-3xl p-8 border border-[#E5E5E5]">
-               <div className="space-y-6">
-                 <div>
-                   <div className="flex justify-between text-sm mb-2"><span className="font-medium">Directness</span><span className="text-[#A3A3A3]">85%</span></div>
-                   <div className="h-2 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full bg-[#1A1A1A] w-[85%] rounded-full"></div></div>
-                 </div>
-                 <div>
-                   <div className="flex justify-between text-sm mb-2"><span className="font-medium">Vulnerability</span><span className="text-[#A3A3A3]">60%</span></div>
-                   <div className="h-2 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full bg-[#6056FA] w-[60%] rounded-full"></div></div>
-                 </div>
-                 <div>
-                   <div className="flex justify-between text-sm mb-2"><span className="font-medium">Academic</span><span className="text-[#A3A3A3]">15%</span></div>
-                   <div className="h-2 bg-[#E5E5E5] rounded-full overflow-hidden"><div className="h-full bg-[#A3A3A3] w-[15%] rounded-full"></div></div>
-                 </div>
-                 <div className="pt-4 border-t border-[#E5E5E5]">
-                   <p className="text-xs text-[#A3A3A3] uppercase tracking-wider mb-3">Top Vocabulary</p>
-                   <div className="flex flex-wrap gap-2">
-                     <span className="px-3 py-1 bg-white border border-[#E5E5E5] rounded-md text-xs font-medium">actually</span>
-                     <span className="px-3 py-1 bg-white border border-[#E5E5E5] rounded-md text-xs font-medium">brutal</span>
-                     <span className="px-3 py-1 bg-white border border-[#E5E5E5] rounded-md text-xs font-medium">founder</span>
-                     <span className="px-3 py-1 bg-white border border-[#E5E5E5] rounded-md text-xs font-medium">revenue</span>
-                   </div>
-                 </div>
-               </div>
-            </div>
-          </div>
-        </section>
-
         {/* Footer CTA */}
         <section className="bg-[#6056FA] py-32 px-6 text-center scroll-reveal opacity-0-init">
           <div className="max-w-3xl mx-auto text-white">
