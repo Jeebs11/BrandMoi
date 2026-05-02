@@ -1,57 +1,68 @@
 export function LogoB() {
+  const navy = "#0F1F3D";
+  const white = "#FFFFFF";
+  const offwhite = "#F7F8FA";
+  const accent = "#2563EB";
+
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-12 p-12">
-      {/* Main lockup */}
+    <div className="min-h-screen flex flex-col items-center justify-center gap-12 p-12" style={{ background: offwhite }}>
+      {/* Light version */}
       <div className="flex flex-col items-center gap-3">
-        <p className="text-[10px] uppercase tracking-widest text-gray-300 mb-2">Light</p>
+        <p className="text-[10px] uppercase tracking-widest mb-2" style={{ color: "#C5CDD8" }}>Light</p>
         <div className="flex items-center gap-3">
-          {/* Icon: stacked bars representing voice/content */}
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <rect x="0" y="0" width="36" height="36" rx="10" fill="#6056FA"/>
-            <rect x="8" y="20" width="4" height="9" rx="2" fill="white" opacity="0.4"/>
-            <rect x="14" y="14" width="4" height="15" rx="2" fill="white" opacity="0.7"/>
-            <rect x="20" y="9" width="4" height="20" rx="2" fill="white"/>
-            <rect x="26" y="16" width="4" height="13" rx="2" fill="white" opacity="0.6"/>
+          <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+            <rect width="38" height="38" rx="10" fill={navy}/>
+            <rect x="9" y="21" width="3.5" height="9" rx="1.5" fill={white} opacity="0.3"/>
+            <rect x="14.5" y="15" width="3.5" height="15" rx="1.5" fill={white} opacity="0.55"/>
+            <rect x="20" y="10" width="3.5" height="20" rx="1.5" fill={white}/>
+            <rect x="25.5" y="17" width="3.5" height="13" rx="1.5" fill={white} opacity="0.5"/>
           </svg>
-          <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 30, color: "#1A1A1A", letterSpacing: "-1px" }}>BrandMe</span>
+          <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 30, color: navy, letterSpacing: "-1px" }}>BrandMe</span>
         </div>
       </div>
 
       {/* Dark version */}
-      <div className="flex flex-col items-center gap-3 bg-[#1A1A1A] rounded-2xl px-16 py-10">
-        <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-2">Dark</p>
+      <div className="flex flex-col items-center gap-3 rounded-2xl px-14 py-10" style={{ background: navy }}>
+        <p className="text-[10px] uppercase tracking-widest mb-2" style={{ color: "#3A5070" }}>Dark</p>
         <div className="flex items-center gap-3">
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <rect x="0" y="0" width="36" height="36" rx="10" fill="#6056FA"/>
-            <rect x="8" y="20" width="4" height="9" rx="2" fill="white" opacity="0.4"/>
-            <rect x="14" y="14" width="4" height="15" rx="2" fill="white" opacity="0.7"/>
-            <rect x="20" y="9" width="4" height="20" rx="2" fill="white"/>
-            <rect x="26" y="16" width="4" height="13" rx="2" fill="white" opacity="0.6"/>
+          <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+            <rect width="38" height="38" rx="10" fill={accent}/>
+            <rect x="9" y="21" width="3.5" height="9" rx="1.5" fill={white} opacity="0.3"/>
+            <rect x="14.5" y="15" width="3.5" height="15" rx="1.5" fill={white} opacity="0.55"/>
+            <rect x="20" y="10" width="3.5" height="20" rx="1.5" fill={white}/>
+            <rect x="25.5" y="17" width="3.5" height="13" rx="1.5" fill={white} opacity="0.5"/>
           </svg>
-          <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 30, color: "#ffffff", letterSpacing: "-1px" }}>BrandMe</span>
+          <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 30, color: white, letterSpacing: "-1px" }}>BrandMe</span>
         </div>
       </div>
 
-      {/* Icon alone */}
+      {/* Icon sizes */}
       <div className="flex items-center gap-6">
-        <p className="text-[10px] uppercase tracking-widest text-gray-300">Icon only</p>
-        <svg width="48" height="48" viewBox="0 0 36 36" fill="none">
-          <rect x="0" y="0" width="36" height="36" rx="10" fill="#6056FA"/>
-          <rect x="8" y="20" width="4" height="9" rx="2" fill="white" opacity="0.4"/>
-          <rect x="14" y="14" width="4" height="15" rx="2" fill="white" opacity="0.7"/>
-          <rect x="20" y="9" width="4" height="20" rx="2" fill="white"/>
-          <rect x="26" y="16" width="4" height="13" rx="2" fill="white" opacity="0.6"/>
+        <p className="text-[10px] uppercase tracking-widest" style={{ color: "#C5CDD8" }}>Icon</p>
+        <svg width="48" height="48" viewBox="0 0 38 38" fill="none">
+          <rect width="38" height="38" rx="10" fill={navy}/>
+          <rect x="9" y="21" width="3.5" height="9" rx="1.5" fill={white} opacity="0.3"/>
+          <rect x="14.5" y="15" width="3.5" height="15" rx="1.5" fill={white} opacity="0.55"/>
+          <rect x="20" y="10" width="3.5" height="20" rx="1.5" fill={white}/>
+          <rect x="25.5" y="17" width="3.5" height="13" rx="1.5" fill={white} opacity="0.5"/>
         </svg>
-        <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
-          <rect x="0" y="0" width="36" height="36" rx="8" fill="#6056FA"/>
-          <rect x="8" y="20" width="4" height="9" rx="2" fill="white" opacity="0.4"/>
-          <rect x="14" y="14" width="4" height="15" rx="2" fill="white" opacity="0.7"/>
-          <rect x="20" y="9" width="4" height="20" rx="2" fill="white"/>
-          <rect x="26" y="16" width="4" height="13" rx="2" fill="white" opacity="0.6"/>
+        <svg width="32" height="32" viewBox="0 0 38 38" fill="none">
+          <rect width="38" height="38" rx="8" fill={navy}/>
+          <rect x="9" y="21" width="3.5" height="9" rx="1.5" fill={white} opacity="0.3"/>
+          <rect x="14.5" y="15" width="3.5" height="15" rx="1.5" fill={white} opacity="0.55"/>
+          <rect x="20" y="10" width="3.5" height="20" rx="1.5" fill={white}/>
+          <rect x="25.5" y="17" width="3.5" height="13" rx="1.5" fill={white} opacity="0.5"/>
+        </svg>
+        <svg width="20" height="20" viewBox="0 0 38 38" fill="none">
+          <rect width="38" height="38" rx="6" fill={navy}/>
+          <rect x="9" y="21" width="3.5" height="9" rx="1.5" fill={white} opacity="0.3"/>
+          <rect x="14.5" y="15" width="3.5" height="15" rx="1.5" fill={white} opacity="0.55"/>
+          <rect x="20" y="10" width="3.5" height="20" rx="1.5" fill={white}/>
+          <rect x="25.5" y="17" width="3.5" height="13" rx="1.5" fill={white} opacity="0.5"/>
         </svg>
       </div>
 
-      <p className="text-xs text-gray-300 font-medium tracking-wide" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>B — Voice Bars + Wordmark</p>
+      <p className="text-xs font-medium tracking-wide" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: "#C5CDD8" }}>B — Signal Bars + Wordmark</p>
     </div>
   );
 }
