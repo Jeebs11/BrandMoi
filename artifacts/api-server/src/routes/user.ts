@@ -29,7 +29,7 @@ const UpdatePreferencesBody = z.object({
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave", "stars", "shooting-stars", "custom"]).optional(),
+  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave", "stars", "shooting-stars", "fireflies", "ripple", "plasma", "custom"]).optional(),
   bgCustomImageUrl: z.string().max(1_000_000).optional().nullable(),
   bgSpeed: z.enum(["slow", "normal", "fast"]).optional(),
   bgDensity: z.enum(["low", "normal", "high"]).optional(),

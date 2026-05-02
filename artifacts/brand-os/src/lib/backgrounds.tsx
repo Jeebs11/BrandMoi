@@ -492,8 +492,8 @@ function Wave() {
   );
 }
 
-// ── Stars (interactive: mouse parallax across 3 depth layers) ─────────────────
-function Stars() {
+// ── Fireflies (interactive: warm glowing orbs drift & pulse, scatter on hover) ──
+function Fireflies() {
   const { speed, density } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
@@ -506,54 +506,65 @@ function Stars() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     let raf: number;
-    interface StarPt { x:number; y:number; r:number; alpha:number; dAlpha:number; layer:number }
-    let stars: StarPt[] = [];
+    interface Fly { x:number; y:number; vx:number; vy:number; phase:number; dPhase:number; r:number; hue:number }
+    let flies: Fly[] = [];
 
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      stars = Array.from({ length: Math.round(280 * (DENSITY_MULT[density] ?? 1)) }, () => {
-        const layer = Math.floor(Math.random() * 3);
-        return {
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          r: layer === 0 ? Math.random()*0.6+0.2 : layer === 1 ? Math.random()*0.8+0.5 : Math.random()*1.4+0.8,
-          alpha: Math.random()*0.5+0.3,
-          dAlpha: (Math.random()-0.5) * 0.007,
-          layer,
-        };
-      });
+      flies = Array.from({ length: Math.round(52 * (DENSITY_MULT[density] ?? 1)) }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        phase: Math.random() * Math.PI * 2,
+        dPhase: 0.01 + Math.random() * 0.022,
+        r: 1.3 + Math.random() * 1.8,
+        hue: 42 + Math.random() * 55,
+      }));
     };
     init();
     window.addEventListener("resize", init);
 
-    const PARALLAX = [0.004, 0.012, 0.025];
-
     const draw = () => {
       const sp = speedRef.current;
       const mouse = mouseRef.current;
-      const mx = mouse ? (mouse.x - canvas.width/2) : 0;
-      const my = mouse ? (mouse.y - canvas.height/2) : 0;
-
-      ctx.fillStyle = "#040812";
+      ctx.fillStyle = "rgba(4,8,3,0.87)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      stars.forEach(s => {
-        s.alpha += s.dAlpha * sp;
-        if (s.alpha < 0.15) s.dAlpha = Math.abs(s.dAlpha);
-        if (s.alpha > 0.95) s.dAlpha = -Math.abs(s.dAlpha);
-        const px = s.x + mx * PARALLAX[s.layer];
-        const py = s.y + my * PARALLAX[s.layer];
+      flies.forEach(f => {
+        f.phase += f.dPhase * sp;
+        const glow = (Math.sin(f.phase) + 1) / 2;
 
-        if (s.r > 1.2) {
-          const g = ctx.createRadialGradient(px, py, 0, px, py, s.r*3);
-          g.addColorStop(0, `rgba(210,225,255,${s.alpha*0.35})`);
-          g.addColorStop(1, "transparent");
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(px, py, s.r*3, 0, Math.PI*2); ctx.fill();
+        f.vx += (Math.random() - 0.5) * 0.01;
+        f.vy += (Math.random() - 0.5) * 0.01 - 0.001;
+        f.vx *= 0.98; f.vy *= 0.98;
+        f.vx = Math.max(-0.65, Math.min(0.65, f.vx));
+        f.vy = Math.max(-0.65, Math.min(0.65, f.vy));
+
+        if (mouse) {
+          const dx = f.x - mouse.x, dy = f.y - mouse.y;
+          const d = Math.sqrt(dx*dx + dy*dy) || 1;
+          if (d < 110) { const force = (110-d)/110 * 0.07; f.vx += (dx/d)*force; f.vy += (dy/d)*force; }
         }
-        ctx.beginPath(); ctx.arc(px, py, s.r, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(215,228,255,${s.alpha})`; ctx.fill();
+
+        f.x += f.vx * sp; f.y += f.vy * sp;
+        if (f.x < -12) f.x = canvas.width + 12;
+        if (f.x > canvas.width + 12) f.x = -12;
+        if (f.y < -12) f.y = canvas.height + 12;
+        if (f.y > canvas.height + 12) f.y = -12;
+
+        const alpha = 0.25 + glow * 0.75;
+        const glowR = f.r * (2.5 + glow * 4.5);
+
+        const halo = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowR);
+        halo.addColorStop(0, `hsla(${f.hue},100%,68%,${alpha * 0.4})`);
+        halo.addColorStop(1, "transparent");
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(f.x, f.y, glowR, 0, Math.PI*2); ctx.fill();
+
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.55 + glow * 0.45), 0, Math.PI*2);
+        ctx.fillStyle = `hsla(${f.hue},100%,88%,${alpha})`; ctx.fill();
       });
       raf = requestAnimationFrame(draw);
     };
@@ -561,7 +572,117 @@ function Stars() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
   }, [mouseRef, density]);
 
-  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#040812" }} />;
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#040803" }} />;
+}
+
+// ── Ripple (interactive: click = big splash, auto ripples on dark water) ────────
+function Ripple() {
+  const { speed, density } = useBackgroundTheme();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const speedRef = useRef(SPEED_MULT[speed] ?? 1);
+
+  useEffect(() => { speedRef.current = SPEED_MULT[speed] ?? 1; }, [speed]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    let raf: number;
+    interface Ring { x:number; y:number; r:number; maxR:number; alpha:number; width:number; hue:number }
+    let rings: Ring[] = [];
+    let autoTimer = 0;
+
+    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const spawnRipple = (x: number, y: number, big = false) => {
+      const maxR = big
+        ? canvas.width * 0.3 + canvas.height * 0.2
+        : 70 + Math.random() * 110;
+      rings.push({
+        x, y, r: 0, maxR,
+        alpha: big ? 0.65 : 0.3 + Math.random() * 0.25,
+        width: big ? 1.8 : 0.7 + Math.random() * 0.7,
+        hue: 185 + Math.random() * 35,
+      });
+    };
+
+    const onClick = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      spawnRipple(e.clientX - rect.left, e.clientY - rect.top, true);
+    };
+    window.addEventListener("click", onClick);
+
+    const draw = () => {
+      const sp = Math.max(0.3, speedRef.current);
+      const dMult = DENSITY_MULT[density] ?? 1;
+      ctx.fillStyle = "rgba(3,10,22,0.95)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let y = 0; y < canvas.height; y += 36) {
+        ctx.strokeStyle = "rgba(0,190,210,0.03)";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      autoTimer -= sp;
+      if (autoTimer <= 0) {
+        spawnRipple(Math.random() * canvas.width, Math.random() * canvas.height);
+        autoTimer = 55 / Math.max(0.4, sp) / dMult;
+      }
+
+      rings = rings.filter(r => r.alpha > 0.007);
+      rings.forEach(r => {
+        const progress = r.r / r.maxR;
+        r.r += (1.6 + progress * 2.4) * sp;
+        r.alpha *= (0.986 - 0.004 * sp);
+
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+        ctx.strokeStyle = `hsla(${r.hue},80%,65%,${r.alpha})`;
+        ctx.lineWidth = r.width * (1 - progress * 0.6);
+        ctx.stroke();
+
+        if (r.r > 14) {
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, r.r * 0.83, 0, Math.PI*2);
+          ctx.strokeStyle = `hsla(${r.hue},100%,82%,${r.alpha * 0.22})`;
+          ctx.lineWidth = r.width * 0.45;
+          ctx.stroke();
+        }
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("click", onClick);
+    };
+  }, [density]);
+
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030a16" }} />;
+}
+
+// ── Plasma (vivid morphing color blobs — purple/pink/cyan/amber) ───────────────
+function Plasma() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"#0c001e",overflow:"hidden" }}>
+      <style>{`
+        @keyframes plasma1 { 0%,100%{transform:translate(0%,0%) scale(1)} 30%{transform:translate(14%,9%) scale(1.22)} 65%{transform:translate(-9%,16%) scale(0.83)} }
+        @keyframes plasma2 { 0%,100%{transform:translate(0%,0%) scale(1)} 40%{transform:translate(-20%,-12%) scale(1.3)} 75%{transform:translate(11%,-20%) scale(0.88)} }
+        @keyframes plasma3 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(13%,-14%) scale(1.18)} 80%{transform:translate(-6%,10%) scale(0.92)} }
+        @keyframes plasma4 { 0%,100%{transform:translate(0%,0%) scale(1)} 35%{transform:translate(-13%,20%) scale(1.12)} 70%{transform:translate(20%,7%) scale(0.94)} }
+      `}</style>
+      <div style={{ position:"absolute",width:"72%",height:"72%",top:"2%",left:"12%",background:"radial-gradient(ellipse,rgba(139,92,246,0.72) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(52px)",animation:`plasma1 ${13/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"62%",height:"62%",top:"28%",left:"22%",background:"radial-gradient(ellipse,rgba(236,72,153,0.62) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(46px)",animation:`plasma2 ${16/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"58%",height:"58%",top:"12%",left:"38%",background:"radial-gradient(ellipse,rgba(6,182,212,0.55) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(56px)",animation:`plasma3 ${11/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"68%",height:"68%",top:"42%",left:"2%",background:"radial-gradient(ellipse,rgba(251,146,60,0.52) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(62px)",animation:`plasma4 ${19/m}s ease-in-out infinite` }} />
+    </div>
+  );
 }
 
 // ── Custom (user-uploaded photo as cover) ─────────────────────────────────────
@@ -697,8 +818,10 @@ export const BACKGROUNDS: BackgroundEntry[] = [
   { key: "ink-wash",        label: "Ink Wash",         category: "Minimal",       component: InkWash },
   { key: "neon-grid",       label: "Neon Grid",        category: "Playful",       component: NeonGrid },
   { key: "wave",            label: "Ocean Wave",       category: "Playful",       component: Wave },
-  { key: "stars",           label: "Stars",            category: "Minimal",       component: Stars,          interactive: true },
+  { key: "fireflies",       label: "Fireflies",        category: "Minimal",       component: Fireflies,      interactive: true },
   { key: "shooting-stars",  label: "Shooting Stars",   category: "Creative",      component: ShootingStars,  interactive: true },
+  { key: "ripple",          label: "Ripple",           category: "Creative",      component: Ripple,         interactive: true },
+  { key: "plasma",          label: "Plasma",           category: "Creative",      component: Plasma },
   { key: "custom",          label: "My Photo",         category: "Minimal",       component: CustomBg },
 ];
 
