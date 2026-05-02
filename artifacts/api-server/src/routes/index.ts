@@ -10,6 +10,7 @@ import smartImportRouter from "./smart-import.js";
 import aiImageRouter from "./ai-image.js";
 import agentRouter from "./agent.js";
 import linkedinRouter from "./linkedin.js";
+import adminRouter from "./admin.js";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(momentumRouter);
 router.use(smartImportRouter);
 router.use(agentRouter);
 router.use(linkedinRouter);
+router.use(adminRouter);
 
 export default router;

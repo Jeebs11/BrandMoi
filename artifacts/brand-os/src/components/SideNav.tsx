@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useListDrafts } from "@workspace/api-client-react";
@@ -77,6 +77,26 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         "border-t border-gray-100 space-y-0.5 flex-shrink-0",
         collapsed ? "px-1 py-4" : "px-3 py-4"
       )}>
+        {user?.email === "odmlawal@gmail.com" && (
+          <Link
+            href="/admin"
+            title={collapsed ? "Admin" : undefined}
+            className={cn(
+              "flex items-center rounded-xl transition-all text-sm font-semibold",
+              collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
+              location.startsWith("/admin")
+                ? "bg-primary/10 text-primary"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            )}
+          >
+            <Shield
+              className={cn("w-5 h-5 flex-shrink-0", location.startsWith("/admin") ? "text-primary" : "text-gray-400")}
+              strokeWidth={location.startsWith("/admin") ? 2.5 : 1.75}
+            />
+            {!collapsed && "Admin"}
+          </Link>
+        )}
+
         <Link
           href="/settings"
           title={collapsed ? "Settings" : undefined}

@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { usersTable, preferencesTable } from "@workspace/db";
+import { usersTable, preferencesTable, loginEventsTable } from "@workspace/db";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -88,6 +88,8 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   const token = signToken({ userId: user.id, email: user.email, displayName: user.displayName });
   res.cookie("brandos_token", token, COOKIE_OPTIONS);
+  // Track login event (fire-and-forget, never block the response)
+  db.insert(loginEventsTable).values({ userId: user.id }).catch(() => {});
   res.json({ id: user.id, email: user.email, displayName: user.displayName });
 });
 

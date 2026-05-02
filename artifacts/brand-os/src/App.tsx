@@ -15,6 +15,7 @@ import Library from "@/pages/Library";
 import Settings from "@/pages/Settings";
 import Vault from "@/pages/Vault";
 import Analytics from "@/pages/Analytics";
+import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -142,6 +143,11 @@ function Router() {
       <Route path="/analytics">
         <AuthGuard>
           <Analytics />
+        </AuthGuard>
+      </Route>
+      <Route path="/admin">
+        <AuthGuard requireOnboarded={false}>
+          <Admin />
         </AuthGuard>
       </Route>
       <Route path="/">

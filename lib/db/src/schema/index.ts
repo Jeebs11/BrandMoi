@@ -7,3 +7,4 @@ export * from "./performance_signals";
 export * from "./daily_activity";
 export * from "./linkedin_connections";
 export * from "./voice_suggestions";
+export * from "./login_events";
