@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import multer from "multer";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { draftsTable, performanceSignalsTable } from "@workspace/db";
+import { parseLinkedinAnalytics } from "../lib/linkedin-analytics-parser.js";
 import {
   CreateDraftBody,
   UpdateDraftBody,
@@ -218,7 +220,18 @@ const PerformanceBody = z.object({
   impressions: z.number().int().min(0),
   reactions: z.number().int().min(0),
   comments: z.number().int().min(0),
+  reposts: z.number().int().min(0).optional().default(0),
+  saves: z.number().int().min(0).optional().default(0),
+  sends: z.number().int().min(0).optional().default(0),
+  membersReached: z.number().int().min(0).optional().default(0),
+  followersGained: z.number().int().min(0).optional().default(0),
+  linkEngagements: z.number().int().min(0).optional().default(0),
+  linkedinUrl: z.string().max(2000).optional().nullable(),
+  linkedinPostDate: z.string().max(50).optional().nullable(),
+  demographics: z.record(z.unknown()).optional().nullable(),
 });
+
+const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 router.post("/drafts/:id/performance", requireAuth, async (req, res): Promise<void> => {
   const params = GetDraftParams.safeParse(req.params);
@@ -248,23 +261,114 @@ router.post("/drafts/:id/performance", requireAuth, async (req, res): Promise<vo
     .from(performanceSignalsTable)
     .where(eq(performanceSignalsTable.draftId, params.data.id));
 
+  const signalData = {
+    impressions: parsed.data.impressions,
+    reactions: parsed.data.reactions,
+    comments: parsed.data.comments,
+    reposts: parsed.data.reposts ?? 0,
+    saves: parsed.data.saves ?? 0,
+    sends: parsed.data.sends ?? 0,
+    membersReached: parsed.data.membersReached ?? 0,
+    followersGained: parsed.data.followersGained ?? 0,
+    linkEngagements: parsed.data.linkEngagements ?? 0,
+    ...(parsed.data.linkedinUrl !== undefined ? { linkedinUrl: parsed.data.linkedinUrl } : {}),
+    ...(parsed.data.linkedinPostDate !== undefined ? { linkedinPostDate: parsed.data.linkedinPostDate } : {}),
+    ...(parsed.data.demographics !== undefined ? { demographics: parsed.data.demographics } : {}),
+  };
+
   let signal;
   if (existing) {
     const [updated] = await db
       .update(performanceSignalsTable)
-      .set({ impressions: parsed.data.impressions, reactions: parsed.data.reactions, comments: parsed.data.comments })
+      .set(signalData)
       .where(eq(performanceSignalsTable.draftId, params.data.id))
       .returning();
     signal = updated;
   } else {
     const [created] = await db
       .insert(performanceSignalsTable)
-      .values({ draftId: params.data.id, ...parsed.data })
+      .values({ draftId: params.data.id, ...signalData })
       .returning();
     signal = created;
   }
 
   res.json(signal);
+});
+
+router.post("/drafts/:id/performance/upload", requireAuth, xlsxUpload.single("file"), async (req, res): Promise<void> => {
+  const params = GetDraftParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
+  const validExt = req.file.originalname.toLowerCase().endsWith(".xlsx");
+  const validMime = req.file.mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    || req.file.mimetype === "application/octet-stream";
+  const validMagic = req.file.buffer.length >= 4
+    && req.file.buffer[0] === 0x50 && req.file.buffer[1] === 0x4B; // ZIP/OOXML magic bytes PK
+  if (!validExt || !validMagic) {
+    res.status(400).json({ error: "File must be a LinkedIn analytics .xlsx export" }); return;
+  }
+  void validMime; // type checked via extension + magic bytes above
+
+  const [draft] = await db
+    .select({ id: draftsTable.id })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+
+  if (!draft) { res.status(404).json({ error: "Draft not found" }); return; }
+
+  let parsed: ReturnType<typeof parseLinkedinAnalytics>;
+  try {
+    parsed = parseLinkedinAnalytics(req.file.buffer);
+  } catch (err) {
+    console.error("[upload-analytics] parse error", err);
+    res.status(422).json({ error: "Could not parse the xlsx file. Make sure it is a LinkedIn single-post analytics export." });
+    return;
+  }
+
+  const signalData = {
+    impressions: parsed.impressions,
+    reactions: parsed.reactions,
+    comments: parsed.comments,
+    reposts: parsed.reposts,
+    saves: parsed.saves,
+    sends: parsed.sends,
+    membersReached: parsed.membersReached,
+    followersGained: parsed.followersGained,
+    linkEngagements: parsed.linkEngagements,
+    demographics: parsed.demographics as Record<string, unknown>,
+    linkedinUrl: parsed.linkedinUrl ?? undefined,
+    linkedinPostDate: parsed.linkedinPostDate ?? undefined,
+  };
+
+  const [existing] = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(eq(performanceSignalsTable.draftId, params.data.id));
+
+  let signal;
+  if (existing) {
+    const [updated] = await db
+      .update(performanceSignalsTable)
+      .set(signalData)
+      .where(eq(performanceSignalsTable.draftId, params.data.id))
+      .returning();
+    signal = updated;
+  } else {
+    const [created] = await db
+      .insert(performanceSignalsTable)
+      .values({ draftId: params.data.id, ...signalData })
+      .returning();
+    signal = created;
+  }
+
+  // Auto-mark the draft as published if it isn't already
+  await db
+    .update(draftsTable)
+    .set({ status: "published", ...(parsed.linkedinUrl ? { linkedinUrl: parsed.linkedinUrl } : {}) })
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+
+  res.json({ signal, parsed });
 });
 
 router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> => {
@@ -280,23 +384,24 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
   const totalPublished = allDrafts.length;
 
   const draftIds = allDrafts.map(d => d.id);
-  const perfMap = new Map<number, { impressions: number; reactions: number; comments: number; reposts: number }>();
+  const perfMap = new Map<number, { impressions: number; reactions: number; comments: number; reposts: number; saves: number; membersReached: number }>();
   if (draftIds.length > 0) {
     const signals = await db
       .select()
       .from(performanceSignalsTable)
       .where(inArray(performanceSignalsTable.draftId, draftIds));
     for (const s of signals) {
-      perfMap.set(s.draftId, { impressions: s.impressions, reactions: s.reactions, comments: s.comments, reposts: s.reposts });
+      perfMap.set(s.draftId, { impressions: s.impressions, reactions: s.reactions, comments: s.comments, reposts: s.reposts, saves: s.saves, membersReached: s.membersReached });
     }
   }
 
   const resonanceOf = (draftId: number): number | null => {
     const p = perfMap.get(draftId);
     if (!p) return null;
-    const engagementWeight = p.reactions * 3 + p.comments * 5 + p.reposts * 4;
-    if (p.impressions > 0) {
-      return Math.min(100, Math.round((engagementWeight / p.impressions) * 1000));
+    const engagementWeight = p.reactions * 3 + p.comments * 5 + p.reposts * 4 + p.saves * 8;
+    const reach = p.membersReached > 0 ? p.membersReached : p.impressions;
+    if (reach > 0) {
+      return Math.min(100, Math.round((engagementWeight / reach) * 1000));
     }
     if (engagementWeight === 0) return null;
     return Math.min(100, Math.round(Math.log2(1 + engagementWeight) * 12));
@@ -659,10 +764,11 @@ router.get("/analytics/resonance-map", requireAuth, async (req, res): Promise<vo
 
   const map: Record<number, number> = {};
   for (const s of signals) {
-    const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4;
+    const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4 + s.saves * 8;
+    const reach = s.membersReached > 0 ? s.membersReached : s.impressions;
     let score: number;
-    if (s.impressions > 0) {
-      score = Math.min(100, Math.round((w / s.impressions) * 1000));
+    if (reach > 0) {
+      score = Math.min(100, Math.round((w / reach) * 1000));
     } else if (w === 0) {
       score = 0;
     } else {

@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import multer from "multer";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -64,9 +65,17 @@ if (process.env.NODE_ENV === "production") {
 }
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      res.status(413).json({ error: "File too large — LinkedIn analytics exports are under 2 MB." });
+      return;
+    }
+    res.status(400).json({ error: `Upload error: ${err.message}` });
+    return;
+  }
   console.error("[unhandled-error]", err?.code, err?.status, err?.message);
   if (!res.headersSent) {
-    res.status(err?.status || 500).send(err?.message || "Internal Server Error");
+    res.status(err?.status || 500).json({ error: err?.message || "Internal Server Error" });
   }
 });
 

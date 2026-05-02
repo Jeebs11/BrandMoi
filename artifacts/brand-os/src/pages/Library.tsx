@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2 } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
@@ -403,20 +403,56 @@ export default function Library() {
 }
 
 function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; onClose: () => void }) {
+  const [tab, setTab] = useState<"upload" | "manual">("upload");
   const [impressions, setImpressions] = useState(modal.existing?.impressions ?? 0);
   const [reactions, setReactions] = useState(modal.existing?.reactions ?? 0);
   const [comments, setComments] = useState(modal.existing?.comments ?? 0);
+  const [reposts, setReposts] = useState(modal.existing?.reposts ?? 0);
+  const [saves, setSaves] = useState(modal.existing?.saves ?? 0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "success" | "error">("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSummary, setUploadSummary] = useState<{ impressions: number; reactions: number; saves: number; membersReached: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const resonanceScore = impressions > 0
-    ? Math.min(100, Math.round(((reactions * 3 + comments * 5) / impressions) * 1000))
-    : 0;
+  const resonanceScore = (() => {
+    const reach = (modal.existing?.membersReached ?? 0) > 0 ? (modal.existing?.membersReached ?? 0) : impressions;
+    const w = reactions * 3 + comments * 5 + reposts * 4 + saves * 8;
+    if (reach > 0) return Math.min(100, Math.round((w / reach) * 1000));
+    return 0;
+  })();
 
-  const handleSave = async () => {
+  const handleXlsxUpload = async (file: File) => {
+    setUploadState("uploading");
+    setUploadError(null);
+    try {
+      const { signal, parsed } = await performanceApi.uploadXlsx(modal.draftId, file);
+      setUploadSummary({
+        impressions: signal.impressions,
+        reactions: signal.reactions,
+        saves: signal.saves,
+        membersReached: signal.membersReached,
+      });
+      // Also pre-fill manual tab fields
+      setImpressions(signal.impressions);
+      setReactions(signal.reactions);
+      setComments(signal.comments);
+      setReposts(signal.reposts);
+      setSaves(signal.saves);
+      void parsed; // acknowledged
+      setUploadState("success");
+      setTimeout(onClose, 2000);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+      setUploadState("error");
+    }
+  };
+
+  const handleManualSave = async () => {
     setSaving(true);
     try {
-      await performanceApi.log(modal.draftId, { impressions, reactions, comments });
+      await performanceApi.log(modal.draftId, { impressions, reactions, comments, reposts, saves });
       setSaved(true);
       setTimeout(onClose, 1200);
     } finally {
@@ -428,7 +464,7 @@ function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; on
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl">
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <BarChart2 className="w-4 h-4 text-violet-500" />
@@ -441,41 +477,130 @@ function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; on
           </button>
         </div>
 
-        <div className="space-y-4 mb-5">
-          <NumberInput label="Impressions" value={impressions} onChange={setImpressions} />
-          <NumberInput label="Reactions" value={reactions} onChange={setReactions} />
-          <NumberInput label="Comments" value={comments} onChange={setComments} />
+        {/* Tab switcher */}
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-5">
+          {(["upload", "manual"] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
+                tab === t ? "bg-white text-violet-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              {t === "upload" ? <><Upload className="w-3.5 h-3.5" /> Upload xlsx</> : <><Pencil className="w-3.5 h-3.5" /> Enter manually</>}
+            </button>
+          ))}
         </div>
 
-        {impressions > 0 && (
-          <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl mb-4">
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Resonance Score</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black text-violet-700">{resonanceScore}</span>
-                <span className="text-xs text-violet-400 font-bold">/100</span>
+        {tab === "upload" ? (
+          <div>
+            <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+              Export your post's analytics from LinkedIn (Content → Post → Export) and upload the <strong>.xlsx</strong> file. The AI will learn what content works best for your audience.
+            </p>
+
+            {uploadState === "success" && uploadSummary ? (
+              <div className="p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
+                <div className="text-2xl mb-1">✓</div>
+                <p className="font-bold text-green-700 text-sm mb-2">Analytics imported!</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white rounded-xl p-2 text-center">
+                    <div className="font-black text-gray-900">{uploadSummary.impressions.toLocaleString()}</div>
+                    <div className="text-gray-400">impressions</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-2 text-center">
+                    <div className="font-black text-gray-900">{uploadSummary.membersReached.toLocaleString()}</div>
+                    <div className="text-gray-400">members reached</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-2 text-center">
+                    <div className="font-black text-gray-900">{uploadSummary.reactions.toLocaleString()}</div>
+                    <div className="text-gray-400">reactions</div>
+                  </div>
+                  <div className="bg-white rounded-xl p-2 text-center">
+                    <div className="font-black text-gray-900">{uploadSummary.saves.toLocaleString()}</div>
+                    <div className="text-gray-400">saves</div>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploadState === "uploading"}
+                className={cn(
+                  "w-full border-2 border-dashed rounded-2xl p-8 flex flex-col items-center gap-3 transition-all",
+                  uploadState === "error" ? "border-red-300 bg-red-50" : "border-violet-200 bg-violet-50 hover:bg-violet-100 hover:border-violet-400",
+                  uploadState === "uploading" && "opacity-60 cursor-not-allowed"
+                )}
+              >
+                {uploadState === "uploading"
+                  ? <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                  : <Upload className="w-8 h-8 text-violet-400" />
+                }
+                <div className="text-center">
+                  <p className="text-sm font-bold text-violet-700">
+                    {uploadState === "uploading" ? "Parsing analytics…" : "Tap to choose xlsx file"}
+                  </p>
+                  <p className="text-xs text-violet-400 mt-0.5">LinkedIn single-post export · max 2 MB</p>
+                </div>
+              </button>
+            )}
+
+            {uploadState === "error" && uploadError && (
+              <p className="text-xs text-red-500 mt-2 text-center">{uploadError}</p>
+            )}
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleXlsxUpload(file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        ) : (
+          <div>
+            <div className="space-y-3 mb-5">
+              <NumberInput label="Impressions" value={impressions} onChange={setImpressions} />
+              <NumberInput label="Reactions" value={reactions} onChange={setReactions} />
+              <NumberInput label="Comments" value={comments} onChange={setComments} />
+              <NumberInput label="Reposts" value={reposts} onChange={setReposts} />
+              <NumberInput label="Saves" value={saves} onChange={setSaves} />
             </div>
-            <div className="w-16 h-16 relative flex items-center justify-center">
-              <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                <circle cx="32" cy="32" r="26" fill="none" stroke="#ede9fe" strokeWidth="8" />
-                <circle cx="32" cy="32" r="26" fill="none" stroke="#7c3aed" strokeWidth="8"
-                  strokeDasharray={`${(resonanceScore / 100) * 163} 163`} strokeLinecap="round" />
-              </svg>
-              <span className="absolute text-xs font-black text-violet-700">{resonanceScore}</span>
-            </div>
+
+            {impressions > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl mb-4">
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Resonance Score</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-violet-700">{resonanceScore}</span>
+                    <span className="text-xs text-violet-400 font-bold">/100</span>
+                  </div>
+                </div>
+                <div className="w-16 h-16 relative flex items-center justify-center">
+                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="26" fill="none" stroke="#ede9fe" strokeWidth="8" />
+                    <circle cx="32" cy="32" r="26" fill="none" stroke="#7c3aed" strokeWidth="8"
+                      strokeDasharray={`${(resonanceScore / 100) * 163} 163`} strokeLinecap="round" />
+                  </svg>
+                  <span className="absolute text-xs font-black text-violet-700">{resonanceScore}</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => void handleManualSave()}
+              disabled={saving || saved}
+              className={cn("w-full h-12 rounded-2xl font-bold text-sm transition-all",
+                saved ? "bg-green-500 text-white" : "bg-primary text-white hover:bg-primary/90 disabled:opacity-60"
+              )}
+            >
+              {saved ? "✓ Saved" : saving ? "Saving..." : "Save performance data"}
+            </button>
           </div>
         )}
-
-        <button
-          onClick={() => void handleSave()}
-          disabled={saving || saved}
-          className={cn("w-full h-12 rounded-2xl font-bold text-sm transition-all",
-            saved ? "bg-green-500 text-white" : "bg-primary text-white hover:bg-primary/90 disabled:opacity-60"
-          )}
-        >
-          {saved ? "✓ Saved" : saving ? "Saving..." : "Save performance data"}
-        </button>
       </div>
     </div>
   );

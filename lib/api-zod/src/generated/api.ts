@@ -188,7 +188,7 @@ export const GetAgentBriefResponse = zod.object({
 });
 
 /**
- * @summary Generate LinkedIn content from confirmed structure
+ * @summary Generate LinkedIn content from raw idea with audience and feeling
  */
 export const GenerateContentBody = zod.object({
   rawInput: zod.string(),

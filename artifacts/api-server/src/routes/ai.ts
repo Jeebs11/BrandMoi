@@ -113,7 +113,10 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
 
   const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction } = parsed.data;
   const userId = req.user!.userId;
-  const voiceContext = await getUserBrandContext(userId);
+  const [voiceContext, performanceContext] = await Promise.all([
+    getUserBrandContext(userId),
+    buildPerformanceContext(userId),
+  ]);
   const fallbackBrand = buildBrandContext(objective ?? "", persona ?? "", tone ?? "");
 
   const audienceLabel = audience && NEW_FLOW_AUDIENCES.has(audience) ? audience : (audience ?? "My audience");
@@ -145,6 +148,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "",
     "## FEELING OVERLAY (mandatory):",
     feelingOverlay,
+    performanceContext ? `\n${performanceContext}` : "",
     newsContext ? `\n## TODAY'S NEWS CONTEXT (weave the headline naturally — never paste a URL):\n${newsContext}` : "",
     extraInstruction ? `\n## EXTRA INSTRUCTION (apply on top of everything else, this is the user's refine ask):\n${extraInstruction}` : "",
     "",
@@ -402,11 +406,64 @@ router.post("/ai/check-angle", requireAuth, async (req, res): Promise<void> => {
 const ALLOWED_VOICE_FIELDS = ["tone", "objective", "persona", "brandRole", "brandAudience", "brandBelief"] as const;
 type AllowedVoiceField = typeof ALLOWED_VOICE_FIELDS[number];
 
-function resonanceScore(s: { impressions: number; reactions: number; comments: number; reposts: number }): number {
-  const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4;
-  if (s.impressions > 0) return Math.min(100, Math.round((w / s.impressions) * 1000));
+function resonanceScore(s: { impressions: number; reactions: number; comments: number; reposts: number; saves?: number; membersReached?: number }): number {
+  const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4 + (s.saves ?? 0) * 8;
+  const reach = (s.membersReached ?? 0) > 0 ? (s.membersReached ?? 0) : s.impressions;
+  if (reach > 0) return Math.min(100, Math.round((w / reach) * 1000));
   if (w === 0) return 0;
   return Math.min(100, Math.round(Math.log2(1 + w) * 12));
+}
+
+async function buildPerformanceContext(userId: number): Promise<string> {
+  const publishedDrafts = await db
+    .select()
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+    .orderBy(desc(draftsTable.updatedAt))
+    .limit(50);
+
+  if (publishedDrafts.length === 0) return "";
+
+  const draftIds = publishedDrafts.map((d) => d.id);
+  const signals = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(inArray(performanceSignalsTable.draftId, draftIds));
+
+  if (signals.length < 3) return "";
+
+  const perfMap = new Map(signals.map((s) => [s.draftId, s]));
+  const scored = publishedDrafts
+    .map((d) => {
+      const s = perfMap.get(d.id);
+      if (!s) return null;
+      const score = resonanceScore(s);
+      const saveRate = s.impressions > 0 ? ((s.saves / s.impressions) * 100).toFixed(1) : "0";
+      return { draft: d, signal: s, resonance: score, saveRate };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.resonance - a.resonance);
+
+  if (scored.length < 3) return "";
+
+  const top = scored.slice(0, Math.min(5, scored.length));
+  const bottom = scored.slice(-Math.min(3, Math.floor(scored.length / 2)));
+
+  const describePost = (x: typeof scored[0]) => {
+    const bd = x.draft.structuredBreakdown as { topic?: string; feeling?: string; audience?: string } | null;
+    const topic = bd?.topic ?? x.draft.rawInput?.slice(0, 50) ?? "unknown";
+    const feeling = bd?.feeling ?? x.draft.tone ?? "unknown";
+    const audience = bd?.audience ?? x.draft.objective ?? "unknown";
+    return `"${topic}" | ${feeling} tone | ${audience} audience | resonance: ${x.resonance} | saves: ${x.saveRate}%`;
+  };
+
+  return [
+    "## YOUR PERFORMANCE HISTORY (calibrate this post toward your highest-reach patterns):",
+    "TOP PERFORMERS — emulate these patterns:",
+    ...top.map((x) => `  + ${describePost(x)}`),
+    "UNDERPERFORMERS — avoid these patterns:",
+    ...bottom.map((x) => `  - ${describePost(x)}`),
+  ].join("\n");
 }
 
 router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Promise<void> => {

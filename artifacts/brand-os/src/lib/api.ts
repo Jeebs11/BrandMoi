@@ -15,6 +15,15 @@ export type PerformanceSignal = {
   impressions: number;
   reactions: number;
   comments: number;
+  reposts: number;
+  saves: number;
+  sends: number;
+  membersReached: number;
+  followersGained: number;
+  linkEngagements: number;
+  demographics: unknown;
+  linkedinUrl: string | null;
+  linkedinPostDate: string | null;
   loggedAt: string;
 };
 
@@ -65,11 +74,30 @@ export const angleApi = {
 export const performanceApi = {
   get: (draftId: number) =>
     apiFetch<PerformanceSignal | null>(`/drafts/${draftId}/performance`),
-  log: (draftId: number, data: { impressions: number; reactions: number; comments: number }) =>
+  log: (draftId: number, data: {
+    impressions: number; reactions: number; comments: number;
+    reposts?: number; saves?: number; sends?: number;
+    membersReached?: number; followersGained?: number; linkEngagements?: number;
+    linkedinUrl?: string | null;
+  }) =>
     apiFetch<PerformanceSignal>(`/drafts/${draftId}/performance`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  uploadXlsx: async (draftId: number, file: File): Promise<{ signal: PerformanceSignal; parsed: Record<string, unknown> }> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/drafts/${draftId}/performance/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+      throw new Error(err.error ?? `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<{ signal: PerformanceSignal; parsed: Record<string, unknown> }>;
+  },
 };
 
 export const voiceApi = {

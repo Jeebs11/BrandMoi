@@ -753,7 +753,7 @@ export function useGetAgentBrief<
 }
 
 /**
- * @summary Generate LinkedIn content from confirmed structure
+ * @summary Generate LinkedIn content from raw idea with audience and feeling
  */
 export const getGenerateContentUrl = () => {
   return `/api/ai/generate`;
@@ -816,7 +816,7 @@ export type GenerateContentMutationBody = BodyType<GenerateContentBody>;
 export type GenerateContentMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Generate LinkedIn content from confirmed structure
+ * @summary Generate LinkedIn content from raw idea with audience and feeling
  */
 export const useGenerateContent = <
   TError = ErrorType<ErrorResponse>,
