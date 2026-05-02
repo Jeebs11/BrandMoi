@@ -40,7 +40,7 @@ export default function Login() {
         <div className="mb-8">
           <div className="w-10 h-10 bg-primary rounded-2xl mb-5" />
           <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Welcome back</h1>
-          <p className="text-gray-500 text-sm">Log in to your Brand OS account.</p>
+          <p className="text-gray-500 text-sm">Log in to your BrandMe account.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -36,9 +36,11 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         "flex items-center border-b border-gray-100 flex-shrink-0",
         collapsed ? "justify-center py-5 h-[65px]" : "gap-2.5 px-5 py-6"
       )}>
-        <div className="w-8 h-8 bg-primary rounded-xl flex-shrink-0" />
+        <div className="w-8 h-8 bg-primary rounded-xl flex-shrink-0 flex items-center justify-center text-white font-black text-sm">B</div>
         {!collapsed && (
-          <span className="text-base font-extrabold text-gray-900 tracking-tight whitespace-nowrap">Brand OS</span>
+          <span className="text-base tracking-tight whitespace-nowrap">
+            <span className="font-extrabold text-gray-900">Brand</span><span className="font-light text-gray-400">Me</span>
+          </span>
         )}
       </div>
 

@@ -28,10 +28,10 @@ export function VariantD() {
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b" style={{ background: "rgba(247,248,250,0.85)", borderColor: "#E2E6EC" }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ background: "#0F1F3D" }}>
-              B
-            </div>
-            <span className="font-bold tracking-tight text-lg" style={{ color: "#0F1F3D" }}>BrandMe</span>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-sm" style={{ background: "#0F1F3D" }}>B</div>
+            <span className="tracking-tight text-lg">
+              <span style={{ fontWeight: 800, color: "#0F1F3D" }}>Brand</span><span style={{ fontWeight: 300, color: "#0F1F3D", opacity: 0.45 }}>Me</span>
+            </span>
           </div>
           <button className="text-sm font-medium transition-colors duration-300" style={{ color: "#0F1F3D" }}
             onMouseEnter={e => (e.currentTarget.style.color = "#2563EB")}

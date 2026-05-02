@@ -250,7 +250,7 @@ export default function Dashboard() {
         <header className="px-6 pt-12 pb-6 bg-white border-b border-gray-100 sticky top-0 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Brand OS</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">BrandMe</p>
               <h1 className="text-xl font-extrabold text-gray-900">
                 {firstName ? `Hey, ${firstName}` : "Dashboard"}
               </h1>

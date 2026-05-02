@@ -217,7 +217,7 @@ export default function Onboarding() {
             <div>
               <h2 className="text-2xl font-extrabold text-gray-900 mb-2">You're set up</h2>
               <p className="text-gray-500 text-sm max-w-[280px] mx-auto">
-                Brand OS will use your voice settings to personalise every piece of content it helps you create.
+                BrandMe will use your voice settings to personalise every piece of content it helps you create.
               </p>
             </div>
 
