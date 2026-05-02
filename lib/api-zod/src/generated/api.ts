@@ -320,6 +320,37 @@ export const RefineContentResponse = zod.object({
 });
 
 /**
+ * @summary Generate 3 minimal post concepts (hook + key points) in distinct feelings before committing to a full post
+ */
+export const ExploreDirectionsBody = zod.object({
+  rawInput: zod.string(),
+  audience: zod.string().nullish(),
+});
+
+export const ExploreDirectionsResponse = zod.object({
+  directions: zod.array(
+    zod.object({
+      feeling: zod.string(),
+      hook: zod.string().describe("Opening line under 120 characters"),
+      points: zod
+        .array(zod.string())
+        .describe("3 key supporting ideas for this angle"),
+    }),
+  ),
+});
+
+/**
+ * @summary Lightweight performance stats — returns best feeling and audience combo for the current user based on resonance history
+ */
+export const GetPerformanceInsightsResponse = zod.object({
+  bestFeeling: zod.string().nullish(),
+  bestAudience: zod.string().nullish(),
+  confidence: zod.enum(["low", "medium", "high"]),
+  sampleSize: zod.number(),
+  message: zod.string().nullish(),
+});
+
+/**
  * @summary Get LinkedIn connection status for the current user
  */
 export const GetLinkedinStatusResponse = zod.object({

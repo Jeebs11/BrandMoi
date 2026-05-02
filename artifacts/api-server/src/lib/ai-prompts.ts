@@ -54,6 +54,10 @@ Apply the AUDIENCE overlay to decide what to say.
 Apply the FEELING overlay to decide how it lands.
 Both overlays are mandatory — they must shape the hook, the body, and the CTA.
 
+VOICE DNA (when provided in context): Let those signals shape register, rhythm, and sentence length — NOT topic choice. The author's voice fingerprint is how they write, not what they've already written about.
+
+FRESHNESS RULE: The hook's opening move, angle, and structure must feel distinct from any previous posts shown in the performance history. Repetition is the single biggest failure mode. Even when the feeling is the same, find a new first move — different image, different provocateur, different scene, different question.
+
 OUTPUT — return only valid JSON, no markdown fences, with these fields:
 {
   "post": "the main post (string)",

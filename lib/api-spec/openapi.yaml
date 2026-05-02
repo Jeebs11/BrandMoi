@@ -239,6 +239,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /ai/explore-directions:
+    post:
+      operationId: exploreDirections
+      tags: [ai]
+      summary: Generate 3 minimal post concepts (hook + key points) in distinct feelings before committing to a full post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExploreDirectionsBody"
+      responses:
+        "200":
+          description: Three direction concepts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExploreDirectionsResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: AI error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ai/performance-insights:
+    get:
+      operationId: getPerformanceInsights
+      tags: [ai]
+      summary: Lightweight performance stats — returns best feeling and audience combo for the current user based on resonance history
+      responses:
+        "200":
+          description: Performance insights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceInsightsResponse"
+
   /linkedin/status:
     get:
       operationId: getLinkedinStatus
@@ -966,6 +1010,66 @@ components:
           type: string
       required:
         - content
+
+    ExploreDirectionsBody:
+      type: object
+      properties:
+        rawInput:
+          type: string
+        audience:
+          type: string
+          nullable: true
+      required:
+        - rawInput
+
+    DirectionConcept:
+      type: object
+      properties:
+        feeling:
+          type: string
+        hook:
+          type: string
+          description: Opening line under 120 characters
+        points:
+          type: array
+          items:
+            type: string
+          description: 3 key supporting ideas for this angle
+      required:
+        - feeling
+        - hook
+        - points
+
+    ExploreDirectionsResponse:
+      type: object
+      properties:
+        directions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DirectionConcept"
+      required:
+        - directions
+
+    PerformanceInsightsResponse:
+      type: object
+      properties:
+        bestFeeling:
+          type: string
+          nullable: true
+        bestAudience:
+          type: string
+          nullable: true
+        confidence:
+          type: string
+          enum: [low, medium, high]
+        sampleSize:
+          type: integer
+        message:
+          type: string
+          nullable: true
+      required:
+        - confidence
+        - sampleSize
 
     Draft:
       type: object

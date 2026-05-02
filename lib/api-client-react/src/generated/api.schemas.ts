@@ -250,6 +250,40 @@ export interface RefinedContent {
   content: string;
 }
 
+export interface ExploreDirectionsBody {
+  rawInput: string;
+  audience?: string | null;
+}
+
+export interface DirectionConcept {
+  feeling: string;
+  /** Opening line under 120 characters */
+  hook: string;
+  /** 3 key supporting ideas for this angle */
+  points: string[];
+}
+
+export interface ExploreDirectionsResponse {
+  directions: DirectionConcept[];
+}
+
+export type PerformanceInsightsResponseConfidence =
+  (typeof PerformanceInsightsResponseConfidence)[keyof typeof PerformanceInsightsResponseConfidence];
+
+export const PerformanceInsightsResponseConfidence = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export interface PerformanceInsightsResponse {
+  bestFeeling?: string | null;
+  bestAudience?: string | null;
+  confidence: PerformanceInsightsResponseConfidence;
+  sampleSize: number;
+  message?: string | null;
+}
+
 /**
  * @nullable
  */

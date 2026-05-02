@@ -22,6 +22,8 @@ import type {
   CreateDraftBody,
   Draft,
   ErrorResponse,
+  ExploreDirectionsBody,
+  ExploreDirectionsResponse,
   GenerateContentBody,
   GeneratePostDiagnosis200,
   GeneratedContent,
@@ -31,6 +33,7 @@ import type {
   LinkedinStatusResponse,
   LinkedinSyncResponse,
   LoginBody,
+  PerformanceInsightsResponse,
   PreferencesResponse,
   RefineContentBody,
   RefinedContent,
@@ -923,6 +926,171 @@ export const useRefineContent = <
 > => {
   return useMutation(getRefineContentMutationOptions(options));
 };
+
+/**
+ * @summary Generate 3 minimal post concepts (hook + key points) in distinct feelings before committing to a full post
+ */
+export const getExploreDirectionsUrl = () => {
+  return `/api/ai/explore-directions`;
+};
+
+export const exploreDirections = async (
+  exploreDirectionsBody: ExploreDirectionsBody,
+  options?: RequestInit,
+): Promise<ExploreDirectionsResponse> => {
+  return customFetch<ExploreDirectionsResponse>(getExploreDirectionsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(exploreDirectionsBody),
+  });
+};
+
+export const getExploreDirectionsMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exploreDirections>>,
+    TError,
+    { data: BodyType<ExploreDirectionsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof exploreDirections>>,
+  TError,
+  { data: BodyType<ExploreDirectionsBody> },
+  TContext
+> => {
+  const mutationKey = ["exploreDirections"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof exploreDirections>>,
+    { data: BodyType<ExploreDirectionsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return exploreDirections(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExploreDirectionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof exploreDirections>>
+>;
+export type ExploreDirectionsMutationBody = BodyType<ExploreDirectionsBody>;
+export type ExploreDirectionsMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Generate 3 minimal post concepts (hook + key points) in distinct feelings before committing to a full post
+ */
+export const useExploreDirections = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exploreDirections>>,
+    TError,
+    { data: BodyType<ExploreDirectionsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof exploreDirections>>,
+  TError,
+  { data: BodyType<ExploreDirectionsBody> },
+  TContext
+> => {
+  return useMutation(getExploreDirectionsMutationOptions(options));
+};
+
+/**
+ * @summary Lightweight performance stats — returns best feeling and audience combo for the current user based on resonance history
+ */
+export const getGetPerformanceInsightsUrl = () => {
+  return `/api/ai/performance-insights`;
+};
+
+export const getPerformanceInsights = async (
+  options?: RequestInit,
+): Promise<PerformanceInsightsResponse> => {
+  return customFetch<PerformanceInsightsResponse>(
+    getGetPerformanceInsightsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPerformanceInsightsQueryKey = () => {
+  return [`/api/ai/performance-insights`] as const;
+};
+
+export const getGetPerformanceInsightsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPerformanceInsights>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPerformanceInsights>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPerformanceInsightsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPerformanceInsights>>
+  > = ({ signal }) => getPerformanceInsights({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPerformanceInsights>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPerformanceInsightsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPerformanceInsights>>
+>;
+export type GetPerformanceInsightsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Lightweight performance stats — returns best feeling and audience combo for the current user based on resonance history
+ */
+
+export function useGetPerformanceInsights<
+  TData = Awaited<ReturnType<typeof getPerformanceInsights>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPerformanceInsights>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPerformanceInsightsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get LinkedIn connection status for the current user

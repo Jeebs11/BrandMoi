@@ -297,6 +297,15 @@ export default function Library() {
                         <DropdownMenuItem onClick={() => navigate(`/capture?draftId=${draft.id}`)}>
                           <Pencil className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          const sb = (draft.structuredBreakdown ?? {}) as { feeling?: string; audience?: string };
+                          const draftFeeling = sb.feeling ?? TONE_TO_FEELING[draft.tone] ?? "Direct";
+                          const draftAudience = sb.audience ?? OBJECTIVE_TO_AUDIENCE[draft.objective] ?? draft.objective ?? "My audience";
+                          const hook = draft.postOutput?.split("\n").map(l => l.trim()).find(l => l.length > 10)?.slice(0, 100) ?? topic;
+                          navigate(`/capture?audience=${encodeURIComponent(draftAudience)}&feeling=${encodeURIComponent(draftFeeling)}&raw=${encodeURIComponent(`More like: ${hook}`)}`);
+                        }}>
+                          <Sparkles className="w-4 h-4 mr-2 text-violet-500" /> More like this
+                        </DropdownMenuItem>
                         {draft.status === "published" && (
                           <>
                             <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic, "upload")}>

@@ -5,15 +5,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, ChevronLeft, RefreshCw, Copy, Save, Newspaper,
   Image as ImageIcon, Layout, BarChart3, PenTool, Wand2,
-  ArrowDown, ArrowUp, BookOpen, Check,
+  ArrowDown, ArrowUp, BookOpen, Check, Layers,
 } from "lucide-react";
 import {
   useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
+  useExploreDirections, useGetPerformanceInsights,
 } from "@workspace/api-client-react";
 import type {
   GeneratedContent, CarouselSlide, StructuredBreakdown, InfographicData,
-  CreateDraftBodyContentSource,
+  CreateDraftBodyContentSource, DirectionConcept,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
@@ -422,6 +423,13 @@ export default function Capture() {
             tieToNews={tieToNews} setTieToNews={setTieToNews}
             isGenerating={isGenerating}
             onMakeIt={() => runGenerate()}
+            onSelectDirection={(d) => {
+              setFeeling(d.feeling);
+              runGenerate({
+                feeling: d.feeling,
+                extraInstruction: `Open with a hook in this direction (make it your own voice): "${d.hook}"`,
+              });
+            }}
             error={generateError instanceof Error ? generateError.message : null}
           />
         )}
@@ -488,11 +496,50 @@ interface CaptureFormProps {
   tieToNews: boolean; setTieToNews: (v: boolean) => void;
   isGenerating: boolean;
   onMakeIt: () => void;
+  onSelectDirection: (d: { feeling: string; hook: string }) => void;
   error: string | null;
 }
 
 function CaptureForm(props: CaptureFormProps) {
-  const { rawInput, setRawInput, audience, setAudience, feeling, setFeeling, tieToNews, setTieToNews, isGenerating, onMakeIt, error } = props;
+  const {
+    rawInput, setRawInput, audience, setAudience,
+    feeling, setFeeling, tieToNews, setTieToNews,
+    isGenerating, onMakeIt, onSelectDirection, error,
+  } = props;
+
+  const [showDirections, setShowDirections] = useState(false);
+  const [directions, setDirections] = useState<DirectionConcept[]>([]);
+
+  const { mutate: exploreDirs, isPending: isExploring } = useExploreDirections();
+  const { data: insights } = useGetPerformanceInsights();
+
+  const handleExplore = () => {
+    if (!rawInput.trim()) return;
+    setShowDirections(true);
+    setDirections([]);
+    exploreDirs(
+      { data: { rawInput, audience: audience || undefined } },
+      {
+        onSuccess: (data) => setDirections(data.directions),
+        onError: () => setShowDirections(false),
+      }
+    );
+  };
+
+  // Reset explore panel when the raw idea changes significantly
+  const prevRawRef = React.useRef(rawInput);
+  useEffect(() => {
+    if (Math.abs(rawInput.length - prevRawRef.current.length) > 20) {
+      setShowDirections(false);
+      setDirections([]);
+    }
+    prevRawRef.current = rawInput;
+  }, [rawInput]);
+
+  const feelingNudge = insights && insights.confidence !== "low" && insights.bestFeeling && insights.bestFeeling !== feeling
+    ? insights.bestFeeling
+    : null;
+
   return (
     <div className="space-y-6">
       <textarea
@@ -524,7 +571,18 @@ function CaptureForm(props: CaptureFormProps) {
       </div>
 
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">How should it feel?</p>
+        <div className="flex items-center gap-2 mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">How should it feel?</p>
+          {feelingNudge && (
+            <button
+              onClick={() => setFeeling(feelingNudge)}
+              className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full hover:bg-violet-100 transition"
+            >
+              <Sparkles className="w-2.5 h-2.5" />
+              {feelingNudge} works best for you
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           {FEELINGS.map((f) => (
             <button
@@ -567,6 +625,50 @@ function CaptureForm(props: CaptureFormProps) {
           {tieToNews && <Check className="w-3 h-3 text-white" />}
         </div>
       </button>
+
+      {/* Explore 3 directions */}
+      {!showDirections && rawInput.trim() && (
+        <button
+          onClick={handleExplore}
+          disabled={isExploring || isGenerating}
+          className="w-full flex items-center justify-center gap-2 py-3 text-sm text-violet-600 font-medium border border-violet-200 rounded-2xl hover:bg-violet-50 transition disabled:opacity-50"
+        >
+          <Layers className="w-4 h-4" />
+          Not sure? Explore 3 angles
+        </button>
+      )}
+
+      {showDirections && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pick a direction — tap to generate</p>
+            <button onClick={() => setShowDirections(false)} className="text-xs text-gray-400 hover:text-gray-600">Hide</button>
+          </div>
+          {isExploring || directions.length === 0 ? (
+            <div className="text-center py-8">
+              <RefreshCw className="w-5 h-5 animate-spin mx-auto text-violet-400 mb-2" />
+              <p className="text-sm text-gray-400">Finding angles…</p>
+            </div>
+          ) : (
+            directions.map((d, i) => (
+              <button
+                key={i}
+                onClick={() => onSelectDirection(d)}
+                disabled={isGenerating}
+                className="w-full text-left p-4 rounded-2xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50/30 transition space-y-2 disabled:opacity-50"
+              >
+                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                  {d.feeling}
+                </span>
+                <p className="font-semibold text-sm text-gray-900 leading-snug">"{d.hook}"</p>
+                <ul className="text-xs text-gray-500 space-y-0.5">
+                  {d.points.map((pt, j) => <li key={j}>· {pt}</li>)}
+                </ul>
+              </button>
+            ))
+          )}
+        </div>
+      )}
 
       {error && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>

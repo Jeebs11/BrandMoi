@@ -454,15 +454,21 @@ async function buildPerformanceContext(userId: number): Promise<string> {
     const topic = bd?.topic ?? x.draft.rawInput?.slice(0, 50) ?? "unknown";
     const feeling = bd?.feeling ?? x.draft.tone ?? "unknown";
     const audience = bd?.audience ?? x.draft.objective ?? "unknown";
-    return `"${topic}" | ${feeling} tone | ${audience} audience | resonance: ${x.resonance} | saves: ${x.saveRate}%`;
+    // Include actual hook so Claude can match voice register — NOT to copy the topic
+    const postText = x.draft.postOutput ?? "";
+    const hook = postText.split("\n").map((l: string) => l.trim()).find((l: string) => l.length > 10)?.slice(0, 110) ?? "";
+    const base = `Topic: "${topic}" | ${feeling} | ${audience} | Resonance: ${x.resonance} | Saves: ${x.saveRate}%`;
+    return hook ? `${base}\n    Hook register: "${hook}"` : base;
   };
 
   return [
-    "## YOUR PERFORMANCE HISTORY (calibrate this post toward your highest-reach patterns):",
-    "TOP PERFORMERS — emulate these patterns:",
-    ...top.map((x) => `  + ${describePost(x)}`),
-    "UNDERPERFORMERS — avoid these patterns:",
-    ...bottom.map((x) => `  - ${describePost(x)}`),
+    "## PERFORMANCE HISTORY — match the voice REGISTER and structural confidence of high-resonance posts; take fresh angles the author hasn't used before:",
+    "HIGH RESONANCE — study the hook register for rhythm cues; do NOT repeat the topic or angle:",
+    ...top.map((x) => `  ✓ ${describePost(x)}`),
+    ...(bottom.length > 0 ? [
+      "LOW RESONANCE — avoid these structural patterns (not just these topics):",
+      ...bottom.map((x) => `  ✗ ${describePost(x)}`),
+    ] : []),
   ].join("\n");
 }
 
@@ -770,6 +776,169 @@ Diagnose this post. Return JSON only.`,
   await db.update(draftsTable).set({ diagnosis }).where(eq(draftsTable.id, draftId));
 
   res.json({ diagnosis });
+});
+
+// ── POST /ai/explore-directions ────────────────────────────────────────────
+// Returns 3 minimal post concepts (feeling + hook + points) for the user to
+// pick a direction before committing to a full generation. Uses recent hooks
+// to ensure the angles suggested are fresh relative to prior posts.
+router.post("/ai/explore-directions", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const body = z.object({
+    rawInput: z.string().min(1),
+    audience: z.string().nullish(),
+  }).safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
+
+  const { rawInput, audience: audienceHint } = body.data;
+  const userId = req.user!.userId;
+
+  const recentDrafts = await db
+    .select({ postOutput: draftsTable.postOutput })
+    .from(draftsTable)
+    .where(eq(draftsTable.userId, userId))
+    .orderBy(desc(draftsTable.updatedAt))
+    .limit(6);
+
+  const recentHooks = recentDrafts
+    .map((d) => {
+      const text = d.postOutput ?? "";
+      return text.split("\n").map((l: string) => l.trim()).find((l: string) => l.length > 10)?.slice(0, 80) ?? "";
+    })
+    .filter(Boolean);
+
+  const avoidNote = recentHooks.length > 0
+    ? `\nDo NOT open with an angle similar to these recent posts the author has already published:\n${recentHooks.map((h) => `  - "${h}"`).join("\n")}`
+    : "";
+
+  const systemPrompt = `You are a creative director. Given a raw idea, generate exactly 3 distinct post concepts — each using a DIFFERENT feeling and a completely different opening strategy.
+
+Return only valid JSON (no markdown fences, no explanation):
+{
+  "directions": [
+    { "feeling": "Direct", "hook": "opening line under 120 chars", "points": ["key idea 1", "key idea 2", "key idea 3"] },
+    { "feeling": "Story", "hook": "opening line under 120 chars", "points": ["key idea 1", "key idea 2", "key idea 3"] },
+    { "feeling": "Contrarian", "hook": "opening line under 120 chars", "points": ["key idea 1", "key idea 2", "key idea 3"] }
+  ]
+}
+
+RULES:
+- Each of the 3 directions must use a DIFFERENT feeling — pick from: Direct, Witty, Vulnerable, Story, Contrarian
+- Each hook must open from a completely different angle — different first move, different image, different tension
+- Points are the 3 raw supporting ideas for that angle (brief, not polished LinkedIn copy)
+- Keep every hook under 120 characters
+- Banned words in hooks: game-changer, passionate, excited to share, leverage, synergy, groundbreaking`;
+
+  const userMsg = `Raw idea: ${rawInput}${audienceHint ? `\nTarget audience: ${audienceHint}` : ""}${avoidNote}\n\nGenerate 3 directions. Return JSON only.`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMsg }],
+    });
+    const t = message.content[0];
+    if (t.type !== "text") { res.status(500).json({ error: "Unexpected AI response" }); return; }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+    } catch {
+      res.status(500).json({ error: "AI returned invalid JSON" }); return;
+    }
+    const validated = z.object({
+      directions: z.array(z.object({
+        feeling: z.string(),
+        hook: z.string(),
+        points: z.array(z.string()),
+      })).min(1).max(5),
+    }).safeParse(parsed);
+    if (!validated.success) { res.status(500).json({ error: "AI response shape mismatch" }); return; }
+    res.json(validated.data);
+  } catch (err) {
+    console.error("[explore-directions]", err);
+    res.status(500).json({ error: "Failed to explore directions" });
+  }
+});
+
+// ── GET /ai/performance-insights ───────────────────────────────────────────
+// Lightweight query: best feeling and audience combo based on resonance history.
+// Used by Capture to show a pre-generation nudge ("Vulnerable works best for you").
+router.get("/ai/performance-insights", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+
+  const publishedDrafts = await db
+    .select()
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+    .orderBy(desc(draftsTable.updatedAt))
+    .limit(50);
+
+  if (publishedDrafts.length === 0) {
+    res.json({ confidence: "low", sampleSize: 0, bestFeeling: null, bestAudience: null, message: null });
+    return;
+  }
+
+  const draftIds = publishedDrafts.map((d) => d.id);
+  const signals = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(inArray(performanceSignalsTable.draftId, draftIds));
+
+  if (signals.length < 3) {
+    res.json({ confidence: "low", sampleSize: signals.length, bestFeeling: null, bestAudience: null, message: null });
+    return;
+  }
+
+  const perfMap = new Map(signals.map((s) => [s.draftId, s]));
+  const scored = publishedDrafts
+    .map((d) => {
+      const s = perfMap.get(d.id);
+      if (!s) return null;
+      const bd = d.structuredBreakdown as { feeling?: string; audience?: string } | null;
+      const feeling = bd?.feeling ?? d.tone ?? null;
+      const audience = bd?.audience ?? d.objective ?? null;
+      return { feeling, audience, resonance: resonanceScore(s) };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  const feelingStats = new Map<string, { total: number; count: number }>();
+  const audienceStats = new Map<string, { total: number; count: number }>();
+  for (const { feeling, audience, resonance } of scored) {
+    if (feeling) {
+      const f = feelingStats.get(feeling) ?? { total: 0, count: 0 };
+      f.total += resonance; f.count++;
+      feelingStats.set(feeling, f);
+    }
+    if (audience) {
+      const a = audienceStats.get(audience) ?? { total: 0, count: 0 };
+      a.total += resonance; a.count++;
+      audienceStats.set(audience, a);
+    }
+  }
+
+  let bestFeeling: string | null = null;
+  let bestFeelingAvg = 0;
+  for (const [f, { total, count }] of feelingStats) {
+    if (count >= 2) {
+      const avg = total / count;
+      if (avg > bestFeelingAvg) { bestFeelingAvg = avg; bestFeeling = f; }
+    }
+  }
+
+  let bestAudience: string | null = null;
+  let bestAudienceAvg = 0;
+  for (const [a, { total, count }] of audienceStats) {
+    if (count >= 2) {
+      const avg = total / count;
+      if (avg > bestAudienceAvg) { bestAudienceAvg = avg; bestAudience = a; }
+    }
+  }
+
+  const sampleSize = scored.length;
+  const confidence: "low" | "medium" | "high" = sampleSize >= 10 ? "high" : sampleSize >= 5 ? "medium" : "low";
+  const message = bestFeeling && confidence !== "low" ? `${bestFeeling} posts resonate most for you` : null;
+
+  res.json({ bestFeeling, bestAudience, confidence, sampleSize, message });
 });
 
 export async function extractVoiceDNA(userId: number, draftId: number, postOutput: string): Promise<void> {

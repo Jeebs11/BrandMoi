@@ -25,7 +25,12 @@ Features email/password authentication, a 5-screen onboarding process (Audience,
 Users can manage drafts with filtering capabilities. A "Log Performance" feature allows tracking content engagement (Impressions, Reactions, Comments) to calculate a Resonance Score.
 
 ### AI-Powered Enhancements
-- **Prompt Architecture**: Short `GENERATE_SYSTEM_PROMPT` (~45 lines) + mandatory `AUDIENCE_OVERLAYS` (5 audience types) + `FEELING_INSTRUCTIONS` (5 feelings) + optional news-tie context. One Claude call returns post, alternativeHooks[2], hashtags, shortPost, carousel, visual, infographic.
+- **Prompt Architecture**: Short `GENERATE_SYSTEM_PROMPT` (~50 lines) + mandatory `AUDIENCE_OVERLAYS` (5 audience types) + `FEELING_INSTRUCTIONS` (5 feelings) + optional news-tie context. One Claude call returns post, alternativeHooks[2], hashtags, shortPost, carousel, visual, infographic.
+- **Voice DNA Directive**: System prompt explicitly instructs Claude that DNA signals shape register/rhythm — NOT topic choice. Freshness rule prevents hook angle repetition even when feeling stays the same.
+- **Richer Performance Context**: `buildPerformanceContext` now includes the actual opening hook line of each top-performing post (not just labels), so Claude can match voice register while taking fresh angles.
+- **Explore 3 Directions**: `POST /ai/explore-directions` — fast Claude call returning 3 concepts with distinct feelings + hook + 3 points. Used by the Capture form's "Not sure? Explore 3 angles" button before committing to a full generation. Avoids repeating the user's recent hook angles.
+- **Performance Insights Nudge**: `GET /ai/performance-insights` — lightweight DB query computing best feeling/audience by resonance avg. Shown as a pill badge on the Capture form's feeling section ("Vulnerable works best for you") when confidence ≥ medium.
+- **More Like This (Library)**: Every draft card's dropdown includes "More like this" — navigates to Capture pre-filled with the post's audience, feeling, and hook so the user can replicate a successful post pattern in one tap.
 - **Illustration Styles**: 4 styles — cartoon, new-yorker, isometric, loose-pencil. Audience and feeling threaded into concept generation. Relaxed literal-scene rules (no cliché-trope ban on literal scenes).
 - **News Anchor**: When tieToNews=true, fetches a fresh headline and weaves it into the post naturally.
 - **Smart Document Import**: A reusable component (`SmartImportButton`) allows users to upload PDF/DOCX/TXT files for backend extraction of brand voice parameters using Claude.
