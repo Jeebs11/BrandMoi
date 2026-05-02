@@ -78,14 +78,6 @@ export default function Landing() {
 
         {/* Hero */}
         <section className="max-w-5xl mx-auto px-6 pt-20 pb-32 text-center">
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold tracking-wide mb-12 lp-hidden lp-animate-in"
-            style={{ background: "#E8EDF5", color: "#0F1F3D" }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: "#2563EB" }} />
-            Private Beta
-          </div>
-
           <h1
             className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.1] mb-8 max-w-4xl mx-auto lp-hidden lp-animate-in lp-delay-100"
             style={{ color: "#0F1F3D", letterSpacing: "-2px" }}
