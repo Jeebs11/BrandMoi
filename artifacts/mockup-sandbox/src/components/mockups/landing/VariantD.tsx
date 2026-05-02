@@ -31,7 +31,7 @@ export function VariantD() {
             <div className="w-8 h-8 rounded-full bg-[#1A1A1A] flex items-center justify-center text-white font-bold text-sm">
               B
             </div>
-            <span className="font-semibold tracking-tight text-lg">Brand OS</span>
+            <span className="font-semibold tracking-tight text-lg">BrandMe</span>
           </div>
           <button className="text-sm font-medium hover:text-[#6056FA] transition-colors duration-300">
             Join Waitlist
@@ -53,7 +53,7 @@ export function VariantD() {
           </h1>
           
           <p className="text-xl md:text-2xl text-[#666666] font-light max-w-2xl mx-auto leading-relaxed mb-12 opacity-0-init animate-fade-in-up delay-200">
-            Stop sounding like an AI generated your thoughts. Brand OS learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
+            Stop sounding like an AI generated your thoughts. BrandMe learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 opacity-0-init animate-fade-in-up delay-300">
@@ -99,7 +99,7 @@ export function VariantD() {
       </main>
 
       <footer className="py-8 text-center text-sm text-[#A3A3A3] bg-[#FAFAFA] border-t border-[#E5E5E5]">
-        <p>© 2025 Brand OS. Built for people who care.</p>
+        <p>© 2025 BrandMe. Built for people who care.</p>
       </footer>
     </div>
   );
