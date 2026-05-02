@@ -63,10 +63,12 @@ const TABS: Array<{ key: TabType; label: string; icon: React.ComponentType<{ cla
   { key: "illustration", label: "Illustration", icon: Wand2 },
 ];
 
-// Map persisted-draft objective → audience chip (mirrors backend normaliser).
+// Map persisted-draft objective → audience chip (mirrors backend normalizeDraft).
 function audienceFromObjective(objective?: string | null): string {
   if (!objective) return "My audience";
-  const o = objective.toLowerCase();
+  const o = objective.toLowerCase().trim();
+  // "Hiring" means the user is recruiting (their own audience) — NOT the same as Recruiters.
+  if (o === "hiring") return "My audience";
   if (o.includes("client")) return "Clients";
   if (o.includes("job") || o.includes("recruit") || o.includes("hire")) return "Recruiters & Headhunters";
   if (o.includes("invest")) return "Investors";
@@ -150,7 +152,7 @@ export default function Capture() {
 
   // ── Load draft if ?draftId= ─────────────────────────────────────────────
   const { data: existingDraft } = useGetDraft(draftId ?? 0, {
-    query: { enabled: !!draftId, staleTime: 0 },
+    query: { enabled: !!draftId, staleTime: 0, queryKey: getGetDraftQueryKey(draftId ?? 0) },
   });
 
   useEffect(() => {

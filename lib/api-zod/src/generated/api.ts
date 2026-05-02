@@ -117,6 +117,24 @@ export const UpdatePreferencesBody = zod.object({
     .string()
     .nullish()
     .describe("Animation speed; slow | normal | fast"),
+  bgDensity: zod
+    .string()
+    .nullish()
+    .describe("Animation particle density; low | normal | high"),
+  bgPanelOpacity: zod
+    .string()
+    .nullish()
+    .describe("Content panel opacity; solid | frosted | semi | glass"),
+  bgCustomImageUrl: zod
+    .string()
+    .nullish()
+    .describe("Base64 data URL of user-uploaded custom background image"),
+  bgPalette: zod
+    .string()
+    .nullish()
+    .describe(
+      "Named colour palette for Ripple\/Plasma\/Prismatic; ocean | sunset | forest | void | ember | rose | arctic | gold",
+    ),
   siteTheme: zod
     .string()
     .nullish()

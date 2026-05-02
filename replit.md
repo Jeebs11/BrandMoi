@@ -16,15 +16,18 @@ The project utilizes a pnpm workspace monorepo structure with TypeScript 5.9. Th
 ## Key Features & Implementations
 
 ### Content Creation Workflow
-A core 6-step workflow (Capture → Context → Structure → Create → Refine → Save) guides users through AI-assisted content generation. Anthropic Claude (claude-sonnet-4-6) is used for structured idea breakdown and content generation.
+A single-screen 3-input flow: textarea → audience chip (Clients/Peers/Recruiters/Investors/My audience) → feeling chip (Direct/Witty/Vulnerable/Story/Contrarian) → optional "Tie to fresh news" toggle → "Make it" button. One Claude call returns post + 2 alternative hooks (tap-to-swap) + hashtags + short post + carousel + visual + infographic. Feeling chips on the result screen re-generate with a new tone in one tap.
 
 ### User Management & Onboarding
-Features email/password authentication, a 5-screen onboarding process (Objective, Persona, Tone, Brand Voice, Confirm), and a user dashboard.
+Features email/password authentication, a 5-screen onboarding process (Audience, Feeling, Brand Voice, Confirm), and a user dashboard. Settings and Onboarding use AUDIENCES + FEELINGS arrays replacing the old Objective/Persona/Tone selectors.
 
 ### Content Management & Library
 Users can manage drafts with filtering capabilities. A "Log Performance" feature allows tracking content engagement (Impressions, Reactions, Comments) to calculate a Resonance Score.
 
 ### AI-Powered Enhancements
+- **Prompt Architecture**: Short `GENERATE_SYSTEM_PROMPT` (~45 lines) + mandatory `AUDIENCE_OVERLAYS` (5 audience types) + `FEELING_INSTRUCTIONS` (5 feelings) + optional news-tie context. One Claude call returns post, alternativeHooks[2], hashtags, shortPost, carousel, visual, infographic.
+- **Illustration Styles**: 4 styles — cartoon, new-yorker, isometric, loose-pencil. Audience and feeling threaded into concept generation. Relaxed literal-scene rules (no cliché-trope ban on literal scenes).
+- **News Anchor**: When tieToNews=true, fetches a fresh headline and weaves it into the post naturally.
 - **Smart Document Import**: A reusable component (`SmartImportButton`) allows users to upload PDF/DOCX/TXT files for backend extraction of brand voice parameters using Claude.
 - **AI Image Generation**: Integration with DALL-E 3 for generating images based on visual brief descriptions, with inline previews and save options.
 - **Agentic Intelligence Layer**:
@@ -47,8 +50,14 @@ Users can manage drafts with filtering capabilities. A "Log Performance" feature
   - **Engagement rate** — shown as reactions+comments÷impressions where impressions > 0, with trend direction
 - **LinkedIn Sync**: During import, maps `shareMediaCategory` to the `mediaFormat` field on the draft for richer format analytics
 
+### Animated Backgrounds & Palette System
+- **Active themes**: Minimal (Particles, Fireflies, My Photo), Professional (Topographic), Creative (Constellation, Shooting Stars, Ripple, Plasma, Prismatic), Technical (Matrix, Neural), Playful (Neon Grid, Ocean Wave, Sunset Wave, Arctic Wave, Night Wave).
+- **Palette system**: 8 named palettes (Ocean/Sunset/Forest/Void/Ember/Rose/Arctic/Gold) colour Ripple, Plasma, and Prismatic dynamically via hue/saturation/lightness. Palette picker appears in Settings only when one of these three is the active theme.
+- **Clamping**: Removed theme keys (aurora, grid-pulse, ink-wash, breathe, zen-mist, still-aurora, solid-*) auto-fall-back to "none".
+- **Persistence**: bgPalette stored in preferences DB table; bgDensity, bgPanelOpacity, bgCustomImageUrl, bgPalette all in OpenAPI UpdatePreferencesBody.
+
 ### UI/UX
-The frontend is mobile-first, utilizing TailwindCSS and shadcn/ui for a consistent design. Bottom navigation (Home, Capture, Vault, Library) and a dashboard provide intuitive access to features. Export options include Carousel PDF export (using `html-to-image` + `jspdf`) and Visual card PNG downloads.
+The frontend is mobile-first, utilizing TailwindCSS and shadcn/ui for a consistent design. Bottom navigation (Capture, Vault, Library) and a dashboard provide intuitive access to features. Export options include Carousel PDF export (using `html-to-image` + `jspdf`) and Visual card PNG downloads.
 
 ### System Robustness
 Includes rate limiting on AI endpoints, React `ErrorBoundary` for app-wide error handling, and dedicated 404/error pages.

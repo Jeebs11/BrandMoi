@@ -12,7 +12,7 @@ import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryR
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
 import { BACKGROUNDS } from "@/lib/backgrounds";
-import { useBackgroundTheme, SITE_THEMES, type BgSpeed, type BgDensity, type BgPanelOpacity, type SiteTheme } from "@/lib/background-context";
+import { useBackgroundTheme, SITE_THEMES, BG_PALETTES, PALETTEABLE_THEMES, type BgSpeed, type BgDensity, type BgPanelOpacity, type SiteTheme, type BgPalette } from "@/lib/background-context";
 
 // Audience replaces legacy Objective. Stored in preferences.objective for back-compat.
 const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
@@ -56,7 +56,7 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
   const { toast } = useToast();
-  const { activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, panelOpacity, setPanelOpacity, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl } = useBackgroundTheme();
+  const { activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, panelOpacity, setPanelOpacity, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl, bgPalette, setBgPalette } = useBackgroundTheme();
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const [objective, setObjective] = useState(preferences?.objective ?? "Authority");
@@ -295,6 +295,14 @@ export default function Settings() {
     updatePreferences(
       { data: { siteTheme: t } },
       { onError: () => toast({ title: "Could not save colour theme.", variant: "destructive" }) }
+    );
+  };
+
+  const handlePaletteSelect = (p: BgPalette) => {
+    setBgPalette(p);
+    updatePreferences(
+      { data: { bgPalette: p } as Parameters<typeof updatePreferences>[0]["data"] },
+      { onError: () => toast({ title: "Could not save palette.", variant: "destructive" }) }
     );
   };
 
@@ -626,6 +634,36 @@ export default function Settings() {
               <p className="text-[10px] text-gray-400 mt-2">How much of the animated background shows through the content panel.</p>
             </div>
 
+            {/* Colour Palette — only visible when Ripple / Plasma / Prismatic is active */}
+            {PALETTEABLE_THEMES.has(activeTheme) && (
+              <div className="mb-5">
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2.5">Colour Palette</p>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.entries(BG_PALETTES) as [string, typeof BG_PALETTES[keyof typeof BG_PALETTES]][]).map(([key, pal]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handlePaletteSelect(key as BgPalette)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-bold transition-all",
+                        bgPalette === key
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-gray-600 text-gray-400 hover:border-gray-400"
+                      )}
+                    >
+                      <span className="flex gap-0.5">
+                        {pal.preview.map((c, i) => (
+                          <span key={i} className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c }} />
+                        ))}
+                      </span>
+                      {pal.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">Colours the active background. Applies to Ripple, Plasma, and Prismatic.</p>
+              </div>
+            )}
+
             {/* None + My Photo — always first */}
             <div className="mb-4">
               <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider mb-2">Default</p>
@@ -688,11 +726,7 @@ export default function Settings() {
             {Array.from(new Set(BACKGROUNDS.filter(b => b.key !== "custom").map(b => b.category))).map(cat => {
               const items = BACKGROUNDS.filter(b => b.category === cat && b.key !== "custom");
               if (items.length === 0) return null;
-              const isSolid = cat === "Solid";
-              const isFocus = cat === "Focus";
-              const CAT_META: Record<string, { icon: string; hint?: string }> = {
-                Focus:        { icon: "🌊", hint: "Calm & cool — great for deep-work sessions." },
-                Solid:        { icon: "▪", hint: "Clean flat colour. No movement, no distractions." },
+              const CAT_META: Record<string, { icon: string }> = {
                 Minimal:      { icon: "✦" },
                 Professional: { icon: "◈" },
                 Creative:     { icon: "✦✦" },
@@ -705,29 +739,22 @@ export default function Settings() {
                   <div className="flex items-baseline gap-1.5 mb-1.5">
                     <span className="text-[9px] text-gray-400">{meta.icon}</span>
                     <p className="text-[10px] font-black text-gray-300 uppercase tracking-wider">{cat}</p>
-                    {(isFocus || isSolid) && meta.hint && (
-                      <p className="text-[9px] text-gray-500 ml-1 normal-case font-normal tracking-normal">{meta.hint}</p>
-                    )}
                   </div>
-                  <div className={cn("grid gap-2", isSolid ? "grid-cols-4" : "grid-cols-3")}>
+                  <div className="grid grid-cols-3 gap-2">
                     {items.map(bg => {
                       const BgComp = bg.component;
-                      const isLight = isSolid && ["solid-cloud","solid-paper","solid-sage"].includes(bg.key);
-                      const isPrismatic = bg.key === "prismatic";
+                      const isInteractive = ["ripple","plasma","prismatic"].includes(bg.key);
                       return (
                         <ThumbBtn key={bg.key} bgKey={bg.key} label={bg.label} isActive={activeTheme === bg.key} onSelect={handleThemeSelect}>
                           <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
                             <BgComp />
                           </div>
-                          <div className={cn(
-                            "absolute bottom-0 inset-x-0 px-1.5 py-1",
-                            isLight ? "bg-gradient-to-t from-white/80 to-transparent" : "bg-gradient-to-t from-black/60 to-transparent"
-                          )}>
-                            <p className={cn("text-[9px] font-bold leading-tight truncate", isLight ? "text-gray-600" : "text-white")}>{bg.label}</p>
+                          <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/60 to-transparent">
+                            <p className="text-[9px] font-bold leading-tight truncate text-white">{bg.label}</p>
                           </div>
-                          {isPrismatic && !isSolid && (
+                          {isInteractive && (
                             <div className="absolute top-1 left-1">
-                              <span className="text-[7px] font-black text-white/70 bg-black/30 rounded px-0.5">mouse</span>
+                              <span className="text-[7px] font-black text-white/70 bg-black/30 rounded px-0.5">palette</span>
                             </div>
                           )}
                         </ThumbBtn>

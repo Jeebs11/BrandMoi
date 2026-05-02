@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
-import { useBackgroundTheme, SPEED_MULT, DENSITY_MULT } from "@/lib/background-context";
+import { useBackgroundTheme, SPEED_MULT, DENSITY_MULT, BG_PALETTES } from "@/lib/background-context";
 
 export interface BackgroundEntry {
   key: string;
   label: string;
-  category: "Focus" | "Solid" | "Minimal" | "Professional" | "Creative" | "Technical" | "Playful";
+  category: "Minimal" | "Professional" | "Creative" | "Technical" | "Playful";
   component: React.ComponentType;
   interactive?: boolean;
 }
@@ -30,24 +30,6 @@ function useWindowMouse(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     };
   }, [canvasRef]);
   return mouseRef;
-}
-
-// ── Aurora ────────────────────────────────────────────────────────────────────
-function Aurora() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"#0a0e1a",overflow:"hidden" }}>
-      <style>{`
-        @keyframes aurora1 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(8%,6%) scale(1.15)} }
-        @keyframes aurora2 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(-10%,-8%) scale(1.2)} }
-        @keyframes aurora3 { 0%,100%{transform:translate(0%,0%) scale(1)} 60%{transform:translate(6%,-10%) scale(1.1)} }
-      `}</style>
-      <div style={{ position:"absolute",width:"70%",height:"70%",top:"10%",left:"15%",background:"radial-gradient(ellipse,rgba(99,102,241,0.45) 0%,transparent 70%)",borderRadius:"50%",filter:"blur(48px)",animation:`aurora1 ${10/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"60%",height:"60%",top:"30%",left:"30%",background:"radial-gradient(ellipse,rgba(139,92,246,0.35) 0%,transparent 70%)",borderRadius:"50%",filter:"blur(56px)",animation:`aurora2 ${13/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"50%",height:"50%",top:"5%",left:"40%",background:"radial-gradient(ellipse,rgba(6,182,212,0.25) 0%,transparent 70%)",borderRadius:"50%",filter:"blur(40px)",animation:`aurora3 ${9/m}s ease-in-out infinite` }} />
-    </div>
-  );
 }
 
 // ── Matrix (interactive: column under cursor brightens & speeds up) ───────────
@@ -296,30 +278,6 @@ function Particles() {
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#111827" }} />;
 }
 
-// ── Grid Pulse ────────────────────────────────────────────────────────────────
-function GridPulse() {
-  const { speed, density } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  const COLS = density === "high" ? 10 : density === "low" ? 6 : 8;
-  const total = COLS * COLS;
-  const step = 100 / COLS;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"#0f172a",overflow:"hidden" }}>
-      <style>{`@keyframes gpulse { 0%,100%{opacity:0.12} 50%{opacity:0.6} }`}</style>
-      <div style={{ position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(99,102,241,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.08) 1px,transparent 1px)",backgroundSize:"40px 40px" }} />
-      {Array.from({ length: total }, (_, i) => (
-        <div key={i} style={{
-          position:"absolute",
-          left:`${(i % COLS) * step + step * 0.5}%`,
-          top:`${Math.floor(i / COLS) * step + step * 0.5}%`,
-          width:3,height:3,borderRadius:"50%",background:"#6366f1",
-          animation:`gpulse ${(2 + (i*0.11)%3)/m}s ease-in-out ${-(i*0.07)%3}s infinite`,
-        }} />
-      ))}
-    </div>
-  );
-}
-
 // ── Constellation (interactive: cursor = bright star + connections) ────────────
 function Constellation() {
   const { speed, density } = useBackgroundTheme();
@@ -427,24 +385,6 @@ function Topographic() {
             style={{ animation:`topo-shift ${(18+i*2.5)/m}s linear ${-i*1.5}s infinite` }} />
         ))}
       </svg>
-    </div>
-  );
-}
-
-// ── Ink Wash ──────────────────────────────────────────────────────────────────
-function InkWash() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"#f8f5f0",overflow:"hidden" }}>
-      <style>{`
-        @keyframes ink1 { 0%,100%{transform:translate(0,0) scale(1) rotate(0deg)} 33%{transform:translate(5%,8%) scale(1.1) rotate(5deg)} 66%{transform:translate(-4%,-6%) scale(0.95) rotate(-3deg)} }
-        @keyframes ink2 { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(-7%,5%) scale(1.12)} 80%{transform:translate(6%,-8%) scale(0.9)} }
-        @keyframes ink3 { 0%,100%{transform:translate(0,0) scale(1) rotate(0deg)} 50%{transform:translate(4%,-6%) scale(1.08) rotate(-4deg)} }
-      `}</style>
-      <div style={{ position:"absolute",width:"80%",height:"80%",top:"10%",left:"10%",background:"radial-gradient(ellipse,rgba(30,30,50,0.12) 0%,transparent 65%)",filter:"blur(60px)",animation:`ink1 ${16/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"60%",height:"60%",top:"25%",left:"20%",background:"radial-gradient(ellipse,rgba(50,30,30,0.10) 0%,transparent 65%)",filter:"blur(50px)",animation:`ink2 ${20/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"50%",height:"50%",top:"5%",left:"35%",background:"radial-gradient(ellipse,rgba(20,40,60,0.08) 0%,transparent 65%)",filter:"blur(40px)",animation:`ink3 ${12/m}s ease-in-out infinite` }} />
     </div>
   );
 }
@@ -575,13 +515,15 @@ function Fireflies() {
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#040803" }} />;
 }
 
-// ── Ripple (interactive: click = big splash, auto ripples on dark water) ────────
+// ── Ripple (interactive: click = big splash, auto ripples — palette coloured) ───
 function Ripple() {
-  const { speed, density } = useBackgroundTheme();
+  const { speed, density, bgPalette } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const speedRef = useRef(SPEED_MULT[speed] ?? 1);
+  const palRef = useRef(BG_PALETTES[bgPalette] ?? BG_PALETTES.ocean);
 
   useEffect(() => { speedRef.current = SPEED_MULT[speed] ?? 1; }, [speed]);
+  useEffect(() => { palRef.current = BG_PALETTES[bgPalette] ?? BG_PALETTES.ocean; }, [bgPalette]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -597,6 +539,7 @@ function Ripple() {
     window.addEventListener("resize", resize);
 
     const spawnRipple = (x: number, y: number, big = false) => {
+      const pal = palRef.current;
       const maxR = big
         ? canvas.width * 0.3 + canvas.height * 0.2
         : 70 + Math.random() * 110;
@@ -604,7 +547,7 @@ function Ripple() {
         x, y, r: 0, maxR,
         alpha: big ? 0.65 : 0.3 + Math.random() * 0.25,
         width: big ? 1.8 : 0.7 + Math.random() * 0.7,
-        hue: 185 + Math.random() * 35,
+        hue: pal.hueBase + Math.random() * pal.hueSpread,
       });
     };
 
@@ -615,13 +558,14 @@ function Ripple() {
     window.addEventListener("click", onClick);
 
     const draw = () => {
+      const pal = palRef.current;
       const sp = Math.max(0.3, speedRef.current);
       const dMult = DENSITY_MULT[density] ?? 1;
-      ctx.fillStyle = "rgba(3,10,22,0.95)";
+      ctx.fillStyle = "rgba(0,0,0,0.92)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       for (let y = 0; y < canvas.height; y += 36) {
-        ctx.strokeStyle = "rgba(0,190,210,0.03)";
+        ctx.strokeStyle = `hsla(${pal.hueBase},${pal.saturation}%,${pal.lightness}%,0.04)`;
         ctx.lineWidth = 0.5;
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
@@ -640,14 +584,14 @@ function Ripple() {
 
         ctx.beginPath();
         ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
-        ctx.strokeStyle = `hsla(${r.hue},80%,65%,${r.alpha})`;
+        ctx.strokeStyle = `hsla(${r.hue},${pal.saturation}%,${pal.lightness}%,${r.alpha})`;
         ctx.lineWidth = r.width * (1 - progress * 0.6);
         ctx.stroke();
 
         if (r.r > 14) {
           ctx.beginPath();
           ctx.arc(r.x, r.y, r.r * 0.83, 0, Math.PI*2);
-          ctx.strokeStyle = `hsla(${r.hue},100%,82%,${r.alpha * 0.22})`;
+          ctx.strokeStyle = `hsla(${r.hue},${Math.min(100,pal.saturation+15)}%,${Math.min(95,pal.lightness+15)}%,${r.alpha * 0.22})`;
           ctx.lineWidth = r.width * 0.45;
           ctx.stroke();
         }
@@ -662,119 +606,48 @@ function Ripple() {
     };
   }, [density]);
 
-  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030a16" }} />;
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:(BG_PALETTES[bgPalette]??BG_PALETTES.ocean).bg }} />;
 }
 
-// ── Plasma (vivid morphing color blobs — purple/pink/cyan/amber) ───────────────
+// ── Plasma (morphing colour blobs — palette coloured) ─────────────────────────
 function Plasma() {
-  const { speed } = useBackgroundTheme();
+  const { speed, bgPalette } = useBackgroundTheme();
   const m = SPEED_MULT[speed] ?? 1;
+  const pal = BG_PALETTES[bgPalette] ?? BG_PALETTES.ocean;
+  const { hueBase, hueSpread, saturation, lightness } = pal;
+  const h1 = hueBase;
+  const h2 = (hueBase + hueSpread * 0.35) % 360;
+  const h3 = (hueBase + hueSpread * 0.65) % 360;
+  const h4 = (hueBase + hueSpread * 0.90) % 360;
   return (
-    <div style={{ position:"absolute",inset:0,background:"#0c001e",overflow:"hidden" }}>
+    <div style={{ position:"absolute",inset:0,background:pal.bg,overflow:"hidden" }}>
       <style>{`
         @keyframes plasma1 { 0%,100%{transform:translate(0%,0%) scale(1)} 30%{transform:translate(14%,9%) scale(1.22)} 65%{transform:translate(-9%,16%) scale(0.83)} }
         @keyframes plasma2 { 0%,100%{transform:translate(0%,0%) scale(1)} 40%{transform:translate(-20%,-12%) scale(1.3)} 75%{transform:translate(11%,-20%) scale(0.88)} }
         @keyframes plasma3 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(13%,-14%) scale(1.18)} 80%{transform:translate(-6%,10%) scale(0.92)} }
         @keyframes plasma4 { 0%,100%{transform:translate(0%,0%) scale(1)} 35%{transform:translate(-13%,20%) scale(1.12)} 70%{transform:translate(20%,7%) scale(0.94)} }
       `}</style>
-      <div style={{ position:"absolute",width:"72%",height:"72%",top:"2%",left:"12%",background:"radial-gradient(ellipse,rgba(139,92,246,0.72) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(52px)",animation:`plasma1 ${13/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"62%",height:"62%",top:"28%",left:"22%",background:"radial-gradient(ellipse,rgba(236,72,153,0.62) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(46px)",animation:`plasma2 ${16/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"58%",height:"58%",top:"12%",left:"38%",background:"radial-gradient(ellipse,rgba(6,182,212,0.55) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(56px)",animation:`plasma3 ${11/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"68%",height:"68%",top:"42%",left:"2%",background:"radial-gradient(ellipse,rgba(251,146,60,0.52) 0%,transparent 65%)",borderRadius:"50%",filter:"blur(62px)",animation:`plasma4 ${19/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"72%",height:"72%",top:"2%",left:"12%",background:`radial-gradient(ellipse,hsla(${h1},${saturation}%,${lightness}%,0.72) 0%,transparent 65%)`,borderRadius:"50%",filter:"blur(52px)",animation:`plasma1 ${13/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"62%",height:"62%",top:"28%",left:"22%",background:`radial-gradient(ellipse,hsla(${h2},${Math.max(0,saturation-5)}%,${Math.max(0,lightness-5)}%,0.62) 0%,transparent 65%)`,borderRadius:"50%",filter:"blur(46px)",animation:`plasma2 ${16/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"58%",height:"58%",top:"12%",left:"38%",background:`radial-gradient(ellipse,hsla(${h3},${saturation}%,${Math.min(95,lightness+5)}%,0.55) 0%,transparent 65%)`,borderRadius:"50%",filter:"blur(56px)",animation:`plasma3 ${11/m}s ease-in-out infinite` }} />
+      <div style={{ position:"absolute",width:"68%",height:"68%",top:"42%",left:"2%",background:`radial-gradient(ellipse,hsla(${h4},${Math.max(0,saturation-8)}%,${Math.max(0,lightness-3)}%,0.52) 0%,transparent 65%)`,borderRadius:"50%",filter:"blur(62px)",animation:`plasma4 ${19/m}s ease-in-out infinite` }} />
     </div>
   );
 }
 
-// ── Breathe (Focus: slow pulsing rings, cooling teal tones) ──────────────────
-function Breathe() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  const dur = 8 / Math.max(0.1, m);
-  return (
-    <div style={{ position:"absolute",inset:0,background:"#070c12",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center" }}>
-      <style>{`
-        @keyframes breathe-ring { 0%,100%{transform:scale(0.82);opacity:0.16} 50%{transform:scale(1.18);opacity:0.40} }
-        @keyframes breathe-core { 0%,100%{transform:scale(0.75);opacity:0.50} 50%{transform:scale(1.25);opacity:0.85} }
-      `}</style>
-      {[0,1,2,3].map(i => (
-        <div key={i} style={{
-          position:"absolute",
-          width:`${200 + i * 90}px`, height:`${200 + i * 90}px`,
-          borderRadius:"50%",
-          border:`${Math.max(0.4, 1.2 - i * 0.25)}px solid rgba(56,189,195,${0.22 - i * 0.045})`,
-          animation:`breathe-ring ${(dur + i * 1.6)}s ease-in-out ${-i * 1.8}s infinite`,
-        }} />
-      ))}
-      <div style={{
-        position:"absolute", width:"100px", height:"100px", borderRadius:"50%",
-        background:"radial-gradient(circle,rgba(56,189,195,0.30) 0%,transparent 70%)",
-        filter:"blur(20px)",
-        animation:`breathe-core ${dur}s ease-in-out infinite`,
-      }} />
-      <div style={{ position:"relative", animation:`breathe-core ${dur}s ease-in-out infinite` }}>
-        <div style={{ width:"6px",height:"6px",borderRadius:"50%",background:"rgba(56,195,195,0.9)",boxShadow:"0 0 14px rgba(56,195,195,0.75)" }} />
-      </div>
-    </div>
-  );
-}
-
-// ── Zen Mist (Focus: ultra-slow drifting pale fog on deep slate) ──────────────
-function ZenMist() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"#070b11",overflow:"hidden" }}>
-      <style>{`
-        @keyframes mist1 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(4%,5%) scale(1.09)} }
-        @keyframes mist2 { 0%,100%{transform:translate(0%,0%) scale(1)} 60%{transform:translate(-5%,-4%) scale(1.11)} }
-        @keyframes mist3 { 0%,100%{transform:translate(0%,0%) scale(1)} 40%{transform:translate(3%,-6%) scale(1.07)} }
-      `}</style>
-      <div style={{ position:"absolute",width:"88%",height:"88%",top:"6%",left:"6%",
-        background:"radial-gradient(ellipse,rgba(90,140,175,0.14) 0%,transparent 70%)",
-        filter:"blur(65px)",animation:`mist1 ${26/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"70%",height:"70%",top:"18%",left:"18%",
-        background:"radial-gradient(ellipse,rgba(70,110,155,0.10) 0%,transparent 70%)",
-        filter:"blur(80px)",animation:`mist2 ${32/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"58%",height:"58%",top:"12%",left:"30%",
-        background:"radial-gradient(ellipse,rgba(50,95,140,0.08) 0%,transparent 70%)",
-        filter:"blur(55px)",animation:`mist3 ${22/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",inset:0,
-        backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(90,140,180,0.018) 40px)" }} />
-    </div>
-  );
-}
-
-// ── Still Aurora (Focus: very dim, very slow cool aurora — almost static) ─────
-function StillAurora() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"#050a10",overflow:"hidden" }}>
-      <style>{`
-        @keyframes saurora1 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(5%,4%) scale(1.10)} }
-        @keyframes saurora2 { 0%,100%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(-6%,-5%) scale(1.12)} }
-        @keyframes saurora3 { 0%,100%{transform:translate(0%,0%) scale(1)} 60%{transform:translate(4%,-7%) scale(1.07)} }
-      `}</style>
-      <div style={{ position:"absolute",width:"82%",height:"82%",top:"4%",left:"9%",
-        background:"radial-gradient(ellipse,rgba(44,170,165,0.18) 0%,transparent 70%)",
-        borderRadius:"50%",filter:"blur(65px)",animation:`saurora1 ${20/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"66%",height:"66%",top:"24%",left:"24%",
-        background:"radial-gradient(ellipse,rgba(80,90,195,0.13) 0%,transparent 70%)",
-        borderRadius:"50%",filter:"blur(75px)",animation:`saurora2 ${25/m}s ease-in-out infinite` }} />
-      <div style={{ position:"absolute",width:"55%",height:"55%",top:"7%",left:"36%",
-        background:"radial-gradient(ellipse,rgba(6,170,170,0.11) 0%,transparent 70%)",
-        borderRadius:"50%",filter:"blur(55px)",animation:`saurora3 ${17/m}s ease-in-out infinite` }} />
-    </div>
-  );
-}
-
-// ── Prismatic (interactive: mouse X maps to full hue spectrum, auto-cycles idle) ─
+// ── Prismatic (interactive: mouse X maps palette hue range, auto-cycles idle) ──
 function Prismatic() {
-  const { speed } = useBackgroundTheme();
+  const { speed, bgPalette } = useBackgroundTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const hueRef = useRef(200);
-  const targetHueRef = useRef(200);
+  const palRef = useRef(BG_PALETTES[bgPalette] ?? BG_PALETTES.ocean);
+  const hueRef = useRef(palRef.current.hueBase);
+  const targetHueRef = useRef(palRef.current.hueBase);
   const mouseRef = useWindowMouse(canvasRef);
+
+  useEffect(() => {
+    palRef.current = BG_PALETTES[bgPalette] ?? BG_PALETTES.ocean;
+    targetHueRef.current = palRef.current.hueBase;
+  }, [bgPalette]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -787,20 +660,23 @@ function Prismatic() {
     window.addEventListener("resize", resize);
 
     const draw = () => {
+      const pal = palRef.current;
       const mouse = mouseRef.current;
       if (mouse) {
-        targetHueRef.current = (mouse.x / Math.max(1, canvas.width)) * 360;
+        targetHueRef.current = pal.hueBase + (mouse.x / Math.max(1, canvas.width)) * pal.hueSpread;
       } else {
-        targetHueRef.current = (targetHueRef.current + 0.14 * m) % 360;
+        targetHueRef.current += 0.14 * m;
+        if (targetHueRef.current > pal.hueBase + pal.hueSpread) targetHueRef.current = pal.hueBase;
       }
       hueRef.current += (targetHueRef.current - hueRef.current) * 0.05;
       const h = hueRef.current;
+      const sp = pal.hueSpread;
 
       const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
       g.addColorStop(0,   `hsl(${h},52%,7%)`);
-      g.addColorStop(0.4, `hsl(${(h + 22) % 360},56%,10%)`);
-      g.addColorStop(0.7, `hsl(${(h + 40) % 360},50%,9%)`);
-      g.addColorStop(1,   `hsl(${(h + 58) % 360},46%,7%)`);
+      g.addColorStop(0.4, `hsl(${(h + sp * 0.25) % 360},56%,10%)`);
+      g.addColorStop(0.7, `hsl(${(h + sp * 0.5) % 360},50%,9%)`);
+      g.addColorStop(1,   `hsl(${(h + sp * 0.75) % 360},46%,7%)`);
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -808,15 +684,15 @@ function Prismatic() {
         canvas.width * 0.5, canvas.height * 0.42, 0,
         canvas.width * 0.5, canvas.height * 0.42, canvas.width * 0.52,
       );
-      bloom.addColorStop(0, `hsla(${(h + 15) % 360},75%,65%,0.13)`);
-      bloom.addColorStop(0.5, `hsla(${(h + 15) % 360},65%,52%,0.06)`);
+      bloom.addColorStop(0, `hsla(${(h + sp * 0.2) % 360},${pal.saturation}%,${pal.lightness}%,0.13)`);
+      bloom.addColorStop(0.5, `hsla(${(h + sp * 0.2) % 360},${pal.saturation - 10}%,${pal.lightness - 13}%,0.06)`);
       bloom.addColorStop(1, "transparent");
       ctx.fillStyle = bloom;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       if (mouse) {
         const mg = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 85);
-        mg.addColorStop(0, `hsla(${h},85%,72%,0.15)`);
+        mg.addColorStop(0, `hsla(${h},${pal.saturation}%,${pal.lightness}%,0.15)`);
         mg.addColorStop(1, "transparent");
         ctx.fillStyle = mg;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -830,22 +706,6 @@ function Prismatic() {
 
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%" }} />;
 }
-
-// ── Solid colour factory ───────────────────────────────────────────────────────
-function makeSolid(hex: string, label: string) {
-  const Solid = () => <div style={{ position:"absolute",inset:0,background:hex }} />;
-  Solid.displayName = `Solid(${label})`;
-  return Solid;
-}
-
-const SolidCloud    = makeSolid("#FAFAFA", "Cloud");
-const SolidPaper    = makeSolid("#F5F0E8", "Paper");
-const SolidSage     = makeSolid("#E6EFE3", "Sage");
-const SolidSlate    = makeSolid("#1E293B", "Slate");
-const SolidNavy     = makeSolid("#0F172A", "Navy");
-const SolidCharcoal = makeSolid("#111111", "Charcoal");
-const SolidDusk     = makeSolid("#1A1030", "Dusk");
-const SolidForest   = makeSolid("#0D1F14", "Forest");
 
 // ── Custom (user-uploaded photo as cover) ─────────────────────────────────────
 function CustomBg() {
@@ -969,34 +829,88 @@ function ShootingStars() {
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030614" }} />;
 }
 
+// ── Wave Sunset (warm coral sky + orange-gold waves) ─────────────────────────
+function WaveSunset() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#0d0402 0%,#2a0d04 35%,#5c1a06 70%,#7c2e0a 100%)",overflow:"hidden" }}>
+      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"65%" }}>
+        <path d="M0 90 Q150 30 300 90 T600 70 L600 200 L0 200Z" fill="rgba(220,80,20,0.20)">
+          <animate attributeName="d" dur={`${7/m}s`} repeatCount="indefinite"
+            values="M0 90 Q150 30 300 90 T600 70 L600 200 L0 200Z;M0 90 Q150 140 300 90 T600 110 L600 200 L0 200Z;M0 90 Q150 30 300 90 T600 70 L600 200 L0 200Z" />
+        </path>
+        <path d="M0 120 Q150 70 300 120 T600 100 L600 200 L0 200Z" fill="rgba(240,110,30,0.14)">
+          <animate attributeName="d" dur={`${10/m}s`} repeatCount="indefinite"
+            values="M0 120 Q150 70 300 120 T600 100 L600 200 L0 200Z;M0 120 Q150 160 300 120 T600 140 L600 200 L0 200Z;M0 120 Q150 70 300 120 T600 100 L600 200 L0 200Z" />
+        </path>
+        <path d="M0 148 Q150 110 300 148 T600 130 L600 200 L0 200Z" fill="rgba(200,60,10,0.22)">
+          <animate attributeName="d" dur={`${13/m}s`} repeatCount="indefinite"
+            values="M0 148 Q150 110 300 148 T600 130 L600 200 L0 200Z;M0 148 Q150 178 300 148 T600 162 L600 200 L0 200Z;M0 148 Q150 110 300 148 T600 130 L600 200 L0 200Z" />
+        </path>
+      </svg>
+    </div>
+  );
+}
+
+// ── Wave Arctic (icy midnight ocean — pale blue waves on near-black) ──────────
+function WaveArctic() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#020810 0%,#041428 45%,#071e3a 100%)",overflow:"hidden" }}>
+      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"60%" }}>
+        <path d="M0 75 Q150 15 300 75 T600 55 L600 200 L0 200Z" fill="rgba(186,230,253,0.10)">
+          <animate attributeName="d" dur={`${8/m}s`} repeatCount="indefinite"
+            values="M0 75 Q150 15 300 75 T600 55 L600 200 L0 200Z;M0 75 Q150 125 300 75 T600 95 L600 200 L0 200Z;M0 75 Q150 15 300 75 T600 55 L600 200 L0 200Z" />
+        </path>
+        <path d="M0 108 Q150 55 300 108 T600 88 L600 200 L0 200Z" fill="rgba(224,242,254,0.08)">
+          <animate attributeName="d" dur={`${11/m}s`} repeatCount="indefinite"
+            values="M0 108 Q150 55 300 108 T600 88 L600 200 L0 200Z;M0 108 Q150 152 300 108 T600 128 L600 200 L0 200Z;M0 108 Q150 55 300 108 T600 88 L600 200 L0 200Z" />
+        </path>
+        <path d="M0 138 Q150 98 300 138 T600 118 L600 200 L0 200Z" fill="rgba(125,211,252,0.14)">
+          <animate attributeName="d" dur={`${14/m}s`} repeatCount="indefinite"
+            values="M0 138 Q150 98 300 138 T600 118 L600 200 L0 200Z;M0 138 Q150 172 300 138 T600 152 L600 200 L0 200Z;M0 138 Q150 98 300 138 T600 118 L600 200 L0 200Z" />
+        </path>
+      </svg>
+    </div>
+  );
+}
+
+// ── Wave Night (deep midnight ocean — near-black indigo waves) ────────────────
+function WaveNight() {
+  const { speed } = useBackgroundTheme();
+  const m = SPEED_MULT[speed] ?? 1;
+  return (
+    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#000208 0%,#010414 40%,#02061f 100%)",overflow:"hidden" }}>
+      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"62%" }}>
+        <path d="M0 85 Q150 25 300 85 T600 65 L600 200 L0 200Z" fill="rgba(60,80,180,0.12)">
+          <animate attributeName="d" dur={`${9/m}s`} repeatCount="indefinite"
+            values="M0 85 Q150 25 300 85 T600 65 L600 200 L0 200Z;M0 85 Q150 135 300 85 T600 105 L600 200 L0 200Z;M0 85 Q150 25 300 85 T600 65 L600 200 L0 200Z" />
+        </path>
+        <path d="M0 115 Q150 65 300 115 T600 95 L600 200 L0 200Z" fill="rgba(40,55,160,0.09)">
+          <animate attributeName="d" dur={`${12/m}s`} repeatCount="indefinite"
+            values="M0 115 Q150 65 300 115 T600 95 L600 200 L0 200Z;M0 115 Q150 158 300 115 T600 135 L600 200 L0 200Z;M0 115 Q150 65 300 115 T600 95 L600 200 L0 200Z" />
+        </path>
+        <path d="M0 142 Q150 105 300 142 T600 124 L600 200 L0 200Z" fill="rgba(30,45,140,0.18)">
+          <animate attributeName="d" dur={`${15/m}s`} repeatCount="indefinite"
+            values="M0 142 Q150 105 300 142 T600 124 L600 200 L0 200Z;M0 142 Q150 174 300 142 T600 158 L600 200 L0 200Z;M0 142 Q150 105 300 142 T600 124 L600 200 L0 200Z" />
+        </path>
+      </svg>
+    </div>
+  );
+}
+
 export const BACKGROUNDS: BackgroundEntry[] = [
-  // ── Focus — calm, cool, distraction-free ──
-  { key: "breathe",         label: "Breathe",          category: "Focus",         component: Breathe },
-  { key: "zen-mist",        label: "Zen Mist",         category: "Focus",         component: ZenMist },
-  { key: "still-aurora",    label: "Still Aurora",     category: "Focus",         component: StillAurora },
-
-  // ── Solid — flat colour, no animation ──
-  { key: "solid-cloud",     label: "Cloud",            category: "Solid",         component: SolidCloud },
-  { key: "solid-paper",     label: "Paper",            category: "Solid",         component: SolidPaper },
-  { key: "solid-sage",      label: "Sage",             category: "Solid",         component: SolidSage },
-  { key: "solid-slate",     label: "Slate",            category: "Solid",         component: SolidSlate },
-  { key: "solid-navy",      label: "Navy",             category: "Solid",         component: SolidNavy },
-  { key: "solid-charcoal",  label: "Charcoal",         category: "Solid",         component: SolidCharcoal },
-  { key: "solid-dusk",      label: "Dusk",             category: "Solid",         component: SolidDusk },
-  { key: "solid-forest",    label: "Forest",           category: "Solid",         component: SolidForest },
-
   // ── Minimal ──
   { key: "particles",       label: "Particles",        category: "Minimal",       component: Particles,      interactive: true },
-  { key: "ink-wash",        label: "Ink Wash",         category: "Minimal",       component: InkWash },
   { key: "fireflies",       label: "Fireflies",        category: "Minimal",       component: Fireflies,      interactive: true },
   { key: "custom",          label: "My Photo",         category: "Minimal",       component: CustomBg },
 
   // ── Professional ──
-  { key: "grid-pulse",      label: "Grid Pulse",       category: "Professional",  component: GridPulse },
   { key: "topographic",     label: "Topographic",      category: "Professional",  component: Topographic },
 
   // ── Creative ──
-  { key: "aurora",          label: "Aurora",           category: "Creative",      component: Aurora },
   { key: "constellation",   label: "Constellation",    category: "Creative",      component: Constellation,  interactive: true },
   { key: "shooting-stars",  label: "Shooting Stars",   category: "Creative",      component: ShootingStars,  interactive: true },
   { key: "ripple",          label: "Ripple",           category: "Creative",      component: Ripple,         interactive: true },
@@ -1010,6 +924,9 @@ export const BACKGROUNDS: BackgroundEntry[] = [
   // ── Playful ──
   { key: "neon-grid",       label: "Neon Grid",        category: "Playful",       component: NeonGrid },
   { key: "wave",            label: "Ocean Wave",       category: "Playful",       component: Wave },
+  { key: "wave-sunset",     label: "Sunset Wave",      category: "Playful",       component: WaveSunset },
+  { key: "wave-arctic",     label: "Arctic Wave",      category: "Playful",       component: WaveArctic },
+  { key: "wave-night",      label: "Night Wave",       category: "Playful",       component: WaveNight },
 ];
 
 export function getBackground(key: string): BackgroundEntry | undefined {

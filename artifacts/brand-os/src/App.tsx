@@ -138,6 +138,7 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
     bgPanelOpacity?: string | null;
     siteTheme?: string | null;
     bgCustomImageUrl?: string | null;
+    bgPalette?: string | null;
   }) | undefined;
   return (
     <BackgroundProvider
@@ -147,6 +148,7 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
       initialPanelOpacity={prefs?.bgPanelOpacity ?? "solid"}
       initialSiteTheme={prefs?.siteTheme ?? "indigo"}
       initialCustomImageUrl={prefs?.bgCustomImageUrl ?? null}
+      initialBgPalette={prefs?.bgPalette ?? "ocean"}
     >
       {children}
     </BackgroundProvider>

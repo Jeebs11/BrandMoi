@@ -74,6 +74,14 @@ export interface UpdatePreferencesBody {
   backgroundTheme?: string | null;
   /** Animation speed; slow | normal | fast */
   bgSpeed?: string | null;
+  /** Animation particle density; low | normal | high */
+  bgDensity?: string | null;
+  /** Content panel opacity; solid | frosted | semi | glass */
+  bgPanelOpacity?: string | null;
+  /** Base64 data URL of user-uploaded custom background image */
+  bgCustomImageUrl?: string | null;
+  /** Named colour palette for Ripple/Plasma/Prismatic; ocean | sunset | forest | void | ember | rose | arctic | gold */
+  bgPalette?: string | null;
   /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
   siteTheme?: string | null;
 }

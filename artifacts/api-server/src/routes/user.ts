@@ -30,22 +30,24 @@ const UpdatePreferencesBody = z.object({
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   backgroundTheme: z.enum([
-    "none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation",
-    "topographic", "ink-wash", "neon-grid", "wave", "stars", "shooting-stars", "fireflies",
-    "ripple", "plasma", "custom",
-    // Focus
-    "breathe", "zen-mist", "still-aurora",
-    // Solid
-    "solid-cloud", "solid-paper", "solid-sage", "solid-slate", "solid-navy",
-    "solid-charcoal", "solid-dusk", "solid-forest",
-    // Creative (new)
-    "prismatic",
+    "none",
+    // Minimal
+    "particles", "fireflies", "custom",
+    // Professional
+    "topographic",
+    // Creative
+    "constellation", "shooting-stars", "ripple", "plasma", "prismatic",
+    // Technical
+    "matrix", "neural",
+    // Playful
+    "neon-grid", "wave", "wave-sunset", "wave-arctic", "wave-night",
   ]).optional(),
   bgCustomImageUrl: z.string().max(1_000_000).optional().nullable(),
   bgSpeed: z.enum(["slow", "normal", "fast"]).optional(),
   bgDensity: z.enum(["low", "normal", "high"]).optional(),
   bgPanelOpacity: z.enum(["solid", "frosted", "semi", "glass"]).optional(),
   siteTheme: z.enum(["indigo", "violet", "sky", "emerald", "rose", "amber"]).optional(),
+  bgPalette: z.enum(["ocean", "sunset", "forest", "void", "ember", "rose", "arctic", "gold"]).optional(),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
@@ -92,6 +94,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.bgDensity !== undefined) updateData.bgDensity = parsed.data.bgDensity;
   if (parsed.data.bgPanelOpacity !== undefined) updateData.bgPanelOpacity = parsed.data.bgPanelOpacity;
   if (parsed.data.siteTheme !== undefined) updateData.siteTheme = parsed.data.siteTheme;
+  if (parsed.data.bgPalette !== undefined) updateData.bgPalette = parsed.data.bgPalette;
 
   const [prefs] = await db
     .update(preferencesTable)

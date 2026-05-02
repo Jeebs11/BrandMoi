@@ -678,6 +678,22 @@ components:
           type: string
           nullable: true
           description: Animation speed; slow | normal | fast
+        bgDensity:
+          type: string
+          nullable: true
+          description: Animation particle density; low | normal | high
+        bgPanelOpacity:
+          type: string
+          nullable: true
+          description: Content panel opacity; solid | frosted | semi | glass
+        bgCustomImageUrl:
+          type: string
+          nullable: true
+          description: Base64 data URL of user-uploaded custom background image
+        bgPalette:
+          type: string
+          nullable: true
+          description: Named colour palette for Ripple/Plasma/Prismatic; ocean | sunset | forest | void | ember | rose | arctic | gold
         siteTheme:
           type: string
           nullable: true
