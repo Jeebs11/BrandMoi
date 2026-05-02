@@ -455,8 +455,8 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Grouped by category */}
-            {(["Minimal", "Professional", "Technical", "Creative", "Playful"] as const).map(cat => {
+            {/* Grouped by category — derived dynamically so adding a theme to backgrounds.tsx is all that's needed */}
+            {Array.from(new Set(BACKGROUNDS.map(b => b.category))).map(cat => {
               const items = BACKGROUNDS.filter(b => b.category === cat);
               if (items.length === 0) return null;
               return (

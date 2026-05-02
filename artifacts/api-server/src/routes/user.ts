@@ -29,7 +29,7 @@ const UpdatePreferencesBody = z.object({
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  backgroundTheme: z.string().max(64).optional(),
+  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave"]).optional(),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
