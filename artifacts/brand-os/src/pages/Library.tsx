@@ -77,6 +77,7 @@ type PerformanceModalState = {
   draftId: number;
   topic: string;
   existing: PerformanceSignal | null;
+  initialTab?: "upload" | "manual";
 };
 
 export default function Library() {
@@ -101,9 +102,11 @@ export default function Library() {
     }
   }, [highlightId, drafts]);
 
-  useEffect(() => {
+  const loadResonanceMap = () => {
     resonanceMapApi.get().then(setResonanceMap).catch(() => {});
-  }, []);
+  };
+
+  useEffect(() => { loadResonanceMap(); }, []);
 
   const openDiagnosis = async (draftId: number, topic: string, cachedDiagnosis?: PostDiagnosis | null) => {
     if (cachedDiagnosis) {
@@ -155,9 +158,14 @@ export default function Library() {
     );
   };
 
-  const openPerfModal = async (draftId: number, topic: string) => {
+  const openPerfModal = async (draftId: number, topic: string, initialTab?: "upload" | "manual") => {
     const existing = await performanceApi.get(draftId).catch(() => null);
-    setPerfModal({ draftId, topic, existing });
+    setPerfModal({ draftId, topic, existing, initialTab });
+  };
+
+  const handlePerfSuccess = () => {
+    void refetch();
+    loadResonanceMap();
   };
 
   return (
@@ -258,9 +266,16 @@ export default function Library() {
                           {new Date(draft.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                         </span>
                         {resonanceMap[String(draft.id)] !== undefined && (
-                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", resonanceMap[String(draft.id)] >= 60 ? "bg-violet-50 text-violet-700" : "bg-gray-50 text-gray-500")}>
-                            ◈ {resonanceMap[String(draft.id)]} resonance
-                          </span>
+                          <>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                              ◈ logged
+                            </span>
+                            {resonanceMap[String(draft.id)] > 0 && (
+                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", resonanceMap[String(draft.id)] >= 60 ? "bg-violet-50 text-violet-700" : "bg-gray-50 text-gray-500")}>
+                                {resonanceMap[String(draft.id)]} resonance
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                       {(resonanceMap[String(draft.id)] ?? 0) >= 60 && (
@@ -283,9 +298,14 @@ export default function Library() {
                           <Pencil className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
                         {draft.status === "published" && (
-                          <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic)}>
-                            <BarChart2 className="w-4 h-4 mr-2 text-violet-500" /> Log Performance
-                          </DropdownMenuItem>
+                          <>
+                            <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic, "upload")}>
+                              <Upload className="w-4 h-4 mr-2 text-violet-500" /> Upload LinkedIn analytics
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic, "manual")}>
+                              <BarChart2 className="w-4 h-4 mr-2 text-gray-500" /> Log Performance manually
+                            </DropdownMenuItem>
+                          </>
                         )}
                         <DropdownMenuSeparator />
                         {draft.status !== "draft" && (
@@ -325,6 +345,7 @@ export default function Library() {
           <PerformanceModal
             modal={perfModal}
             onClose={() => setPerfModal(null)}
+            onSuccess={handlePerfSuccess}
           />
         )}
 
@@ -402,13 +423,14 @@ export default function Library() {
   );
 }
 
-function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; onClose: () => void }) {
-  const [tab, setTab] = useState<"upload" | "manual">("upload");
+function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceModalState; onClose: () => void; onSuccess: () => void }) {
+  const [tab, setTab] = useState<"upload" | "manual">(modal.initialTab ?? "upload");
   const [impressions, setImpressions] = useState(modal.existing?.impressions ?? 0);
   const [reactions, setReactions] = useState(modal.existing?.reactions ?? 0);
   const [comments, setComments] = useState(modal.existing?.comments ?? 0);
   const [reposts, setReposts] = useState(modal.existing?.reposts ?? 0);
   const [saves, setSaves] = useState(modal.existing?.saves ?? 0);
+  const [linkedinUrl, setLinkedinUrl] = useState(modal.existing?.linkedinUrl ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploadState, setUploadState] = useState<"idle" | "uploading" | "success" | "error">("idle");
@@ -434,14 +456,15 @@ function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; on
         saves: signal.saves,
         membersReached: signal.membersReached,
       });
-      // Also pre-fill manual tab fields
       setImpressions(signal.impressions);
       setReactions(signal.reactions);
       setComments(signal.comments);
       setReposts(signal.reposts);
       setSaves(signal.saves);
-      void parsed; // acknowledged
+      if (signal.linkedinUrl) setLinkedinUrl(signal.linkedinUrl);
+      void parsed;
       setUploadState("success");
+      onSuccess();
       setTimeout(onClose, 2000);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
@@ -452,8 +475,12 @@ function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; on
   const handleManualSave = async () => {
     setSaving(true);
     try {
-      await performanceApi.log(modal.draftId, { impressions, reactions, comments, reposts, saves });
+      await performanceApi.log(modal.draftId, {
+        impressions, reactions, comments, reposts, saves,
+        linkedinUrl: linkedinUrl.trim() || null,
+      });
       setSaved(true);
+      onSuccess();
       setTimeout(onClose, 1200);
     } finally {
       setSaving(false);
@@ -568,6 +595,16 @@ function PerformanceModal({ modal, onClose }: { modal: PerformanceModalState; on
               <NumberInput label="Comments" value={comments} onChange={setComments} />
               <NumberInput label="Reposts" value={reposts} onChange={setReposts} />
               <NumberInput label="Saves" value={saves} onChange={setSaves} />
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">LinkedIn post URL (optional)</p>
+                <input
+                  type="url"
+                  placeholder="https://www.linkedin.com/posts/..."
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors placeholder:font-normal placeholder:text-gray-300"
+                />
+              </div>
             </div>
 
             {impressions > 0 && (

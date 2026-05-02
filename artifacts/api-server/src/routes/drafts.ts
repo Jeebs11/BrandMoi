@@ -301,14 +301,11 @@ router.post("/drafts/:id/performance/upload", requireAuth, xlsxUpload.single("fi
 
   if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
   const validExt = req.file.originalname.toLowerCase().endsWith(".xlsx");
-  const validMime = req.file.mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    || req.file.mimetype === "application/octet-stream";
   const validMagic = req.file.buffer.length >= 4
-    && req.file.buffer[0] === 0x50 && req.file.buffer[1] === 0x4B; // ZIP/OOXML magic bytes PK
+    && req.file.buffer[0] === 0x50 && req.file.buffer[1] === 0x4B; // ZIP/OOXML magic bytes (PK)
   if (!validExt || !validMagic) {
     res.status(400).json({ error: "File must be a LinkedIn analytics .xlsx export" }); return;
   }
-  void validMime; // type checked via extension + magic bytes above
 
   const [draft] = await db
     .select({ id: draftsTable.id })
