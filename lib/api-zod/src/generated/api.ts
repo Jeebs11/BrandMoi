@@ -70,6 +70,10 @@ export const GetPreferencesResponse = zod.object({
   brandBgColor: zod.string().nullish(),
   brandAccentColor: zod.string().nullish(),
   brandTextColor: zod.string().nullish(),
+  backgroundTheme: zod
+    .string()
+    .nullish()
+    .describe('Animated background theme key; \"none\" means default gray.'),
 });
 
 /**
@@ -95,6 +99,10 @@ export const UpdatePreferencesBody = zod.object({
   brandBgColor: zod.string().nullish(),
   brandAccentColor: zod.string().nullish(),
   brandTextColor: zod.string().nullish(),
+  backgroundTheme: zod
+    .string()
+    .nullish()
+    .describe('Animated background theme key; \"none\" means default gray.'),
 });
 
 export const UpdatePreferencesResponse = zod.object({
@@ -116,6 +124,10 @@ export const UpdatePreferencesResponse = zod.object({
   brandBgColor: zod.string().nullish(),
   brandAccentColor: zod.string().nullish(),
   brandTextColor: zod.string().nullish(),
+  backgroundTheme: zod
+    .string()
+    .nullish()
+    .describe('Animated background theme key; \"none\" means default gray.'),
 });
 
 /**

@@ -46,6 +46,8 @@ export interface PreferencesResponse {
   brandBgColor?: string | null;
   brandAccentColor?: string | null;
   brandTextColor?: string | null;
+  /** Animated background theme key; "none" means default gray. */
+  backgroundTheme?: string | null;
 }
 
 export interface UpdatePreferencesBody {
@@ -64,6 +66,8 @@ export interface UpdatePreferencesBody {
   brandBgColor?: string | null;
   brandAccentColor?: string | null;
   brandTextColor?: string | null;
+  /** Animated background theme key; "none" means default gray. */
+  backgroundTheme?: string | null;
 }
 
 export interface SuggestionItem {

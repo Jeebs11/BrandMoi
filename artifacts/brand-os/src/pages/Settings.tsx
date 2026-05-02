@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Link2, Unlink, RefreshCcw, CheckCircle2, ExternalLink, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { voiceApi, accountApi, linkedinApi, voiceInsightsApi, type VoiceSummaryResult, type LinkedinStatus } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
 import type { ExtractedBrandVoice } from "@/lib/api";
+import { BACKGROUNDS } from "@/lib/backgrounds";
+import { useBackgroundTheme } from "@/lib/background-context";
 
 // Audience replaces legacy Objective. Stored in preferences.objective for back-compat.
 const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
@@ -23,6 +25,7 @@ export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
   const { toast } = useToast();
+  const { activeTheme, setActiveTheme } = useBackgroundTheme();
 
   const [objective, setObjective] = useState(preferences?.objective ?? "Authority");
   const [persona, setPersona] = useState(preferences?.persona ?? "Founder");
@@ -32,7 +35,7 @@ export default function Settings() {
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
   const [aboutMe, setAboutMe] = useState((preferences as typeof preferences & { aboutMe?: string })?.aboutMe ?? "");
 
-  const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string; brandTextColor?: string });
+  const prefs = preferences as (typeof preferences & { brandBgColor?: string; brandAccentColor?: string; brandTextColor?: string; backgroundTheme?: string });
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
   const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
   const [brandTextColor, setBrandTextColor] = useState(prefs?.brandTextColor ?? "#ffffff");
@@ -178,6 +181,14 @@ export default function Settings() {
 
   const { mutate: updatePreferences, isPending: isSaving } = useUpdatePreferences();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  const handleThemeSelect = (key: string) => {
+    setActiveTheme(key);
+    updatePreferences(
+      { data: { backgroundTheme: key } },
+      { onError: () => toast({ title: "Could not save theme.", variant: "destructive" }) }
+    );
+  };
 
   const handleSave = () => {
     if (showPasswordSection) {
@@ -389,6 +400,85 @@ export default function Settings() {
                   </div>
                 </label>
               </div>
+            </div>
+          </section>
+
+          {/* Appearance */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-violet-400" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Appearance</h2>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+              Pick an animated background for the app shell. Changes apply instantly.
+            </p>
+            <div className="grid grid-cols-3 gap-2.5">
+              {/* None option */}
+              <button
+                type="button"
+                onClick={() => handleThemeSelect("none")}
+                className={cn(
+                  "relative rounded-xl overflow-hidden border-2 transition-all aspect-[8/5]",
+                  activeTheme === "none"
+                    ? "border-primary ring-2 ring-primary/30"
+                    : "border-gray-200 hover:border-gray-300"
+                )}
+                title="None"
+              >
+                <div className="absolute inset-0 bg-[#EDEDEE] flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-gray-400">None</span>
+                </div>
+                {activeTheme === "none" && (
+                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
+                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+
+              {BACKGROUNDS.map(bg => {
+                const BgComp = bg.component;
+                const isActive = activeTheme === bg.key;
+                return (
+                  <button
+                    key={bg.key}
+                    type="button"
+                    onClick={() => handleThemeSelect(bg.key)}
+                    className={cn(
+                      "relative rounded-xl overflow-hidden border-2 transition-all aspect-[8/5]",
+                      isActive
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
+                    title={bg.label}
+                  >
+                    <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
+                      <BgComp />
+                    </div>
+                    <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/60 to-transparent">
+                      <p className="text-[9px] font-bold text-white leading-tight truncate">{bg.label}</p>
+                    </div>
+                    {isActive && (
+                      <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
+                        <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {(["Minimal", "Professional", "Technical", "Creative", "Playful"] as const).map(cat => {
+                const count = BACKGROUNDS.filter(b => b.category === cat).length;
+                return count > 0 ? (
+                  <span key={cat} className="px-2 py-0.5 rounded-full bg-gray-100 text-[10px] font-semibold text-gray-500">
+                    {cat} ({count})
+                  </span>
+                ) : null;
+              })}
             </div>
           </section>
 

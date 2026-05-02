@@ -617,6 +617,10 @@ components:
         brandTextColor:
           type: string
           nullable: true
+        backgroundTheme:
+          type: string
+          nullable: true
+          description: Animated background theme key; "none" means default gray.
       required:
         - id
         - userId
@@ -658,6 +662,10 @@ components:
         brandTextColor:
           type: string
           nullable: true
+        backgroundTheme:
+          type: string
+          nullable: true
+          description: Animated background theme key; "none" means default gray.
 
     SuggestionItem:
       type: object

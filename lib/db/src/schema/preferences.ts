@@ -19,6 +19,7 @@ export const preferencesTable = pgTable("preferences", {
   brandBgColor: text("brand_bg_color").notNull().default("#0f172a"),
   brandAccentColor: text("brand_accent_color").notNull().default("#6366f1"),
   brandTextColor: text("brand_text_color").notNull().default("#ffffff"),
+  backgroundTheme: text("background_theme").default("none"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

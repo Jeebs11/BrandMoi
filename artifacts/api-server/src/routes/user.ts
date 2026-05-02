@@ -29,6 +29,7 @@ const UpdatePreferencesBody = z.object({
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  backgroundTheme: z.string().max(64).optional(),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
@@ -69,6 +70,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.brandBgColor !== undefined) updateData.brandBgColor = parsed.data.brandBgColor;
   if (parsed.data.brandAccentColor !== undefined) updateData.brandAccentColor = parsed.data.brandAccentColor;
   if (parsed.data.brandTextColor !== undefined) updateData.brandTextColor = parsed.data.brandTextColor;
+  if (parsed.data.backgroundTheme !== undefined) updateData.backgroundTheme = parsed.data.backgroundTheme;
 
   const [prefs] = await db
     .update(preferencesTable)
