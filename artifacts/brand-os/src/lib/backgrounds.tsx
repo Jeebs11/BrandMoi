@@ -561,84 +561,19 @@ function Stars() {
   return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#040812" }} />;
 }
 
-// ── Galaxy (rotating spiral arms + glowing core) ──────────────────────────────
-function Galaxy() {
-  const { speed } = useBackgroundTheme();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const speedRef = useRef(SPEED_MULT[speed] ?? 1);
-
-  useEffect(() => { speedRef.current = SPEED_MULT[speed] ?? 1; }, [speed]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    let raf: number;
-    interface GStar { r:number; theta:number; dTheta:number; brightness:number; size:number; warmth:number }
-    let gstars: GStar[] = [];
-    let bgStars: Array<{x:number;y:number;r:number;a:number}> = [];
-
-    const init = () => {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      bgStars = Array.from({ length: 160 }, () => ({
-        x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-        r: Math.random() * 0.8 + 0.2, a: Math.random() * 0.35 + 0.1,
-      }));
-      gstars = [];
-      const ARMS = 3;
-      for (let a = 0; a < ARMS; a++) {
-        const offset = (a / ARMS) * Math.PI * 2;
-        for (let i = 0; i < 130; i++) {
-          const r = (i / 130) * 0.43 + 0.02;
-          const spread = 0.25 + r * 1.1;
-          const theta = offset + i * 0.17 + (Math.random()-0.5) * spread;
-          gstars.push({ r, theta, dTheta: 0.00007 / (r+0.04), brightness: Math.random()*0.6+0.3, size: Math.random()*1.5+0.3, warmth: Math.max(0, 1-r*2.5) });
-        }
-      }
-      for (let i = 0; i < 80; i++) {
-        const r = Math.random() * 0.07;
-        gstars.push({ r, theta: Math.random()*Math.PI*2, dTheta: 0.0003/(r+0.01), brightness: Math.random()*0.8+0.2, size: Math.random()*1.2+0.3, warmth: 1 });
-      }
-    };
-    init();
-    window.addEventListener("resize", init);
-
-    const draw = () => {
-      const sp = speedRef.current;
-      const R = Math.min(canvas.width, canvas.height) * 0.44;
-      const cx = canvas.width * 0.5, cy = canvas.height * 0.5;
-
-      ctx.fillStyle = "#030610";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      bgStars.forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fillStyle = `rgba(200,210,240,${s.a})`; ctx.fill(); });
-
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R*0.9);
-      glow.addColorStop(0, "rgba(190,160,255,0.22)"); glow.addColorStop(0.3, "rgba(120,90,220,0.08)"); glow.addColorStop(1, "transparent");
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, R*0.9, 0, Math.PI*2); ctx.fill();
-
-      const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R*0.13);
-      core.addColorStop(0, "rgba(255,245,200,0.9)"); core.addColorStop(0.35, "rgba(255,210,140,0.4)"); core.addColorStop(1, "transparent");
-      ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, R*0.13, 0, Math.PI*2); ctx.fill();
-
-      gstars.forEach(s => {
-        s.theta += s.dTheta * sp;
-        const x = cx + Math.cos(s.theta) * s.r * R;
-        const y = cy + Math.sin(s.theta) * s.r * R * 0.38;
-        const rC = Math.floor(200 + s.warmth*55);
-        const gC = Math.floor(200 + s.warmth*20);
-        const bC = Math.floor(220 - s.warmth*70);
-        ctx.beginPath(); ctx.arc(x, y, s.size, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(${rC},${gC},${bC},${s.brightness})`; ctx.fill();
-      });
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); };
-  }, []);
-
-  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030610" }} />;
+// ── Custom (user-uploaded photo as cover) ─────────────────────────────────────
+function CustomBg() {
+  const { customImageUrl } = useBackgroundTheme();
+  if (!customImageUrl) {
+    return <div style={{ position:"absolute",inset:0,background:"#111" }} />;
+  }
+  return (
+    <img
+      src={customImageUrl}
+      alt=""
+      style={{ position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center" }}
+    />
+  );
 }
 
 // ── Shooting Stars (night sky + streaking comets + mouse parallax) ─────────────
@@ -760,8 +695,8 @@ export const BACKGROUNDS: BackgroundEntry[] = [
   { key: "neon-grid",       label: "Neon Grid",        category: "Playful",       component: NeonGrid },
   { key: "wave",            label: "Ocean Wave",       category: "Playful",       component: Wave },
   { key: "stars",           label: "Stars",            category: "Minimal",       component: Stars,          interactive: true },
-  { key: "galaxy",          label: "Galaxy",           category: "Creative",      component: Galaxy },
   { key: "shooting-stars",  label: "Shooting Stars",   category: "Creative",      component: ShootingStars,  interactive: true },
+  { key: "custom",          label: "My Photo",         category: "Minimal",       component: CustomBg },
 ];
 
 export function getBackground(key: string): BackgroundEntry | undefined {

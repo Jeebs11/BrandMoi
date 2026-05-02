@@ -29,7 +29,8 @@ const UpdatePreferencesBody = z.object({
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave", "stars", "galaxy", "shooting-stars"]).optional(),
+  backgroundTheme: z.enum(["none", "aurora", "matrix", "neural", "particles", "grid-pulse", "constellation", "topographic", "ink-wash", "neon-grid", "wave", "stars", "shooting-stars", "custom"]).optional(),
+  bgCustomImageUrl: z.string().max(1_000_000).optional().nullable(),
   bgSpeed: z.enum(["slow", "normal", "fast"]).optional(),
   siteTheme: z.enum(["indigo", "violet", "sky", "emerald", "rose", "amber"]).optional(),
 });
@@ -73,6 +74,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.brandAccentColor !== undefined) updateData.brandAccentColor = parsed.data.brandAccentColor;
   if (parsed.data.brandTextColor !== undefined) updateData.brandTextColor = parsed.data.brandTextColor;
   if (parsed.data.backgroundTheme !== undefined) updateData.backgroundTheme = parsed.data.backgroundTheme;
+  if (parsed.data.bgCustomImageUrl !== undefined) updateData.bgCustomImageUrl = parsed.data.bgCustomImageUrl;
   if (parsed.data.bgSpeed !== undefined) updateData.bgSpeed = parsed.data.bgSpeed;
   if (parsed.data.siteTheme !== undefined) updateData.siteTheme = parsed.data.siteTheme;
 

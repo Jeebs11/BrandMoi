@@ -135,12 +135,14 @@ function RootBackgroundProvider({ children }: { children: React.ReactNode }) {
     backgroundTheme?: string | null;
     bgSpeed?: string | null;
     siteTheme?: string | null;
+    bgCustomImageUrl?: string | null;
   }) | undefined;
   return (
     <BackgroundProvider
       initialTheme={prefs?.backgroundTheme ?? "none"}
       initialSpeed={prefs?.bgSpeed ?? "normal"}
       initialSiteTheme={prefs?.siteTheme ?? "indigo"}
+      initialCustomImageUrl={prefs?.bgCustomImageUrl ?? null}
     >
       {children}
     </BackgroundProvider>

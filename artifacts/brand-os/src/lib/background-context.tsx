@@ -25,6 +25,8 @@ interface BackgroundContextType {
   setSpeed: (s: BgSpeed) => void;
   siteTheme: SiteTheme;
   setSiteTheme: (t: SiteTheme) => void;
+  customImageUrl: string | null;
+  setCustomImageUrl: (url: string | null) => void;
 }
 
 const BackgroundContext = createContext<BackgroundContextType>({
@@ -34,6 +36,8 @@ const BackgroundContext = createContext<BackgroundContextType>({
   setSpeed: () => {},
   siteTheme: "indigo",
   setSiteTheme: () => {},
+  customImageUrl: null,
+  setCustomImageUrl: () => {},
 });
 
 export function BackgroundProvider({
@@ -41,15 +45,18 @@ export function BackgroundProvider({
   initialTheme,
   initialSpeed,
   initialSiteTheme,
+  initialCustomImageUrl,
 }: {
   children: ReactNode;
   initialTheme?: string | null;
   initialSpeed?: string | null;
   initialSiteTheme?: string | null;
+  initialCustomImageUrl?: string | null;
 }) {
   const [activeTheme, setActiveTheme] = useState(initialTheme ?? "none");
   const [speed, setSpeed] = useState<BgSpeed>((initialSpeed as BgSpeed) ?? "normal");
   const [siteTheme, setSiteTheme] = useState<SiteTheme>((initialSiteTheme as SiteTheme) ?? "indigo");
+  const [customImageUrl, setCustomImageUrl] = useState<string | null>(initialCustomImageUrl ?? null);
 
   useEffect(() => {
     if (initialTheme && initialTheme !== activeTheme) setActiveTheme(initialTheme);
@@ -67,6 +74,13 @@ export function BackgroundProvider({
   }, [initialSiteTheme]);
 
   useEffect(() => {
+    if (initialCustomImageUrl !== undefined && initialCustomImageUrl !== customImageUrl) {
+      setCustomImageUrl(initialCustomImageUrl);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCustomImageUrl]);
+
+  useEffect(() => {
     const t = SITE_THEMES[siteTheme] ?? SITE_THEMES.indigo;
     const root = document.documentElement;
     root.style.setProperty("--primary", t.primary);
@@ -77,7 +91,7 @@ export function BackgroundProvider({
   }, [siteTheme]);
 
   return (
-    <BackgroundContext.Provider value={{ activeTheme, setActiveTheme, speed, setSpeed, siteTheme, setSiteTheme }}>
+    <BackgroundContext.Provider value={{ activeTheme, setActiveTheme, speed, setSpeed, siteTheme, setSiteTheme, customImageUrl, setCustomImageUrl }}>
       {children}
     </BackgroundContext.Provider>
   );
