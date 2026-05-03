@@ -55,6 +55,7 @@ function ThumbBtn({
 export default function Settings() {
   const [, navigate] = useLocation();
   const { user, preferences, invalidate } = useAuth();
+  const isDemo = user?.email === "demo@brandos.app";
   const { toast } = useToast();
   const { activeTheme, setActiveTheme, speed, setSpeed, density, setDensity, panelOpacity, setPanelOpacity, siteTheme: activeSiteTheme, setSiteTheme, customImageUrl, setCustomImageUrl, bgPalette, setBgPalette } = useBackgroundTheme();
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -773,78 +774,101 @@ export default function Settings() {
           {/* Account */}
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Account</h2>
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Display name</p>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  maxLength={80}
-                  className="w-full text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
-                />
+            {isDemo ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-start gap-2 mb-1">
+                  <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Demo account — read-only</span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Display name</p>
+                  <p className="text-sm text-gray-600">{user?.displayName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
+                  <p className="text-sm text-gray-500">{user?.email}</p>
+                </div>
+                <p className="text-xs text-amber-700 leading-relaxed">Name, password, and settings cannot be changed in demo mode. <a href="/signup" className="font-semibold underline underline-offset-2">Sign up free</a> to get your own account.</p>
               </div>
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
-                <p className="text-sm text-gray-500">{user?.email}</p>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Display name</p>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    maxLength={80}
+                    className="w-full text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Email</p>
+                  <p className="text-sm text-gray-500">{user?.email}</p>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordSection(v => !v)}
+                    className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    {showPasswordSection ? "Cancel password change" : "Change password"}
+                  </button>
+                  {showPasswordSection && (
+                    <div className="mt-3 space-y-3">
+                      <div className="relative">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Current password</p>
+                        <input
+                          type={showCurrentPw ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={e => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                          className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                        />
+                        <button type="button" onClick={() => setShowCurrentPw(v => !v)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
+                          {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">New password</p>
+                        <input
+                          type={showNewPw ? "text" : "password"}
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder="Min. 8 characters"
+                          className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                        />
+                        <button type="button" onClick={() => setShowNewPw(v => !v)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
+                          {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Confirm new password</p>
+                        <input
+                          type="password"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                          placeholder="Repeat new password"
+                          className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordSection(v => !v)}
-                  className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-wider"
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  {showPasswordSection ? "Cancel password change" : "Change password"}
-                </button>
-                {showPasswordSection && (
-                  <div className="mt-3 space-y-3">
-                    <div className="relative">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Current password</p>
-                      <input
-                        type={showCurrentPw ? "text" : "password"}
-                        value={currentPassword}
-                        onChange={e => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
-                      />
-                      <button type="button" onClick={() => setShowCurrentPw(v => !v)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
-                        {showCurrentPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">New password</p>
-                      <input
-                        type={showNewPw ? "text" : "password"}
-                        value={newPassword}
-                        onChange={e => setNewPassword(e.target.value)}
-                        placeholder="Min. 8 characters"
-                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
-                      />
-                      <button type="button" onClick={() => setShowNewPw(v => !v)} className="absolute right-3 top-8 text-gray-400 hover:text-gray-600">
-                        {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Confirm new password</p>
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={e => setConfirmPassword(e.target.value)}
-                        placeholder="Repeat new password"
-                        className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
           </section>
 
           {/* Save Button */}
-          <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSavingAccount || isSaving}>
-            {(isSavingAccount || isSaving) ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Save changes</>}
-          </Button>
+          {isDemo ? (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <span className="flex-1">Settings are view-only in demo mode. <a href="/signup" className="font-semibold underline underline-offset-2">Sign up free</a> to save your own settings.</span>
+            </div>
+          ) : (
+            <Button className="w-full h-14 text-base font-semibold" onClick={handleSave} disabled={isSavingAccount || isSaving}>
+              {(isSavingAccount || isSaving) ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Save changes</>}
+            </Button>
+          )}
 
           {/* Logout */}
           <button

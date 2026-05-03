@@ -7,6 +7,7 @@ import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable, voiceSuggestionsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { signToken } from "../lib/jwt.js";
+import { isDemoUser } from "../lib/demo-content.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -70,6 +71,10 @@ router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => 
 });
 
 router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot change settings." });
+    return;
+  }
   const parsed = UpdatePreferencesBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
@@ -342,6 +347,10 @@ const UpdateAccountBody = z.object({
 );
 
 router.put("/user/account", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot change account details." });
+    return;
+  }
   const parsed = UpdateAccountBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });

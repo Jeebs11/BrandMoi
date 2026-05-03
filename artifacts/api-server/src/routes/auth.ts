@@ -6,6 +6,7 @@ import { db } from "@workspace/db";
 import { usersTable, preferencesTable, loginEventsTable } from "@workspace/db";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth } from "../middleware/auth.js";
+import { isDemoUser } from "../lib/demo-content.js";
 
 const router: IRouter = Router();
 
@@ -109,6 +110,10 @@ const ChangePasswordBody = z.object({
 });
 
 router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot change their password." });
+    return;
+  }
   const parsed = ChangePasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
