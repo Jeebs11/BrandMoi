@@ -121,7 +121,8 @@ export default function Capture() {
   const rawParam = params.get("raw") ?? "";
   const newsUrlParam = params.get("newsUrl") ?? "";
 
-  const { preferences } = useAuth();
+  const { user, preferences } = useAuth();
+  const isDemo = user?.email === "demo@brandos.app";
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -448,6 +449,7 @@ export default function Capture() {
             audience={audience} feeling={feeling}
             isRefining={isRefining}
             isSaving={isSaving}
+            isDemo={isDemo}
             onSwapHook={swapHook}
             onRefine={runRefine}
             onTryAgain={() => runGenerate({ extraInstruction: "Take a completely different angle on the same idea." })}
@@ -476,7 +478,7 @@ export default function Capture() {
               className="fixed inset-0 bg-white/90 z-50 flex items-center justify-center"
             >
               <div className="text-center">
-                <GenerationLoader text="Crafting your post…" />
+                <GenerationLoader text={isDemo ? "Loading your demo post…" : "Crafting your post…"} isDemo={isDemo} />
               </div>
             </motion.div>
           )}
@@ -701,6 +703,7 @@ interface ResultViewProps {
   audience: string; feeling: string;
   isRefining: boolean;
   isSaving: boolean;
+  isDemo: boolean;
   onSwapHook: (hook: string) => void;
   onRefine: (instruction: string, tab?: TabType) => void;
   onTryAgain: () => void;
@@ -720,7 +723,7 @@ function ResultView(props: ResultViewProps) {
     activeTab, setActiveTab, visualStyle, setVisualStyle,
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
-    fullPost, audience, feeling, isRefining, isSaving,
+    fullPost, audience, feeling, isRefining, isSaving, isDemo,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration,
     onSave, onCopy,
@@ -728,6 +731,19 @@ function ResultView(props: ResultViewProps) {
 
   return (
     <div className="space-y-4">
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+          <span className="text-base">🧪</span>
+          <div>
+            <span className="font-semibold">Demo preview</span>
+            <span className="text-amber-700"> — this is a curated example, not AI output. </span>
+            <a href="/signup" className="font-semibold underline underline-offset-2 hover:text-amber-900">Sign up free</a>
+            <span className="text-amber-700"> to generate posts from your own ideas.</span>
+          </div>
+        </div>
+      )}
+
       {/* Audience badge + News pill */}
       <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
         <span className="px-2 py-1 bg-gray-100 rounded-full">{audience}</span>

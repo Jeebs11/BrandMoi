@@ -19,6 +19,7 @@ import {
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
+import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
 import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 
@@ -113,6 +114,15 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
 
   const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction } = parsed.data;
   const userId = req.user!.userId;
+
+  // Demo account: return pre-written content, no AI call
+  if (isDemoUser(req.user!.email)) {
+    await demoDelay();
+    const demo = getDemoGenerateResponse(rawInput);
+    res.json({ ...demo, isDemo: true });
+    return;
+  }
+
   const [voiceContext, performanceContext] = await Promise.all([
     getUserBrandContext(userId),
     buildPerformanceContext(userId),
@@ -208,6 +218,13 @@ router.post("/ai/refine", requireAuth, aiRateLimit, async (req, res): Promise<vo
   }
 
   const { content, instruction, tab } = parsed.data;
+
+  // Demo account: echo content back unchanged, no AI call
+  if (isDemoUser(req.user!.email)) {
+    await demoDelay();
+    res.json({ content });
+    return;
+  }
 
   // Carousel: Claude returns a JSON array of slides, not a plain string.
   // Handle separately so the response shape matches what the frontend expects.
@@ -791,6 +808,13 @@ router.post("/ai/explore-directions", requireAuth, aiRateLimit, async (req, res)
 
   const { rawInput, audience: audienceHint } = body.data;
   const userId = req.user!.userId;
+
+  // Demo account: return pre-written directions, no AI call
+  if (isDemoUser(req.user!.email)) {
+    await demoDelay();
+    res.json(DEMO_EXPLORE_DIRECTIONS);
+    return;
+  }
 
   const recentDrafts = await db
     .select({ postOutput: draftsTable.postOutput })

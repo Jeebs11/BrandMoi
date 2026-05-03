@@ -3,6 +3,7 @@ import { z } from "zod";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
+import { isDemoUser } from "../lib/demo-content.js";
 
 const router: IRouter = Router();
 
@@ -75,6 +76,11 @@ const GenerateIllustrationConceptBody = z.object({
 });
 
 router.post("/ai/generate-illustration-concept", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user?.email)) {
+    res.status(403).json({ error: "Image generation is not available in demo mode. Sign up to unlock it." });
+    return;
+  }
+
   const parsed = GenerateIllustrationConceptBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Post content is required." });
@@ -115,6 +121,11 @@ router.post("/ai/generate-illustration-concept", requireAuth, aiRateLimit, async
 });
 
 router.post("/ai/generate-image-prompt", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user?.email)) {
+    res.status(403).json({ error: "Image generation is not available in demo mode. Sign up to unlock it." });
+    return;
+  }
+
   const parsed = GenerateImagePromptBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "A visual description of at least 10 characters is required." });
@@ -149,6 +160,11 @@ const GenerateImageBody = z.object({
 });
 
 router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user?.email)) {
+    res.status(403).json({ error: "Image generation is not available in demo mode. Sign up to unlock it." });
+    return;
+  }
+
   if (!process.env.OPENAI_API_KEY) {
     res.status(503).json({
       error: "Image generation is not configured. Add an OPENAI_API_KEY secret to enable this feature.",
@@ -225,6 +241,11 @@ const EditSceneBody = z.object({
 });
 
 router.post("/ai/edit-scene", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user?.email)) {
+    res.status(403).json({ error: "Image generation is not available in demo mode. Sign up to unlock it." });
+    return;
+  }
+
   const parsed = EditSceneBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Current scene and edit request are required." });
