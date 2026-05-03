@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
+import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,8 @@ type PerformanceModalState = {
 
 export default function Library() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isDemo = user?.email === "demo@brandos.app";
   const search = useSearch();
   const highlightId = (() => { const m = new URLSearchParams(search).get("highlight"); return m ? Number(m) : null; })();
   const highlightRef = useRef<HTMLDivElement | null>(null);
@@ -297,16 +300,18 @@ export default function Library() {
                         <DropdownMenuItem onClick={() => navigate(`/capture?draftId=${draft.id}`)}>
                           <Pencil className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => {
-                          const sb = (draft.structuredBreakdown ?? {}) as { feeling?: string; audience?: string };
-                          const draftFeeling = sb.feeling ?? TONE_TO_FEELING[draft.tone] ?? "Direct";
-                          const draftAudience = sb.audience ?? OBJECTIVE_TO_AUDIENCE[draft.objective] ?? draft.objective ?? "My audience";
-                          const hook = draft.postOutput?.split("\n").map(l => l.trim()).find(l => l.length > 10)?.slice(0, 100) ?? topic;
-                          navigate(`/capture?audience=${encodeURIComponent(draftAudience)}&feeling=${encodeURIComponent(draftFeeling)}&raw=${encodeURIComponent(`More like: ${hook}`)}`);
-                        }}>
-                          <Sparkles className="w-4 h-4 mr-2 text-violet-500" /> More like this
-                        </DropdownMenuItem>
-                        {draft.status === "published" && (
+                        {!isDemo && (
+                          <DropdownMenuItem onClick={() => {
+                            const sb = (draft.structuredBreakdown ?? {}) as { feeling?: string; audience?: string };
+                            const draftFeeling = sb.feeling ?? TONE_TO_FEELING[draft.tone] ?? "Direct";
+                            const draftAudience = sb.audience ?? OBJECTIVE_TO_AUDIENCE[draft.objective] ?? draft.objective ?? "My audience";
+                            const hook = draft.postOutput?.split("\n").map(l => l.trim()).find(l => l.length > 10)?.slice(0, 100) ?? topic;
+                            navigate(`/capture?audience=${encodeURIComponent(draftAudience)}&feeling=${encodeURIComponent(draftFeeling)}&raw=${encodeURIComponent(`More like: ${hook}`)}`);
+                          }}>
+                            <Sparkles className="w-4 h-4 mr-2 text-violet-500" /> More like this
+                          </DropdownMenuItem>
+                        )}
+                        {!isDemo && draft.status === "published" && (
                           <>
                             <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic, "upload")}>
                               <Upload className="w-4 h-4 mr-2 text-violet-500" /> Upload LinkedIn analytics
@@ -316,31 +321,35 @@ export default function Library() {
                             </DropdownMenuItem>
                           </>
                         )}
-                        <DropdownMenuSeparator />
-                        {draft.status !== "draft" && (
-                          <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "draft")}>
-                            <FileText className="w-4 h-4 mr-2 text-gray-500" /> Mark as Draft
-                          </DropdownMenuItem>
+                        {!isDemo && (
+                          <>
+                            <DropdownMenuSeparator />
+                            {draft.status !== "draft" && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "draft")}>
+                                <FileText className="w-4 h-4 mr-2 text-gray-500" /> Mark as Draft
+                              </DropdownMenuItem>
+                            )}
+                            {draft.status !== "ready" && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "ready")}>
+                                <Clock className="w-4 h-4 mr-2 text-blue-500" /> Mark as Ready
+                              </DropdownMenuItem>
+                            )}
+                            {draft.status !== "published" && (
+                              <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "published")}>
+                                <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" /> Mark as Published
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              onClick={() => {
+                                if (confirm(`Delete "${topic}"? This can't be undone.`)) handleDelete(draft.id);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </>
                         )}
-                        {draft.status !== "ready" && (
-                          <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "ready")}>
-                            <Clock className="w-4 h-4 mr-2 text-blue-500" /> Mark as Ready
-                          </DropdownMenuItem>
-                        )}
-                        {draft.status !== "published" && (
-                          <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "published")}>
-                            <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" /> Mark as Published
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                          onClick={() => {
-                            if (confirm(`Delete "${topic}"? This can't be undone.`)) handleDelete(draft.id);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" /> Delete
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

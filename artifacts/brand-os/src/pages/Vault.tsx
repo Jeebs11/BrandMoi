@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Lightbulb, Plus, Trash2, ArrowRight, CheckCircle2, ChevronLeft } from "lucide-react";
+import { Lightbulb, Plus, Trash2, ArrowRight, CheckCircle2, ChevronLeft, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, type Thought } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Vault() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const isDemo = user?.email === "demo@brandos.app";
   const [thoughts, setThoughts] = useState<Thought[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
@@ -78,39 +81,46 @@ export default function Vault() {
         </header>
 
         <main className="flex-1 px-5 py-5 overflow-y-auto space-y-6">
-          {/* Quick capture input */}
-          <div className="bg-white rounded-2xl border-2 border-gray-100 focus-within:border-primary/40 transition-colors shadow-sm">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  void handleCapture();
-                }
-              }}
-              placeholder="Drop a half-formed idea, question, or observation — no editing needed..."
-              rows={3}
-              className="w-full px-4 pt-4 pb-2 text-sm text-gray-800 placeholder:text-gray-300 bg-transparent outline-none resize-none leading-relaxed"
-            />
-            <div className="flex items-center justify-between px-4 pb-3">
-              <span className="text-[10px] text-gray-300 font-medium">⌘↵ to save</span>
-              <button
-                onClick={() => void handleCapture()}
-                disabled={!input.trim() || saving}
-                className={cn(
-                  "flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all",
-                  input.trim() && !saving
-                    ? "bg-primary text-white hover:bg-primary/90"
-                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                )}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {saving ? "Saving..." : "Capture"}
-              </button>
+          {/* Quick capture input — hidden for demo users */}
+          {isDemo ? (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              <Lock className="w-4 h-4 flex-shrink-0 text-amber-500" />
+              <span>Vault capture is view-only in demo mode. <a href="/signup" className="font-semibold underline underline-offset-2">Sign up free</a> to capture your own ideas.</span>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white rounded-2xl border-2 border-gray-100 focus-within:border-primary/40 transition-colors shadow-sm">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void handleCapture();
+                  }
+                }}
+                placeholder="Drop a half-formed idea, question, or observation — no editing needed..."
+                rows={3}
+                className="w-full px-4 pt-4 pb-2 text-sm text-gray-800 placeholder:text-gray-300 bg-transparent outline-none resize-none leading-relaxed"
+              />
+              <div className="flex items-center justify-between px-4 pb-3">
+                <span className="text-[10px] text-gray-300 font-medium">⌘↵ to save</span>
+                <button
+                  onClick={() => void handleCapture()}
+                  disabled={!input.trim() || saving}
+                  className={cn(
+                    "flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                    input.trim() && !saving
+                      ? "bg-primary text-white hover:bg-primary/90"
+                      : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {saving ? "Saving..." : "Capture"}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Undeveloped thoughts */}
           <section>
@@ -146,6 +156,7 @@ export default function Vault() {
                     onDelete={() => void handleDelete(thought.id)}
                     developingId={developingId}
                     deletingId={deletingId}
+                    isDemo={isDemo}
                   />
                 ))}
               </div>
@@ -161,13 +172,15 @@ export default function Vault() {
                   <div key={thought.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
                     <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
                     <p className="text-sm text-gray-500 flex-1 line-clamp-2">{thought.content}</p>
-                    <button
-                      onClick={() => void handleDelete(thought.id)}
-                      disabled={deletingId === thought.id}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {!isDemo && (
+                      <button
+                        onClick={() => void handleDelete(thought.id)}
+                        disabled={deletingId === thought.id}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -180,7 +193,7 @@ export default function Vault() {
 }
 
 function ThoughtCard({
-  thought, onDevelop, onMarkDeveloped, onDelete, developingId, deletingId,
+  thought, onDevelop, onMarkDeveloped, onDelete, developingId, deletingId, isDemo,
 }: {
   thought: Thought;
   onDevelop: () => void;
@@ -188,6 +201,7 @@ function ThoughtCard({
   onDelete: () => void;
   developingId: number | null;
   deletingId: number | null;
+  isDemo: boolean;
 }) {
   const daysOld = Math.floor((Date.now() - new Date(thought.createdAt).getTime()) / (1000 * 60 * 60 * 24));
   const isRipe = daysOld >= 2;
@@ -209,21 +223,25 @@ function ThoughtCard({
         >
           Develop <ArrowRight className="w-3 h-3" />
         </button>
-        <button
-          onClick={onMarkDeveloped}
-          disabled={developingId === thought.id}
-          className="flex items-center gap-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl text-xs font-bold transition-colors"
-        >
-          <CheckCircle2 className="w-3 h-3" /> Done
-        </button>
+        {!isDemo && (
+          <button
+            onClick={onMarkDeveloped}
+            disabled={developingId === thought.id}
+            className="flex items-center gap-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl text-xs font-bold transition-colors"
+          >
+            <CheckCircle2 className="w-3 h-3" /> Done
+          </button>
+        )}
         <div className="flex-1" />
-        <button
-          onClick={onDelete}
-          disabled={deletingId === thought.id}
-          className="p-2 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+        {!isDemo && (
+          <button
+            onClick={onDelete}
+            disabled={deletingId === thought.id}
+            className="p-2 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
         <span className="text-[10px] text-gray-300 font-medium">
           {new Date(thought.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
         </span>

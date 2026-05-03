@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { thoughtsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
+import { isDemoUser } from "../lib/demo-content.js";
 
 const router: IRouter = Router();
 
@@ -24,6 +25,11 @@ router.get("/thoughts", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/thoughts", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot create thoughts. Sign up to use the Vault." });
+    return;
+  }
+
   const parsed = CreateThoughtBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
@@ -39,6 +45,11 @@ router.post("/thoughts", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.patch("/thoughts/:id", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot modify thoughts." });
+    return;
+  }
+
   const params = UpdateThoughtParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid id" });
@@ -75,6 +86,11 @@ router.patch("/thoughts/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.delete("/thoughts/:id", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot delete thoughts." });
+    return;
+  }
+
   const params = UpdateThoughtParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: "Invalid id" });

@@ -17,6 +17,7 @@ import {
   GetAnalyticsOverviewResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth.js";
+import { isDemoUser } from "../lib/demo-content.js";
 import { extractVoiceDNA } from "./ai.js";
 import { upsertDailyActivity } from "../lib/momentum.js";
 
@@ -109,6 +110,11 @@ router.get("/drafts", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot save drafts. Sign up to save your posts." });
+    return;
+  }
+
   const parsed = CreateDraftBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -164,6 +170,11 @@ router.get("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot edit drafts. Sign up to save your posts." });
+    return;
+  }
+
   const params = UpdateDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -205,6 +216,11 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.delete("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot delete drafts." });
+    return;
+  }
+
   const params = DeleteDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

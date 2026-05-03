@@ -862,13 +862,15 @@ function ResultView(props: ResultViewProps) {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className={cn("grid gap-2", isDemo ? "grid-cols-1" : "grid-cols-2")}>
             <Button variant="ghost" onClick={() => onCopy(fullPost, "Post copied")}>
               <Copy className="w-3.5 h-3.5 mr-1" />Copy
             </Button>
-            <Button onClick={onSave} disabled={isSaving}>
-              <Save className="w-3.5 h-3.5 mr-1" />{isSaving ? "Saving…" : "Save"}
-            </Button>
+            {!isDemo && (
+              <Button onClick={onSave} disabled={isSaving}>
+                <Save className="w-3.5 h-3.5 mr-1" />{isSaving ? "Saving…" : "Save"}
+              </Button>
+            )}
           </div>
         </div>
       )}
