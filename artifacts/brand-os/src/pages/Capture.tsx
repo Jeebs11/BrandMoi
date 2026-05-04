@@ -471,17 +471,21 @@ export default function Capture() {
           />
         )}
 
-        {/* Loading overlay — rendered via portal so fixed positioning is always viewport-relative */}
-        {isGenerating && createPortal(
+        {/* Loading overlay — rendered via portal so fixed positioning is always viewport-relative.
+            AnimatePresence is always mounted (outside the condition) so the exit fade plays
+            when isGenerating flips to false. */}
+        {createPortal(
           <AnimatePresence>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-white/90 z-50 flex items-center justify-center"
-            >
-              <div className="text-center">
-                <GenerationLoader text={isDemo ? "Loading your demo post…" : "Crafting your post…"} isDemo={isDemo} />
-              </div>
-            </motion.div>
+            {isGenerating && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-white/90 z-50 flex items-center justify-center"
+              >
+                <div className="text-center">
+                  <GenerationLoader text={isDemo ? "Loading your demo post…" : "Crafting your post…"} isDemo={isDemo} />
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>,
           document.body
         )}
