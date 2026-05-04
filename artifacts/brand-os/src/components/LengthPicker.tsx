@@ -1,4 +1,5 @@
 import { Zap, AlignLeft, BookOpen, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 export type PostLength = "short" | "medium" | "long";
@@ -59,7 +60,7 @@ interface LengthPickerProps {
 export function LengthPicker({ open, onClose, onSelect, title }: LengthPickerProps) {
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end items-center">
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
@@ -105,6 +106,7 @@ export function LengthPicker({ open, onClose, onSelect, title }: LengthPickerPro
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

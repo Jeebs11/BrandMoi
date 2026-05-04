@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
 import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
@@ -367,7 +368,7 @@ export default function Library() {
           />
         )}
 
-        {diagnosisPanel && (
+        {diagnosisPanel && createPortal(
           <div className="fixed inset-0 z-50 flex items-end justify-center">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDiagnosisPanel(null)} />
             <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
@@ -435,7 +436,8 @@ export default function Library() {
                 </div>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
     </AppShell>
   );
@@ -520,7 +522,7 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl">
@@ -694,7 +696,8 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

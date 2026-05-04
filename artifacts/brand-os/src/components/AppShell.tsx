@@ -90,7 +90,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
             className={cn(
               "absolute inset-0 pointer-events-none",
               "max-w-[430px]",
-              !noNav && "md:max-w-[700px]",
+              !noNav && "md:max-w-[700px] lg:max-w-[900px]",
               "mx-auto"
             )}
             style={{
@@ -103,7 +103,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
           className={cn(
             "w-full bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200",
             "max-w-[430px]",
-            !noNav && "pb-20 md:pb-8 md:max-w-[700px] md:shadow-xl",
+            !noNav && "pb-20 md:pb-8 md:max-w-[700px] lg:max-w-[900px] md:shadow-xl",
             contentClassName
           )}
           style={panelBgStyle}

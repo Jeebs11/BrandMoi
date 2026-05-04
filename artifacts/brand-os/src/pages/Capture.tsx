@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -470,9 +471,9 @@ export default function Capture() {
           />
         )}
 
-        {/* Loading overlay */}
-        <AnimatePresence>
-          {isGenerating && (
+        {/* Loading overlay — rendered via portal so fixed positioning is always viewport-relative */}
+        {isGenerating && createPortal(
+          <AnimatePresence>
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-white/90 z-50 flex items-center justify-center"
@@ -481,8 +482,9 @@ export default function Capture() {
                 <GenerationLoader text={isDemo ? "Loading your demo post…" : "Crafting your post…"} isDemo={isDemo} />
               </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+          </AnimatePresence>,
+          document.body
+        )}
       </div>
     </AppShell>
   );
