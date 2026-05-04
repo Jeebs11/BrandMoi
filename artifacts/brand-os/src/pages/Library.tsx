@@ -454,9 +454,15 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
   const [parsedLinkedinUrl, setParsedLinkedinUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "success" | "error">("idle");
+  const [uploadPhase, setUploadPhase] = useState<"idle" | "staged" | "analysing" | "results" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSummary, setUploadSummary] = useState<{ impressions: number; reactions: number; saves: number; membersReached: number } | null>(null);
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [uploadAnalysis, setUploadAnalysis] = useState<{
+    metrics: { impressions: number; reactions: number; comments: number; reposts: number; saves: number; membersReached: number };
+    strengths: string[];
+    takeaways: string[];
+    futureImprovement: string;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const normalizeUrl = (u: string) => u.trim().replace(/\/$/, "").toLowerCase();
@@ -476,34 +482,46 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
     return 0;
   })();
 
-  const handleXlsxUpload = async (file: File) => {
-    setUploadState("uploading");
+  const handleFileStage = (file: File) => {
+    setStagedFile(file);
+    setUploadPhase("staged");
+    setUploadError(null);
+  };
+
+  const handleAnalyse = async () => {
+    if (!stagedFile) return;
+    setUploadPhase("analysing");
     setUploadError(null);
     try {
-      const { signal, parsed } = await performanceApi.uploadXlsx(modal.draftId, file);
-      setUploadSummary({
-        impressions: signal.impressions,
-        reactions: signal.reactions,
-        saves: signal.saves,
-        membersReached: signal.membersReached,
-      });
+      const result = await performanceApi.uploadXlsx(modal.draftId, stagedFile);
+      const { signal } = result;
       setImpressions(signal.impressions);
       setReactions(signal.reactions);
       setComments(signal.comments);
       setReposts(signal.reposts);
       setSaves(signal.saves);
-      // Store parsed URL separately for match-check; only auto-fill if user left it blank
       if (signal.linkedinUrl) {
         setParsedLinkedinUrl(signal.linkedinUrl);
         if (!linkedinUrl.trim()) setLinkedinUrl(signal.linkedinUrl);
       }
-      void parsed;
-      setUploadState("success");
+      setUploadAnalysis({
+        metrics: {
+          impressions: signal.impressions,
+          reactions: signal.reactions,
+          comments: signal.comments,
+          reposts: signal.reposts,
+          saves: signal.saves,
+          membersReached: signal.membersReached,
+        },
+        strengths: result.analysis?.strengths ?? [],
+        takeaways: result.analysis?.takeaways ?? [],
+        futureImprovement: result.analysis?.futureImprovement ?? "",
+      });
+      setUploadPhase("results");
       onSuccess();
-      setTimeout(onClose, 2000);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
-      setUploadState("error");
+      setUploadPhase("error");
     }
   };
 
@@ -525,7 +543,7 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl">
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center gap-2 mb-0.5">
@@ -556,93 +574,181 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
 
         {tab === "upload" ? (
           <div>
-            <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-              Export your post's analytics from LinkedIn (Content → Post → Export) and upload the <strong>.xlsx</strong> file. The AI will learn what content works best for your audience.
-            </p>
-
-            {/* URL input — always visible so user can paste before or after upload */}
-            <div className="mb-3">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">LinkedIn post URL</p>
-              <input
-                type="url"
-                placeholder="https://www.linkedin.com/posts/..."
-                value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors placeholder:font-normal placeholder:text-gray-300"
-              />
-              {/* URL match indicator — shown after a file is uploaded */}
-              {parsedLinkedinUrl && (
-                <div className={cn("flex items-center gap-1.5 mt-1.5 text-xs font-semibold",
-                  urlMatchStatus === "match" ? "text-emerald-600" : urlMatchStatus === "mismatch" ? "text-amber-600" : "text-gray-400"
-                )}>
-                  {urlMatchStatus === "match" && <><span>✓</span> URL matches the file</>}
-                  {urlMatchStatus === "mismatch" && <><span>⚠</span> URL in file differs — check you chose the right post</>}
-                  {urlMatchStatus === "parsed-only" && <><span>→</span> URL auto-filled from file</>}
-                </div>
-              )}
-            </div>
-
-            {uploadState === "success" && uploadSummary ? (
-              <div className="p-4 bg-green-50 rounded-2xl border border-green-200 text-center">
-                <div className="text-2xl mb-1">✓</div>
-                <p className="font-bold text-green-700 text-sm mb-2">Analytics imported!</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-white rounded-xl p-2 text-center">
-                    <div className="font-black text-gray-900">{uploadSummary.impressions.toLocaleString()}</div>
-                    <div className="text-gray-400">impressions</div>
+            {uploadPhase === "results" && uploadAnalysis ? (
+              /* ── Analysis results popup ── */
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-emerald-600 font-black text-sm">✓</span>
                   </div>
-                  <div className="bg-white rounded-xl p-2 text-center">
-                    <div className="font-black text-gray-900">{uploadSummary.membersReached.toLocaleString()}</div>
-                    <div className="text-gray-400">members reached</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-2 text-center">
-                    <div className="font-black text-gray-900">{uploadSummary.reactions.toLocaleString()}</div>
-                    <div className="text-gray-400">reactions</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-2 text-center">
-                    <div className="font-black text-gray-900">{uploadSummary.saves.toLocaleString()}</div>
-                    <div className="text-gray-400">saves</div>
+                  <div>
+                    <p className="font-extrabold text-gray-900 text-sm">Analysis complete</p>
+                    <p className="text-[11px] text-gray-400">AI has learned from this post</p>
                   </div>
                 </div>
+
+                {/* Metrics row */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {[
+                    { label: "impressions", value: uploadAnalysis.metrics.impressions },
+                    { label: "reached", value: uploadAnalysis.metrics.membersReached },
+                    { label: "reactions", value: uploadAnalysis.metrics.reactions },
+                    { label: "comments", value: uploadAnalysis.metrics.comments },
+                    { label: "saves", value: uploadAnalysis.metrics.saves },
+                    { label: "reposts", value: uploadAnalysis.metrics.reposts },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-gray-50 rounded-xl p-2.5 text-center">
+                      <div className="font-black text-gray-900 text-sm">{value.toLocaleString()}</div>
+                      <div className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* URL match status */}
+                {parsedLinkedinUrl && (
+                  <div className={cn("flex items-center gap-1.5 mb-3 text-xs font-semibold px-1",
+                    urlMatchStatus === "match" ? "text-emerald-600" : urlMatchStatus === "mismatch" ? "text-amber-600" : "text-gray-400"
+                  )}>
+                    {urlMatchStatus === "match" && <><span>✓</span> URL matches the file</>}
+                    {urlMatchStatus === "mismatch" && <><span>⚠</span> URL in file differs — double-check you chose the right post</>}
+                    {urlMatchStatus === "parsed-only" && <><span>→</span> URL auto-filled from file</>}
+                  </div>
+                )}
+
+                {/* AI diagnosis */}
+                {uploadAnalysis.strengths.length > 0 && (
+                  <div className="mb-3 p-3.5 bg-violet-50 rounded-2xl border border-violet-100">
+                    <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-2">What worked</p>
+                    <div className="space-y-1.5">
+                      {uploadAnalysis.strengths.map((s, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-700 text-[9px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                          <p className="text-xs text-gray-700 leading-relaxed">{s}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {uploadAnalysis.takeaways.length > 0 && (
+                  <div className="mb-3 p-3.5 bg-blue-50 rounded-2xl border border-blue-100">
+                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-2">Key takeaways</p>
+                    <div className="space-y-1.5">
+                      {uploadAnalysis.takeaways.map((t, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="text-blue-400 font-black text-xs flex-shrink-0 mt-0.5">→</span>
+                          <p className="text-xs text-gray-700 leading-relaxed">{t}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {uploadAnalysis.futureImprovement && (
+                  <div className="mb-4 p-3.5 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1.5">How this improves your content</p>
+                    <p className="text-xs text-emerald-800 leading-relaxed">{uploadAnalysis.futureImprovement}</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={onClose}
+                  className="w-full h-12 rounded-2xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-all"
+                >
+                  Done
+                </button>
               </div>
             ) : (
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploadState === "uploading"}
-                className={cn(
-                  "w-full border-2 border-dashed rounded-2xl p-8 flex flex-col items-center gap-3 transition-all",
-                  uploadState === "error" ? "border-red-300 bg-red-50" : "border-violet-200 bg-violet-50 hover:bg-violet-100 hover:border-violet-400",
-                  uploadState === "uploading" && "opacity-60 cursor-not-allowed"
-                )}
-              >
-                {uploadState === "uploading"
-                  ? <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
-                  : <Upload className="w-8 h-8 text-violet-400" />
-                }
-                <div className="text-center">
-                  <p className="text-sm font-bold text-violet-700">
-                    {uploadState === "uploading" ? "Parsing analytics…" : "Tap to choose xlsx file"}
-                  </p>
-                  <p className="text-xs text-violet-400 mt-0.5">LinkedIn single-post export · max 2 MB</p>
+              /* ── Upload / stage flow ── */
+              <div>
+                <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                  Export your post's analytics from LinkedIn (Content → Post → Export) and upload the <strong>.xlsx</strong> file. The AI will learn what content works best for your audience.
+                </p>
+
+                {/* URL input */}
+                <div className="mb-3">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">LinkedIn post URL</p>
+                  <input
+                    type="url"
+                    placeholder="https://www.linkedin.com/posts/..."
+                    value={linkedinUrl}
+                    onChange={(e) => setLinkedinUrl(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors placeholder:font-normal placeholder:text-gray-300"
+                  />
                 </div>
-              </button>
-            )}
 
-            {uploadState === "error" && uploadError && (
-              <p className="text-xs text-red-500 mt-2 text-center">{uploadError}</p>
-            )}
+                {/* File select area */}
+                {uploadPhase === "staged" && stagedFile ? (
+                  <div className="border-2 border-emerald-200 bg-emerald-50 rounded-2xl p-4 flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <Upload className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-emerald-800 truncate">{stagedFile.name}</p>
+                      <p className="text-[11px] text-emerald-600">{(stagedFile.size / 1024).toFixed(0)} KB · ready to analyse</p>
+                    </div>
+                    <button
+                      onClick={() => { setStagedFile(null); setUploadPhase("idle"); setUploadError(null); }}
+                      className="text-emerald-400 hover:text-emerald-600 transition-colors p-1"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploadPhase === "analysing"}
+                    className={cn(
+                      "w-full border-2 border-dashed rounded-2xl p-8 flex flex-col items-center gap-3 transition-all mb-3",
+                      uploadPhase === "error" ? "border-red-300 bg-red-50" : "border-violet-200 bg-violet-50 hover:bg-violet-100 hover:border-violet-400",
+                      uploadPhase === "analysing" && "opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    <Upload className="w-8 h-8 text-violet-400" />
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-violet-700">Tap to choose xlsx file</p>
+                      <p className="text-xs text-violet-400 mt-0.5">LinkedIn single-post export · max 2 MB</p>
+                    </div>
+                  </button>
+                )}
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleXlsxUpload(file);
-                e.target.value = "";
-              }}
-            />
+                {uploadPhase === "error" && uploadError && (
+                  <p className="text-xs text-red-500 mb-3 text-center">{uploadError}</p>
+                )}
+
+                {/* Analyse button — only shown when a file is staged */}
+                {uploadPhase === "staged" || uploadPhase === "analysing" ? (
+                  <button
+                    onClick={() => void handleAnalyse()}
+                    disabled={uploadPhase === "analysing"}
+                    className={cn(
+                      "w-full h-12 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+                      uploadPhase === "analysing"
+                        ? "bg-violet-100 text-violet-400 cursor-not-allowed"
+                        : "bg-primary text-white hover:bg-primary/90"
+                    )}
+                  >
+                    {uploadPhase === "analysing" ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Analysing post…</>
+                    ) : (
+                      "Analyse this post"
+                    )}
+                  </button>
+                ) : null}
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileStage(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <div>

@@ -5,6 +5,7 @@ import { eq, and, desc, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { draftsTable, performanceSignalsTable } from "@workspace/db";
 import { parseLinkedinAnalytics } from "../lib/linkedin-analytics-parser.js";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
   CreateDraftBody,
   UpdateDraftBody,
@@ -383,13 +384,49 @@ router.post("/drafts/:id/performance/upload", requireAuth, xlsxUpload.single("fi
     signal = created;
   }
 
-  // Auto-mark the draft as published if it isn't already
-  await db
+  // Auto-mark the draft as published if it isn't already, and grab postOutput for analysis
+  const [updatedDraft] = await db
     .update(draftsTable)
     .set({ status: "published", ...(parsed.linkedinUrl ? { linkedinUrl: parsed.linkedinUrl } : {}) })
-    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+    .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)))
+    .returning({ postOutput: draftsTable.postOutput });
 
-  res.json({ signal, parsed });
+  // Generate AI analysis of the post performance (best-effort — non-fatal)
+  let analysis: { strengths: string[]; takeaways: string[]; futureImprovement: string } | null = null;
+  try {
+    const postText = updatedDraft?.postOutput;
+    if (postText && postText.length > 50) {
+      const reach = parsed.membersReached > 0 ? parsed.membersReached : parsed.impressions;
+      const w = parsed.reactions * 3 + parsed.comments * 5 + parsed.reposts * 4 + parsed.saves * 8;
+      const resonanceScore = reach > 0 ? Math.min(100, Math.round((w / reach) * 1000)) : 0;
+
+      const msg = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 500,
+        system: `You are a LinkedIn content analyst. Analyse a post and its performance data.
+Return JSON only — no markdown, no explanation:
+{
+  "strengths": ["specific thing this post did well (max 20 words)", "another strength (max 20 words)"],
+  "takeaways": ["key content lesson from the performance (max 20 words)", "another lesson (max 20 words)"],
+  "futureImprovement": "One sentence: the specific pattern or technique from this post the AI should replicate to improve this creator's future content (max 35 words)"
+}`,
+        messages: [{
+          role: "user",
+          content: `Post:\n${postText.slice(0, 1500)}\n\nPerformance metrics:\n- Impressions: ${parsed.impressions.toLocaleString()}\n- Members reached: ${parsed.membersReached.toLocaleString()}\n- Reactions: ${parsed.reactions}\n- Comments: ${parsed.comments}\n- Saves: ${parsed.saves}\n- Reposts: ${parsed.reposts}\n- Resonance score: ${resonanceScore}/100`,
+        }],
+      });
+
+      const block = msg.content[0];
+      if (block.type === "text") {
+        const cleaned = block.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/m, "").trim();
+        analysis = JSON.parse(cleaned) as { strengths: string[]; takeaways: string[]; futureImprovement: string };
+      }
+    }
+  } catch (err) {
+    console.error("[upload-analytics] analysis generation failed (non-fatal):", err);
+  }
+
+  res.json({ signal, parsed, ...(analysis ? { analysis } : {}) });
 });
 
 router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> => {

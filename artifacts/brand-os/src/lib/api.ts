@@ -84,7 +84,11 @@ export const performanceApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  uploadXlsx: async (draftId: number, file: File): Promise<{ signal: PerformanceSignal; parsed: Record<string, unknown> }> => {
+  uploadXlsx: async (draftId: number, file: File): Promise<{
+    signal: PerformanceSignal;
+    parsed: Record<string, unknown>;
+    analysis?: { strengths: string[]; takeaways: string[]; futureImprovement: string };
+  }> => {
     const form = new FormData();
     form.append("file", file);
     const res = await fetch(`/api/drafts/${draftId}/performance/upload`, {
@@ -96,7 +100,7 @@ export const performanceApi = {
       const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
       throw new Error(err.error ?? `HTTP ${res.status}`);
     }
-    return res.json() as Promise<{ signal: PerformanceSignal; parsed: Record<string, unknown> }>;
+    return res.json() as Promise<{ signal: PerformanceSignal; parsed: Record<string, unknown>; analysis?: { strengths: string[]; takeaways: string[]; futureImprovement: string } }>;
   },
 };
 
