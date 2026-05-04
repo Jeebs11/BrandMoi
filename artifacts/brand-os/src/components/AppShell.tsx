@@ -46,17 +46,19 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
     : "";
 
   // When an animated background is active, apply the user-chosen translucency.
-  // IMPORTANT: backdropFilter must NOT be set on the panel div itself — any element
-  // with backdropFilter creates a new containing block for position:fixed children,
-  // which breaks fixed-position modals (they render inside the panel instead of
-  // covering the viewport). We instead apply the blur on a separate sibling element
-  // that sits behind the content but is not an ancestor of it.
+  // backdropFilter is safe to put directly on the content panel now that all
+  // modals use createPortal() — they render in document.body, so they are NOT
+  // position:fixed descendants of this div and won't be trapped by its stacking
+  // context. The blur only affects what's painted behind the panel (the animated
+  // background), never the panel's own children (cards, text, buttons).
   const alpha = BgComponent ? (PANEL_OPACITY_ALPHA[panelOpacity] ?? 1) : 1;
   const hasFrost = alpha < 1;
   const panelBgStyle = hasFrost
     ? {
         backgroundColor: `rgba(249,250,251,${alpha})`,
         borderColor: `rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
       } as React.CSSProperties
     : undefined;
 
@@ -82,23 +84,6 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
           marginClass
         )}
       >
-        {/* Frosted-glass backdrop layer — separate from content so backdropFilter
-            never becomes a containing block for fixed-position children (modals). */}
-        {hasFrost && (
-          <div
-            aria-hidden="true"
-            className={cn(
-              "absolute inset-0 pointer-events-none",
-              "max-w-[430px]",
-              !noNav && "md:max-w-[700px] lg:max-w-[900px]",
-              "mx-auto"
-            )}
-            style={{
-              backdropFilter: "blur(2px)",
-              WebkitBackdropFilter: "blur(2px)",
-            }}
-          />
-        )}
         <div
           className={cn(
             "w-full bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200",
