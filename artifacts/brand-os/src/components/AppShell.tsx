@@ -7,9 +7,7 @@ import { getBackground } from "@/lib/backgrounds";
 
 interface AppShellProps {
   children: React.ReactNode;
-  /** Hides sidebar + bottom nav, keeps full-height column (for Onboarding wizard) */
   noNav?: boolean;
-  /** Auth card mode: centers children vertically, no sidebar/nav (for Login/Signup/404) */
   auth?: boolean;
   contentClassName?: string;
 }
@@ -24,7 +22,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
   const toggleSidebar = () => {
     setSidebarCollapsed(v => {
       const next = !v;
-      try { localStorage.setItem("sidenav-collapsed", String(next)); } catch { /* ignore */ }
+      try { localStorage.setItem("sidenav-collapsed", String(next)); } catch { }
       return next;
     });
   };
@@ -40,27 +38,18 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
     );
   }
 
-  // Tailwind classes must be full strings for static analysis — pick from these two
   const marginClass = !noNav
     ? (sidebarCollapsed ? "md:ml-[56px]" : "md:ml-[220px]")
     : "";
 
-  // When an animated background is active, apply the user-chosen translucency.
-  // backdropFilter is safe to put directly on the content panel now that all
-  // modals use createPortal() — they render in document.body, so they are NOT
-  // position:fixed descendants of this div and won't be trapped by its stacking
-  // context. The blur only affects what's painted behind the panel (the animated
-  // background), never the panel's own children (cards, text, buttons).
   const alpha = BgComponent ? (PANEL_OPACITY_ALPHA[panelOpacity] ?? 1) : 1;
   const hasFrost = alpha < 1;
-  const panelBgStyle = hasFrost
-    ? {
-        backgroundColor: `rgba(249,250,251,${alpha})`,
-        borderColor: `rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-      } as React.CSSProperties
-    : undefined;
+
+  // Shared width classes for both the frost layer and content panel
+  const panelWidthClasses = cn(
+    "max-w-[430px]",
+    !noNav && "md:max-w-[700px] lg:max-w-[900px]"
+  );
 
   return (
     <div className="min-h-screen bg-[#EDEDEE] relative">
@@ -84,14 +73,51 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
           marginClass
         )}
       >
+        {/*
+          FROST LAYER — z-0, absolute, rendered BEHIND the content panel.
+          - Has the semi-transparent background + backdrop blur.
+          - backdrop-filter here only blurs the animated background behind this div,
+            NOT the content panel (which is stacked above it at z-[1]).
+          - All modals use createPortal(document.body) so position:fixed children
+            of the content panel are never trapped by this element's stacking context.
+        */}
+        {hasFrost && (
+          <div
+            aria-hidden="true"
+            className={cn(
+              "absolute inset-0 z-0 pointer-events-none mx-auto",
+              panelWidthClasses
+            )}
+            style={{
+              backgroundColor: `rgba(249,250,251,${alpha})`,
+              borderLeft: `1px solid rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
+              borderRight: `1px solid rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            }}
+          />
+        )}
+
+        {/*
+          CONTENT PANEL — relative z-[1], stacked ABOVE the frost layer.
+          - No background in frost mode (transparent — lets the frost layer show through).
+          - In solid mode keeps the default bg-gray-50.
+          - Children (cards, buttons, text) have their own opaque backgrounds and
+            are completely unaffected by the frost layer below.
+        */}
         <div
           className={cn(
-            "w-full bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200",
+            "w-full min-h-screen shadow-2xl flex flex-col",
             "max-w-[430px]",
             !noNav && "pb-20 md:pb-8 md:max-w-[700px] lg:max-w-[900px] md:shadow-xl",
+            hasFrost
+              ? "relative z-[1] bg-transparent border-x"
+              : "bg-gray-50 border-x border-gray-200",
             contentClassName
           )}
-          style={panelBgStyle}
+          style={hasFrost ? {
+            borderColor: `rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
+          } : undefined}
         >
           {children}
         </div>
