@@ -45,15 +45,18 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
     ? (sidebarCollapsed ? "md:ml-[56px]" : "md:ml-[220px]")
     : "";
 
-  // When an animated background is active, apply the user-chosen translucency
-  // to the content panel. Gray-50 is rgb(249,250,251).
+  // When an animated background is active, apply the user-chosen translucency.
+  // IMPORTANT: backdropFilter must NOT be set on the panel div itself — any element
+  // with backdropFilter creates a new containing block for position:fixed children,
+  // which breaks fixed-position modals (they render inside the panel instead of
+  // covering the viewport). We instead apply the blur on a separate sibling element
+  // that sits behind the content but is not an ancestor of it.
   const alpha = BgComponent ? (PANEL_OPACITY_ALPHA[panelOpacity] ?? 1) : 1;
-  const panelStyle = alpha < 1
+  const hasFrost = alpha < 1;
+  const panelBgStyle = hasFrost
     ? {
         backgroundColor: `rgba(249,250,251,${alpha})`,
         borderColor: `rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
-        backdropFilter: "blur(2px)",
-        WebkitBackdropFilter: "blur(2px)",
       } as React.CSSProperties
     : undefined;
 
@@ -79,6 +82,23 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
           marginClass
         )}
       >
+        {/* Frosted-glass backdrop layer — separate from content so backdropFilter
+            never becomes a containing block for fixed-position children (modals). */}
+        {hasFrost && (
+          <div
+            aria-hidden="true"
+            className={cn(
+              "absolute inset-0 pointer-events-none",
+              "max-w-[430px]",
+              !noNav && "md:max-w-[700px]",
+              "mx-auto"
+            )}
+            style={{
+              backdropFilter: "blur(2px)",
+              WebkitBackdropFilter: "blur(2px)",
+            }}
+          />
+        )}
         <div
           className={cn(
             "w-full bg-gray-50 min-h-screen shadow-2xl flex flex-col border-x border-gray-200",
@@ -86,7 +106,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
             !noNav && "pb-20 md:pb-8 md:max-w-[700px] md:shadow-xl",
             contentClassName
           )}
-          style={panelStyle}
+          style={panelBgStyle}
         >
           {children}
         </div>
