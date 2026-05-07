@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -93,6 +93,7 @@ export default function Library() {
   const [feelingFilter, setFeelingFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [viewDraft, setViewDraft] = useState<{ id: number; topic: string; postOutput: string | null; shortPost: string | null; status: string; audience: string; feeling: string } | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [resonanceMap, setResonanceMap] = useState<Record<string, number>>({});
@@ -298,6 +299,20 @@ export default function Library() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-[190px]">
+                        <DropdownMenuItem onClick={() => {
+                          const sb = (draft.structuredBreakdown ?? {}) as { feeling?: string; audience?: string };
+                          setViewDraft({
+                            id: draft.id,
+                            topic,
+                            postOutput: draft.postOutput ?? null,
+                            shortPost: draft.shortPost ?? null,
+                            status: draft.status,
+                            audience: sb.audience ?? OBJECTIVE_TO_AUDIENCE[draft.objective] ?? draft.objective ?? "",
+                            feeling: sb.feeling ?? TONE_TO_FEELING[draft.tone] ?? draft.tone ?? "",
+                          });
+                        }}>
+                          <Eye className="w-4 h-4 mr-2" /> View post
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigate(`/capture?draftId=${draft.id}`)}>
                           <Pencil className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
@@ -359,6 +374,14 @@ export default function Library() {
             })
           )}
         </main>
+
+        {viewDraft && (
+          <ViewPostModal
+            draft={viewDraft}
+            onClose={() => setViewDraft(null)}
+            onEdit={() => { setViewDraft(null); navigate(`/capture?draftId=${viewDraft.id}`); }}
+          />
+        )}
 
         {perfModal && (
           <PerformanceModal
@@ -440,6 +463,123 @@ export default function Library() {
           document.body
         )}
     </AppShell>
+  );
+}
+
+function ViewPostModal({
+  draft,
+  onClose,
+  onEdit,
+}: {
+  draft: { id: number; topic: string; postOutput: string | null; shortPost: string | null; status: string; audience: string; feeling: string };
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"post" | "short">("post");
+  const [copied, setCopied] = useState(false);
+
+  const text = activeTab === "short" ? draft.shortPost : draft.postOutput;
+
+  const handleCopy = () => {
+    if (!text) return;
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const StatusIcon = STATUS_ICONS[draft.status] ?? FileText;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh]">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex-1 min-w-0 pr-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Eye className="w-4 h-4 text-violet-500 flex-shrink-0" />
+              <h3 className="font-extrabold text-gray-900 text-sm truncate">{draft.topic}</h3>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {draft.audience && (
+                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", OBJECTIVE_COLORS[draft.audience] ?? "bg-gray-100 text-gray-600")}>
+                  {draft.audience}
+                </span>
+              )}
+              {draft.feeling && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                  {draft.feeling}
+                </span>
+              )}
+              <div className={cn("flex items-center gap-1 text-[10px] font-bold capitalize", STATUS_COLORS[draft.status])}>
+                <StatusIcon className="w-3 h-3" />
+                {draft.status}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Tabs — only show if short post exists */}
+        {draft.shortPost && (
+          <div className="flex gap-1 p-1 mx-6 mt-4 bg-gray-100 rounded-xl flex-shrink-0">
+            {(["post", "short"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                className={cn(
+                  "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
+                  activeTab === t ? "bg-white text-violet-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                {t === "post" ? "Full post" : "⚡ Short version"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {text ? (
+            <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{text}</p>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FileText className="w-10 h-10 text-gray-200 mb-3" />
+              <p className="text-sm text-gray-400">No content saved yet.</p>
+              <p className="text-xs text-gray-300 mt-1">Tap Edit to write or generate content.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="flex gap-2 px-6 pb-6 pt-3 border-t border-gray-100 flex-shrink-0">
+          <button
+            onClick={handleCopy}
+            disabled={!text}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-3 rounded-2xl text-sm font-bold border-2 transition-all",
+              copied
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 disabled:opacity-40"
+            )}
+          >
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <button
+            onClick={onEdit}
+            className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-all"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit in BrandMe
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
