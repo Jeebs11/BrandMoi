@@ -212,11 +212,10 @@ router.post("/ai/generate-image", requireAuth, aiRateLimit, async (req, res): Pr
 
   try {
     const response = await openai.images.generate({
-      model: "dall-e-3",
+      model: "gpt-image-1",
       prompt: imagePrompt,
       n: 1,
       size: "1024x1024",
-      response_format: "b64_json",
     });
 
     const imageData = Array.isArray(response.data) ? response.data[0] : undefined;
