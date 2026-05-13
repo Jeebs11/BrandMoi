@@ -196,6 +196,17 @@ export const preferencesApi = {
     }),
 };
 
+export type PainPoint = {
+  title: string;
+  description: string;
+  angle: string;
+};
+
+export type SkillAngle = {
+  angle: string;
+  hook: string;
+};
+
 export type AgentBrief = {
   headline: string;
   insight: string;
@@ -251,6 +262,13 @@ export const agentApi = {
     apiFetch<{ hooks: string[] }>("/agent/hook-alternatives", {
       method: "POST",
       body: JSON.stringify({ draftText, tone, hookTypes }),
+    }),
+  painPoints: () =>
+    apiFetch<{ painPoints: PainPoint[] }>("/agent/pain-points"),
+  skillAngles: (skill: string) =>
+    apiFetch<{ angles: SkillAngle[] }>("/agent/skill-angles", {
+      method: "POST",
+      body: JSON.stringify({ skill }),
     }),
 };
 

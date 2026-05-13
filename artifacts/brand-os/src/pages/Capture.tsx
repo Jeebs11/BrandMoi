@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, ChevronLeft, RefreshCw, Copy, Save, Newspaper,
   Image as ImageIcon, Layout, BarChart3, PenTool, Wand2,
-  ArrowDown, ArrowUp, BookOpen, Check, Layers,
+  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target,
 } from "lucide-react";
 import {
   useGenerateContent, useRefineContent,
@@ -188,8 +188,9 @@ export default function Capture() {
   }, [existingDraft, initialized]);
 
   // ── Generate (initial Make-it / Try a different angle) ─────────────────
-  const runGenerate = (overrides?: { extraInstruction?: string; feeling?: string; audience?: string }) => {
-    if (!rawInput.trim()) {
+  const runGenerate = (overrides?: { extraInstruction?: string; feeling?: string; audience?: string; rawInput?: string }) => {
+    const effectiveRawInput = overrides?.rawInput ?? rawInput;
+    if (!effectiveRawInput.trim()) {
       toast({ title: "Add an idea first", description: "Tell us what you want to say.", variant: "destructive" });
       return;
     }
@@ -198,7 +199,7 @@ export default function Capture() {
     generateContent(
       {
         data: {
-          rawInput,
+          rawInput: effectiveRawInput,
           audience: effectiveAudience,
           feeling: effectiveFeeling,
           tieToNews,
@@ -424,7 +425,7 @@ export default function Capture() {
             feeling={feeling} setFeeling={setFeeling}
             tieToNews={tieToNews} setTieToNews={setTieToNews}
             isGenerating={isGenerating}
-            onMakeIt={() => runGenerate()}
+            onMakeIt={(overrides) => runGenerate(overrides)}
             onSelectDirection={(d) => {
               setFeeling(d.feeling);
               runGenerate({
@@ -503,7 +504,7 @@ interface CaptureFormProps {
   feeling: string; setFeeling: (v: string) => void;
   tieToNews: boolean; setTieToNews: (v: boolean) => void;
   isGenerating: boolean;
-  onMakeIt: () => void;
+  onMakeIt: (overrides?: { rawInput?: string; extraInstruction?: string }) => void;
   onSelectDirection: (d: { feeling: string; hook: string }) => void;
   error: string | null;
 }
@@ -517,6 +518,28 @@ function CaptureForm(props: CaptureFormProps) {
 
   const [showDirections, setShowDirections] = useState(false);
   const [directions, setDirections] = useState<DirectionConcept[]>([]);
+  const [painPointMode, setPainPointMode] = useState(false);
+  const [ppConcept, setPpConcept] = useState("");
+  const [ppWentWrong, setPpWentWrong] = useState("");
+  const [ppAnalogy, setPpAnalogy] = useState("");
+
+  const handleMakeIt = () => {
+    if (painPointMode) {
+      if (!ppConcept.trim()) return;
+      const composed = [
+        `Topic: ${ppConcept}`,
+        ppWentWrong ? `What goes wrong: ${ppWentWrong}` : "",
+        ppAnalogy ? `Analogy or hook: ${ppAnalogy}` : "",
+      ].filter(Boolean).join("\n");
+      onMakeIt({
+        rawInput: composed,
+        extraInstruction:
+          "Structure this as a Pain Point Post: open with an uncomfortable question or bold observation that surfaces the pain, use the analogy/hook to make it vivid and concrete, describe the real-world consequences people feel, then close with the key insight or reframe. Direct and conversational.",
+      });
+    } else {
+      onMakeIt();
+    }
+  };
 
   const { mutate: exploreDirs, isPending: isExploring } = useExploreDirections();
   const { data: insights } = useGetPerformanceInsights();
@@ -550,13 +573,15 @@ function CaptureForm(props: CaptureFormProps) {
 
   return (
     <div className="space-y-6">
-      <textarea
-        value={rawInput}
-        onChange={(e) => setRawInput(e.target.value)}
-        placeholder="A rough thought, a story, an opinion. Just type — we'll shape it."
-        className="w-full min-h-[140px] p-4 rounded-2xl border border-gray-200 focus:border-primary focus:outline-none text-base leading-relaxed resize-none"
-        autoFocus
-      />
+      {!painPointMode && (
+        <textarea
+          value={rawInput}
+          onChange={(e) => setRawInput(e.target.value)}
+          placeholder="A rough thought, a story, an opinion. Just type — we'll shape it."
+          className="w-full min-h-[140px] p-4 rounded-2xl border border-gray-200 focus:border-primary focus:outline-none text-base leading-relaxed resize-none"
+          autoFocus
+        />
+      )}
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Who's it for?</p>
@@ -608,6 +633,74 @@ function CaptureForm(props: CaptureFormProps) {
           ))}
         </div>
       </div>
+
+      {/* Pain Point Post mode toggle */}
+      <button
+        onClick={() => { setPainPointMode(!painPointMode); setShowDirections(false); }}
+        className={cn(
+          "w-full flex items-center gap-3 p-4 rounded-2xl border transition text-left",
+          painPointMode ? "bg-rose-50 border-rose-300" : "bg-white border-gray-200 hover:border-gray-300"
+        )}
+      >
+        <div className={cn(
+          "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
+          painPointMode ? "bg-rose-200 text-rose-900" : "bg-gray-100 text-gray-500"
+        )}>
+          <Target className="w-5 h-5" />
+        </div>
+        <div className="flex-1">
+          <p className="font-medium text-sm">Pain Point Post</p>
+          <p className="text-xs text-gray-500">Question → analogy → pain → insight</p>
+        </div>
+        <div className={cn(
+          "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
+          painPointMode ? "bg-rose-500 border-rose-500" : "border-gray-300"
+        )}>
+          {painPointMode && <Check className="w-3 h-3 text-white" />}
+        </div>
+      </button>
+
+      {painPointMode && (
+        <div className="space-y-3 p-4 bg-rose-50/50 rounded-2xl border border-rose-100">
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-gray-500 block mb-1.5">
+              Skill or concept <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={ppConcept}
+              onChange={(e) => setPpConcept(e.target.value)}
+              placeholder="e.g. Emotional intelligence, Pricing strategy, Delegation"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-rose-400 focus:outline-none text-sm"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-gray-500 block mb-1.5">
+              What goes wrong when people get this wrong?
+            </label>
+            <textarea
+              value={ppWentWrong}
+              onChange={(e) => setPpWentWrong(e.target.value)}
+              placeholder="e.g. Teams burn out, deals collapse, decisions stall…"
+              rows={3}
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-rose-400 focus:outline-none text-sm resize-none"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase tracking-wide text-gray-500 block mb-1.5">
+              Analogy or hook <span className="text-gray-400">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={ppAnalogy}
+              onChange={(e) => setPpAnalogy(e.target.value)}
+              placeholder="e.g. It's like trying to drive without a dashboard…"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-rose-400 focus:outline-none text-sm"
+            />
+          </div>
+        </div>
+      )}
 
       <button
         onClick={() => setTieToNews(!tieToNews)}
@@ -683,12 +776,12 @@ function CaptureForm(props: CaptureFormProps) {
       )}
 
       <Button
-        onClick={onMakeIt}
-        disabled={isGenerating || !rawInput.trim()}
-        className="w-full h-14 text-base rounded-2xl"
+        onClick={handleMakeIt}
+        disabled={isGenerating || (painPointMode ? !ppConcept.trim() : !rawInput.trim())}
+        className={cn("w-full h-14 text-base rounded-2xl", painPointMode && "bg-rose-600 hover:bg-rose-500 border-rose-600")}
       >
         <Sparkles className="w-4 h-4 mr-2" />
-        Make it
+        {painPointMode ? "Write Pain Point Post" : "Make it"}
       </Button>
     </div>
   );

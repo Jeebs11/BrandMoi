@@ -315,13 +315,15 @@ Return JSON only (no markdown):
 });
 
 const ALL_HOOK_TYPES = [
-  { key: "how-i",       instruction: 'A personal "How I [achieved X]" opener. Doesn\'t start with "I". Implies you\'ve done it.' },
-  { key: "contrarian",  instruction: 'A bold claim challenging conventional wisdom. No question mark. Doesn\'t start with "I" or "You".' },
-  { key: "number",      instruction: 'Starts with a specific number, percentage, or timeframe. E.g. "After 3 years…" or "47% of…".' },
-  { key: "question",    instruction: 'A specific, uncomfortable question that makes the reader stop and reconsider. Must end with "?".' },
-  { key: "scene-setter",instruction: 'Drops the reader into a specific moment using concrete sensory detail. Past or present tense. No question mark.' },
-  { key: "prediction",  instruction: 'A bold, specific claim about what will happen. Must start with a timeframe or "By [year]".' },
-  { key: "analogy",     instruction: 'Uses a surprising comparison or metaphor to reframe the topic in an unexpected way.' },
+  { key: "how-i",        instruction: 'A personal "How I [achieved X]" opener. Doesn\'t start with "I". Implies you\'ve done it.' },
+  { key: "contrarian",   instruction: 'A bold claim challenging conventional wisdom. No question mark. Doesn\'t start with "I" or "You".' },
+  { key: "number",       instruction: 'Starts with a specific number, percentage, or timeframe. E.g. "After 3 years…" or "47% of…".' },
+  { key: "question",     instruction: 'A specific, uncomfortable question that makes the reader stop and reconsider. Must end with "?".' },
+  { key: "scene-setter", instruction: 'Drops the reader into a specific moment using concrete sensory detail. Past or present tense. No question mark.' },
+  { key: "prediction",   instruction: 'A bold, specific claim about what will happen. Must start with a timeframe or "By [year]".' },
+  { key: "analogy",      instruction: 'Uses a surprising comparison or metaphor to reframe the topic in an unexpected way.' },
+  { key: "story",        instruction: 'Opens with a vivid first-person scene or specific moment. Past tense. Drops the reader into the action immediately — no preamble, no "I want to tell you about".' },
+  { key: "picture-this", instruction: 'Starts with "Picture this:" followed by an immersive scenario or analogy that makes the reader visualise something very specific and relatable.' },
 ];
 
 const HookAlternativesBody = z.object({
@@ -389,6 +391,97 @@ Return JSON only (no markdown):
   } catch (err) {
     console.error("[agent-hook-alternatives]", err);
     res.status(500).json({ error: "Failed to generate hook alternatives" });
+  }
+});
+
+router.get("/agent/pain-points", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  try {
+    const { prefs } = await getUserAgentContext(req.user!.userId);
+
+    const userMessage = [
+      prefs?.brandRole ? `Role: ${prefs.brandRole}` : "Professional",
+      prefs?.brandAudience ? `Target audience: ${prefs.brandAudience}` : "",
+      prefs?.brandBelief ? `Core belief: ${prefs.brandBelief}` : "",
+    ].filter(Boolean).join("\n");
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 700,
+      system: `You are a LinkedIn content strategist. Given a creator's brand profile, identify the 4 most pressing pain points their target audience faces day-to-day.
+
+For each pain point:
+- title: short punchy label (3-5 words, no generic words like "challenges" or "issues")
+- description: what this pain feels like in practice — visceral, specific, recognisable (max 25 words)
+- angle: a LinkedIn post angle this creator could write to address it (max 15 words, sounds like a real post premise)
+
+Return JSON only (no markdown):
+{
+  "painPoints": [
+    { "title": "...", "description": "...", "angle": "..." }
+  ]
+}`,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    try {
+      const data = parseJson(block.text) as { painPoints?: unknown };
+      if (!Array.isArray(data.painPoints)) throw new Error("bad shape");
+      res.json({ painPoints: data.painPoints.slice(0, 4) });
+    } catch {
+      res.status(500).json({ error: "Invalid AI response" });
+    }
+  } catch (err) {
+    console.error("[agent-pain-points]", err);
+    res.status(500).json({ error: "Failed to generate pain points" });
+  }
+});
+
+const SkillAnglesBody = z.object({ skill: z.string().min(2).max(200) });
+
+router.post("/agent/skill-angles", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = SkillAnglesBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "skill is required." }); return; }
+
+  try {
+    const { prefs } = await getUserAgentContext(req.user!.userId);
+
+    const userMessage = [
+      `Skill: ${parsed.data.skill}`,
+      prefs?.brandRole ? `Creator's role: ${prefs.brandRole}` : "",
+      prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
+      prefs?.brandBelief ? `Core belief: ${prefs.brandBelief}` : "",
+    ].filter(Boolean).join("\n");
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 600,
+      system: `You are a LinkedIn content strategist. Given a professional's skill, generate 3 compelling post angles they could write.
+
+For each angle:
+- angle: the post premise in 1-2 sentences (20-35 words) — specific enough to write from immediately, not a vague topic label
+- hook: a strong opening line (max 15 words) that would stop someone scrolling
+
+Vary the 3 angles: (1) personal story/lesson, (2) contrarian or counterintuitive take, (3) tactical how-to or framework.
+
+Return JSON only (no markdown):
+{ "angles": [{ "angle": "...", "hook": "..." }, { "angle": "...", "hook": "..." }, { "angle": "...", "hook": "..." }] }`,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    try {
+      const data = parseJson(block.text) as { angles?: unknown };
+      if (!Array.isArray(data.angles)) throw new Error("bad shape");
+      res.json({ angles: data.angles.slice(0, 3) });
+    } catch {
+      res.status(500).json({ error: "Invalid AI response" });
+    }
+  } catch (err) {
+    console.error("[agent-skill-angles]", err);
+    res.status(500).json({ error: "Failed to generate skill angles" });
   }
 });
 

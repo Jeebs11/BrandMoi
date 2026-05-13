@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 import { useToast } from "@/hooks/use-toast";
 
@@ -24,6 +24,20 @@ function loadCachedBrief(): AgentBrief | null {
 
 function saveBriefCache(brief: AgentBrief) {
   try { sessionStorage.setItem(todayKey(), JSON.stringify(brief)); } catch { /* noop */ }
+}
+
+function painPointsCacheKey() {
+  return `brand_os_pp_v1_${new Date().toISOString().slice(0, 10)}`;
+}
+function loadCachedPainPoints(): PainPoint[] | null {
+  try {
+    const raw = sessionStorage.getItem(painPointsCacheKey());
+    if (!raw) return null;
+    return JSON.parse(raw) as PainPoint[];
+  } catch { return null; }
+}
+function savePainPointsCache(points: PainPoint[]) {
+  try { sessionStorage.setItem(painPointsCacheKey(), JSON.stringify(points)); } catch { /* noop */ }
 }
 
 function formatNewsAge(publishedAt: string | undefined): string | null {
@@ -148,6 +162,13 @@ export default function Dashboard() {
   const [voiceSuggestions, setVoiceSuggestions] = useState<VoiceSuggestion[]>([]);
   const [voiceSuggestionsLoading, setVoiceSuggestionsLoading] = useState(true);
   const [scoredPostCount, setScoredPostCount] = useState<number>(0);
+  const [painPoints, setPainPoints] = useState<PainPoint[] | null>(loadCachedPainPoints());
+  const [painPointsLoading, setPainPointsLoading] = useState<boolean>(!loadCachedPainPoints());
+  const [expandedPainPoint, setExpandedPainPoint] = useState<number | null>(null);
+  const [skillInput, setSkillInput] = useState<string>("");
+  const [skillAngles, setSkillAngles] = useState<SkillAngle[] | null>(null);
+  const [skillAnglesLoading, setSkillAnglesLoading] = useState<boolean>(false);
+  const [expandedSkillAngle, setExpandedSkillAngle] = useState<number | null>(null);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -190,7 +211,33 @@ export default function Dashboard() {
         }).catch(() => {});
       }
     }).finally(() => setVoiceSuggestionsLoading(false));
+
+    const cachedPP = loadCachedPainPoints();
+    if (cachedPP) {
+      setPainPoints(cachedPP);
+      setPainPointsLoading(false);
+    } else {
+      agentApi.painPoints().then((r) => {
+        setPainPoints(r.painPoints);
+        savePainPointsCache(r.painPoints);
+      }).catch(() => {}).finally(() => setPainPointsLoading(false));
+    }
   }, []);
+
+  const handleGenerateSkillAngles = async () => {
+    if (!skillInput.trim() || skillAnglesLoading) return;
+    setSkillAnglesLoading(true);
+    setSkillAngles(null);
+    setExpandedSkillAngle(null);
+    try {
+      const result = await agentApi.skillAngles(skillInput.trim());
+      setSkillAngles(result.angles);
+    } catch {
+      toast({ title: "Couldn't generate angles — try again.", variant: "destructive" });
+    } finally {
+      setSkillAnglesLoading(false);
+    }
+  };
 
   const refreshBrief = () => {
     setBriefLoading(true);
@@ -622,6 +669,136 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* Pain Point Map */}
+          {painPointsLoading ? (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-4 h-4 text-rose-500" />
+                <h3 className="text-sm font-bold text-gray-700">Audience Pain Points</h3>
+              </div>
+              <div className="space-y-2">
+                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-14 rounded-2xl" />)}
+              </div>
+            </section>
+          ) : painPoints && painPoints.length > 0 ? (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-4 h-4 text-rose-500" />
+                <h3 className="text-sm font-bold text-gray-700">Audience Pain Points</h3>
+                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">What they struggle with</span>
+              </div>
+              <div className="bg-white rounded-3xl border border-rose-100 shadow-sm overflow-hidden">
+                <div className="px-5 pt-5 pb-3">
+                  <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Write about what hurts</p>
+                </div>
+                <div className="px-5 pb-5 flex flex-col gap-1.5">
+                  {painPoints.map((pp, i) => {
+                    const isOpen = expandedPainPoint === i;
+                    return (
+                      <div key={i} className="rounded-xl border border-rose-100 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedPainPoint(isOpen ? null : i)}
+                          className="w-full text-left flex items-start justify-between gap-2 bg-rose-50/60 hover:bg-rose-100/60 px-3 py-2.5 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-900 text-xs font-bold leading-snug">{pp.title}</p>
+                            {!isOpen && (
+                              <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{pp.description}</p>
+                            )}
+                          </div>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2 bg-white border-t border-rose-100 space-y-2.5">
+                            <p className="text-xs text-gray-600 leading-relaxed">{pp.description}</p>
+                            <div className="bg-rose-50 rounded-lg px-2.5 py-2">
+                              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wide mb-0.5">Post angle</p>
+                              <p className="text-xs text-gray-700 font-medium">{pp.angle}</p>
+                            </div>
+                            <button
+                              onClick={() => openLengthPicker(pp.angle)}
+                              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors"
+                            >
+                              Write about this →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {/* Skills Workshop */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Wrench className="w-4 h-4 text-amber-500" />
+              <h3 className="text-sm font-bold text-gray-700">Skills Workshop</h3>
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Turn a skill into post angles</span>
+            </div>
+            <div className="bg-white rounded-3xl border border-amber-100 shadow-sm overflow-hidden">
+              <div className="px-5 pt-5 pb-4">
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-3">What skill do you want to post about?</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={skillInput}
+                    onChange={(e) => setSkillInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void handleGenerateSkillAngles()}
+                    placeholder="e.g. Negotiation, Data storytelling, Cold outreach…"
+                    className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 focus:border-amber-400 focus:outline-none text-sm"
+                  />
+                  <button
+                    onClick={() => void handleGenerateSkillAngles()}
+                    disabled={skillAnglesLoading || !skillInput.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white text-xs font-bold transition-colors whitespace-nowrap"
+                  >
+                    {skillAnglesLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    {skillAnglesLoading ? "Generating…" : "Generate"}
+                  </button>
+                </div>
+              </div>
+              {skillAngles && skillAngles.length > 0 && (
+                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-amber-100 pt-4">
+                  {skillAngles.map((sa, i) => {
+                    const isOpen = expandedSkillAngle === i;
+                    const labels = ["Personal story", "Contrarian take", "Tactical how-to"];
+                    return (
+                      <div key={i} className="rounded-xl border border-amber-100 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSkillAngle(isOpen ? null : i)}
+                          className="w-full text-left flex items-start justify-between gap-2 bg-amber-50/60 hover:bg-amber-100/60 px-3 py-2.5 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">{labels[i] ?? `Angle ${i + 1}`}</span>
+                            <p className={cn("text-gray-800 text-xs font-medium leading-snug mt-0.5", !isOpen && "line-clamp-1")}>{sa.angle}</p>
+                          </div>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-1 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2 bg-white border-t border-amber-100 space-y-2.5">
+                            <div className="bg-amber-50 rounded-lg px-2.5 py-2">
+                              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">Opening hook</p>
+                              <p className="text-xs text-gray-700 font-medium italic">"{sa.hook}"</p>
+                            </div>
+                            <button
+                              onClick={() => openLengthPicker(sa.angle, `extraInstruction=${encodeURIComponent(`Open with: "${sa.hook}"`)}`)}
+                              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-colors"
+                            >
+                              Use this angle →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Ripe Thoughts */}
           {!thoughtsLoading && ripeThoughts.length > 0 && (
