@@ -403,13 +403,46 @@ export default function Capture() {
   };
 
   // ── Stress Test ──────────────────────────────────────────────────────
+
+  // Silently creates a draft if one doesn't exist yet, so every stress test
+  // result can be persisted with a draftId. Returns the draftId on success.
+  const ensureDraftSaved = (): Promise<number | null> => {
+    if (savedDraftId) return Promise.resolve(savedDraftId);
+    if (!content) return Promise.resolve(null);
+    const payload = {
+      rawInput,
+      objective: objectiveFromAudience(audience),
+      persona: preferences?.persona ?? "Founder",
+      tone: toneFromFeeling(feeling),
+      structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
+      postOutput: editedPost,
+      shortPost: content.shortPost ?? "",
+      carouselOutput: JSON.stringify(content.carousel ?? []),
+      visualOutput: content.visual ?? "",
+      status: "draft" as const,
+      visualStyle,
+      contentSource: "capture" as CreateDraftBodyContentSource,
+    };
+    return new Promise((resolve) => {
+      createDraft(
+        { data: payload },
+        {
+          onSuccess: (newDraft) => { setSavedDraftId(newDraft.id); resolve(newDraft.id); },
+          onError: () => resolve(null),
+        }
+      );
+    });
+  };
+
   const handleStressTest = async (postText: string, sourceTab: "post" | "short" = "post") => {
     setStressTestSourceTab(sourceTab);
     setStressTestOpen(true);
     setStressTestResult(null);
     setIsStressTestLoading(true);
     try {
-      const result = await agentApi.stressTest(postText, savedDraftId);
+      // Auto-save draft so every successful test gets persisted with a draftId
+      const draftIdForTest = await ensureDraftSaved();
+      const result = await agentApi.stressTest(postText, draftIdForTest);
       setStressTestResult(result);
     } catch (err) {
       toast({ title: "Stress test failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
@@ -437,7 +470,9 @@ export default function Capture() {
             setContent((c) => c ? { ...c, post: refined } : c);
           }
           try {
-            const result = await agentApi.stressTest(refined, savedDraftId);
+            // Re-test with same format as initial test (post + hashtags for post tab)
+            const retestContent = isShort ? refined : `${refined}${hashtags ? `\n\n${hashtags}` : ""}`;
+            const result = await agentApi.stressTest(retestContent, savedDraftId);
             setStressTestResult(result);
           } catch {
             // keep existing result if re-test fails

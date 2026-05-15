@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable, stressTestScoresTable } from "@workspace/db";
+import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA } from "../lib/voice-dna.js";
@@ -499,6 +499,24 @@ router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Pr
     const { postContent, draftId } = parsed.data;
     const { dna } = await getUserAgentContext(userId);
 
+    // Fetch resonance context from performance signals when draftId is available
+    let resonanceContext = "";
+    if (draftId) {
+      try {
+        const [signal] = await db
+          .select()
+          .from(performanceSignalsTable)
+          .where(eq(performanceSignalsTable.draftId, draftId))
+          .limit(1);
+        if (signal) {
+          const total = signal.reactions + signal.comments + signal.reposts;
+          if (total > 0) {
+            resonanceContext = `Previous performance on this post: ${signal.reactions} reactions, ${signal.comments} comments, ${signal.reposts} reposts, ${signal.impressions} impressions.`;
+          }
+        }
+      } catch { /* continue without resonance context */ }
+    }
+
     const charCount = postContent.length;
 
     const systemPrompt = `You are a LinkedIn post quality analyser. Score this post against 6 evidence-based factors from studies of 1.8M+ LinkedIn posts. Return ONLY valid JSON — no markdown, no commentary.
@@ -605,6 +623,7 @@ Return this exact JSON shape:
     const userMessage = [
       `Post draft (${charCount} characters):\n\n${postContent}`,
       dna ? `\nUser's writing DNA for personalInsight:\n${dna}` : "",
+      resonanceContext ? `\nResonance/performance context (use in personalInsight if helpful):\n${resonanceContext}` : "",
     ].filter(Boolean).join("\n");
 
     const { default: OpenAI } = await import("openai");
