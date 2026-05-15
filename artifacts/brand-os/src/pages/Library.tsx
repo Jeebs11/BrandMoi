@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor } from "@/lib/api";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
@@ -296,7 +296,7 @@ export default function Library() {
                               ? "bg-amber-50 text-amber-700"
                               : "bg-red-50 text-red-600"
                           )}>
-                            ⚡ {stressScoreMap[String(draft.id)].score}
+                            {stressScoreMap[String(draft.id)].score}/100
                           </span>
                         )}
                       </div>
@@ -484,6 +484,50 @@ export default function Library() {
   );
 }
 
+function FactorBreakdown({ factors }: { factors: StressTestFactor[] }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  return (
+    <div className="px-4 pb-4 space-y-1.5 border-t border-gray-100">
+      {factors.map((f, i) => {
+        const pct = f.score / f.maxScore;
+        const FactorIcon = pct >= 1 ? CheckCircle2 : pct >= 0.6 ? AlertTriangle : XCircle;
+        const iconColor = pct >= 1 ? "text-emerald-500" : pct >= 0.6 ? "text-amber-500" : "text-red-500";
+        const isOpen = expanded === i;
+        return (
+          <div key={i} className="bg-white rounded-xl overflow-hidden">
+            <button
+              onClick={() => setExpanded(isOpen ? null : i)}
+              className="w-full flex items-center gap-2.5 p-3 text-left"
+            >
+              <FactorIcon className={cn("w-4 h-4 flex-shrink-0", iconColor)} />
+              <span className="flex-1 text-xs font-semibold text-gray-800">{f.name}</span>
+              <span className={cn("text-xs font-bold tabular-nums mr-1", pct >= 1 ? "text-emerald-600" : pct >= 0.6 ? "text-amber-600" : "text-red-500")}>
+                {f.score}/{f.maxScore}
+              </span>
+              {isOpen ? <ChevronUp className="w-3 h-3 text-gray-400" /> : <ChevronDown className="w-3 h-3 text-gray-400" />}
+            </button>
+            {isOpen && (
+              <div className="px-3 pb-3 space-y-1.5 border-t border-gray-100">
+                {f.why && (
+                  <p className="text-[11px] text-gray-600 leading-relaxed">
+                    <span className="font-semibold text-gray-700">Why: </span>{f.why}
+                  </p>
+                )}
+                {f.howToFix && (
+                  <p className="text-[11px] text-gray-600 leading-relaxed">
+                    <span className="font-semibold text-gray-700">How to fix: </span>{f.howToFix}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <p className="text-[10px] text-gray-400 text-center pt-1">Open in editor to apply fixes and re-test</p>
+    </div>
+  );
+}
+
 function ViewPostModal({
   draft,
   onClose,
@@ -602,25 +646,7 @@ function ViewPostModal({
               </button>
 
               {stressExpanded && stressScore.factors && stressScore.factors.length > 0 && (
-                <div className="px-4 pb-4 space-y-2 border-t border-gray-100">
-                  {stressScore.factors.map((f, i) => {
-                    const pct = f.score / f.maxScore;
-                    const FactorIcon = pct >= 1 ? CheckCircle2 : pct >= 0.6 ? AlertTriangle : XCircle;
-                    const iconColor = pct >= 1 ? "text-emerald-500" : pct >= 0.6 ? "text-amber-500" : "text-red-500";
-                    return (
-                      <div key={i} className="bg-white rounded-xl p-3 flex items-center gap-2.5">
-                        <FactorIcon className={cn("w-4 h-4 flex-shrink-0", iconColor)} />
-                        <span className="flex-1 text-xs font-semibold text-gray-800">{f.name}</span>
-                        <span className={cn("text-xs font-bold tabular-nums", pct >= 1 ? "text-emerald-600" : pct >= 0.6 ? "text-amber-600" : "text-red-500")}>
-                          {f.score}/{f.maxScore}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  <p className="text-[10px] text-gray-400 text-center pt-1">
-                    Open in editor to apply fixes and re-test
-                  </p>
-                </div>
+                <FactorBreakdown factors={stressScore.factors} />
               )}
 
               {stressExpanded && (!stressScore.factors || stressScore.factors.length === 0) && (
