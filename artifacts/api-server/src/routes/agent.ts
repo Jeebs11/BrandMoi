@@ -670,11 +670,21 @@ Return this exact JSON shape:
     }
 
     const normalizedScore = Math.min(100, Math.max(0, Number(data.score)));
+    const publishReady = normalizedScore >= 85;
+    // When publish-ready, strip howToFix from every factor so the UI cannot
+    // surface improvement suggestions after the 85+ threshold is reached.
+    const factors = data.factors.slice(0, 6).map((f: { name: string; score: number; maxScore: number; why?: string; howToFix?: string }) => ({
+      name: f.name,
+      score: f.score,
+      maxScore: f.maxScore,
+      why: f.why,
+      ...(publishReady ? {} : { howToFix: f.howToFix }),
+    }));
     const result = {
       score: normalizedScore,
-      publishReady: normalizedScore >= 85,
-      factors: data.factors.slice(0, 6),
-      fixes: normalizedScore >= 85 ? [] : (data.fixes ?? []).slice(0, 3),
+      publishReady,
+      factors,
+      fixes: publishReady ? [] : (data.fixes ?? []).slice(0, 3),
       personalInsight: dna && data.personalInsight ? data.personalInsight : undefined,
     };
 
