@@ -6,8 +6,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, ChevronLeft, RefreshCw, Copy, Save, Newspaper,
   Image as ImageIcon, Layout, BarChart3, PenTool, Wand2,
-  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target,
+  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, Zap,
 } from "lucide-react";
+import { StressTestPanel, type StressTestResult } from "@/components/StressTestPanel";
+import { agentApi } from "@/lib/api";
 import {
   useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
@@ -146,6 +148,10 @@ export default function Capture() {
   const [isLoadingVisual, setIsLoadingVisual] = useState(false);
   const [isLoadingIllustration, setIsLoadingIllustration] = useState(false);
   const downloadedVisualRef = useRef<string | null>(null);
+  const [stressTestOpen, setStressTestOpen] = useState(false);
+  const [stressTestResult, setStressTestResult] = useState<StressTestResult | null>(null);
+  const [isStressTestLoading, setIsStressTestLoading] = useState(false);
+  const [isApplyingFixes, setIsApplyingFixes] = useState(false);
 
   const { mutate: generateContent, isPending: isGenerating, error: generateError } = useGenerateContent();
   const { mutate: refineContent, isPending: isRefining } = useRefineContent();
@@ -395,6 +401,50 @@ export default function Capture() {
     toast({ title: label });
   };
 
+  // ── Stress Test ──────────────────────────────────────────────────────
+  const handleStressTest = async (postText: string) => {
+    setStressTestOpen(true);
+    setStressTestResult(null);
+    setIsStressTestLoading(true);
+    try {
+      const result = await agentApi.stressTest(postText, savedDraftId);
+      setStressTestResult(result);
+    } catch (err) {
+      toast({ title: "Stress test failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+      setStressTestOpen(false);
+    } finally {
+      setIsStressTestLoading(false);
+    }
+  };
+
+  const handleApplyFixes = () => {
+    if (!stressTestResult?.fixes?.length || !content) return;
+    setIsApplyingFixes(true);
+    const fixInstruction = `Apply these specific improvements to the post: ${stressTestResult.fixes.join("; ")}. Keep the same topic, voice, and structure — only make the targeted changes listed.`;
+    refineContent(
+      { data: { content: editedPost, instruction: fixInstruction, tab: "post" } },
+      {
+        onSuccess: async (data) => {
+          const refined = data.content ?? editedPost;
+          setEditedPost(refined);
+          setContent((c) => c ? { ...c, post: refined } : c);
+          try {
+            const result = await agentApi.stressTest(refined, savedDraftId);
+            setStressTestResult(result);
+          } catch {
+            // keep existing result if re-test fails
+          } finally {
+            setIsApplyingFixes(false);
+          }
+        },
+        onError: (err) => {
+          toast({ title: "Fix failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+          setIsApplyingFixes(false);
+        },
+      }
+    );
+  };
+
   // ── Render ──────────────────────────────────────────────────────────
   const showResult = !!content;
   const fullPost = useMemo(() => `${editedPost}${hashtags ? `\n\n${hashtags}` : ""}`, [editedPost, hashtags]);
@@ -469,6 +519,18 @@ export default function Capture() {
             onRegenIllustration={regenIllustrationWithScene}
             onSave={handleSave}
             onCopy={copy}
+            onStressTest={handleStressTest}
+            isStressTestLoading={isStressTestLoading}
+          />
+        )}
+
+        {stressTestOpen && (
+          <StressTestPanel
+            result={stressTestResult}
+            isLoading={isStressTestLoading}
+            onClose={() => setStressTestOpen(false)}
+            onApplyFixes={handleApplyFixes}
+            isApplying={isApplyingFixes}
           />
         )}
 
@@ -814,6 +876,8 @@ interface ResultViewProps {
   onRegenIllustration: (scene: string) => void;
   onSave: () => void;
   onCopy: (text: string, label?: string) => void;
+  onStressTest: (postText: string) => void;
+  isStressTestLoading: boolean;
 }
 
 function ResultView(props: ResultViewProps) {
@@ -825,7 +889,7 @@ function ResultView(props: ResultViewProps) {
     fullPost, audience, feeling, isRefining, isSaving, isDemo,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration,
-    onSave, onCopy,
+    onSave, onCopy, onStressTest, isStressTestLoading,
   } = props;
 
   return (
@@ -971,15 +1035,35 @@ function ResultView(props: ResultViewProps) {
               </Button>
             )}
           </div>
+          <Button
+            variant="outline"
+            className="w-full border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"
+            onClick={() => onStressTest(fullPost)}
+            disabled={isStressTestLoading || isRefining}
+          >
+            <Zap className="w-3.5 h-3.5 mr-1.5" />
+            {isStressTestLoading ? "Analysing…" : "Stress Test"}
+          </Button>
         </div>
       )}
 
       {activeTab === "short" && (
         <div className="space-y-3">
           <pre className="whitespace-pre-wrap text-sm p-4 bg-gray-50 rounded-xl">{content.shortPost ?? "No short version yet."}</pre>
-          <Button variant="outline" onClick={() => onCopy(content.shortPost ?? "", "Short post copied")}>
-            <Copy className="w-3.5 h-3.5 mr-1" />Copy short
-          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => onCopy(content.shortPost ?? "", "Short post copied")}>
+              <Copy className="w-3.5 h-3.5 mr-1" />Copy
+            </Button>
+            <Button
+              variant="outline"
+              className="border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"
+              onClick={() => onStressTest(content.shortPost ?? "")}
+              disabled={isStressTestLoading}
+            >
+              <Zap className="w-3.5 h-3.5 mr-1.5" />
+              {isStressTestLoading ? "Analysing…" : "Stress Test"}
+            </Button>
+          </div>
         </div>
       )}
 

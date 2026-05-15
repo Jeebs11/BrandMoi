@@ -245,6 +245,28 @@ export const accountApi = {
     }),
 };
 
+export type StressTestFactor = {
+  name: string;
+  score: number;
+  maxScore: number;
+  why: string;
+  howToFix?: string;
+};
+
+export type StressTestResult = {
+  score: number;
+  factors: StressTestFactor[];
+  fixes: string[];
+  personalInsight?: string;
+  publishReady: boolean;
+};
+
+export type StressTestScoreEntry = {
+  score: number;
+  publishReady: boolean;
+  createdAt: string;
+};
+
 export const agentApi = {
   brief: () => apiFetch<AgentBrief>("/agent/brief"),
   coach: (postText: string) =>
@@ -270,6 +292,13 @@ export const agentApi = {
       method: "POST",
       body: JSON.stringify({ skill }),
     }),
+  stressTest: (postContent: string, draftId?: number | null) =>
+    apiFetch<StressTestResult>("/agent/stress-test", {
+      method: "POST",
+      body: JSON.stringify({ postContent, draftId }),
+    }),
+  stressTestScores: () =>
+    apiFetch<Record<string, StressTestScoreEntry>>("/agent/stress-test/scores"),
 };
 
 export type KpiTrend = { current: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };

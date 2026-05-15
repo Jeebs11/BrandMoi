@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry } from "@/lib/api";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
@@ -97,6 +97,7 @@ export default function Library() {
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [resonanceMap, setResonanceMap] = useState<Record<string, number>>({});
+  const [stressScoreMap, setStressScoreMap] = useState<Record<string, StressTestScoreEntry>>({});
   const [diagnosisPanel, setDiagnosisPanel] = useState<{ draftId: number; topic: string; diagnosis: PostDiagnosis | null; loading: boolean } | null>(null);
 
   const { data: drafts, isLoading, refetch } = useListDrafts();
@@ -111,7 +112,11 @@ export default function Library() {
     resonanceMapApi.get().then(setResonanceMap).catch(() => {});
   };
 
-  useEffect(() => { loadResonanceMap(); }, []);
+  const loadStressScoreMap = () => {
+    agentApi.stressTestScores().then(setStressScoreMap).catch(() => {});
+  };
+
+  useEffect(() => { loadResonanceMap(); loadStressScoreMap(); }, []);
 
   const openDiagnosis = async (draftId: number, topic: string, cachedDiagnosis?: PostDiagnosis | null) => {
     if (cachedDiagnosis) {
@@ -281,6 +286,18 @@ export default function Library() {
                               </span>
                             )}
                           </>
+                        )}
+                        {stressScoreMap[String(draft.id)] !== undefined && (
+                          <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5",
+                            stressScoreMap[String(draft.id)].publishReady
+                              ? "bg-emerald-50 text-emerald-700"
+                              : stressScoreMap[String(draft.id)].score >= 65
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-red-50 text-red-600"
+                          )}>
+                            ⚡ {stressScoreMap[String(draft.id)].score}
+                          </span>
                         )}
                       </div>
                       {(resonanceMap[String(draft.id)] ?? 0) >= 60 && (

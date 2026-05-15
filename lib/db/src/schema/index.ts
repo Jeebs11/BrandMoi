@@ -8,3 +8,4 @@ export * from "./daily_activity";
 export * from "./linkedin_connections";
 export * from "./voice_suggestions";
 export * from "./login_events";
+export * from "./stress_test_scores";

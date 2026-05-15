@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable } from "@workspace/db";
+import { preferencesTable, draftsTable, stressTestScoresTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA } from "../lib/voice-dna.js";
@@ -482,6 +482,214 @@ Return JSON only (no markdown):
   } catch (err) {
     console.error("[agent-skill-angles]", err);
     res.status(500).json({ error: "Failed to generate skill angles" });
+  }
+});
+
+const StressTestBody = z.object({
+  postContent: z.string().min(10).max(5000),
+  draftId: z.number().int().positive().optional().nullable(),
+});
+
+router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = StressTestBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "postContent is required." }); return; }
+
+  try {
+    const userId = req.user!.userId;
+    const { postContent, draftId } = parsed.data;
+    const { dna } = await getUserAgentContext(userId);
+
+    const charCount = postContent.length;
+
+    const systemPrompt = `You are a LinkedIn post quality analyser. Score this post against 6 evidence-based factors from studies of 1.8M+ LinkedIn posts. Return ONLY valid JSON — no markdown, no commentary.
+
+SCORING RUBRIC:
+
+Factor 1 — Hook Power (max 25 points)
+LinkedIn truncates after ~140 chars. 90% of post performance is determined by whether the hook earns the "See more" click.
+- 25 pts: First line ≤140 chars, creates curiosity/tension/surprise via bold claim, specific stat, provocative question, or scene-setting opener. Does NOT start with "I ", "We ", "Today", "In this post", "Sharing", "I've been thinking".
+- 13 pts: Decent hook but not strong enough to guarantee "See more" click (weak question, vague premise).
+- 0-5 pts: Weak opener starting with "I've been thinking", "In today's world", "Let me tell you", "Sharing this because", or a generic greeting.
+
+Factor 2 — Dwell Time Potential (max 20 points)
+Posts with 61+ sec dwell time achieve 15.6% engagement vs 1.2% at 0-3 sec. Formatted posts generate 40% longer dwell time and up to 3× more engagement vs walls of text (ContentIn 2025).
+- 20 pts: Short paragraphs (1-2 lines max), consistent line breaks between ideas, no walls of text, escalating value toward the end.
+- 10 pts: Some formatting but inconsistent — long blocks mixed with short ones.
+- 0 pts: Dense wall of text with no line breaks.
+
+Factor 3 — Comment Trigger (max 20 points)
+Comments weighted 2x-15x higher than likes. Comments with 15+ words valued 2.5x higher (2025 algorithm). Comment threads trigger aggressive reach expansion.
+- 20 pts: Ends with a specific, answerable question inviting real perspective or gentle disagreement. No engagement bait.
+- 10 pts: Has a CTA/question but it is generic, passive, or tacked on ("Let me know your thoughts", "Drop a comment").
+- 0 pts: No question/CTA, OR uses engagement bait phrases ("Comment YES if you agree", "Like and share if this helped", "Tag someone who needs this", "Repost this", "Follow me for more").
+
+Factor 4 — Specificity & Credibility (max 15 points)
+LinkedIn's 2025 Interest Graph rewards expertise-driven, topic-consistent, authority-signalling content.
+- 15 pts: Contains at least one concrete anchor — specific number, percentage, timeframe, named scenario, real outcome, or illustrative example.
+- 8 pts: Some specific elements but also vague generalisations that dilute credibility.
+- 0 pts: Entirely vague — no concrete numbers, no specific examples, no real scenario.
+
+Factor 5 — Length Optimisation (max 10 points)
+Cross-study consensus (621K posts — AuthoredUp, 372K posts — AuthoredUp 2025 update): 800-1,800 chars = peak engagement zone. Under 400 chars = low dwell, low perceived value.
+The post is ${charCount} characters.
+- 10 pts: 800–1,800 characters.
+- 6 pts: 400–800 chars or 1,800–2,500 chars.
+- 2 pts: Under 400 chars or over 2,500 chars.
+
+Factor 6 — LinkedIn Fit (max 10 points)
+External links in post body carry a 26.5% average reach penalty, growing from 5% in 2023 to 42% in 2025 (900K post study — Ordinal). Engagement bait triggers LinkedIn's spam classifier in the first 60 minutes. Optimal hashtags: 1-3. Diminishing returns above 5.
+- 10 pts: No external links in post body, no engagement bait, 0-5 hashtags, native-content feel throughout.
+- 5 pts: One minor issue (e.g. 6+ hashtags or one borderline phrase).
+- 0 pts: External link present in post body, or engagement bait detected, or multiple issues.
+
+RULES:
+- publishReady MUST be true if and only if the total score is 85 or higher.
+- If publishReady is true: fixes array must be empty (or at most 1 minor polish note). Do NOT invent new problems.
+- If publishReady is false: surface at most 2-3 fixes, focused on the lowest-scoring factors only.
+- howToFix: only include for factors that are below their maximum score. Make it specific to THIS post, not generic advice.
+- why: 1-2 sentences grounded in the research data above — always include at least one specific stat or number from the rubric.
+- fixes: short (1 sentence each), actionable summaries of the most important changes needed.
+
+Return this exact JSON shape:
+{
+  "score": <integer 0-100>,
+  "publishReady": <boolean>,
+  "factors": [
+    {
+      "name": "Hook Power",
+      "score": <integer 0-25>,
+      "maxScore": 25,
+      "why": "<1-2 sentences with research stat>",
+      "howToFix": "<specific actionable instruction, or omit if at max score>"
+    },
+    {
+      "name": "Dwell Time",
+      "score": <integer 0-20>,
+      "maxScore": 20,
+      "why": "<1-2 sentences with research stat>",
+      "howToFix": "<specific actionable instruction, or omit if at max score>"
+    },
+    {
+      "name": "Comment Trigger",
+      "score": <integer 0-20>,
+      "maxScore": 20,
+      "why": "<1-2 sentences with research stat>",
+      "howToFix": "<specific actionable instruction, or omit if at max score>"
+    },
+    {
+      "name": "Specificity",
+      "score": <integer 0-15>,
+      "maxScore": 15,
+      "why": "<1-2 sentences with research stat>",
+      "howToFix": "<specific actionable instruction, or omit if at max score>"
+    },
+    {
+      "name": "Length",
+      "score": <integer 0-10>,
+      "maxScore": 10,
+      "why": "<1-2 sentences with research stat>",
+      "howToFix": "<specific actionable instruction, or omit if at max score>"
+    },
+    {
+      "name": "LinkedIn Fit",
+      "score": <integer 0-10>,
+      "maxScore": 10,
+      "why": "<1-2 sentences with research stat>",
+      "howToFix": "<specific actionable instruction, or omit if at max score>"
+    }
+  ],
+  "fixes": ["<fix 1>", "<fix 2>"],
+  "personalInsight": "<optional: 1-2 sentences comparing to user's voice DNA or best posts. Omit if no voice data available.>"
+}`;
+
+    const userMessage = [
+      `Post draft (${charCount} characters):\n\n${postContent}`,
+      dna ? `\nUser's writing DNA for personalInsight:\n${dna}` : "",
+    ].filter(Boolean).join("\n");
+
+    const { default: OpenAI } = await import("openai");
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 1500,
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const data = JSON.parse(raw) as {
+      score?: number;
+      publishReady?: boolean;
+      factors?: Array<{ name: string; score: number; maxScore: number; why: string; howToFix?: string }>;
+      fixes?: string[];
+      personalInsight?: string;
+    };
+
+    if (!data.score || !Array.isArray(data.factors)) {
+      res.status(500).json({ error: "Invalid AI response shape" });
+      return;
+    }
+
+    const result = {
+      score: Math.min(100, Math.max(0, Number(data.score))),
+      publishReady: !!data.publishReady,
+      factors: data.factors.slice(0, 6),
+      fixes: (data.fixes ?? []).slice(0, 3),
+      personalInsight: dna && data.personalInsight ? data.personalInsight : undefined,
+    };
+
+    // Save to DB if draftId provided
+    if (draftId) {
+      try {
+        await db.insert(stressTestScoresTable).values({
+          draftId,
+          userId,
+          overallScore: result.score,
+          factorScores: result.factors as unknown as Record<string, unknown>[],
+          fixesApplied: false,
+        });
+      } catch (dbErr) {
+        console.error("[stress-test] DB save failed:", dbErr);
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error("[agent-stress-test]", err);
+    res.status(500).json({ error: "Failed to run stress test" });
+  }
+});
+
+router.get("/agent/stress-test/scores", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const userId = req.user!.userId;
+    const scores = await db
+      .select()
+      .from(stressTestScoresTable)
+      .where(eq(stressTestScoresTable.userId, userId))
+      .orderBy(desc(stressTestScoresTable.createdAt));
+
+    // Return latest score per draftId
+    const scoreMap: Record<string, { score: number; publishReady: boolean; createdAt: string }> = {};
+    for (const s of scores) {
+      if (s.draftId && !scoreMap[String(s.draftId)]) {
+        scoreMap[String(s.draftId)] = {
+          score: s.overallScore,
+          publishReady: s.overallScore >= 85,
+          createdAt: s.createdAt.toISOString(),
+        };
+      }
+    }
+
+    res.json(scoreMap);
+  } catch (err) {
+    console.error("[stress-test-scores]", err);
+    res.status(500).json({ error: "Failed to fetch scores" });
   }
 });
 
