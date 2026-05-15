@@ -630,16 +630,17 @@ Return this exact JSON shape:
       personalInsight?: string;
     };
 
-    if (!data.score || !Array.isArray(data.factors)) {
+    if (data.score === undefined || data.score === null || !Array.isArray(data.factors)) {
       res.status(500).json({ error: "Invalid AI response shape" });
       return;
     }
 
+    const normalizedScore = Math.min(100, Math.max(0, Number(data.score)));
     const result = {
-      score: Math.min(100, Math.max(0, Number(data.score))),
-      publishReady: !!data.publishReady,
+      score: normalizedScore,
+      publishReady: normalizedScore >= 85,
       factors: data.factors.slice(0, 6),
-      fixes: (data.fixes ?? []).slice(0, 3),
+      fixes: normalizedScore >= 85 ? [] : (data.fixes ?? []).slice(0, 3),
       personalInsight: dna && data.personalInsight ? data.personalInsight : undefined,
     };
 
@@ -675,13 +676,14 @@ router.get("/agent/stress-test/scores", requireAuth, async (req, res): Promise<v
       .orderBy(desc(stressTestScoresTable.createdAt));
 
     // Return latest score per draftId
-    const scoreMap: Record<string, { score: number; publishReady: boolean; createdAt: string }> = {};
+    const scoreMap: Record<string, { score: number; publishReady: boolean; createdAt: string; factors: unknown }> = {};
     for (const s of scores) {
       if (s.draftId && !scoreMap[String(s.draftId)]) {
         scoreMap[String(s.draftId)] = {
           score: s.overallScore,
           publishReady: s.overallScore >= 85,
           createdAt: s.createdAt.toISOString(),
+          factors: s.factorScores,
         };
       }
     }

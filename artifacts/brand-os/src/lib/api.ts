@@ -265,6 +265,7 @@ export type StressTestScoreEntry = {
   score: number;
   publishReady: boolean;
   createdAt: string;
+  factors?: StressTestFactor[];
 };
 
 export const agentApi = {

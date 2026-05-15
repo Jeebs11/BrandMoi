@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -397,6 +397,7 @@ export default function Library() {
             draft={viewDraft}
             onClose={() => setViewDraft(null)}
             onEdit={() => { setViewDraft(null); navigate(`/capture?draftId=${viewDraft.id}`); }}
+            stressScore={stressScoreMap[String(viewDraft.id)]}
           />
         )}
 
@@ -487,13 +488,16 @@ function ViewPostModal({
   draft,
   onClose,
   onEdit,
+  stressScore,
 }: {
   draft: { id: number; topic: string; postOutput: string | null; shortPost: string | null; status: string; audience: string; feeling: string };
   onClose: () => void;
   onEdit: () => void;
+  stressScore?: StressTestScoreEntry;
 }) {
   const [activeTab, setActiveTab] = useState<"post" | "short">("post");
   const [copied, setCopied] = useState(false);
+  const [stressExpanded, setStressExpanded] = useState(false);
 
   const text = activeTab === "short" ? draft.shortPost : draft.postOutput;
 
@@ -559,7 +563,7 @@ function ViewPostModal({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {text ? (
             <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{text}</p>
           ) : (
@@ -567,6 +571,61 @@ function ViewPostModal({
               <FileText className="w-10 h-10 text-gray-200 mb-3" />
               <p className="text-sm text-gray-400">No content saved yet.</p>
               <p className="text-xs text-gray-300 mt-1">Tap Edit to write or generate content.</p>
+            </div>
+          )}
+
+          {/* Stress test score section */}
+          {stressScore && (
+            <div className={cn(
+              "border rounded-2xl overflow-hidden",
+              stressScore.publishReady ? "border-emerald-200 bg-emerald-50/50" : stressScore.score >= 65 ? "border-amber-200 bg-amber-50/50" : "border-red-200 bg-red-50/50"
+            )}>
+              <button
+                className="w-full flex items-center justify-between px-4 py-3"
+                onClick={() => setStressExpanded((v) => !v)}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Zap className={cn("w-4 h-4", stressScore.publishReady ? "text-emerald-600" : stressScore.score >= 65 ? "text-amber-600" : "text-red-500")} />
+                  <div className="text-left">
+                    <p className="text-xs font-extrabold text-gray-800">Stress Test Score</p>
+                    <p className={cn("text-[10px] font-semibold", stressScore.publishReady ? "text-emerald-700" : stressScore.score >= 65 ? "text-amber-700" : "text-red-600")}>
+                      {stressScore.publishReady ? "Publish ready" : stressScore.score >= 65 ? "Needs minor fixes" : "Needs improvement"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-xl font-black tabular-nums", stressScore.publishReady ? "text-emerald-700" : stressScore.score >= 65 ? "text-amber-700" : "text-red-600")}>
+                    {stressScore.score}
+                  </span>
+                  {stressExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </div>
+              </button>
+
+              {stressExpanded && stressScore.factors && stressScore.factors.length > 0 && (
+                <div className="px-4 pb-4 space-y-2 border-t border-gray-100">
+                  {stressScore.factors.map((f, i) => {
+                    const pct = f.score / f.maxScore;
+                    const FactorIcon = pct >= 1 ? CheckCircle2 : pct >= 0.6 ? AlertTriangle : XCircle;
+                    const iconColor = pct >= 1 ? "text-emerald-500" : pct >= 0.6 ? "text-amber-500" : "text-red-500";
+                    return (
+                      <div key={i} className="bg-white rounded-xl p-3 flex items-center gap-2.5">
+                        <FactorIcon className={cn("w-4 h-4 flex-shrink-0", iconColor)} />
+                        <span className="flex-1 text-xs font-semibold text-gray-800">{f.name}</span>
+                        <span className={cn("text-xs font-bold tabular-nums", pct >= 1 ? "text-emerald-600" : pct >= 0.6 ? "text-amber-600" : "text-red-500")}>
+                          {f.score}/{f.maxScore}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[10px] text-gray-400 text-center pt-1">
+                    Open in editor to apply fixes and re-test
+                  </p>
+                </div>
+              )}
+
+              {stressExpanded && (!stressScore.factors || stressScore.factors.length === 0) && (
+                <p className="px-4 pb-4 text-xs text-gray-400">Factor breakdown not available for this result.</p>
+              )}
             </div>
           )}
         </div>
