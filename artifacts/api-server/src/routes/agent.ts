@@ -488,6 +488,7 @@ Return JSON only (no markdown):
 const StressTestBody = z.object({
   postContent: z.string().min(10).max(5000),
   draftId: z.number().int().positive().optional().nullable(),
+  fixesApplied: z.boolean().optional().default(false),
 });
 
 router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -496,7 +497,7 @@ router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Pr
 
   try {
     const userId = req.user!.userId;
-    const { postContent, draftId } = parsed.data;
+    const { postContent, draftId, fixesApplied } = parsed.data;
     const { dna } = await getUserAgentContext(userId);
 
     // Verify draft ownership before any read/write using draftId (prevents IDOR)
@@ -680,11 +681,14 @@ Return this exact JSON shape:
       return;
     }
 
+    // After validation, factors is guaranteed to be a valid 6-element array
+    const validatedFactors = data.factors as Array<{ name: string; score: number; maxScore: number; why: string; howToFix?: string }>;
+
     const normalizedScore = Math.min(100, Math.max(0, Number(data.score)));
     const publishReady = normalizedScore >= 85;
     // When publish-ready, strip howToFix from every factor so the UI cannot
     // surface improvement suggestions after the 85+ threshold is reached.
-    const factors = data.factors.slice(0, 6).map((f: { name: string; score: number; maxScore: number; why?: string; howToFix?: string }) => ({
+    const factors = validatedFactors.slice(0, 6).map((f) => ({
       name: f.name,
       score: f.score,
       maxScore: f.maxScore,
@@ -708,7 +712,7 @@ Return this exact JSON shape:
           userId,
           overallScore: result.score,
           factorScores: result.factors as unknown as Record<string, unknown>[],
-          fixesApplied: false,
+          fixesApplied: fixesApplied ?? false,
         });
       } catch (dbErr) {
         console.error("[stress-test] DB save failed:", dbErr);

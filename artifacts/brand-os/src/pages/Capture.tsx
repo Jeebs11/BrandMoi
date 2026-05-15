@@ -472,7 +472,7 @@ export default function Capture() {
           try {
             // Re-test with same format as initial test (post + hashtags for post tab)
             const retestContent = isShort ? refined : `${refined}${hashtags ? `\n\n${hashtags}` : ""}`;
-            const result = await agentApi.stressTest(retestContent, savedDraftId);
+            const result = await agentApi.stressTest(retestContent, savedDraftId, true);
             setStressTestResult(result);
           } catch {
             // keep existing result if re-test fails

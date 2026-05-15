@@ -294,10 +294,10 @@ export const agentApi = {
       method: "POST",
       body: JSON.stringify({ skill }),
     }),
-  stressTest: (postContent: string, draftId?: number | null) =>
+  stressTest: (postContent: string, draftId?: number | null, fixesApplied?: boolean) =>
     apiFetch<StressTestResult>("/agent/stress-test", {
       method: "POST",
-      body: JSON.stringify({ postContent, draftId }),
+      body: JSON.stringify({ postContent, draftId, fixesApplied }),
     }),
   stressTestScores: () =>
     apiFetch<Record<string, StressTestScoreEntry>>("/agent/stress-test/scores"),
