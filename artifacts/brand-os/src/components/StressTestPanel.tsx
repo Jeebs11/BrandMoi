@@ -19,6 +19,7 @@ export type StressTestResult = {
   fixes: string[];
   personalInsight?: string;
   publishReady: boolean;
+  persistenceWarning?: string;
 };
 
 interface StressTestPanelProps {
