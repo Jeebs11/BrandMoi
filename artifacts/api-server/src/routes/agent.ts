@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable } from "@workspace/db";
@@ -499,14 +499,29 @@ router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Pr
     const { postContent, draftId } = parsed.data;
     const { dna } = await getUserAgentContext(userId);
 
-    // Fetch resonance context from performance signals when draftId is available
-    let resonanceContext = "";
+    // Verify draft ownership before any read/write using draftId (prevents IDOR)
+    let verifiedDraftId: number | null = null;
     if (draftId) {
+      const [ownedDraft] = await db
+        .select({ id: draftsTable.id })
+        .from(draftsTable)
+        .where(and(eq(draftsTable.id, draftId), eq(draftsTable.userId, userId)))
+        .limit(1);
+      if (!ownedDraft) {
+        res.status(404).json({ error: "Draft not found." });
+        return;
+      }
+      verifiedDraftId = ownedDraft.id;
+    }
+
+    // Fetch resonance context from performance signals (ownership already verified)
+    let resonanceContext = "";
+    if (verifiedDraftId) {
       try {
         const [signal] = await db
           .select()
           .from(performanceSignalsTable)
-          .where(eq(performanceSignalsTable.draftId, draftId))
+          .where(eq(performanceSignalsTable.draftId, verifiedDraftId))
           .limit(1);
         if (signal) {
           const total = signal.reactions + signal.comments + signal.reposts;
@@ -663,11 +678,11 @@ Return this exact JSON shape:
       personalInsight: dna && data.personalInsight ? data.personalInsight : undefined,
     };
 
-    // Save to DB if draftId provided
-    if (draftId) {
+    // Save to DB if ownership-verified draftId is present
+    if (verifiedDraftId) {
       try {
         await db.insert(stressTestScoresTable).values({
-          draftId,
+          draftId: verifiedDraftId,
           userId,
           overallScore: result.score,
           factorScores: result.factors as unknown as Record<string, unknown>[],
