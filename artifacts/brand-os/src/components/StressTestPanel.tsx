@@ -233,6 +233,11 @@ export function StressTestPanel({ result, isLoading, onClose, onApplyFixes, isAp
                     <p className="text-xs text-violet-800 leading-relaxed">{result.personalInsight}</p>
                   </div>
                 )}
+                {result.persistenceWarning && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+                    <p className="text-[11px] text-amber-700 leading-relaxed">{result.persistenceWarning}</p>
+                  </div>
+                )}
               </>
             )}
           </div>

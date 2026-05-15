@@ -259,6 +259,7 @@ export type StressTestResult = {
   fixes: string[];
   personalInsight?: string;
   publishReady: boolean;
+  persistenceWarning?: string;
 };
 
 export type StressTestScoreEntry = {
@@ -300,13 +301,6 @@ export const agentApi = {
     }),
   stressTestScores: () =>
     apiFetch<Record<string, StressTestScoreEntry>>("/agent/stress-test/scores"),
-  // Persistence is handled server-side inside stressTest(); this method is
-  // provided for explicit client-driven save calls if needed in future flows.
-  saveStressTestScore: (postContent: string, draftId: number) =>
-    apiFetch<StressTestResult>("/agent/stress-test", {
-      method: "POST",
-      body: JSON.stringify({ postContent, draftId }),
-    }),
 };
 
 export type KpiTrend = { current: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };

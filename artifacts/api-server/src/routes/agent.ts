@@ -664,7 +664,13 @@ Return this exact JSON shape:
       personalInsight?: string;
     };
 
-    if (data.score === undefined || data.score === null || !Array.isArray(data.factors)) {
+    const validFactors = Array.isArray(data.factors) && data.factors.every(
+      (f: unknown) => f && typeof f === "object" && "name" in (f as object) &&
+        typeof (f as { name: unknown }).name === "string" &&
+        typeof (f as { score: unknown }).score === "number" &&
+        typeof (f as { maxScore: unknown }).maxScore === "number"
+    );
+    if (data.score === undefined || data.score === null || !validFactors) {
       res.status(500).json({ error: "Invalid AI response shape" });
       return;
     }
@@ -689,6 +695,7 @@ Return this exact JSON shape:
     };
 
     // Save to DB if ownership-verified draftId is present
+    let persistenceWarning: string | undefined;
     if (verifiedDraftId) {
       try {
         await db.insert(stressTestScoresTable).values({
@@ -700,10 +707,11 @@ Return this exact JSON shape:
         });
       } catch (dbErr) {
         console.error("[stress-test] DB save failed:", dbErr);
+        persistenceWarning = "Score could not be saved. Your result is shown but will not appear in Library.";
       }
     }
 
-    res.json(result);
+    res.json({ ...result, ...(persistenceWarning ? { persistenceWarning } : {}) });
   } catch (err) {
     console.error("[agent-stress-test]", err);
     res.status(500).json({ error: "Failed to run stress test" });
