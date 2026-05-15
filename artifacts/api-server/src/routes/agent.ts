@@ -664,12 +664,17 @@ Return this exact JSON shape:
       personalInsight?: string;
     };
 
-    const validFactors = Array.isArray(data.factors) && data.factors.every(
-      (f: unknown) => f && typeof f === "object" && "name" in (f as object) &&
-        typeof (f as { name: unknown }).name === "string" &&
-        typeof (f as { score: unknown }).score === "number" &&
-        typeof (f as { maxScore: unknown }).maxScore === "number"
-    );
+    const validFactors = Array.isArray(data.factors) &&
+      data.factors.length === 6 &&
+      data.factors.every(
+        (f: unknown) => f && typeof f === "object" && "name" in (f as object) &&
+          typeof (f as { name: unknown }).name === "string" &&
+          typeof (f as { score: unknown }).score === "number" &&
+          typeof (f as { maxScore: unknown }).maxScore === "number" &&
+          (f as { score: number }).score >= 0 &&
+          (f as { maxScore: number }).maxScore > 0 &&
+          (f as { score: number }).score <= (f as { maxScore: number }).maxScore
+      );
     if (data.score === undefined || data.score === null || !validFactors) {
       res.status(500).json({ error: "Invalid AI response shape" });
       return;
@@ -709,6 +714,9 @@ Return this exact JSON shape:
         console.error("[stress-test] DB save failed:", dbErr);
         persistenceWarning = "Score could not be saved. Your result is shown but will not appear in Library.";
       }
+    } else {
+      // No draftId provided — result is shown but not persisted
+      persistenceWarning = "Save your draft first to keep this score in your Library.";
     }
 
     res.json({ ...result, ...(persistenceWarning ? { persistenceWarning } : {}) });
