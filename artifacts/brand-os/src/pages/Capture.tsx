@@ -152,6 +152,7 @@ export default function Capture() {
   const [stressTestResult, setStressTestResult] = useState<StressTestResult | null>(null);
   const [isStressTestLoading, setIsStressTestLoading] = useState(false);
   const [isApplyingFixes, setIsApplyingFixes] = useState(false);
+  const [stressTestSourceTab, setStressTestSourceTab] = useState<"post" | "short">("post");
 
   const { mutate: generateContent, isPending: isGenerating, error: generateError } = useGenerateContent();
   const { mutate: refineContent, isPending: isRefining } = useRefineContent();
@@ -402,7 +403,8 @@ export default function Capture() {
   };
 
   // ── Stress Test ──────────────────────────────────────────────────────
-  const handleStressTest = async (postText: string) => {
+  const handleStressTest = async (postText: string, sourceTab: "post" | "short" = "post") => {
+    setStressTestSourceTab(sourceTab);
     setStressTestOpen(true);
     setStressTestResult(null);
     setIsStressTestLoading(true);
@@ -420,14 +422,20 @@ export default function Capture() {
   const handleApplyFixes = () => {
     if (!stressTestResult?.fixes?.length || !content) return;
     setIsApplyingFixes(true);
-    const fixInstruction = `Apply these specific improvements to the post: ${stressTestResult.fixes.join("; ")}. Keep the same topic, voice, and structure — only make the targeted changes listed.`;
+    const isShort = stressTestSourceTab === "short";
+    const sourceContent = isShort ? (content.shortPost ?? "") : editedPost;
+    const fixInstruction = `Apply these specific improvements: ${stressTestResult.fixes.join("; ")}. Keep the same topic, voice, and structure — only make the targeted changes listed.`;
     refineContent(
-      { data: { content: editedPost, instruction: fixInstruction, tab: "post" } },
+      { data: { content: sourceContent, instruction: fixInstruction, tab: stressTestSourceTab } },
       {
         onSuccess: async (data) => {
-          const refined = data.content ?? editedPost;
-          setEditedPost(refined);
-          setContent((c) => c ? { ...c, post: refined } : c);
+          const refined = data.content ?? sourceContent;
+          if (isShort) {
+            setContent((c) => c ? { ...c, shortPost: refined } : c);
+          } else {
+            setEditedPost(refined);
+            setContent((c) => c ? { ...c, post: refined } : c);
+          }
           try {
             const result = await agentApi.stressTest(refined, savedDraftId);
             setStressTestResult(result);
@@ -876,7 +884,7 @@ interface ResultViewProps {
   onRegenIllustration: (scene: string) => void;
   onSave: () => void;
   onCopy: (text: string, label?: string) => void;
-  onStressTest: (postText: string) => void;
+  onStressTest: (postText: string, sourceTab: "post" | "short") => void;
   isStressTestLoading: boolean;
 }
 
@@ -1038,7 +1046,7 @@ function ResultView(props: ResultViewProps) {
           <Button
             variant="outline"
             className="w-full border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"
-            onClick={() => onStressTest(fullPost)}
+            onClick={() => onStressTest(fullPost, "post")}
             disabled={isStressTestLoading || isRefining}
           >
             <Zap className="w-3.5 h-3.5 mr-1.5" />
@@ -1057,7 +1065,7 @@ function ResultView(props: ResultViewProps) {
             <Button
               variant="outline"
               className="border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"
-              onClick={() => onStressTest(content.shortPost ?? "")}
+              onClick={() => onStressTest(content.shortPost ?? "", "short")}
               disabled={isStressTestLoading}
             >
               <Zap className="w-3.5 h-3.5 mr-1.5" />
