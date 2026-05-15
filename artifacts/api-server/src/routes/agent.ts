@@ -682,18 +682,21 @@ Return this exact JSON shape:
     }
 
     // After validation, factors is guaranteed to be a valid 6-element array
-    const validatedFactors = data.factors as Array<{ name: string; score: number; maxScore: number; why: string; howToFix?: string }>;
+    const validatedFactors = data.factors as Array<{ name: string; score: number; maxScore: number; why?: string; howToFix?: string }>;
 
     const normalizedScore = Math.min(100, Math.max(0, Number(data.score)));
     const publishReady = normalizedScore >= 85;
     // When publish-ready, strip howToFix from every factor so the UI cannot
     // surface improvement suggestions after the 85+ threshold is reached.
-    const factors = validatedFactors.slice(0, 6).map((f) => ({
-      name: f.name,
+    // Fallback defaults for why/name ensure UI never receives empty strings.
+    const factors = validatedFactors.slice(0, 6).map((f, i) => ({
+      name: typeof f.name === "string" && f.name.trim() ? f.name.trim() : `Factor ${i + 1}`,
       score: f.score,
       maxScore: f.maxScore,
-      why: f.why,
-      ...(publishReady ? {} : { howToFix: f.howToFix }),
+      why: typeof f.why === "string" && f.why.trim() ? f.why.trim() : "No explanation provided.",
+      ...(publishReady ? {} : {
+        howToFix: typeof f.howToFix === "string" && f.howToFix.trim() ? f.howToFix.trim() : undefined,
+      }),
     }));
     const result = {
       score: normalizedScore,
