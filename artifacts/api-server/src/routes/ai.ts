@@ -314,15 +314,15 @@ Return ONLY the updated infographic as JSON — no markdown fences, no extra tex
     return;
   }
 
-  // Post and visual: standard string-content refinement
+  // Post and visual: return plain text — wrapping in JSON ourselves avoids
+  // parse failures when Claude's output contains quotes or special characters.
   const userMessage = `Refine this ${tab} content:
 
 ${content}
 
 Instruction: ${instruction}
 
-Return this exact JSON shape (no markdown fences):
-{"content": ""}`;
+Return ONLY the refined text. No JSON. No markdown fences. No preamble. No explanation. Just the rewritten content.`;
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -337,23 +337,14 @@ Return this exact JSON shape (no markdown fences):
     return;
   }
 
-  // Strip markdown fences Claude sometimes adds despite being told not to
-  const raw = text.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-  let parsed2: unknown;
-  try {
-    parsed2 = JSON.parse(raw);
-  } catch {
-    res.status(500).json({ error: "AI returned invalid JSON" });
+  // Strip any stray markdown fences and return as structured response
+  const refined = text.text.replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/, "").trim();
+  if (!refined) {
+    res.status(500).json({ error: "AI returned empty content" });
     return;
   }
 
-  const validated = RefineContentResponse.safeParse(parsed2);
-  if (!validated.success) {
-    res.status(500).json({ error: "AI response did not match expected shape" });
-    return;
-  }
-
-  res.json(validated.data);
+  res.json({ content: refined });
 });
 
 const CheckAngleBody = z.object({

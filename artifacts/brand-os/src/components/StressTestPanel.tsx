@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronDown, ChevronUp, Loader2, Zap, CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
+import { X, ChevronDown, ChevronUp, Loader2, Zap, CheckCircle2, AlertTriangle, XCircle, RefreshCw, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,9 @@ interface StressTestPanelProps {
   onClose: () => void;
   onApplyFixes: () => void;
   isApplying: boolean;
+  pendingContent?: string | null;
+  onApprove?: () => void;
+  onDiscard?: () => void;
 }
 
 function ScoreRing({ score, publishReady }: { score: number; publishReady: boolean }) {
@@ -147,13 +150,18 @@ function FactorRow({ factor }: { factor: StressTestFactor }) {
   );
 }
 
-export function StressTestPanel({ result, isLoading, onClose, onApplyFixes, isApplying }: StressTestPanelProps) {
+export function StressTestPanel({
+  result, isLoading, onClose, onApplyFixes, isApplying,
+  pendingContent, onApprove, onDiscard,
+}: StressTestPanelProps) {
   const summaryLine = () => {
     if (!result) return "";
     if (result.publishReady) return "This post is ready to publish.";
     const failing = result.factors.filter((f) => f.score < f.maxScore).length;
     return `${failing} ${failing === 1 ? "thing" : "things"} to fix before publishing.`;
   };
+
+  const isReviewing = !!pendingContent;
 
   return createPortal(
     <AnimatePresence>
@@ -177,7 +185,9 @@ export function StressTestPanel({ result, isLoading, onClose, onApplyFixes, isAp
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-violet-600" />
-              <h3 className="font-extrabold text-gray-900">Stress Test</h3>
+              <h3 className="font-extrabold text-gray-900">
+                {isReviewing ? "Review rewrite" : "Stress Test"}
+              </h3>
             </div>
             <button
               onClick={onClose}
@@ -187,84 +197,115 @@ export function StressTestPanel({ result, isLoading, onClose, onApplyFixes, isAp
             </button>
           </div>
 
-          {/* Scrollable body */}
-          <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-            {isLoading && (
-              <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="w-7 h-7 text-violet-400 animate-spin" />
-                <p className="text-sm text-gray-500 font-medium">Analysing your post…</p>
-                <p className="text-xs text-gray-400 text-center">Checking 6 LinkedIn algorithm factors from research across 1.8M+ posts</p>
-              </div>
-            )}
-
-            {!isLoading && result && (
-              <>
-                {/* Score */}
-                <ScoreRing score={result.score} publishReady={result.publishReady} />
-
-                {/* Summary line */}
-                <p className={cn(
-                  "text-sm font-bold text-center -mt-1",
-                  result.publishReady ? "text-emerald-700" : "text-gray-700"
-                )}>
-                  {summaryLine()}
+          {/* ── Review screen ── */}
+          {isReviewing && pendingContent && (
+            <>
+              <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Here's the rewritten version. Review it before replacing your current post.
                 </p>
-
-                {/* Publish-ready celebration */}
-                {result.publishReady && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-emerald-800">Strong across all signals</p>
-                    <p className="text-xs text-emerald-700 mt-1">This post is optimised for LinkedIn's algorithm. Time to publish.</p>
-                  </div>
-                )}
-
-                {/* Factor breakdown */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Factor breakdown — tap to expand</p>
-                  {result.factors.map((f, i) => (
-                    <FactorRow key={i} factor={f} />
-                  ))}
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                    {pendingContent}
+                  </p>
                 </div>
+              </div>
+              <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex-shrink-0 flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 rounded-2xl text-sm font-bold border-gray-200 text-gray-600"
+                  onClick={onDiscard}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Discard
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-2xl text-sm font-bold bg-violet-600 hover:bg-violet-700"
+                  onClick={onApprove}
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Apply to post
+                </Button>
+              </div>
+            </>
+          )}
 
-                {/* Personal insight */}
-                {result.personalInsight && (
-                  <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 mb-1.5">Your personal signal</p>
-                    <p className="text-xs text-violet-800 leading-relaxed">{result.personalInsight}</p>
+          {/* ── Normal score screen ── */}
+          {!isReviewing && (
+            <>
+              <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+                {isLoading && (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="w-7 h-7 text-violet-400 animate-spin" />
+                    <p className="text-sm text-gray-500 font-medium">Analysing your post…</p>
+                    <p className="text-xs text-gray-400 text-center">Checking 6 LinkedIn algorithm factors from research across 1.8M+ posts</p>
                   </div>
                 )}
-                {result.persistenceWarning && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
-                    <p className="text-[11px] text-amber-700 leading-relaxed">{result.persistenceWarning}</p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
 
-          {/* Footer — apply fixes button */}
-          {!isLoading && result && !result.publishReady && (
-            <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex-shrink-0">
-              <Button
-                className="w-full h-12 rounded-2xl text-sm font-bold"
-                onClick={onApplyFixes}
-                disabled={isApplying}
-              >
-                {isApplying ? (
+                {!isLoading && result && (
                   <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Applying fixes…
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Apply fixes &amp; regenerate
+                    <ScoreRing score={result.score} publishReady={result.publishReady} />
+
+                    <p className={cn(
+                      "text-sm font-bold text-center -mt-1",
+                      result.publishReady ? "text-emerald-700" : "text-gray-700"
+                    )}>
+                      {summaryLine()}
+                    </p>
+
+                    {result.publishReady && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-emerald-800">Strong across all signals</p>
+                        <p className="text-xs text-emerald-700 mt-1">This post is optimised for LinkedIn's algorithm. Time to publish.</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Factor breakdown — tap to expand</p>
+                      {result.factors.map((f, i) => (
+                        <FactorRow key={i} factor={f} />
+                      ))}
+                    </div>
+
+                    {result.personalInsight && (
+                      <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 mb-1.5">Your personal signal</p>
+                        <p className="text-xs text-violet-800 leading-relaxed">{result.personalInsight}</p>
+                      </div>
+                    )}
+                    {result.persistenceWarning && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+                        <p className="text-[11px] text-amber-700 leading-relaxed">{result.persistenceWarning}</p>
+                      </div>
+                    )}
                   </>
                 )}
-              </Button>
-              <p className="text-[10px] text-gray-400 text-center mt-2">Rewrites the post using the fixes above, then re-scores it</p>
-            </div>
+              </div>
+
+              {!isLoading && result && !result.publishReady && (
+                <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex-shrink-0">
+                  <Button
+                    className="w-full h-12 rounded-2xl text-sm font-bold"
+                    onClick={onApplyFixes}
+                    disabled={isApplying}
+                  >
+                    {isApplying ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Generating rewrite…
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Apply fixes &amp; regenerate
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-[10px] text-gray-400 text-center mt-2">Rewrites the post using the fixes above — you'll review before it applies</p>
+                </div>
+              )}
+            </>
           )}
         </motion.div>
       </div>

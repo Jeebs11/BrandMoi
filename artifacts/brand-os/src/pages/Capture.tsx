@@ -153,6 +153,7 @@ export default function Capture() {
   const [isStressTestLoading, setIsStressTestLoading] = useState(false);
   const [isApplyingFixes, setIsApplyingFixes] = useState(false);
   const [stressTestSourceTab, setStressTestSourceTab] = useState<"post" | "short">("post");
+  const [pendingRefinedContent, setPendingRefinedContent] = useState<string | null>(null);
 
   const { mutate: generateContent, isPending: isGenerating, error: generateError } = useGenerateContent();
   const { mutate: refineContent, isPending: isRefining } = useRefineContent();
@@ -461,24 +462,11 @@ export default function Capture() {
     refineContent(
       { data: { content: sourceContent, instruction: fixInstruction, tab: stressTestSourceTab } },
       {
-        onSuccess: async (data) => {
+        onSuccess: (data) => {
           const refined = data.content ?? sourceContent;
-          if (isShort) {
-            setContent((c) => c ? { ...c, shortPost: refined } : c);
-          } else {
-            setEditedPost(refined);
-            setContent((c) => c ? { ...c, post: refined } : c);
-          }
-          try {
-            // Re-test with same format as initial test (post + hashtags for post tab)
-            const retestContent = isShort ? refined : `${refined}${hashtags ? `\n\n${hashtags}` : ""}`;
-            const result = await agentApi.stressTest(retestContent, savedDraftId, true);
-            setStressTestResult(result);
-          } catch {
-            // keep existing result if re-test fails
-          } finally {
-            setIsApplyingFixes(false);
-          }
+          // Show for review — don't apply until user approves
+          setPendingRefinedContent(refined);
+          setIsApplyingFixes(false);
         },
         onError: (err) => {
           toast({ title: "Fix failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
@@ -486,6 +474,34 @@ export default function Capture() {
         },
       }
     );
+  };
+
+  const handleApproveRefinement = async () => {
+    if (!pendingRefinedContent || !content) return;
+    const isShort = stressTestSourceTab === "short";
+    const refined = pendingRefinedContent;
+    setPendingRefinedContent(null);
+    if (isShort) {
+      setContent((c) => c ? { ...c, shortPost: refined } : c);
+    } else {
+      setEditedPost(refined);
+      setContent((c) => c ? { ...c, post: refined } : c);
+    }
+    // Re-score after applying
+    setIsStressTestLoading(true);
+    try {
+      const retestContent = isShort ? refined : `${refined}${hashtags ? `\n\n${hashtags}` : ""}`;
+      const result = await agentApi.stressTest(retestContent, savedDraftId, true);
+      setStressTestResult(result);
+    } catch {
+      // keep existing result if re-test fails
+    } finally {
+      setIsStressTestLoading(false);
+    }
+  };
+
+  const handleDiscardRefinement = () => {
+    setPendingRefinedContent(null);
   };
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -571,9 +587,12 @@ export default function Capture() {
           <StressTestPanel
             result={stressTestResult}
             isLoading={isStressTestLoading}
-            onClose={() => setStressTestOpen(false)}
+            onClose={() => { setStressTestOpen(false); setPendingRefinedContent(null); }}
             onApplyFixes={handleApplyFixes}
             isApplying={isApplyingFixes}
+            pendingContent={pendingRefinedContent}
+            onApprove={handleApproveRefinement}
+            onDiscard={handleDiscardRefinement}
           />
         )}
 
