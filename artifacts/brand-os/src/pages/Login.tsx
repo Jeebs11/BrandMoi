@@ -105,7 +105,13 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-6">
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Don't have an account?{" "}
+            <a href="/signup" className="font-semibold text-primary underline underline-offset-2">
+              Sign up free
+            </a>
+          </p>
+          <p className="text-center text-xs text-gray-400 mt-3">
             Demo: demo@brandos.app / demo1234
           </p>
         </div>

@@ -39,10 +39,19 @@ export default function Landing() {
             </span>
           </div>
           <button
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/signup")}
             className="text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-300"
             style={{ background: "#0F1F3D", color: "#fff" }}
             onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
+            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          >
+            Get started
+          </button>
+          <button
+            onClick={() => navigate("/login")}
+            className="text-sm font-medium px-4 py-2 rounded-lg transition-all duration-300"
+            style={{ color: "#0F1F3D" }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = "0.6")}
             onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
           >
             Log in
@@ -71,15 +80,25 @@ export default function Landing() {
 
           <div className="flex flex-col items-center gap-4 lp-hidden lp-animate-in lp-delay-300">
             <button
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/signup")}
               className="text-white px-10 py-4 rounded-xl font-semibold text-base transition-all duration-300 shadow-md"
               style={{ background: "#0F1F3D" }}
               onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
               onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
             >
-              Log in to your account
+              Create your account — it's free
             </button>
-            <p className="text-xs" style={{ color: "#8A97A8" }}>
+            <p className="text-sm" style={{ color: "#8A97A8" }}>
+              Already have an account?{" "}
+              <button
+                onClick={() => navigate("/login")}
+                className="font-semibold underline underline-offset-2 transition-opacity"
+                style={{ color: "#0F1F3D" }}
+              >
+                Log in
+              </button>
+            </p>
+            <p className="text-xs" style={{ color: "#B0BBCA" }}>
               Demo: demo@brandos.app / demo1234
             </p>
           </div>
