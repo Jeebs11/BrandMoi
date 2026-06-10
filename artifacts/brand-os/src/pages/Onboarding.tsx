@@ -38,6 +38,7 @@ type OnboardingState = {
   brandRole: string;
   brandAudience: string;
   brandBelief: string;
+  contentPillars: string[];
 };
 
 export default function Onboarding() {
@@ -51,6 +52,7 @@ export default function Onboarding() {
     brandRole: "",
     brandAudience: "",
     brandBelief: "",
+    contentPillars: [],
   });
 
   const { mutate: updatePreferences, isPending } = useUpdatePreferences();
@@ -67,6 +69,7 @@ export default function Onboarding() {
       objective: extracted.objective || d.objective,
       persona: extracted.persona || d.persona,
       tone: extracted.tone || d.tone,
+      contentPillars: extracted.contentPillars?.length ? extracted.contentPillars : d.contentPillars,
     }));
   };
 
@@ -81,6 +84,7 @@ export default function Onboarding() {
           brandAudience: data.brandAudience,
           brandBelief: data.brandBelief,
           onboarded: true,
+          ...(data.contentPillars.length > 0 ? { contentPillars: data.contentPillars } : {}),
         },
       },
       {

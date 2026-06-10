@@ -128,6 +128,7 @@ export type ExtractedBrandVoice = {
   persona: string;
   tone: string;
   summary: string;
+  contentPillars: string[];
 };
 
 export const smartImportApi = {
@@ -322,6 +323,8 @@ export const agentApi = {
     }),
   savedIdeas: () =>
     apiFetch<{ ideas: SavedIdea[] }>("/agent/saved-ideas"),
+  deleteSavedIdea: (id: number) =>
+    apiFetch<{ ok: boolean }>(`/agent/saved-ideas/${id}`, { method: "DELETE" }),
   topPostSuggestions: () =>
     apiFetch<{ suggestions: TopPostSuggestion[]; reason?: string }>("/agent/top-post-suggestions"),
 };

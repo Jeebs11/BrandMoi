@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable, ideaFeedbackTable } from "@workspace/db";
@@ -32,8 +32,15 @@ async function getUserAgentContext(userId: number) {
     .orderBy(desc(draftsTable.createdAt))
     .limit(30);
 
+  const ideaFeedback = await db
+    .select()
+    .from(ideaFeedbackTable)
+    .where(eq(ideaFeedbackTable.userId, userId))
+    .orderBy(desc(ideaFeedbackTable.createdAt))
+    .limit(40);
+
   const dna = await buildVoiceDNA(userId);
-  return { prefs, recentDrafts, dna };
+  return { prefs, recentDrafts, dna, ideaFeedback };
 }
 
 router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
@@ -99,15 +106,23 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       newsContext = "";
     }
 
+    const { ideaFeedback } = await getUserAgentContext(req.user!.userId);
+    const likedIdeas = ideaFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText);
+    const dislikedIdeas = ideaFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText);
+    const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
+
     const userMessage = [
       prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
       prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
       prefs?.brandBelief ? `Core belief: ${prefs.brandBelief}` : "",
+      pillars.length > 0 ? `Content pillars: ${pillars.join(", ")}` : "",
       dna ? `\nWriting DNA:\n${dna}` : "",
       recentTopics ? `\nRecent topics: ${recentTopics}` : "",
       daysSinceLast !== null ? `Days since last draft: ${daysSinceLast}` : "No drafts yet",
       underused.length > 0 ? `Underused objectives: ${underused.join(", ")}` : "",
       `Total drafts: ${recentDrafts.length}`,
+      likedIdeas.length > 0 ? `\nIdeas this user has liked (generate more in this direction):\n${likedIdeas.slice(0, 10).map((t) => `- ${t}`).join("\n")}` : "",
+      dislikedIdeas.length > 0 ? `\nIdeas this user has disliked (avoid these angles and themes):\n${dislikedIdeas.slice(0, 10).map((t) => `- ${t}`).join("\n")}` : "",
       newsContext ? `\nToday's news context (use this to make angles timely):\n${newsContext}` : "",
     ]
       .filter(Boolean)
@@ -856,6 +871,21 @@ router.get("/agent/saved-ideas", requireAuth, async (req, res): Promise<void> =>
   } catch (err) {
     console.error("[saved-ideas]", err);
     res.status(500).json({ error: "Failed to fetch saved ideas" });
+  }
+});
+
+router.delete("/agent/saved-ideas/:id", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  try {
+    await db
+      .delete(ideaFeedbackTable)
+      .where(and(eq(ideaFeedbackTable.id, id), eq(ideaFeedbackTable.userId, userId)));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[saved-ideas delete]", err);
+    res.status(500).json({ error: "Failed to delete idea" });
   }
 });
 

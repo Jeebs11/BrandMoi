@@ -764,6 +764,18 @@ export default function Dashboard() {
                         >
                           Write →
                         </button>
+                        <button
+                          onClick={() => {
+                            setSavedIdeas((prev) => prev.filter((i) => i.id !== idea.id));
+                            agentApi.deleteSavedIdea(idea.id).catch(() => {
+                              setSavedIdeas((prev) => [idea, ...prev]);
+                            });
+                          }}
+                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                          title="Remove idea"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   ))}

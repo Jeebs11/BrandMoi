@@ -56,6 +56,7 @@ export type ExtractedBrandVoice = {
   persona: string;
   tone: string;
   summary: string;
+  contentPillars: string[];
 };
 
 router.post(
@@ -77,7 +78,7 @@ router.post(
       return;
     }
 
-    const truncated = rawText.slice(0, 5000);
+    const truncated = rawText.slice(0, 15000);
 
     if (truncated.trim().length < 100) {
       res.status(422).json({ error: "The document appears to be empty or unreadable." });
@@ -86,7 +87,7 @@ router.post(
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: 1500,
       system: `You extract professional brand voice data from documents. Always return valid JSON only — no markdown, no explanation. Be concise and specific. Map all values to the exact allowed options listed.`,
       messages: [
         {
@@ -104,7 +105,8 @@ Return this exact JSON (no markdown, no commentary):
   "objective": "One of: Clients, Job, Authority, Documenting, Expert, Hiring",
   "persona": "One of: Operator, Founder, Career, Technical, Sales",
   "tone": "One of: Direct, Story, Educational, Bold",
-  "summary": "2-3 sentence plain English summary of what this person does and who they are professionally"
+  "summary": "2-3 sentence plain English summary of what this person does and who they are professionally",
+  "contentPillars": ["pillar 1", "pillar 2", "pillar 3"]
 }
 
 Rules:
@@ -113,7 +115,8 @@ Rules:
 - tone: Infer from the document's writing style
 - Keep brandRole under 120 characters
 - Keep brandAudience under 120 characters  
-- Keep brandBelief under 150 characters`,
+- Keep brandBelief under 150 characters
+- contentPillars: Extract 3-4 distinct recurring themes or topics this person writes about or is known for (e.g. "Leadership & team culture", "SaaS growth strategy", "Career transitions in tech"). Each pillar max 40 characters. These should reflect the person's actual content themes, not generic categories.`,
         },
       ],
     });
@@ -140,6 +143,7 @@ Rules:
     if (!VALID_OBJECTIVES.includes(extracted.objective)) extracted.objective = "Authority";
     if (!VALID_PERSONAS.includes(extracted.persona)) extracted.persona = "Founder";
     if (!VALID_TONES.includes(extracted.tone)) extracted.tone = "Direct";
+    if (!Array.isArray(extracted.contentPillars)) extracted.contentPillars = [];
 
     res.json(extracted);
   }

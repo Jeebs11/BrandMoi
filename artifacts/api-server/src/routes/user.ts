@@ -49,6 +49,7 @@ const UpdatePreferencesBody = z.object({
   bgPanelOpacity: z.enum(["solid", "frosted", "semi", "glass"]).optional(),
   siteTheme: z.enum(["indigo", "violet", "sky", "emerald", "rose", "amber"]).optional(),
   bgPalette: z.enum(["ocean", "sunset", "forest", "void", "ember", "rose", "arctic", "gold"]).optional(),
+  contentPillars: z.array(z.string().max(60)).max(6).optional(),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
@@ -100,6 +101,7 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.bgPanelOpacity !== undefined) updateData.bgPanelOpacity = parsed.data.bgPanelOpacity;
   if (parsed.data.siteTheme !== undefined) updateData.siteTheme = parsed.data.siteTheme;
   if (parsed.data.bgPalette !== undefined) updateData.bgPalette = parsed.data.bgPalette;
+  if (parsed.data.contentPillars !== undefined) updateData.contentPillars = parsed.data.contentPillars;
 
   const [prefs] = await db
     .update(preferencesTable)

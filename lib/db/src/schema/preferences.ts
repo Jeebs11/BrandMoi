@@ -26,6 +26,7 @@ export const preferencesTable = pgTable("preferences", {
   bgPanelOpacity: text("bg_panel_opacity").default("solid"),
   siteTheme: text("site_theme").default("indigo"),
   bgPalette: text("bg_palette").default("ocean"),
+  contentPillars: jsonb("content_pillars").$type<string[]>(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
