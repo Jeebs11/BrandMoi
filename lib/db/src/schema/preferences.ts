@@ -27,6 +27,7 @@ export const preferencesTable = pgTable("preferences", {
   siteTheme: text("site_theme").default("indigo"),
   bgPalette: text("bg_palette").default("ocean"),
   contentPillars: jsonb("content_pillars").$type<string[]>(),
+  writingSamples: jsonb("writing_samples").$type<string[]>(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

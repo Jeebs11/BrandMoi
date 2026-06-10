@@ -1,6 +1,6 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { brandVoiceSignalsTable, draftsTable } from "@workspace/db";
+import { brandVoiceSignalsTable, draftsTable, preferencesTable } from "@workspace/db";
 
 export type VoiceSignals = {
   sentenceStyle: string;
@@ -13,27 +13,48 @@ export type VoiceSignals = {
 
 /**
  * Compose a concise voice DNA excerpt from a user's latest brand voice signals,
- * plus actual writing samples extracted from real published/ready drafts.
+ * actual writing samples from real PUBLISHED drafts (prioritising ones the user
+ * has flagged as "my voice"), and any manually-pinned writing samples from their
+ * profile preferences.
+ *
  * This is injected into AI prompts to personalise the output.
  */
 export async function buildVoiceDNA(userId: number): Promise<string> {
-  const [signals, recentDrafts] = await Promise.all([
+  const [signals, publishedDrafts, prefs] = await Promise.all([
     db
       .select()
       .from(brandVoiceSignalsTable)
       .where(eq(brandVoiceSignalsTable.userId, userId))
       .orderBy(desc(brandVoiceSignalsTable.createdAt))
       .limit(10),
+    // Only look at published posts — they represent what the user actually put their name on
     db
-      .select({ postOutput: draftsTable.postOutput, status: draftsTable.status })
+      .select({ postOutput: draftsTable.postOutput, isVoiceSample: draftsTable.isVoiceSample })
       .from(draftsTable)
-      .where(eq(draftsTable.userId, userId))
-      .orderBy(desc(draftsTable.createdAt))
-      .limit(10),
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+      .orderBy(desc(draftsTable.updatedAt))
+      .limit(20),
+    db
+      .select({ writingSamples: preferencesTable.writingSamples })
+      .from(preferencesTable)
+      .where(eq(preferencesTable.userId, userId))
+      .limit(1),
   ]);
 
   const parts: string[] = [];
 
+  // ── Pinned writing samples from preferences (highest authority) ──────────
+  const pinnedSamples = (prefs[0]?.writingSamples ?? []) as string[];
+  if (pinnedSamples.length > 0) {
+    const lines = ["Pinned writing samples (this is how the user sounds — match this voice above all else):"];
+    pinnedSamples.slice(0, 5).forEach((s, i) => {
+      const preview = s.trim().slice(0, 300) + (s.trim().length > 300 ? "…" : "");
+      lines.push(`Sample ${i + 1}: "${preview}"`);
+    });
+    parts.push(lines.join("\n"));
+  }
+
+  // ── Voice signals (sentence/tone patterns from analysis) ─────────────────
   if (signals.length > 0) {
     const allSignals = signals.map((s) => s.signals as VoiceSignals);
     const sentenceStyles = allSignals.map((s) => s.sentenceStyle).filter(Boolean);
@@ -43,7 +64,7 @@ export async function buildVoiceDNA(userId: number): Promise<string> {
     const dominantSentenceStyle = mostCommon(sentenceStyles);
     const dominantOpeningStyle = mostCommon(openingStyles);
 
-    const dnaLines: string[] = ["Voice DNA (writing style patterns from past posts):"];
+    const dnaLines: string[] = ["Voice DNA (writing style patterns from published posts):"];
     if (dominantSentenceStyle) dnaLines.push(`- Sentence style: ${dominantSentenceStyle}`);
     if (dominantOpeningStyle) dnaLines.push(`- Typical opening: ${dominantOpeningStyle}`);
     if (toneMarkers.length > 0) dnaLines.push(`- Tone markers: ${toneMarkers.join(", ")}`);
@@ -51,18 +72,26 @@ export async function buildVoiceDNA(userId: number): Promise<string> {
     parts.push(dnaLines.join("\n"));
   }
 
-  const writingSamples = recentDrafts
-    .filter((d) => d.postOutput && d.postOutput.trim().length > 120)
-    .slice(0, 3)
-    .map((d) => {
+  // ── Actual writing samples from published posts ───────────────────────────
+  // User-flagged "my voice" samples come first, then other published posts
+  const voiceFlagged = publishedDrafts
+    .filter((d) => d.isVoiceSample && d.postOutput && d.postOutput.trim().length > 120);
+  const regular = publishedDrafts
+    .filter((d) => !d.isVoiceSample && d.postOutput && d.postOutput.trim().length > 120);
+
+  const orderedSamples = [...voiceFlagged, ...regular].slice(0, 5);
+
+  if (orderedSamples.length > 0) {
+    const sampleLines = voiceFlagged.length > 0
+      ? ["Writing samples from published posts (★ = user-flagged as authentic voice):"]
+      : ["Writing samples from published posts:"];
+    orderedSamples.forEach((d, i) => {
       const text = (d.postOutput ?? "").trim();
       const words = text.split(/\s+/);
-      return words.slice(0, 60).join(" ") + (words.length > 60 ? "…" : "");
+      const preview = words.slice(0, 80).join(" ") + (words.length > 80 ? "…" : "");
+      const flag = d.isVoiceSample ? "★ " : "";
+      sampleLines.push(`${flag}Sample ${i + 1}: "${preview}"`);
     });
-
-  if (writingSamples.length > 0) {
-    const sampleLines = ["Here is how this user actually writes:"];
-    writingSamples.forEach((s, i) => sampleLines.push(`Sample ${i + 1}: "${s}"`));
     parts.push(sampleLines.join("\n"));
   }
 

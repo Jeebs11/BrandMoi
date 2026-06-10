@@ -86,6 +86,8 @@ export interface UpdatePreferencesBody {
   siteTheme?: string | null;
   /** User's 3-4 primary content themes extracted from smart import */
   contentPillars?: string[] | null;
+  /** Pinned writing samples used as highest-authority voice anchors in AI generation */
+  writingSamples?: string[] | null;
 }
 
 export interface SuggestionItem {
@@ -478,6 +480,7 @@ export interface UpdateDraftBody {
   status?: UpdateDraftBodyStatus;
   contentSource?: UpdateDraftBodyContentSource;
   visualType?: UpdateDraftBodyVisualType;
+  isVoiceSample?: boolean;
 }
 
 export interface LinkedinStatusResponse {

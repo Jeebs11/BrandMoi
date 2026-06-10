@@ -67,6 +67,8 @@ export default function Settings() {
   const [brandAudience, setBrandAudience] = useState(preferences?.brandAudience ?? "");
   const [brandBelief, setBrandBelief] = useState(preferences?.brandBelief ?? "");
   const [aboutMe, setAboutMe] = useState((preferences as typeof preferences & { aboutMe?: string })?.aboutMe ?? "");
+  const [writingSamples, setWritingSamples] = useState<string[]>((preferences as typeof preferences & { writingSamples?: string[] })?.writingSamples ?? []);
+  const [newSampleText, setNewSampleText] = useState("");
 
   const prefs = preferences as (typeof preferences & {
     brandBgColor?: string;
@@ -109,6 +111,8 @@ export default function Settings() {
       setBrandAudience(preferences.brandAudience);
       setBrandBelief(preferences.brandBelief);
       if (preferences.aboutMe) setAboutMe(preferences.aboutMe);
+      const samples = (preferences as typeof preferences & { writingSamples?: string[] }).writingSamples;
+      if (samples) setWritingSamples(samples);
       if (preferences.brandBgColor) setBrandBgColor(preferences.brandBgColor);
       if (preferences.brandAccentColor) setBrandAccentColor(preferences.brandAccentColor);
       if (preferences.brandTextColor) setBrandTextColor(preferences.brandTextColor);
@@ -280,7 +284,7 @@ export default function Settings() {
 
     setIsSavingAccount(true);
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples: writingSamples.length > 0 ? writingSamples : undefined } },
       {
         onSuccess: async () => {
           try {
@@ -768,6 +772,61 @@ export default function Settings() {
               <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
                 <p className="text-sm text-gray-500">Voice analysis will appear once you have published posts with enough writing signals.</p>
               </div>
+            )}
+          </section>
+
+          {/* Writing Samples */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-violet-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Writing Samples</h2>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">Pin up to 5 writing samples that best represent your voice. These become the highest-authority anchors for every post the AI generates for you.</p>
+            <div className="space-y-3 mb-3">
+              {writingSamples.map((sample, idx) => (
+                <div key={idx} className="relative bg-white rounded-2xl border border-gray-100 p-4 group">
+                  <button
+                    type="button"
+                    onClick={() => setWritingSamples(writingSamples.filter((_, i) => i !== idx))}
+                    className="absolute top-2 right-2 p-1 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  <p className="text-xs text-gray-600 leading-relaxed pr-6 line-clamp-3">{sample}</p>
+                  <p className="text-[10px] text-gray-300 mt-2">{sample.length} characters</p>
+                </div>
+              ))}
+            </div>
+            {writingSamples.length < 5 && (
+              <div className="space-y-2">
+                <textarea
+                  value={newSampleText}
+                  onChange={(e) => setNewSampleText(e.target.value)}
+                  placeholder="Paste a LinkedIn post you're proud of…"
+                  maxLength={3000}
+                  rows={4}
+                  className="w-full text-sm rounded-2xl border border-gray-200 px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white placeholder-gray-300"
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-gray-300">{newSampleText.length}/3000</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={newSampleText.trim().length < 50}
+                    onClick={() => {
+                      if (newSampleText.trim().length < 50) return;
+                      setWritingSamples([...writingSamples, newSampleText.trim()]);
+                      setNewSampleText("");
+                    }}
+                    className="text-xs rounded-xl"
+                  >
+                    Add sample
+                  </Button>
+                </div>
+              </div>
+            )}
+            {writingSamples.length >= 5 && (
+              <p className="text-xs text-gray-400 text-center py-2">5 samples saved. Remove one to add another.</p>
             )}
           </section>
 

@@ -45,7 +45,7 @@ async function getUserAgentContext(userId: number) {
 
 router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
   try {
-    const { prefs, recentDrafts, dna } = await getUserAgentContext(req.user!.userId);
+    const { prefs, recentDrafts, dna, ideaFeedback: _ideaFeedback } = await getUserAgentContext(req.user!.userId);
 
     const daysSinceLast = recentDrafts[0]?.createdAt
       ? Math.floor((Date.now() - new Date(recentDrafts[0].createdAt).getTime()) / 86400000)
@@ -106,7 +106,7 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       newsContext = "";
     }
 
-    const { ideaFeedback } = await getUserAgentContext(req.user!.userId);
+    const ideaFeedback = _ideaFeedback;
     const likedIdeas = ideaFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText);
     const dislikedIdeas = ideaFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText);
     const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];

@@ -1248,6 +1248,7 @@ export const UpdateDraftBody = zod.object({
   visualType: zod
     .enum(["none", "card", "carousel", "infographic", "art"])
     .optional(),
+  isVoiceSample: zod.boolean().optional(),
 });
 
 export const UpdateDraftResponse = zod.object({

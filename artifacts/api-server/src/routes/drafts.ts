@@ -197,6 +197,7 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.structuredBreakdown !== undefined) updateData.structuredBreakdown = parsed.data.structuredBreakdown as object;
   if (parsed.data.contentSource !== undefined) updateData.contentSource = parsed.data.contentSource;
   if (parsed.data.visualType !== undefined) updateData.visualType = parsed.data.visualType;
+  if (parsed.data.isVoiceSample !== undefined) updateData.isVoiceSample = parsed.data.isVoiceSample;
 
   const [draft] = await db
     .update(draftsTable)

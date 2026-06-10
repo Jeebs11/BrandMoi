@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, ChevronLeft, RefreshCw, Copy, Save, Newspaper,
   Image as ImageIcon, Layout, BarChart3, PenTool, Wand2,
-  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, Zap,
+  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, Zap, CheckCircle2,
 } from "lucide-react";
 import { StressTestPanel, type StressTestResult } from "@/components/StressTestPanel";
 import { agentApi } from "@/lib/api";
@@ -358,6 +358,50 @@ export default function Capture() {
     }
   };
 
+  const handleSaveAndPublish = () => {
+    if (!content) {
+      toast({ title: "Nothing to save yet", variant: "destructive" });
+      return;
+    }
+    const payload = {
+      rawInput,
+      objective: objectiveFromAudience(audience),
+      persona: preferences?.persona ?? "Founder",
+      tone: toneFromFeeling(feeling),
+      structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
+      postOutput: editedPost,
+      shortPost: content.shortPost ?? "",
+      carouselOutput: JSON.stringify(content.carousel ?? []),
+      visualOutput: content.visual ?? "",
+      status: "published" as const,
+      visualStyle,
+      contentSource: "capture" as CreateDraftBodyContentSource,
+    };
+    if (savedDraftId) {
+      updateDraft(
+        { id: savedDraftId, data: payload },
+        {
+          onSuccess: () => {
+            toast({ title: "Published", description: "Draft saved and marked as published." });
+            void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
+          },
+          onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
+        }
+      );
+    } else {
+      createDraft(
+        { data: payload },
+        {
+          onSuccess: (newDraft) => {
+            setSavedDraftId(newDraft.id);
+            toast({ title: "Published", description: "Draft created and marked as published." });
+          },
+          onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
+        }
+      );
+    }
+  };
+
   // ── Lazy-load visual image when Visual tab opens ──────────────────────
   useEffect(() => {
     if (activeTab !== "visual" || !content?.visual || visualImage || isLoadingVisual) return;
@@ -577,6 +621,7 @@ export default function Capture() {
             onGenerateIllustration={generateIllustration}
             onRegenIllustration={regenIllustrationWithScene}
             onSave={handleSave}
+            onSaveAndPublish={handleSaveAndPublish}
             onCopy={copy}
             onStressTest={handleStressTest}
             isStressTestLoading={isStressTestLoading}
@@ -937,6 +982,7 @@ interface ResultViewProps {
   onGenerateIllustration: () => void;
   onRegenIllustration: (scene: string) => void;
   onSave: () => void;
+  onSaveAndPublish?: () => void;
   onCopy: (text: string, label?: string) => void;
   onStressTest: (postText: string, sourceTab: "post" | "short") => void;
   isStressTestLoading: boolean;
@@ -951,7 +997,7 @@ function ResultView(props: ResultViewProps) {
     fullPost, audience, feeling, isRefining, isSaving, isDemo,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration,
-    onSave, onCopy, onStressTest, isStressTestLoading,
+    onSave, onSaveAndPublish, onCopy, onStressTest, isStressTestLoading,
   } = props;
 
   return (
@@ -1097,6 +1143,17 @@ function ResultView(props: ResultViewProps) {
               </Button>
             )}
           </div>
+          {!isDemo && onSaveAndPublish && (
+            <Button
+              variant="outline"
+              className="w-full border-green-200 text-green-700 hover:bg-green-50 hover:border-green-400"
+              onClick={onSaveAndPublish}
+              disabled={isSaving}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+              {isSaving ? "Saving…" : "Save & Publish"}
+            </Button>
+          )}
           <Button
             variant="outline"
             className="w-full border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"

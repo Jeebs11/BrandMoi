@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle, Star } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -372,6 +372,14 @@ export default function Library() {
                                 <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" /> Mark as Published
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => {
+                              const current = (draft as typeof draft & { isVoiceSample?: boolean }).isVoiceSample;
+                              updateDraft({ id: draft.id, data: { isVoiceSample: !current } });
+                            }}>
+                              <Star className={cn("w-4 h-4 mr-2", (draft as typeof draft & { isVoiceSample?: boolean }).isVoiceSample ? "fill-amber-400 text-amber-400" : "text-gray-400")} />
+                              {(draft as typeof draft & { isVoiceSample?: boolean }).isVoiceSample ? "Remove Voice Sample" : "This is my voice"}
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-red-600 focus:text-red-600 focus:bg-red-50"
