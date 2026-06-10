@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable } from "@workspace/db";
+import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable, ideaFeedbackTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA } from "../lib/voice-dna.js";
@@ -817,6 +817,142 @@ Rules:
   } catch (err) {
     console.error("[agent-themes]", err);
     res.status(500).json({ error: "Failed to analyze themes" });
+  }
+});
+
+const IdeaFeedbackBody = z.object({
+  ideaText: z.string().min(1).max(500),
+  ideaType: z.enum(["brand", "teach"]),
+  signal: z.enum(["like", "dislike"]),
+});
+
+router.post("/agent/idea-feedback", requireAuth, async (req, res): Promise<void> => {
+  const parsed = IdeaFeedbackBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid input." }); return; }
+  const { ideaText, ideaType, signal } = parsed.data;
+  const userId = req.user!.userId;
+  try {
+    const [row] = await db
+      .insert(ideaFeedbackTable)
+      .values({ userId, ideaText, ideaType, signal })
+      .returning();
+    res.status(201).json({ id: row.id });
+  } catch (err) {
+    console.error("[idea-feedback]", err);
+    res.status(500).json({ error: "Failed to save feedback" });
+  }
+});
+
+router.get("/agent/saved-ideas", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  try {
+    const rows = await db
+      .select()
+      .from(ideaFeedbackTable)
+      .where(and(eq(ideaFeedbackTable.userId, userId), eq(ideaFeedbackTable.signal, "like")))
+      .orderBy(desc(ideaFeedbackTable.createdAt))
+      .limit(50);
+    res.json({ ideas: rows.map((r) => ({ id: r.id, text: r.ideaText, type: r.ideaType, createdAt: r.createdAt.toISOString() })) });
+  } catch (err) {
+    console.error("[saved-ideas]", err);
+    res.status(500).json({ error: "Failed to fetch saved ideas" });
+  }
+});
+
+router.get("/agent/top-post-suggestions", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  try {
+    const { prefs, dna } = await getUserAgentContext(userId);
+
+    // Get top 5 posts by engagement (reactions + comments * 2 + reposts) with their content
+    const topPosts = await db
+      .select({
+        id: draftsTable.id,
+        rawInput: draftsTable.rawInput,
+        postOutput: draftsTable.postOutput,
+        objective: draftsTable.objective,
+        structuredBreakdown: draftsTable.structuredBreakdown,
+        reactions: performanceSignalsTable.reactions,
+        comments: performanceSignalsTable.comments,
+        reposts: performanceSignalsTable.reposts,
+        impressions: performanceSignalsTable.impressions,
+      })
+      .from(draftsTable)
+      .innerJoin(performanceSignalsTable, eq(performanceSignalsTable.draftId, draftsTable.id))
+      .where(
+        and(
+          eq(draftsTable.userId, userId),
+          sql`(${performanceSignalsTable.reactions} + ${performanceSignalsTable.comments} * 2 + ${performanceSignalsTable.reposts}) > 0`
+        )
+      )
+      .orderBy(desc(sql`(${performanceSignalsTable.reactions} + ${performanceSignalsTable.comments} * 2 + ${performanceSignalsTable.reposts})`))
+      .limit(5);
+
+    if (topPosts.length === 0) {
+      res.json({ suggestions: [], reason: "no_data" });
+      return;
+    }
+
+    const postSummaries = topPosts.map((p, i) => {
+      const breakdown = p.structuredBreakdown as { topic?: string; angle?: string } | null;
+      const topic = breakdown?.topic ?? p.rawInput.slice(0, 80);
+      const angle = breakdown?.angle ?? "";
+      const content = (p.postOutput ?? p.rawInput).slice(0, 400);
+      const engagement = p.reactions + p.comments * 2 + p.reposts;
+      return `Post ${i + 1}: "${topic}"${angle ? ` (angle: ${angle})` : ""}
+Engagement score: ${engagement} (${p.reactions} reactions, ${p.comments} comments, ${p.reposts} reposts)
+Content preview: ${content}`;
+    }).join("\n\n");
+
+    const userContext = [
+      prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
+      prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
+      dna ? `Writing DNA:\n${dna}` : "",
+    ].filter(Boolean).join("\n");
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 800,
+      system: `You are a LinkedIn content strategist. Given a creator's top-performing posts, analyse what made each one resonate and generate follow-up angle suggestions.
+
+For each top post, generate 2 angles:
+1. A direct follow-up or deeper dive on the same topic
+2. A "different lens" — same topic viewed from a fresh angle, contrarian take, or opposite perspective
+
+Each angle must be 1-2 sentences (20-35 words), specific and immediately writable — not a topic label.
+
+Return JSON only (no markdown):
+{
+  "suggestions": [
+    {
+      "originalTopic": "short topic label from the post (max 8 words)",
+      "engagementScore": number,
+      "why": "one sentence explaining what made this post perform well (max 20 words)",
+      "angles": [
+        { "label": "Follow-up", "angle": "..." },
+        { "label": "Fresh lens", "angle": "..." }
+      ]
+    }
+  ]
+}`,
+      messages: [{
+        role: "user",
+        content: `${userContext}\n\nTop performing posts:\n${postSummaries}`,
+      }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    try {
+      const data = parseJson(block.text) as { suggestions?: unknown };
+      if (!Array.isArray(data.suggestions)) throw new Error("bad shape");
+      res.json({ suggestions: data.suggestions.slice(0, 5) });
+    } catch {
+      res.status(500).json({ error: "Invalid AI response" });
+    }
+  } catch (err) {
+    console.error("[top-post-suggestions]", err);
+    res.status(500).json({ error: "Failed to generate top post suggestions" });
   }
 });
 

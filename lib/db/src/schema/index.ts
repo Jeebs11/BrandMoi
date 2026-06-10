@@ -9,3 +9,4 @@ export * from "./linkedin_connections";
 export * from "./voice_suggestions";
 export * from "./login_events";
 export * from "./stress_test_scores";
+export * from "./idea_feedback";

@@ -269,6 +269,20 @@ export type StressTestScoreEntry = {
   factors?: StressTestFactor[];
 };
 
+export type SavedIdea = {
+  id: number;
+  text: string;
+  type: string;
+  createdAt: string;
+};
+
+export type TopPostSuggestion = {
+  originalTopic: string;
+  engagementScore: number;
+  why: string;
+  angles: { label: string; angle: string }[];
+};
+
 export const agentApi = {
   brief: () => apiFetch<AgentBrief>("/agent/brief"),
   coach: (postText: string) =>
@@ -301,6 +315,15 @@ export const agentApi = {
     }),
   stressTestScores: () =>
     apiFetch<Record<string, StressTestScoreEntry>>("/agent/stress-test/scores"),
+  ideaFeedback: (ideaText: string, ideaType: "brand" | "teach", signal: "like" | "dislike") =>
+    apiFetch<{ id: number }>("/agent/idea-feedback", {
+      method: "POST",
+      body: JSON.stringify({ ideaText, ideaType, signal }),
+    }),
+  savedIdeas: () =>
+    apiFetch<{ ideas: SavedIdea[] }>("/agent/saved-ideas"),
+  topPostSuggestions: () =>
+    apiFetch<{ suggestions: TopPostSuggestion[]; reason?: string }>("/agent/top-post-suggestions"),
 };
 
 export type KpiTrend = { current: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };

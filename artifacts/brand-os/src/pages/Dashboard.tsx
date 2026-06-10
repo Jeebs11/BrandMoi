@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 import { useToast } from "@/hooks/use-toast";
 
@@ -169,6 +169,12 @@ export default function Dashboard() {
   const [skillAngles, setSkillAngles] = useState<SkillAngle[] | null>(null);
   const [skillAnglesLoading, setSkillAnglesLoading] = useState<boolean>(false);
   const [expandedSkillAngle, setExpandedSkillAngle] = useState<number | null>(null);
+  const [ideaFeedback, setIdeaFeedback] = useState<Record<string, "like" | "dislike">>({});
+  const [savedIdeas, setSavedIdeas] = useState<SavedIdea[]>([]);
+  const [savedIdeasOpen, setSavedIdeasOpen] = useState(false);
+  const [topSuggestions, setTopSuggestions] = useState<TopPostSuggestion[] | null>(null);
+  const [topSuggestionsLoading, setTopSuggestionsLoading] = useState(true);
+  const [expandedTopSuggestion, setExpandedTopSuggestion] = useState<number | null>(null);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -222,7 +228,33 @@ export default function Dashboard() {
         savePainPointsCache(r.painPoints);
       }).catch(() => {}).finally(() => setPainPointsLoading(false));
     }
+
+    agentApi.savedIdeas().then((r) => setSavedIdeas(r.ideas)).catch(() => {});
+
+    agentApi.topPostSuggestions()
+      .then((r) => setTopSuggestions(r.suggestions.length > 0 ? r.suggestions : null))
+      .catch(() => setTopSuggestions(null))
+      .finally(() => setTopSuggestionsLoading(false));
   }, []);
+
+  const handleIdeaFeedback = async (ideaText: string, ideaType: "brand" | "teach", signal: "like" | "dislike") => {
+    const key = `${ideaType}:${ideaText}`;
+    const prev = ideaFeedback[key];
+    if (prev === signal) return;
+    setIdeaFeedback((f) => ({ ...f, [key]: signal }));
+    try {
+      await agentApi.ideaFeedback(ideaText, ideaType, signal);
+      if (signal === "like") {
+        const newIdea: SavedIdea = { id: Date.now(), text: ideaText, type: ideaType, createdAt: new Date().toISOString() };
+        setSavedIdeas((prev) => [newIdea, ...prev.filter((i) => i.text !== ideaText)]);
+        toast({ title: "Saved to your ideas tray" });
+      } else {
+        setSavedIdeas((prev) => prev.filter((i) => i.text !== ideaText));
+      }
+    } catch {
+      setIdeaFeedback((f) => { const next = { ...f }; delete next[key]; return next; });
+    }
+  };
 
   const handleGenerateSkillAngles = async () => {
     if (!skillInput.trim() || skillAnglesLoading) return;
@@ -601,17 +633,35 @@ export default function Dashboard() {
               <div className="px-5 pb-5 flex flex-col gap-1.5">
                 {brief.angles.map((angle, i) => {
                   const isOpen = expandedBriefAngle === i;
+                  const fbKey = `brand:${angle}`;
+                  const fb = ideaFeedback[fbKey];
                   return (
                     <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedBriefAngle(isOpen ? null : i)}
-                        className="w-full text-left flex items-start justify-between gap-2 bg-gray-50 hover:bg-gray-100 px-3 py-2.5 transition-colors"
-                      >
-                        <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
-                          {angle}
-                        </span>
-                        <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                      </button>
+                      <div className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <button
+                          onClick={() => setExpandedBriefAngle(isOpen ? null : i)}
+                          className="flex-1 text-left flex items-start justify-between gap-2 px-3 py-2.5"
+                        >
+                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
+                            {angle}
+                          </span>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "brand", "like"); }}
+                            className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "brand", "dislike"); }}
+                            className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}
+                          >
+                            <ThumbsDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                       {isOpen && (
                         <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
                           <button
@@ -642,17 +692,35 @@ export default function Dashboard() {
               <div className="px-5 pb-5 flex flex-col gap-1.5">
                 {brief.teachAngles.map((angle, i) => {
                   const isOpen = expandedTeachAngle === i;
+                  const fbKey = `teach:${angle}`;
+                  const fb = ideaFeedback[fbKey];
                   return (
                     <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedTeachAngle(isOpen ? null : i)}
-                        className="w-full text-left flex items-start justify-between gap-2 bg-indigo-50/60 hover:bg-indigo-100/60 px-3 py-2.5 transition-colors"
-                      >
-                        <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
-                          {angle}
-                        </span>
-                        <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                      </button>
+                      <div className="flex items-center gap-1 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
+                        <button
+                          onClick={() => setExpandedTeachAngle(isOpen ? null : i)}
+                          className="flex-1 text-left flex items-start justify-between gap-2 px-3 py-2.5"
+                        >
+                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>
+                            {angle}
+                          </span>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "like"); }}
+                            className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}
+                          >
+                            <ThumbsUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "dislike"); }}
+                            className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}
+                          >
+                            <ThumbsDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                       {isOpen && (
                         <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100">
                           <button
@@ -669,6 +737,109 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+
+          {/* Saved Ideas tray */}
+          {savedIdeas.length > 0 && (
+            <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
+              <button
+                onClick={() => setSavedIdeasOpen((v) => !v)}
+                className="w-full px-5 pt-5 pb-4 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Saved Ideas</span>
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">{savedIdeas.length}</span>
+                </div>
+                <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", savedIdeasOpen && "rotate-180")} />
+              </button>
+              {savedIdeasOpen && (
+                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-emerald-50 pt-3">
+                  {savedIdeas.map((idea) => (
+                    <div key={idea.id} className="rounded-xl border border-emerald-100 overflow-hidden">
+                      <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-2.5">
+                        <span className="flex-1 text-gray-800 text-xs font-medium leading-snug">{idea.text}</span>
+                        <button
+                          onClick={() => openLengthPicker(idea.text, idea.type === "teach" ? "teacherMode=true" : "")}
+                          className="flex-shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Write →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Top Post Suggestions */}
+          {topSuggestionsLoading ? (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+                <h3 className="text-sm font-bold text-gray-700">From Your Best Posts</h3>
+              </div>
+              <div className="space-y-2">
+                {[1, 2].map((i) => <Skeleton key={i} className="h-14 rounded-2xl" />)}
+              </div>
+            </section>
+          ) : topSuggestions && topSuggestions.length > 0 ? (
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-orange-500" />
+                <h3 className="text-sm font-bold text-gray-700">From Your Best Posts</h3>
+                <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">Fresh angles</span>
+              </div>
+              <div className="bg-white rounded-3xl border border-orange-100 shadow-sm overflow-hidden">
+                <div className="px-5 pt-5 pb-3">
+                  <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">Your top performers, reimagined</p>
+                </div>
+                <div className="px-5 pb-5 flex flex-col gap-3">
+                  {topSuggestions.map((s, i) => {
+                    const isOpen = expandedTopSuggestion === i;
+                    return (
+                      <div key={i} className="rounded-xl border border-orange-100 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedTopSuggestion(isOpen ? null : i)}
+                          className="w-full text-left flex items-start justify-between gap-2 bg-orange-50/50 hover:bg-orange-50 px-3 py-2.5 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-900 text-xs font-bold leading-snug">{s.originalTopic}</p>
+                            {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{s.why}</p>}
+                          </div>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-orange-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2 bg-white border-t border-orange-100 space-y-2.5">
+                            <div className="bg-orange-50 rounded-lg px-2.5 py-2">
+                              <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wide mb-0.5">Why it performed</p>
+                              <p className="text-xs text-gray-700">{s.why}</p>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {s.angles.map((a, j) => (
+                                <div key={j} className="rounded-lg border border-orange-100 overflow-hidden">
+                                  <div className="flex items-center gap-2 bg-orange-50/40 px-2.5 py-2">
+                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide flex-shrink-0">{a.label}</span>
+                                    <p className="flex-1 text-xs text-gray-700 leading-snug">{a.angle}</p>
+                                    <button
+                                      onClick={() => openLengthPicker(a.angle)}
+                                      className="flex-shrink-0 text-[10px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                                    >
+                                      Write →
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           {/* Pain Point Map */}
           {painPointsLoading ? (
