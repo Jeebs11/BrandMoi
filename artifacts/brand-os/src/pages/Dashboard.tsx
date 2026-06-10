@@ -161,6 +161,7 @@ export default function Dashboard() {
   const [pendingExtra, setPendingExtra] = useState<string>("");
   const [voiceSuggestions, setVoiceSuggestions] = useState<VoiceSuggestion[]>([]);
   const [voiceSuggestionsLoading, setVoiceSuggestionsLoading] = useState(true);
+  const [voiceInsightsGenerating, setVoiceInsightsGenerating] = useState(false);
   const [scoredPostCount, setScoredPostCount] = useState<number>(0);
   const [painPoints, setPainPoints] = useState<PainPoint[] | null>(loadCachedPainPoints());
   const [painPointsLoading, setPainPointsLoading] = useState<boolean>(!loadCachedPainPoints());
@@ -206,16 +207,7 @@ export default function Dashboard() {
     ]).then(([suggestions, map]) => {
       const count = Object.keys(map).length;
       setScoredPostCount(count);
-      if (suggestions.length > 0) {
-        setVoiceSuggestions(suggestions);
-      } else if (count >= 5 && !sessionStorage.getItem("brand_os_vi_auto_v1")) {
-        sessionStorage.setItem("brand_os_vi_auto_v1", "1");
-        voiceInsightsApi.generate().then((result) => {
-          if (result.status === "ok" && result.suggestions.length > 0) {
-            setVoiceSuggestions(result.suggestions);
-          }
-        }).catch(() => {});
-      }
+      if (suggestions.length > 0) setVoiceSuggestions(suggestions);
     }).finally(() => setVoiceSuggestionsLoading(false));
 
     const cachedPP = loadCachedPainPoints();
@@ -316,6 +308,25 @@ export default function Dashboard() {
     } catch { /* ignore */ }
   };
 
+  const handleGenerateInsights = async () => {
+    setVoiceInsightsGenerating(true);
+    try {
+      const result = await voiceInsightsApi.generate();
+      if (result.status === "insufficient") {
+        toast({ title: `Need ${5 - result.count} more performance-logged posts to unlock insights.` });
+      } else if (result.suggestions.length === 0) {
+        toast({ title: "Your settings already match your top posts — nothing to suggest." });
+      } else {
+        setVoiceSuggestions(result.suggestions);
+        toast({ title: `${result.suggestions.length} insight${result.suggestions.length !== 1 ? "s" : ""} generated.` });
+      }
+    } catch {
+      toast({ title: "Could not generate insights — try again.", variant: "destructive" });
+    } finally {
+      setVoiceInsightsGenerating(false);
+    }
+  };
+
   const recentDrafts = drafts?.slice(0, 5) ?? [];
   const firstName = user?.displayName ? user.displayName.split(" ")[0] : null;
 
@@ -398,8 +409,16 @@ export default function Dashboard() {
               </div>
               {voiceSuggestions.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 px-4 py-5 text-center">
-                  <p className="text-xs text-gray-500">No suggestions yet.</p>
-                  <p className="text-[11px] text-gray-400 mt-1">Tap "Get Insights" in Settings to generate AI voice suggestions.</p>
+                  <p className="text-xs text-gray-500 mb-3">No suggestions yet.</p>
+                  <button
+                    onClick={() => void handleGenerateInsights()}
+                    disabled={voiceInsightsGenerating}
+                    className="flex items-center gap-1.5 mx-auto px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {voiceInsightsGenerating ? "Analysing…" : "Analyse my voice"}
+                  </button>
+                  <p className="text-[10px] text-gray-300 mt-2">Uses AI — limited to a few runs per day</p>
                 </div>
               ) : (
                 <div className="space-y-3">

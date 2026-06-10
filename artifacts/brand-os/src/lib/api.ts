@@ -106,6 +106,7 @@ export const performanceApi = {
 
 export const voiceApi = {
   getSummary: () => apiFetch<VoiceSummaryResult>("/user/voice-summary"),
+  refresh: () => apiFetch<VoiceSummaryResult & { remaining: number }>("/user/voice-refresh", { method: "POST" }),
 };
 
 export type MomentumData = {

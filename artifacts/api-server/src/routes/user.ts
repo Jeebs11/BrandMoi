@@ -8,6 +8,22 @@ import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable, voic
 import { requireAuth } from "../middleware/auth.js";
 import { signToken } from "../lib/jwt.js";
 import { isDemoUser } from "../lib/demo-content.js";
+import { extractVoiceDNA } from "./ai.js";
+
+// Per-user voice analysis rate limit — 2 per day, in-memory (resets on restart)
+const voiceAnalysisLimit = new Map<number, { date: string; count: number }>();
+const ANALYSIS_LIMIT_PER_DAY = 2;
+function checkAndIncrementVoiceLimit(userId: number): { allowed: boolean; remaining: number } {
+  const today = new Date().toISOString().slice(0, 10);
+  const entry = voiceAnalysisLimit.get(userId);
+  if (!entry || entry.date !== today) {
+    voiceAnalysisLimit.set(userId, { date: today, count: 1 });
+    return { allowed: true, remaining: ANALYSIS_LIMIT_PER_DAY - 1 };
+  }
+  if (entry.count >= ANALYSIS_LIMIT_PER_DAY) return { allowed: false, remaining: 0 };
+  entry.count++;
+  return { allowed: true, remaining: ANALYSIS_LIMIT_PER_DAY - entry.count };
+}
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -126,47 +142,74 @@ router.get("/user/suggestions", requireAuth, async (req, res): Promise<void> => 
   res.json(suggestions);
 });
 
+// Always returns cached voice summary — never calls Claude automatically.
+// Use POST /user/voice-refresh to trigger a fresh analysis (rate-limited).
 router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
+  const [[prefs], publishedRows] = await Promise.all([
+    db.select({ brandVoiceSummary: preferencesTable.brandVoiceSummary })
+      .from(preferencesTable)
+      .where(eq(preferencesTable.userId, userId))
+      .limit(1),
+    db.select({ id: draftsTable.id })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published"))),
+  ]);
+  res.json({ summary: prefs?.brandVoiceSummary ?? null, draftCount: publishedRows.length });
+});
 
-  const [prefs] = await db
-    .select()
-    .from(preferencesTable)
-    .where(eq(preferencesTable.userId, userId))
-    .limit(1);
-
-  const publishedCount = await db
-    .select({ id: draftsTable.id })
-    .from(draftsTable)
-    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
-
-  const currentCount = publishedCount.length;
-  const lastCount = prefs?.voiceSummaryDraftCount ?? 0;
-  const hasExistingSummary = !!prefs?.brandVoiceSummary;
-  const needsRefresh = currentCount - lastCount >= 5 || (!hasExistingSummary && currentCount > 0);
-
-  if (!needsRefresh && hasExistingSummary) {
-    res.json({ summary: prefs!.brandVoiceSummary, draftCount: currentCount });
+// Manual voice analysis — extracts signals from unanalysed published posts,
+// regenerates the summary, and returns it. Rate-limited to 2 per day.
+router.post("/user/voice-refresh", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot run analysis." });
+    return;
+  }
+  const userId = req.user!.userId;
+  const limit = checkAndIncrementVoiceLimit(userId);
+  if (!limit.allowed) {
+    res.status(429).json({ error: "You've used your 2 analyses for today. Come back tomorrow.", remaining: 0 });
     return;
   }
 
-  const signals = await db
-    .select()
-    .from(brandVoiceSignalsTable)
-    .where(eq(brandVoiceSignalsTable.userId, userId))
-    .orderBy(desc(brandVoiceSignalsTable.createdAt))
-    .limit(20);
+  const [publishedPosts, existingSignals] = await Promise.all([
+    db.select({ id: draftsTable.id, postOutput: draftsTable.postOutput })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+      .orderBy(desc(draftsTable.updatedAt))
+      .limit(30),
+    db.select({ draftId: brandVoiceSignalsTable.draftId })
+      .from(brandVoiceSignalsTable)
+      .where(eq(brandVoiceSignalsTable.userId, userId)),
+  ]);
+
+  const analyzedIds = new Set(existingSignals.map((s) => s.draftId));
+  const unanalyzed = publishedPosts.filter(
+    (p) => !analyzedIds.has(p.id) && p.postOutput && p.postOutput.trim().length > 100,
+  );
+
+  // Extract signals for up to 10 unanalysed posts (parallel, non-blocking)
+  await Promise.allSettled(unanalyzed.slice(0, 10).map((p) => extractVoiceDNA(userId, p.id, p.postOutput!)));
+
+  const [prefs, signals] = await Promise.all([
+    db.select({ brandVoiceSummary: preferencesTable.brandVoiceSummary })
+      .from(preferencesTable)
+      .where(eq(preferencesTable.userId, userId))
+      .limit(1),
+    db.select()
+      .from(brandVoiceSignalsTable)
+      .where(eq(brandVoiceSignalsTable.userId, userId))
+      .orderBy(desc(brandVoiceSignalsTable.createdAt))
+      .limit(20),
+  ]);
 
   if (signals.length === 0) {
-    res.json({ summary: null, draftCount: currentCount });
+    res.json({ summary: null, draftCount: publishedPosts.length, remaining: limit.remaining });
     return;
   }
 
   try {
-    const signalsText = signals
-      .map((s) => JSON.stringify(s.signals))
-      .join("\n");
-
+    const signalsText = signals.map((s) => JSON.stringify(s.signals)).join("\n");
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 512,
@@ -176,20 +219,18 @@ router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> =
 
     const t = message.content[0];
     if (t.type !== "text") {
-      res.json({ summary: prefs?.brandVoiceSummary ?? null, draftCount: currentCount });
+      res.json({ summary: prefs[0]?.brandVoiceSummary ?? null, draftCount: publishedPosts.length, remaining: limit.remaining });
       return;
     }
 
     const summary = t.text.trim();
-
-    await db
-      .update(preferencesTable)
-      .set({ brandVoiceSummary: summary, voiceSummaryDraftCount: currentCount })
+    await db.update(preferencesTable)
+      .set({ brandVoiceSummary: summary, voiceSummaryDraftCount: publishedPosts.length })
       .where(eq(preferencesTable.userId, userId));
 
-    res.json({ summary, draftCount: currentCount });
+    res.json({ summary, draftCount: publishedPosts.length, remaining: limit.remaining });
   } catch {
-    res.json({ summary: prefs?.brandVoiceSummary ?? null, draftCount: currentCount });
+    res.status(500).json({ error: "Analysis failed. Please try again." });
   }
 });
 

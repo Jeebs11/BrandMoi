@@ -143,10 +143,17 @@ export default function Settings() {
   const handleRefreshVoice = async () => {
     setVoiceRefreshing(true);
     try {
-      const data = await voiceApi.getSummary();
+      const data = await voiceApi.refresh();
       setVoiceData(data);
-    } catch {
-      toast({ title: "Could not refresh voice analysis.", variant: "destructive" });
+      const remaining = data.remaining ?? 0;
+      toast({ title: "Voice analysis updated.", description: remaining === 0 ? "No more analyses today — come back tomorrow." : `${remaining} analyse${remaining !== 1 ? "s" : ""} left today.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("2 analyses")) {
+        toast({ title: "Daily limit reached", description: "You've used your 2 analyses today. Come back tomorrow.", variant: "destructive" });
+      } else {
+        toast({ title: "Could not analyse voice.", variant: "destructive" });
+      }
     } finally {
       setVoiceRefreshing(false);
     }
@@ -731,7 +738,7 @@ export default function Settings() {
                     className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
                   >
                     <RefreshCw className={cn("w-3.5 h-3.5", voiceRefreshing && "animate-spin")} />
-                    Refresh
+                    {voiceRefreshing ? "Analysing…" : "Analyse (2/day)"}
                   </button>
                 )}
                 <button
