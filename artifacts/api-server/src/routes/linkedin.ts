@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import { createHmac, createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "@workspace/db";
 import { linkedinConnectionsTable, draftsTable, performanceSignalsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
+import { computeJaccard } from "../lib/voice-dna.js";
 
 const router: IRouter = Router();
 
@@ -295,6 +296,8 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
 
     let imported = 0;
     let skipped = 0;
+    let statsFailures = 0;
+    let reconciledCount = 0;
 
     for (const post of originalPosts) {
       const externalId = post.id;
@@ -308,6 +311,7 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
       let reactions = 0;
       let comments = 0;
       let reposts = 0;
+      let statsOk = true;
 
       try {
         const encodedId = encodeURIComponent(externalId);
@@ -328,17 +332,26 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
         if (reactRes.ok) {
           const rData = await reactRes.json() as { paging?: { total?: number } };
           reactions = rData.paging?.total ?? 0;
+        } else {
+          statsOk = false;
         }
         if (commentRes.ok) {
           const cData = await commentRes.json() as { paging?: { total?: number } };
           comments = cData.paging?.total ?? 0;
+        } else {
+          statsOk = false;
         }
         if (repostRes.ok) {
           const rpData = await repostRes.json() as { paging?: { total?: number } };
           reposts = rpData.paging?.total ?? 0;
+        } else {
+          statsOk = false;
         }
-      } catch {
+      } catch (err) {
+        statsOk = false;
+        console.warn(`LinkedIn stats fetch failed for post ${externalId}:`, err);
       }
+      if (!statsOk) statsFailures++;
 
       const existing = await db
         .select({ id: draftsTable.id })
@@ -347,21 +360,62 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
         .limit(1);
 
       let draftId: number;
+      let reconciled = false;
+
+      // No externalId match — check whether this LinkedIn post is actually a
+      // draft authored in the app and pasted to LinkedIn. Fuzzy text match
+      // marks that draft published and attaches the stats to it, so the
+      // learning loop connects what was generated with how it performed.
+      if (existing.length === 0 && postText.trim().length > 80) {
+        const candidates = await db
+          .select({ id: draftsTable.id, postOutput: draftsTable.postOutput })
+          .from(draftsTable)
+          .where(and(
+            eq(draftsTable.userId, userId),
+            isNull(draftsTable.externalId),
+          ))
+          .orderBy(desc(draftsTable.updatedAt))
+          .limit(100);
+
+        let bestId: number | null = null;
+        let bestSim = 0;
+        for (const c of candidates) {
+          if (!c.postOutput || c.postOutput.trim().length < 80) continue;
+          const sim = computeJaccard(postText, c.postOutput);
+          if (sim > bestSim) { bestSim = sim; bestId = c.id; }
+        }
+
+        if (bestId !== null && bestSim >= 0.65) {
+          await db
+            .update(draftsTable)
+            .set({ status: "published", externalId, postType, mediaFormat: mediaCategory })
+            .where(eq(draftsTable.id, bestId));
+          existing.push({ id: bestId });
+          reconciled = true;
+        }
+      }
 
       if (existing.length > 0) {
         draftId = existing[0].id;
-        const updated = await db
-          .update(performanceSignalsTable)
-          .set({ reactions, comments, reposts, loggedAt: new Date() })
-          .where(eq(performanceSignalsTable.draftId, draftId))
-          .returning({ id: performanceSignalsTable.id });
+        // If the stats fetch failed, keep previously-synced numbers rather
+        // than overwriting them with zeros.
+        const updated = statsOk
+          ? await db
+              .update(performanceSignalsTable)
+              .set({ reactions, comments, reposts, loggedAt: new Date() })
+              .where(eq(performanceSignalsTable.draftId, draftId))
+              .returning({ id: performanceSignalsTable.id })
+          : await db
+              .select({ id: performanceSignalsTable.id })
+              .from(performanceSignalsTable)
+              .where(eq(performanceSignalsTable.draftId, draftId));
         if (updated.length === 0) {
           await db
             .insert(performanceSignalsTable)
             .values({ draftId, reactions, comments, reposts, impressions: 0 })
             .onConflictDoNothing();
         }
-        skipped++;
+        if (reconciled) reconciledCount++; else skipped++;
       } else {
         const topic = postText.split("\n")[0]?.slice(0, 80) ?? "LinkedIn Post";
         const [draft] = await db
@@ -403,7 +457,15 @@ router.post("/linkedin/sync", requireAuth, async (req, res): Promise<void> => {
       .set({ lastSyncedAt: new Date() })
       .where(eq(linkedinConnectionsTable.userId, userId));
 
-    res.json({ imported, skipped, total: originalPosts.length });
+    res.json({
+      imported,
+      skipped,
+      reconciled: reconciledCount,
+      total: originalPosts.length,
+      ...(statsFailures > 0
+        ? { warning: `Engagement stats could not be fetched for ${statsFailures} post(s); existing numbers were kept.` }
+        : {}),
+    });
   } catch (err) {
     console.error("LinkedIn sync error:", err);
     res.status(500).json({ error: "Sync failed" });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Lightbulb, Plus, Trash2, ArrowRight, CheckCircle2, ChevronLeft, Lock } from "lucide-react";
+import { Lightbulb, Plus, Trash2, ArrowRight, CheckCircle2, ChevronLeft, Lock, Pencil, X, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
@@ -62,6 +62,11 @@ export default function Vault() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleEdit = async (id: number, content: string) => {
+    const updated = await thoughtsApi.update(id, content);
+    setThoughts((prev) => prev.map((t) => (t.id === id ? { ...t, content: updated.content } : t)));
   };
 
   const undeveloped = thoughts.filter((t) => !t.developed);
@@ -154,6 +159,7 @@ export default function Vault() {
                     onDevelop={() => handleDevelop(thought)}
                     onMarkDeveloped={() => void handleMarkDeveloped(thought.id)}
                     onDelete={() => void handleDelete(thought.id)}
+                    onEdit={(content) => handleEdit(thought.id, content)}
                     developingId={developingId}
                     deletingId={deletingId}
                     isDemo={isDemo}
@@ -193,18 +199,37 @@ export default function Vault() {
 }
 
 function ThoughtCard({
-  thought, onDevelop, onMarkDeveloped, onDelete, developingId, deletingId, isDemo,
+  thought, onDevelop, onMarkDeveloped, onDelete, onEdit, developingId, deletingId, isDemo,
 }: {
   thought: Thought;
   onDevelop: () => void;
   onMarkDeveloped: () => void;
   onDelete: () => void;
+  onEdit: (content: string) => Promise<void>;
   developingId: number | null;
   deletingId: number | null;
   isDemo: boolean;
 }) {
   const daysOld = Math.floor((Date.now() - new Date(thought.createdAt).getTime()) / (1000 * 60 * 60 * 24));
   const isRipe = daysOld >= 2;
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(thought.content);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const saveEdit = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === thought.content) { setEditing(false); setDraft(thought.content); return; }
+    setSavingEdit(true);
+    try {
+      await onEdit(trimmed);
+      setEditing(false);
+    } catch {
+      // keep editing open on failure so the user doesn't lose their text
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   return (
     <div className={cn("bg-white rounded-2xl border p-4 transition-all", isRipe ? "border-amber-200 shadow-sm" : "border-gray-100")}>
@@ -215,37 +240,82 @@ function ThoughtCard({
           </span>
         </div>
       )}
-      <p className="text-sm text-gray-800 leading-relaxed mb-3">{thought.content}</p>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onDevelop}
-          className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold transition-colors"
-        >
-          Develop <ArrowRight className="w-3 h-3" />
-        </button>
-        {!isDemo && (
+
+      {editing ? (
+        <div className="mb-3">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void saveEdit(); }
+              if (e.key === "Escape") { setEditing(false); setDraft(thought.content); }
+            }}
+            rows={4}
+            maxLength={2000}
+            autoFocus
+            className="w-full text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-primary/40 resize-none leading-relaxed"
+          />
+          <div className="flex items-center justify-end gap-2 mt-2">
+            <button
+              onClick={() => { setEditing(false); setDraft(thought.content); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <X className="w-3 h-3" /> Cancel
+            </button>
+            <button
+              onClick={() => void saveEdit()}
+              disabled={savingEdit || !draft.trim()}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <Check className="w-3 h-3" /> {savingEdit ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-800 leading-relaxed mb-3 whitespace-pre-wrap">{thought.content}</p>
+      )}
+
+      {!editing && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={onMarkDeveloped}
-            disabled={developingId === thought.id}
-            className="flex items-center gap-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl text-xs font-bold transition-colors"
+            onClick={onDevelop}
+            className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold transition-colors"
           >
-            <CheckCircle2 className="w-3 h-3" /> Done
+            Develop <ArrowRight className="w-3 h-3" />
           </button>
-        )}
-        <div className="flex-1" />
-        {!isDemo && (
-          <button
-            onClick={onDelete}
-            disabled={deletingId === thought.id}
-            className="p-2 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
-        <span className="text-[10px] text-gray-300 font-medium">
-          {new Date(thought.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-        </span>
-      </div>
+          {!isDemo && (
+            <button
+              onClick={onMarkDeveloped}
+              disabled={developingId === thought.id}
+              className="flex items-center gap-1 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl text-xs font-bold transition-colors"
+            >
+              <CheckCircle2 className="w-3 h-3" /> Done
+            </button>
+          )}
+          <div className="flex-1" />
+          {!isDemo && (
+            <button
+              onClick={() => { setDraft(thought.content); setEditing(true); }}
+              className="p-2 rounded-xl hover:bg-gray-100 text-gray-300 hover:text-gray-600 transition-colors"
+              title="Edit"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!isDemo && (
+            <button
+              onClick={onDelete}
+              disabled={deletingId === thought.id}
+              className="p-2 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-400 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className="text-[10px] text-gray-300 font-medium">
+            {new Date(thought.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

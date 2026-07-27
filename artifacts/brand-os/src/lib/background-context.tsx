@@ -61,16 +61,28 @@ export const PALETTEABLE_THEMES = new Set(["ripple", "plasma", "prismatic"]);
 
 // Theme keys that have been removed — clamp them to "none" on load.
 const REMOVED_THEMES = new Set([
-  "aurora", "grid-pulse", "ink-wash",
+  "grid-pulse", "ink-wash",
   "breathe", "zen-mist", "still-aurora",
   "solid-cloud", "solid-paper", "solid-sage", "solid-slate",
   "solid-navy", "solid-charcoal", "solid-dusk", "solid-forest",
   "stars",
+  // Trimmed in the Zen-only redesign — fall back to none if still saved.
+  "particles", "fireflies", "topographic", "constellation",
+  "plasma", "prismatic", "matrix", "neural", "neon-grid",
 ]);
+
+// Respect the OS "reduce motion" accessibility setting: suppress animated
+// backgrounds entirely for users who've asked for less motion.
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
 
 function clampTheme(t: string | null | undefined): string {
   if (!t) return "none";
   if (REMOVED_THEMES.has(t)) return "none";
+  // "custom" (My Photo) is a static image — fine under reduced motion.
+  if (prefersReducedMotion() && t !== "custom") return "none";
   return t;
 }
 

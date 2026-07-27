@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { z } from "zod";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
@@ -15,12 +15,15 @@ import {
   GENERATE_SYSTEM_PROMPT,
   AUDIENCE_OVERLAYS,
   FEELING_INSTRUCTIONS,
+  FORMAT_INSTRUCTIONS,
+  OBJECTIVE_OVERLAYS,
   REFINE_SYSTEM_PROMPT,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
 import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
+import { buildFeedbackContext, buildLearnedPatterns, buildTopHashtags } from "../lib/learning.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 
 const InfographicDataSchema = z.object({
@@ -36,7 +39,7 @@ const CarouselSlideSchema = z.array(z.object({
 
 const router: IRouter = Router();
 
-async function getUserBrandContext(userId: number): Promise<string> {
+async function getUserBrandContext(userId: number): Promise<{ context: string; objective: string | null }> {
   const [[prefs], dna] = await Promise.all([
     db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
     buildVoiceDNA(userId),
@@ -62,9 +65,33 @@ async function getUserBrandContext(userId: number): Promise<string> {
     }
   }
 
+  // Quantified career proof points — the generator should reach for these
+  // when a post needs a concrete anchor, instead of inventing vague claims.
+  const proofPoints = (prefs?.proofPoints ?? []) as string[];
+  if (proofPoints.length > 0) {
+    parts.push([
+      "Proof points from this creator's real career (use ONE when the post needs a concrete anchor — never invent numbers, never cram several in):",
+      ...proofPoints.map((p) => `- ${p}`),
+    ].join("\n"));
+  }
+
+  // Aspirational style targets — STYLE ONLY. The guardrail wording matters:
+  // these may be other people's posts; topics and claims must never leak.
+  const aspirational = (prefs?.aspirationalSamples ?? []) as string[];
+  if (aspirational.length > 0) {
+    const lines = [
+      "Aspirational style targets (the author wants to LEAN toward this writing energy — match the rhythm, sentence length patterns, and structural moves. These are NOT the author's posts: NEVER reuse their topics, stories, claims, or specific phrases):",
+    ];
+    aspirational.slice(0, 3).forEach((s, i) => {
+      const preview = s.trim().slice(0, 600) + (s.trim().length > 600 ? "…" : "");
+      lines.push(`Style target ${i + 1}:\n"${preview}"`);
+    });
+    parts.push(lines.join("\n"));
+  }
+
   if (dna) parts.push(dna);
 
-  return parts.join("\n\n");
+  return { context: parts.join("\n\n"), objective: prefs?.objective ?? null };
 }
 
 const NEW_FLOW_AUDIENCES = new Set(["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"]);
@@ -112,7 +139,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction } = parsed.data;
+  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction, format, continuityContext } = parsed.data;
   const userId = req.user!.userId;
 
   // Demo account: return pre-written content, no AI call
@@ -123,16 +150,24 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const [voiceContext, performanceContext] = await Promise.all([
+  const [brand, performanceContext, feedbackContext, learnedPatterns, topHashtags] = await Promise.all([
     getUserBrandContext(userId),
     buildPerformanceContext(userId),
+    buildFeedbackContext(userId),
+    buildLearnedPatterns(userId),
+    buildTopHashtags(userId),
   ]);
+  const voiceContext = brand.context;
   const fallbackBrand = buildBrandContext(objective ?? "", persona ?? "", tone ?? "");
+  const effectiveObjective = objective || brand.objective || "";
+  const objectiveOverlay = OBJECTIVE_OVERLAYS[effectiveObjective] ?? "";
 
   const audienceLabel = audience && NEW_FLOW_AUDIENCES.has(audience) ? audience : (audience ?? "My audience");
   const feelingLabel = feeling ?? "Direct";
   const audienceOverlay = AUDIENCE_OVERLAYS[audienceLabel] ?? AUDIENCE_OVERLAYS["My audience"];
   const feelingOverlay = FEELING_INSTRUCTIONS[feelingLabel] ?? FEELING_INSTRUCTIONS["Direct"];
+  const formatLabel = format ?? "standard";
+  const formatOverlay = FORMAT_INSTRUCTIONS[formatLabel] ?? FORMAT_INSTRUCTIONS["standard"];
 
   let newsContext = "";
   let newsAnchor: { headline: string; url?: string | null; sourceLine?: string | null } | null = null;
@@ -158,8 +193,15 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "",
     "## FEELING OVERLAY (mandatory):",
     feelingOverlay,
+    "## FORMAT OVERLAY (mandatory):",
+    formatOverlay,
+    objectiveOverlay ? `\n## GOAL OVERLAY (mandatory — shape strategy and CTA around this):\n${objectiveOverlay}` : "",
     performanceContext ? `\n${performanceContext}` : "",
+    feedbackContext ? `\n${feedbackContext}` : "",
+    learnedPatterns ? `\n${learnedPatterns}` : "",
+    topHashtags ? `\n${topHashtags}` : "",
     newsContext ? `\n## TODAY'S NEWS CONTEXT (weave the headline naturally — never paste a URL):\n${newsContext}` : "",
+    continuityContext ? `\n## SERIES CONTINUITY (this post is one part of a planned series — build on these prior parts, don't repeat their exact beats, keep voice/thread consistent):\n${continuityContext}` : "",
     extraInstruction ? `\n## EXTRA INSTRUCTION (apply on top of everything else, this is the user's refine ask):\n${extraInstruction}` : "",
     "",
     "Return ONLY valid JSON, no markdown fences, with the exact shape from the system prompt.",
@@ -480,9 +522,27 @@ async function buildPerformanceContext(userId: number): Promise<string> {
   ].join("\n");
 }
 
+// Guards against double-tap duplicate generation: one in-flight voice-insights
+// run per user. The window is only as long as the Claude call (seconds), so a
+// process-local lock is sufficient.
+const voiceInsightsInFlight = new Set<number>();
+
 router.post("/ai/voice-insights", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
 
+  if (voiceInsightsInFlight.has(userId)) {
+    res.status(409).json({ error: "Voice insights are already being generated. Try again in a moment." });
+    return;
+  }
+  voiceInsightsInFlight.add(userId);
+  try {
+    await handleVoiceInsights(userId, res);
+  } finally {
+    voiceInsightsInFlight.delete(userId);
+  }
+});
+
+async function handleVoiceInsights(userId: number, res: Response): Promise<void> {
   const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
 
   // Check if pending suggestions already exist — skip generation if so
@@ -636,7 +696,7 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
     .returning();
 
   res.json({ status: "ok", suggestions: inserted });
-});
+}
 
 router.post("/ai/post-diagnosis/:draftId", requireAuth, async (req, res): Promise<void> => {
   const draftId = Number(req.params.draftId);

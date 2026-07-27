@@ -7,12 +7,12 @@ import {
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, Cell,
+  LineChart, Line, CartesianGrid, Cell, AreaChart, Area,
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { analyticsApi, type AnalyticsOverview, type KpiTrend } from "@/lib/api";
+import { analyticsApi, seriesApi, topicsApi, type AnalyticsOverview, type KpiTrend, type Series, type Topic } from "@/lib/api";
 
 const SOURCE_LABELS: Record<string, string> = {
   capture: "Direct capture",
@@ -138,30 +138,42 @@ export default function Analytics() {
     staleTime: 60_000,
   });
 
+  const { data: seriesList } = useQuery<Series[]>({
+    queryKey: ["series-list"],
+    queryFn: () => seriesApi.list(),
+    staleTime: 60_000,
+  });
+  const { data: topicsList } = useQuery<Topic[]>({
+    queryKey: ["topics-list"],
+    queryFn: () => topicsApi.list(),
+    staleTime: 60_000,
+  });
+
   return (
     <AppShell>
-      <header className="px-6 pt-12 pb-4 bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <BarChart2 className="w-5 h-5 text-primary" />
-            <h1 className="text-xl font-extrabold text-gray-900">Analytics</h1>
+      <header className="px-6 pt-10 pb-4 bg-white/80 backdrop-blur border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <BarChart2 className="w-4.5 h-4.5 text-gray-900" />
+            <h1 className="text-lg font-extrabold text-gray-900 tracking-tight">Analytics</h1>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 bg-gray-50 rounded-full p-0.5">
             {([30, 60, 90] as const).map(w => (
               <button
                 key={w}
                 onClick={() => setTrendWindow(w)}
-                className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors", trendWindow === w ? "bg-violet-100 text-violet-700" : "text-gray-400 hover:text-gray-600")}
+                className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full transition-all", trendWindow === w ? "bg-gray-900 text-white shadow-sm" : "text-gray-400 hover:text-gray-600")}
               >
                 {w}d
               </button>
             ))}
           </div>
         </div>
-        <p className="text-xs text-gray-400 mt-1 ml-8">Performance insights across your published posts</p>
       </header>
-      <main className="flex-1 px-4 py-5 space-y-6 overflow-y-auto pb-28">
-        {isLoading ? <LoadingState /> : !data || data.totalPublished === 0 ? <EmptyState /> : <Content data={data} trendWindow={trendWindow} />}
+      <main className="flex-1 px-4 py-5 overflow-y-auto pb-28">
+        <div className="max-w-3xl mx-auto space-y-5">
+          {isLoading ? <LoadingState /> : !data || data.totalPublished === 0 ? <EmptyState /> : <Content data={data} trendWindow={trendWindow} seriesList={seriesList} topicsList={topicsList} />}
+        </div>
       </main>
     </AppShell>
   );
@@ -193,7 +205,7 @@ function EmptyState() {
   );
 }
 
-function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 30 | 60 | 90 }) {
+function Content({ data, trendWindow, seriesList, topicsList }: { data: AnalyticsOverview; trendWindow: 30 | 60 | 90; seriesList?: Series[]; topicsList?: Topic[] }) {
   const [, navigate] = useLocation();
 
   const hasResonanceData = data.loggedPerformanceCount > 0;
@@ -228,8 +240,107 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
 
   const hasMediaFormatData = data.byMediaFormat.some(f => f.format !== "NONE");
 
+  const nextMilestone = [5, 10, 25, 50, 100, 250].find((m) => m > data.totalPublished) ?? null;
+  const champion = data.topPosts[0] ?? null;
+  const heroTrend = useResonanceTrend ? filteredResTrend : filteredCountTrend;
+  const heroKey = useResonanceTrend ? "avgResonance" : "count";
+
   return (
     <>
+      {/* ── Hero band ── */}
+      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-900 to-violet-950 px-6 pt-6 pb-4">
+        <div className="absolute -top-20 -right-10 w-56 h-56 rounded-full bg-violet-500/10 blur-3xl pointer-events-none" />
+        <div className="relative flex items-end justify-between gap-4 mb-1">
+          <div>
+            <p className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase mb-1.5">
+              {hasResonanceData ? "Average impact" : "Posts published"} · last {trendWindow} days
+            </p>
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-5xl font-black text-white tabular-nums tracking-tight">
+                {hasResonanceData ? (data.kpiTrends.avgResonance.current ?? data.avgResonance) : (data.kpiTrends.totalPublished.current ?? data.totalPublished)}
+              </span>
+              {hasResonanceData && <span className="text-xs text-white/40 font-bold">/ 100</span>}
+              {(hasResonanceData ? data.kpiTrends.avgResonance : data.kpiTrends.totalPublished).trend === "up" && (
+                <span className="text-[11px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">▲ climbing</span>
+              )}
+              {(hasResonanceData ? data.kpiTrends.avgResonance : data.kpiTrends.totalPublished).trend === "down" && (
+                <span className="text-[11px] font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">▼ dipped</span>
+              )}
+            </div>
+          </div>
+        </div>
+        {heroTrend.length >= 2 && (
+          <div className="relative h-16 -mx-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={heroTrend} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="heroGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey={heroKey} stroke="#a78bfa" strokeWidth={2} fill="url(#heroGrad)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        <div className="relative flex gap-4 pt-3 border-t border-white/10">
+          <div className="flex-1">
+            <p className="text-lg font-extrabold text-white tabular-nums">{data.kpiTrends.totalPublished.current ?? data.totalPublished}</p>
+            <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Published</p>
+          </div>
+          {data.avgEngagementRate !== null && (
+            <div className="flex-1">
+              <p className="text-lg font-extrabold text-white tabular-nums">{data.avgEngagementRate}%</p>
+              <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Engagement</p>
+            </div>
+          )}
+          {data.postingConsistency.avgDaysBetweenPosts !== null && (
+            <div className="flex-1">
+              <p className="text-lg font-extrabold text-white tabular-nums">~{data.postingConsistency.avgDaysBetweenPosts}d</p>
+              <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Cadence</p>
+            </div>
+          )}
+          {bestTone && (
+            <div className="flex-1">
+              <p className="text-lg font-extrabold text-white">{TONE_EMOJI[bestTone.tone] ?? ""} {bestTone.tone}</p>
+              <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Best tone</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Milestone progress ── */}
+      {nextMilestone && (
+        <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Next milestone</p>
+            <p className="text-[11px] font-black text-violet-600 tabular-nums">{data.totalPublished} / {nextMilestone} posts</p>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.min(100, Math.round((data.totalPublished / nextMilestone) * 100))}%` }} />
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1.5">{nextMilestone - data.totalPublished} more post{nextMilestone - data.totalPublished !== 1 ? "s" : ""} to hit {nextMilestone} 🏅</p>
+        </div>
+      )}
+
+      {/* ── Personal best ── */}
+      {champion && champion.resonance >= 40 && (
+        <button
+          onClick={() => navigate(`/library?highlight=${champion.id}`)}
+          className="w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 p-[1.5px] text-left group"
+        >
+          <div className="rounded-[14.5px] bg-white px-4 py-3 flex items-center gap-3 group-hover:bg-amber-50/50 transition-colors">
+            <span className="text-xl flex-shrink-0">🏆</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Personal best</p>
+              <p className="text-xs font-bold text-gray-800 truncate">{champion.topic}</p>
+            </div>
+            <span className="text-xl font-black text-amber-500 tabular-nums flex-shrink-0">{champion.resonance}</span>
+          </div>
+        </button>
+      )}
+
       {/* Performance CTA */}
       {data.loggedPerformanceCount < 5 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
@@ -243,64 +354,11 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
         </div>
       )}
 
-      {/* Overview stats with trend arrows */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          icon={<FileText className="w-4 h-4" />}
-          label="Published"
-          value={data.kpiTrends.totalPublished.current ?? data.totalPublished}
-          sub={`last ${trendWindow} days`}
-          trend={data.kpiTrends.totalPublished}
-        />
-        <StatCard
-          icon={<TrendingUp className="w-4 h-4" />}
-          label="Avg Resonance"
-          value={hasResonanceData ? `${data.kpiTrends.avgResonance.current ?? data.avgResonance}` : "—"}
-          sub={hasResonanceData ? "out of 100" : "log performance to track"}
-          trend={hasResonanceData ? data.kpiTrends.avgResonance : undefined}
-        />
-        {data.avgEngagementRate !== null && (
-          <StatCard
-            icon={<Activity className="w-4 h-4" />}
-            label="Eng. Rate"
-            value={`${data.avgEngagementRate}%`}
-            sub="reactions+comments/impressions"
-            trend={data.kpiTrends.avgEngagementRate}
-          />
-        )}
-        {data.postingConsistency.avgDaysBetweenPosts !== null && (
-          <StatCard
-            icon={<CalendarDays className="w-4 h-4" />}
-            label="Cadence"
-            value={`~${data.postingConsistency.avgDaysBetweenPosts}d`}
-            sub="avg days between posts"
-            trend={data.postingConsistency.trend ? { current: data.postingConsistency.avgDaysBetweenPosts, prior: data.postingConsistency.prior, trend: data.postingConsistency.trend } : undefined}
-          />
-        )}
-        {bestTone && (
-          <StatCard
-            icon={<Trophy className="w-4 h-4" />}
-            label="Best tone"
-            value={`${TONE_EMOJI[bestTone.tone] ?? ""} ${bestTone.tone}`}
-            sub={`${bestTone.avgResonance} avg resonance`}
-            accent
-          />
-        )}
-        {topSource && (
-          <StatCard
-            icon={<Layers className="w-4 h-4" />}
-            label="Top source"
-            value={`${SOURCE_EMOJI[topSource.source] ?? ""} ${SOURCE_LABELS[topSource.source] ?? topSource.source}`}
-            sub={`${topSource.count} post${topSource.count !== 1 ? "s" : ""}`}
-          />
-        )}
-      </div>
-
       {/* Trend chart */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
           <SectionTitle>
-            {useResonanceTrend ? "Resonance trend" : "Publishing trend"}
+            {useResonanceTrend ? "Impact trend" : "Publishing trend"}
           </SectionTitle>
         </div>
 
@@ -308,17 +366,22 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
           <>
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={filteredResTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: "#9ca3af" }} tickFormatter={(v: string) => `W${v.split("-W")[1] ?? v}`} />
-                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} domain={[0, 100]} />
+                <AreaChart data={filteredResTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="impactGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={BAR_COLOR} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={BAR_COLOR} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => `W${v.split("-W")[1] ?? v}`} />
+                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, 100]} />
                   <Tooltip
-                    contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }}
-                    formatter={(val: number) => [val, "Avg Resonance"]}
+                    contentStyle={{ fontSize: 11, borderRadius: 10, border: "1px solid #e5e7eb", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}
+                    formatter={(val: number) => [val, "Avg Impact"]}
                     labelFormatter={(l: string) => `Week ${l.split("-W")[1] ?? l}`}
                   />
-                  <Line type="monotone" dataKey="avgResonance" stroke={BAR_COLOR} strokeWidth={2} dot={{ r: 3, fill: BAR_COLOR }} />
-                </LineChart>
+                  <Area type="monotone" dataKey="avgResonance" stroke={BAR_COLOR} strokeWidth={2.5} fill="url(#impactGrad)" dot={{ r: 3, fill: BAR_COLOR, strokeWidth: 0 }} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
             <p className="text-[10px] text-gray-400 text-right mt-1">{trendTotal} post{trendTotal !== 1 ? "s" : ""} in last {trendWindow} days</p>
@@ -327,27 +390,32 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
           <div className="h-24 flex flex-col items-center justify-center gap-2">
             <p className="text-xs text-gray-400">Not enough data for this window yet</p>
             {!hasResonanceData && (
-              <p className="text-[10px] text-amber-500">Log performance on ≥5 posts to unlock resonance trend</p>
+              <p className="text-[10px] text-amber-500">Log performance on ≥5 posts to unlock the impact trend</p>
             )}
           </div>
         ) : (
           <>
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={filteredCountTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: "#9ca3af" }} tickFormatter={(v: string) => `W${v.split("-W")[1] ?? v}`} />
-                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} allowDecimals={false} />
+                <AreaChart data={filteredCountTrend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="countGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={BAR_COLOR} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={BAR_COLOR} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => `W${v.split("-W")[1] ?? v}`} />
+                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }}
+                    contentStyle={{ fontSize: 11, borderRadius: 10, border: "1px solid #e5e7eb", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}
                     formatter={(val: number) => [val, "Posts"]}
                     labelFormatter={(l: string) => `Week ${l.split("-W")[1] ?? l}`}
                   />
-                  <Line type="monotone" dataKey="count" stroke={BAR_COLOR} strokeWidth={2} dot={{ r: 3, fill: BAR_COLOR }} />
-                </LineChart>
+                  <Area type="monotone" dataKey="count" stroke={BAR_COLOR} strokeWidth={2.5} fill="url(#countGrad)" dot={{ r: 3, fill: BAR_COLOR, strokeWidth: 0 }} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-[10px] text-gray-400 text-right mt-1">{trendTotal} post{trendTotal !== 1 ? "s" : ""} in last {trendWindow} days · Log 5+ performances to unlock resonance trend</p>
+            <p className="text-[10px] text-gray-400 text-right mt-1">{trendTotal} post{trendTotal !== 1 ? "s" : ""} in last {trendWindow} days · Log 5+ performances to unlock the impact trend</p>
           </>
         )}
       </div>
@@ -362,14 +430,14 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
           {data.bestTimeToPost.topCombination && (
             <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 mb-3">
               <p className="text-[11px] font-bold text-violet-700">
-                🏆 {data.bestTimeToPost.topCombination.day} {data.bestTimeToPost.topCombination.block.toLowerCase()} posts average {data.bestTimeToPost.topCombination.avgResonance} resonance
+                🏆 {data.bestTimeToPost.topCombination.day} {data.bestTimeToPost.topCombination.block.toLowerCase()} posts average {data.bestTimeToPost.topCombination.avgResonance} impact
               </p>
             </div>
           )}
           {!data.bestTimeToPost.topCombination && bestDay && bestDay.avgResonance !== null && (
             <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 mb-3">
               <p className="text-[11px] font-bold text-violet-700">
-                🏆 {bestDay.day} posts average {bestDay.avgResonance} resonance
+                🏆 {bestDay.day} posts average {bestDay.avgResonance} impact
               </p>
             </div>
           )}
@@ -462,7 +530,7 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
             <>
               {bestTone && (
                 <p className="text-[10px] text-violet-600 font-bold mb-2">
-                  🏆 Strongest tone: {TONE_EMOJI[bestTone.tone] ?? ""} {bestTone.tone} ({bestTone.avgResonance} avg resonance)
+                  🏆 Strongest tone: {TONE_EMOJI[bestTone.tone] ?? ""} {bestTone.tone} ({bestTone.avgResonance} avg impact)
                 </p>
               )}
               <div className="h-40">
@@ -472,7 +540,7 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
                     <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} domain={[0, 100]} />
                     <Tooltip
                       contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }}
-                      formatter={(val: number) => [val, "Avg Resonance"]}
+                      formatter={(val: number) => [val, "Avg Impact"]}
                     />
                     <Bar dataKey="avgResonance" radius={[4, 4, 0, 0]}>
                       {tonesWithResonance.map((entry, i) => (
@@ -497,7 +565,7 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <p className="text-[10px] text-amber-500 mt-2 text-center">Log performance on 2+ posts per tone to see resonance breakdown</p>
+              <p className="text-[10px] text-amber-500 mt-2 text-center">Log performance on 2+ posts per tone to see the impact breakdown</p>
             </>
           )}
           <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
@@ -545,6 +613,65 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Series performance rollup — reuses each series' already-computed
+          aggregate (GET /series), no extra AI or query here. */}
+      {seriesList && seriesList.filter((s) => s.performance.impressions > 0).length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <SectionTitle>By series</SectionTitle>
+          <div className="space-y-2.5">
+            {[...seriesList]
+              .filter((s) => s.performance.impressions > 0)
+              .sort((a, b) => b.performance.impressions - a.performance.impressions)
+              .map((s, i) => {
+                const max = Math.max(...seriesList.map((x) => x.performance.impressions), 1);
+                const pct = Math.round((s.performance.impressions / max) * 100);
+                return (
+                  <div key={s.id}>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-xs text-gray-600 flex-1 font-medium truncate">{s.title}</span>
+                      <span className="text-[10px] text-gray-400 tabular-nums">{s.partsPublished}/{s.plannedParts} published</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-violet-600 tabular-nums w-20 text-right flex-shrink-0">{s.performance.impressions.toLocaleString()} impr.</span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Topic breakdown — post count per topic (performance rollup by topic
+          would need a new aggregation endpoint; this is the count-only view). */}
+      {topicsList && topicsList.filter((t) => t.draftCount > 0).length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <SectionTitle>By topic</SectionTitle>
+          <div className="space-y-2.5">
+            {[...topicsList]
+              .filter((t) => t.draftCount > 0)
+              .sort((a, b) => b.draftCount - a.draftCount)
+              .map((t, i) => {
+                const max = Math.max(...topicsList.map((x) => x.draftCount), 1);
+                const pct = Math.round((t.draftCount / max) * 100);
+                return (
+                  <div key={t.id}>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-xs text-gray-600 flex-1 font-medium truncate">{t.name}</span>
+                      <span className="text-[10px] text-gray-400 tabular-nums">{t.draftCount} post{t.draftCount !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
@@ -637,7 +764,7 @@ function Content({ data, trendWindow }: { data: AnalyticsOverview; trendWindow: 
       {/* Top posts */}
       {data.topPosts.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>Top posts by resonance</SectionTitle>
+          <SectionTitle>Your greatest hits</SectionTitle>
           <div className="space-y-3">
             {data.topPosts.map((p, i) => (
               <button

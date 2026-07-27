@@ -33,9 +33,33 @@ export const FEELINGS = ["Direct", "Witty", "Vulnerable", "Story", "Contrarian"]
 export const AUDIENCE_OVERLAYS: Record<string, string> = {
   "Clients": "Audience: prospective clients evaluating whether to trust this person. Demonstrate competence through a specific lived example, not credentials. Make them think 'this person actually understands my problem.'",
   "Peers": "Audience: senior peers in the same craft. Skip the 101 — start one level deeper than they expect. Earn nodding-along respect with a pointed observation only an insider would make.",
-  "Recruiters & Headhunters": "Audience: recruiters and hiring managers scanning for signal. Surface a concrete capability, decision, or result without listing job titles. The post must answer 'what would they actually be like to hire?' Avoid sounding like a CV.",
+  "Recruiters & Headhunters": "Audience: recruiters and hiring managers scanning for signal, not craft debate. They pattern-match 'could this person do the job, and would I want to manage them' — they are not reading for insight, they are screening a candidate. Lead with an OUTCOME, not an opinion: a result you drove, a call you made under pressure, a problem you fixed — not a framework or a hot take. Include at least one concrete scope signal if it fits naturally (budget size, team size, stakeholder count, timeline, industry) — these are exactly what a hiring manager scans for to judge seniority. Show good judgment in a hard moment; that reads as 'safe to hire.' Keep the tone approachable and grounded — confidence without edge; contrarian/abrasive framing that peers enjoy tends to read as a red flag to a hiring manager. Never list job titles or sound like a CV bullet point — the story should imply the capability, not announce it. One credible post rarely gets noticed; the goal is a consistent pattern a hiring manager can click through, so keep this feeling like a natural continuation of the author's other work, not a one-off pitch.",
   "Investors": "Audience: investors and operators looking for sharp thinking about a market. Lead with a non-consensus take or a number that reframes a category. Show pattern-matching ability, not pitch energy.",
   "My audience": "Audience: the creator's own established following. Speak peer-to-peer, assume shared context, lean into the specific phrasing and obsessions that already define this person's feed.",
+};
+
+// Goal overlays — keyed by the user's profile objective. A job hunter, a
+// founder chasing clients, and someone building authority need different
+// content strategies and CTAs even from the same raw idea.
+export const OBJECTIVE_OVERLAYS: Record<string, string> = {
+  "Job": "Goal — Land a new role: every post is indirect evidence of hireability. Showcase judgment calls, tradeoffs navigated, and results owned — the things interviews try to surface. Never say 'open to work' or sound like an application; let competence speak. End with a question that invites senior people to engage (their comments put the author in front of their networks).",
+  "Clients": "Goal — Win clients: the post should make a prospective buyer feel understood before being impressed. Lead with the client's pain in their words, then demonstrate the author's way of thinking about it. Soft CTA at most — credibility converts, pitching repels.",
+  "Authority": "Goal — Build authority: stake out a clear, defensible position the author can own over time. Consistency of theme matters more than reach on any single post. Prefer depth over breadth; one sharpened insight beats three shallow ones.",
+  "Documenting": "Goal — Document the journey: write like a builder's log, not a press release. Real numbers, real setbacks, what changed this week. The compounding asset is trust through transparency.",
+  "Expert": "Goal — Be seen as the expert: teach something concrete the reader can apply today. Show the work — the reasoning, the steps, the edge cases an amateur would miss. Generosity with knowledge is the strategy.",
+  "Hiring": "Goal — Attract talent: sell the mission and the standard, not the perks. Show what working with this person is actually like — a decision, a debrief, a moment of culture in action. Great candidates self-select on substance.",
+};
+
+// Format controls STRUCTURE (dialogue vs letter vs standard post) — orthogonal
+// to FEELING_INSTRUCTIONS, which controls tone. Both apply on top of each other.
+export const FORMATS = ["standard", "dialogue", "letter", "qa", "story_arc"] as const;
+
+export const FORMAT_INSTRUCTIONS: Record<string, string> = {
+  "standard": "Format — Standard post: normal LinkedIn post structure. No special framing device.",
+  "dialogue": "Format — Dialogue: write as an actual back-and-forth exchange between two named voices (e.g. 'Me at 22:' / 'Me now:'), alternating short lines. No narrator framing, no scene description — just the exchange itself, each line earning its place. The turn from one voice to the other should carry the tension, not stage directions.",
+  "letter": "Format — Letter: direct second-person address written as an actual letter. Open with a salutation ('Dear ___,') and close with a sign-off. No bullet lists, no headers — it should read like something handwritten, not a business memo.",
+  "qa": "Format — Q&A: explicit question-then-answer beats. Each question is its own short line (can stand alone, bolded in spirit), followed immediately by a direct answer. No preamble before the first question.",
+  "story_arc": "Format — Story arc: structure the post as five unnumbered chapter-beats — Scene, Struggle, Turn, Lesson, CTA — each a short paragraph. This is the shape regardless of feeling; do not default back to a standard post structure.",
 };
 
 export const FEELING_INSTRUCTIONS: Record<string, string> = {

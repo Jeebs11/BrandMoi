@@ -15,6 +15,8 @@ import Library from "@/pages/Library";
 import Settings from "@/pages/Settings";
 import Vault from "@/pages/Vault";
 import Analytics from "@/pages/Analytics";
+import BrandStudio from "@/pages/BrandStudio";
+import SeriesPage from "@/pages/Series";
 import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -143,6 +145,16 @@ function Router() {
       <Route path="/analytics">
         <AuthGuard>
           <Analytics />
+        </AuthGuard>
+      </Route>
+      <Route path="/studio">
+        <AuthGuard>
+          <BrandStudio />
+        </AuthGuard>
+      </Route>
+      <Route path="/series">
+        <AuthGuard>
+          <SeriesPage />
         </AuthGuard>
       </Route>
       <Route path="/admin">

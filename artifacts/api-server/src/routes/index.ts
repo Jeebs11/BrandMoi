@@ -11,6 +11,8 @@ import aiImageRouter from "./ai-image.js";
 import agentRouter from "./agent.js";
 import linkedinRouter from "./linkedin.js";
 import adminRouter from "./admin.js";
+import topicsRouter from "./topics.js";
+import seriesRouter from "./series.js";
 
 const router: IRouter = Router();
 
@@ -25,6 +27,8 @@ router.use(momentumRouter);
 router.use(smartImportRouter);
 router.use(agentRouter);
 router.use(linkedinRouter);
+router.use(topicsRouter);
+router.use(seriesRouter);
 router.use(adminRouter);
 
 export default router;

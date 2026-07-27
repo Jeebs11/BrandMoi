@@ -8,8 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { voiceApi, accountApi, voiceInsightsApi, type VoiceSummaryResult } from "@/lib/api";
+import { voiceApi, accountApi, voiceInsightsApi, topicsApi, type VoiceSummaryResult, type Topic } from "@/lib/api";
 import { SmartImportButton } from "@/components/SmartImportButton";
+import { VoiceConstellation } from "@/components/VoiceConstellation";
 import type { ExtractedBrandVoice } from "@/lib/api";
 import { BACKGROUNDS } from "@/lib/backgrounds";
 import { useBackgroundTheme, SITE_THEMES, BG_PALETTES, PALETTEABLE_THEMES, type BgSpeed, type BgDensity, type BgPanelOpacity, type SiteTheme, type BgPalette } from "@/lib/background-context";
@@ -69,6 +70,10 @@ export default function Settings() {
   const [aboutMe, setAboutMe] = useState((preferences as typeof preferences & { aboutMe?: string })?.aboutMe ?? "");
   const [writingSamples, setWritingSamples] = useState<string[]>((preferences as typeof preferences & { writingSamples?: string[] })?.writingSamples ?? []);
   const [newSampleText, setNewSampleText] = useState("");
+  const [proofPoints, setProofPoints] = useState<string[]>((preferences as typeof preferences & { proofPoints?: string[] })?.proofPoints ?? []);
+  const [newProofPoint, setNewProofPoint] = useState("");
+  const [contentPillars, setContentPillars] = useState<string[]>((preferences as typeof preferences & { contentPillars?: string[] })?.contentPillars ?? []);
+  const [newPillar, setNewPillar] = useState("");
 
   const prefs = preferences as (typeof preferences & {
     brandBgColor?: string;
@@ -102,6 +107,30 @@ export default function Settings() {
   const [showNewPw, setShowNewPw] = useState(false);
   const [isSavingAccount, setIsSavingAccount] = useState(false); // kept for loading state during combined save
 
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [newTopicName, setNewTopicName] = useState("");
+
+  useEffect(() => {
+    topicsApi.list().then(setTopics).catch(() => {});
+  }, []);
+
+  const handleAddTopic = async () => {
+    const name = newTopicName.trim();
+    if (name.length < 2) return;
+    try {
+      const topic = await topicsApi.create(name);
+      setTopics((prev) => [...prev, topic]);
+      setNewTopicName("");
+    } catch { /* ignore — non-critical UI action */ }
+  };
+
+  const handleDeleteTopic = async (id: number) => {
+    setTopics((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await topicsApi.delete(id);
+    } catch { /* already optimistically removed */ }
+  };
+
   useEffect(() => {
     if (preferences) {
       setObjective(preferences.objective);
@@ -113,6 +142,10 @@ export default function Settings() {
       if (preferences.aboutMe) setAboutMe(preferences.aboutMe);
       const samples = (preferences as typeof preferences & { writingSamples?: string[] }).writingSamples;
       if (samples) setWritingSamples(samples);
+      const pp = (preferences as typeof preferences & { proofPoints?: string[] }).proofPoints;
+      if (pp) setProofPoints(pp);
+      const pillars = (preferences as typeof preferences & { contentPillars?: string[] }).contentPillars;
+      if (pillars) setContentPillars(pillars);
       if (preferences.brandBgColor) setBrandBgColor(preferences.brandBgColor);
       if (preferences.brandAccentColor) setBrandAccentColor(preferences.brandAccentColor);
       if (preferences.brandTextColor) setBrandTextColor(preferences.brandTextColor);
@@ -137,6 +170,11 @@ export default function Settings() {
     if (extracted.objective) setObjective(extracted.objective);
     if (extracted.persona) setPersona(extracted.persona);
     if (extracted.tone) setTone(extracted.tone);
+    // The extracted summary is positioning copy — exactly what aboutMe is for,
+    // and the server prefers aboutMe over objective/persona labels in AI context.
+    if (extracted.summary) setAboutMe(extracted.summary.slice(0, 500));
+    if (extracted.proofPoints?.length) setProofPoints(extracted.proofPoints.slice(0, 8));
+    if (extracted.contentPillars?.length) setContentPillars(extracted.contentPillars.slice(0, 6));
     toast({ title: "Brand voice imported — review and save when ready." });
   };
 
@@ -291,7 +329,7 @@ export default function Settings() {
 
     setIsSavingAccount(true);
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples: writingSamples.length > 0 ? writingSamples : undefined } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples: writingSamples.length > 0 ? writingSamples : undefined, ...{ proofPoints, contentPillars } } },
       {
         onSuccess: async () => {
           try {
@@ -421,58 +459,223 @@ export default function Settings() {
             </div>
           </section>
 
-          {/* Brand Palette */}
+          {/* Voice Evolution Timeline */}
           <section>
-            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Palette</h2>
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
-              <p className="text-xs text-gray-400 leading-relaxed">These colours are used for carousel slides and visual cards.</p>
-              <div className="flex gap-4">
-                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Background</span>
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
-                      <div className="absolute inset-0" style={{ background: brandBgColor }} />
-                      <input
-                        type="color"
-                        value={brandBgColor}
-                        onChange={e => setBrandBgColor(e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      />
-                    </div>
-                    <code className="text-xs text-gray-400 font-mono">{brandBgColor}</code>
-                  </div>
-                </label>
-                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Accent</span>
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
-                      <div className="absolute inset-0" style={{ background: brandAccentColor }} />
-                      <input
-                        type="color"
-                        value={brandAccentColor}
-                        onChange={e => setBrandAccentColor(e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      />
-                    </div>
-                    <code className="text-xs text-gray-400 font-mono">{brandAccentColor}</code>
-                  </div>
-                </label>
-                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Text</span>
-                  <div className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
-                      <div className="absolute inset-0" style={{ background: brandTextColor }} />
-                      <input
-                        type="color"
-                        value={brandTextColor}
-                        onChange={e => setBrandTextColor(e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      />
-                    </div>
-                    <code className="text-xs text-gray-400 font-mono">{brandTextColor}</code>
-                  </div>
-                </label>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-violet-500" />
+                <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Voice DNA Analysis</h2>
               </div>
+              <div className="flex items-center gap-3">
+                {voiceData && voiceData.draftCount > 0 && (
+                  <button
+                    onClick={() => void handleRefreshVoice()}
+                    disabled={voiceRefreshing}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
+                  >
+                    <RefreshCw className={cn("w-3.5 h-3.5", voiceRefreshing && "animate-spin")} />
+                    {voiceRefreshing ? "Analysing…" : "Analyse (2/day)"}
+                  </button>
+                )}
+                <button
+                  onClick={() => void handleRefreshInsights()}
+                  disabled={insightRefreshing}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
+                >
+                  {insightRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Get Insights
+                </button>
+              </div>
+            </div>
+
+            {voiceLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 rounded-full w-3/4" />
+                <Skeleton className="h-4 rounded-full w-full" />
+                <Skeleton className="h-4 rounded-full w-5/6" />
+              </div>
+            ) : !voiceData || voiceData.draftCount === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-5 text-center">
+                <Brain className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-500 font-medium">No voice data yet</p>
+                <p className="text-xs text-gray-400 mt-1">Publish your first drafts to unlock your voice analysis.</p>
+              </div>
+            ) : voiceData.summary ? (
+              <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black text-violet-400 uppercase tracking-wider">Based on {voiceData.draftCount} published post{voiceData.draftCount !== 1 ? "s" : ""}</p>
+                </div>
+                <div className="space-y-2">
+                  {voiceData.summary.split("\n").filter(Boolean).map((line, i) => (
+                    <p key={i} className="text-sm text-violet-900 leading-relaxed">{line}</p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
+                <p className="text-sm text-gray-500">Voice analysis will appear once you have published posts with enough writing signals.</p>
+              </div>
+            )}
+
+            {/* Living constellation of learned voice traits — tap a star */}
+            {!voiceLoading && voiceData && voiceData.draftCount > 0 && (
+              <div className="mt-4">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Your voice constellation · tap a star</p>
+                <VoiceConstellation />
+              </div>
+            )}
+          </section>
+
+          {/* Writing Samples */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-violet-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Writing Samples</h2>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">Pin up to 5 writing samples that best represent your voice. These become the highest-authority anchors for every post the AI generates for you.</p>
+            <div className="space-y-3 mb-3">
+              {writingSamples.map((sample, idx) => (
+                <div key={idx} className="relative bg-white rounded-2xl border border-gray-100 p-4 group">
+                  <button
+                    type="button"
+                    onClick={() => setWritingSamples(writingSamples.filter((_, i) => i !== idx))}
+                    className="absolute top-2 right-2 p-1 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  <p className="text-xs text-gray-600 leading-relaxed pr-6 line-clamp-3">{sample}</p>
+                  <p className="text-[10px] text-gray-300 mt-2">{sample.length} characters</p>
+                </div>
+              ))}
+            </div>
+            {writingSamples.length < 5 && (
+              <div className="space-y-2">
+                <textarea
+                  value={newSampleText}
+                  onChange={(e) => setNewSampleText(e.target.value)}
+                  placeholder="Paste a LinkedIn post you're proud of…"
+                  maxLength={3000}
+                  rows={4}
+                  className="w-full text-sm rounded-2xl border border-gray-200 px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white placeholder-gray-300"
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-gray-300">{newSampleText.length}/3000</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={newSampleText.trim().length < 50}
+                    onClick={() => {
+                      if (newSampleText.trim().length < 50) return;
+                      setWritingSamples([...writingSamples, newSampleText.trim()]);
+                      setNewSampleText("");
+                    }}
+                    className="text-xs rounded-xl"
+                  >
+                    Add sample
+                  </Button>
+                </div>
+              </div>
+            )}
+            {writingSamples.length >= 5 && (
+              <p className="text-xs text-gray-400 text-center py-2">5 samples saved. Remove one to add another.</p>
+            )}
+          </section>
+
+          {/* Proof Points */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-emerald-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Proof Points</h2>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">Quantified career achievements — real numbers, programmes, and outcomes. The AI reaches for one of these when a post needs a concrete anchor, so it never invents vague claims. Up to 8.</p>
+            <div className="space-y-2 mb-3">
+              {proofPoints.map((point, idx) => (
+                <div key={idx} className="relative bg-white rounded-2xl border border-gray-100 p-3 pr-9 group">
+                  <button
+                    type="button"
+                    onClick={() => setProofPoints(proofPoints.filter((_, i) => i !== idx))}
+                    className="absolute top-2 right-2 p-1 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  <p className="text-xs text-gray-600 leading-relaxed">{point}</p>
+                </div>
+              ))}
+            </div>
+            {proofPoints.length < 8 ? (
+              <div className="space-y-2">
+                <textarea
+                  value={newProofPoint}
+                  onChange={(e) => setNewProofPoint(e.target.value)}
+                  placeholder="e.g. Built a group-wide PMO from scratch overseeing a $5m portfolio…"
+                  maxLength={200}
+                  rows={2}
+                  className="w-full text-sm rounded-2xl border border-gray-200 px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white placeholder-gray-300"
+                />
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-gray-300">{newProofPoint.length}/200</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={newProofPoint.trim().length < 15}
+                    onClick={() => {
+                      if (newProofPoint.trim().length < 15) return;
+                      setProofPoints([...proofPoints, newProofPoint.trim()]);
+                      setNewProofPoint("");
+                    }}
+                    className="text-xs rounded-xl"
+                  >
+                    Add proof point
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-2">8 proof points saved. Remove one to add another.</p>
+            )}
+          </section>
+
+          {/* Topics */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-sky-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Topics</h2>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">The themes your brand consistently owns. Tag drafts and series with a topic to filter and track them across Library, Analytics, and idea suggestions.</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {topics.map((topic) => (
+                <span key={topic.id} className="inline-flex items-center gap-1.5 bg-sky-50 border border-sky-100 text-sky-700 text-xs font-medium rounded-full pl-3 pr-1.5 py-1.5">
+                  {topic.name}
+                  {topic.draftCount > 0 && <span className="text-sky-400">· {topic.draftCount}</span>}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTopic(topic.id)}
+                    className="p-0.5 rounded-full text-sky-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newTopicName}
+                onChange={(e) => setNewTopicName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddTopic();
+                }}
+                placeholder="e.g. PMO design & delivery governance"
+                maxLength={60}
+                className="flex-1 text-sm rounded-2xl border border-gray-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white placeholder-gray-300"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={newTopicName.trim().length < 2}
+                onClick={handleAddTopic}
+                className="text-xs rounded-xl self-center"
+              >
+                Add
+              </Button>
             </div>
           </section>
 
@@ -723,118 +926,59 @@ export default function Settings() {
             })}
           </section>
 
-          {/* Voice Evolution Timeline */}
+          {/* Brand Palette */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Brain className="w-4 h-4 text-violet-500" />
-                <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Voice DNA Analysis</h2>
-              </div>
-              <div className="flex items-center gap-3">
-                {voiceData && voiceData.draftCount > 0 && (
-                  <button
-                    onClick={() => void handleRefreshVoice()}
-                    disabled={voiceRefreshing}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/70 transition-colors"
-                  >
-                    <RefreshCw className={cn("w-3.5 h-3.5", voiceRefreshing && "animate-spin")} />
-                    {voiceRefreshing ? "Analysing…" : "Analyse (2/day)"}
-                  </button>
-                )}
-                <button
-                  onClick={() => void handleRefreshInsights()}
-                  disabled={insightRefreshing}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors"
-                >
-                  {insightRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  Get Insights
-                </button>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Palette</h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
+              <p className="text-xs text-gray-400 leading-relaxed">These colours are used for carousel slides and visual cards.</p>
+              <div className="flex gap-4">
+                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Background</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                      <div className="absolute inset-0" style={{ background: brandBgColor }} />
+                      <input
+                        type="color"
+                        value={brandBgColor}
+                        onChange={e => setBrandBgColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <code className="text-xs text-gray-400 font-mono">{brandBgColor}</code>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Accent</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                      <div className="absolute inset-0" style={{ background: brandAccentColor }} />
+                      <input
+                        type="color"
+                        value={brandAccentColor}
+                        onChange={e => setBrandAccentColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <code className="text-xs text-gray-400 font-mono">{brandAccentColor}</code>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Text</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
+                      <div className="absolute inset-0" style={{ background: brandTextColor }} />
+                      <input
+                        type="color"
+                        value={brandTextColor}
+                        onChange={e => setBrandTextColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                    <code className="text-xs text-gray-400 font-mono">{brandTextColor}</code>
+                  </div>
+                </label>
               </div>
             </div>
-
-            {voiceLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 rounded-full w-3/4" />
-                <Skeleton className="h-4 rounded-full w-full" />
-                <Skeleton className="h-4 rounded-full w-5/6" />
-              </div>
-            ) : !voiceData || voiceData.draftCount === 0 ? (
-              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-5 text-center">
-                <Brain className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 font-medium">No voice data yet</p>
-                <p className="text-xs text-gray-400 mt-1">Publish your first drafts to unlock your voice analysis.</p>
-              </div>
-            ) : voiceData.summary ? (
-              <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-black text-violet-400 uppercase tracking-wider">Based on {voiceData.draftCount} published post{voiceData.draftCount !== 1 ? "s" : ""}</p>
-                </div>
-                <div className="space-y-2">
-                  {voiceData.summary.split("\n").filter(Boolean).map((line, i) => (
-                    <p key={i} className="text-sm text-violet-900 leading-relaxed">{line}</p>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
-                <p className="text-sm text-gray-500">Voice analysis will appear once you have published posts with enough writing signals.</p>
-              </div>
-            )}
-          </section>
-
-          {/* Writing Samples */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-4 h-4 text-violet-500" />
-              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Writing Samples</h2>
-            </div>
-            <p className="text-xs text-gray-400 mb-4 leading-relaxed">Pin up to 5 writing samples that best represent your voice. These become the highest-authority anchors for every post the AI generates for you.</p>
-            <div className="space-y-3 mb-3">
-              {writingSamples.map((sample, idx) => (
-                <div key={idx} className="relative bg-white rounded-2xl border border-gray-100 p-4 group">
-                  <button
-                    type="button"
-                    onClick={() => setWritingSamples(writingSamples.filter((_, i) => i !== idx))}
-                    className="absolute top-2 right-2 p-1 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                  <p className="text-xs text-gray-600 leading-relaxed pr-6 line-clamp-3">{sample}</p>
-                  <p className="text-[10px] text-gray-300 mt-2">{sample.length} characters</p>
-                </div>
-              ))}
-            </div>
-            {writingSamples.length < 5 && (
-              <div className="space-y-2">
-                <textarea
-                  value={newSampleText}
-                  onChange={(e) => setNewSampleText(e.target.value)}
-                  placeholder="Paste a LinkedIn post you're proud of…"
-                  maxLength={3000}
-                  rows={4}
-                  className="w-full text-sm rounded-2xl border border-gray-200 px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white placeholder-gray-300"
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-gray-300">{newSampleText.length}/3000</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={newSampleText.trim().length < 50}
-                    onClick={() => {
-                      if (newSampleText.trim().length < 50) return;
-                      setWritingSamples([...writingSamples, newSampleText.trim()]);
-                      setNewSampleText("");
-                    }}
-                    className="text-xs rounded-xl"
-                  >
-                    Add sample
-                  </Button>
-                </div>
-              </div>
-            )}
-            {writingSamples.length >= 5 && (
-              <p className="text-xs text-gray-400 text-center py-2">5 samples saved. Remove one to add another.</p>
-            )}
           </section>
 
           {/* Account */}

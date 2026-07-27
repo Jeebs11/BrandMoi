@@ -28,6 +28,12 @@ export const preferencesTable = pgTable("preferences", {
   bgPalette: text("bg_palette").default("ocean"),
   contentPillars: jsonb("content_pillars").$type<string[]>(),
   writingSamples: jsonb("writing_samples").$type<string[]>(),
+  // Quantified career achievements (number + context + outcome) extracted
+  // from imported documents — injected into generation as specificity anchors.
+  proofPoints: jsonb("proof_points").$type<string[]>(),
+  // Posts (anyone's) whose STYLE the user wants to lean toward — rhythm and
+  // language patterns only, never topics or claims.
+  aspirationalSamples: jsonb("aspirational_samples").$type<string[]>(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

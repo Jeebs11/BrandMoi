@@ -21,6 +21,7 @@ type Stats = {
 type DayCount = { date: string; count: number };
 type AdminUser = {
   id: number; email: string; displayName: string; createdAt: string;
+  blocked: boolean;
   onboarded: boolean; lastActive: string | null;
   draftCount: number; publishedCount: number; carouselCount: number; visualCount: number;
   tone: string | null; persona: string | null; objective: string | null;
@@ -274,6 +275,50 @@ function UsersTab() {
     } finally { setDeleting(false); }
   };
 
+  const [pwUserId, setPwUserId] = useState<number | null>(null);
+  const [pwValue, setPwValue] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [blockingId, setBlockingId] = useState<number | null>(null);
+
+  const handleBlock = async (id: number, blocked: boolean) => {
+    setBlockingId(id); setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${id}/block`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocked }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, blocked } : u));
+      } else {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setActionError(body.error ?? "Failed to update block status");
+      }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Network error");
+    } finally { setBlockingId(null); }
+  };
+
+  const handleSetPassword = async (id: number) => {
+    if (pwValue.length < 8) { setActionError("Password must be at least 8 characters"); return; }
+    setPwSaving(true); setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${id}/password`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword: pwValue }),
+      });
+      if (res.ok) {
+        setPwUserId(null); setPwValue("");
+      } else {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setActionError(body.error ?? "Failed to set password");
+      }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Network error");
+    } finally { setPwSaving(false); }
+  };
+
   const totalPages = Math.ceil(total / 20);
 
   const SortIcon = ({ col }: { col: SortCol }) => (
@@ -339,7 +384,7 @@ function UsersTab() {
                       onClick={() => { setExpandedId(expandedId === u.id ? null : u.id); setDeleteConfirmId(null); }}
                     >
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-gray-800 truncate max-w-[190px]">{u.email}</p>
+                        <p className="font-semibold text-gray-800 truncate max-w-[190px] flex items-center gap-1.5">{u.email}{u.blocked && <span className="text-[9px] font-black uppercase tracking-wider bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex-shrink-0">Blocked</span>}</p>
                         <p className="text-[11px] text-gray-400">{u.displayName}</p>
                       </td>
                       <td className="px-4 py-3 text-[11px] text-gray-400 hidden md:table-cell">{fmtJoined(u.createdAt)}</td>
@@ -396,7 +441,39 @@ function UsersTab() {
                               </div>
                             </div>
                           </div>
-                          <div className="border-t border-gray-200 pt-3 flex items-center gap-3">
+                          <div className="border-t border-gray-200 pt-3 flex items-center gap-3 flex-wrap">
+                            <button
+                              onClick={e => { e.stopPropagation(); void handleBlock(u.id, !u.blocked); }}
+                              disabled={blockingId === u.id}
+                              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 ${u.blocked ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-amber-50 text-amber-700 hover:bg-amber-100"}`}
+                            >
+                              {blockingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                              {u.blocked ? "Unblock user" : "Block user"}
+                            </button>
+                            {pwUserId === u.id ? (
+                              <span className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                <input
+                                  type="text"
+                                  value={pwValue}
+                                  onChange={e => setPwValue(e.target.value)}
+                                  placeholder="New password (min 8)"
+                                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 w-44 focus:outline-none focus:border-gray-400"
+                                />
+                                <button
+                                  onClick={() => void handleSetPassword(u.id)}
+                                  disabled={pwSaving || pwValue.length < 8}
+                                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-40"
+                                >{pwSaving ? "Saving…" : "Set"}</button>
+                                <button onClick={() => { setPwUserId(null); setPwValue(""); }} className="text-xs text-gray-400 hover:text-gray-700">Cancel</button>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); setPwUserId(u.id); setPwValue(""); }}
+                                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              >
+                                Set password
+                              </button>
+                            )}
                             {deleteConfirmId === u.id ? (
                               <>
                                 <p className="text-xs text-red-600 font-semibold">Permanently delete {u.email}?</p>

@@ -9,7 +9,8 @@ import {
   ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, Zap, CheckCircle2,
 } from "lucide-react";
 import { StressTestPanel, type StressTestResult } from "@/components/StressTestPanel";
-import { agentApi } from "@/lib/api";
+import { PostMeter } from "@/components/PostMeter";
+import { agentApi, analyticsApi, seriesApi, type SeriesDetail } from "@/lib/api";
 import {
   useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
@@ -91,6 +92,22 @@ function feelingFromTone(tone?: string | null, storyMode?: boolean): string {
   return "Direct";
 }
 
+// Deterministically stamps a series' recurring hook onto a generated part so
+// every part carries the exact same recognisable marker — not left to the
+// model's phrasing. Hashtag-shaped hooks (#Foo) are appended to the hashtags
+// field; anything else (a tagline/emoji motif) is prepended as the post's
+// opening line.
+function applySeriesHook(post: string, hashtags: string, hook: string): { post: string; hashtags: string } {
+  const trimmedHook = hook.trim();
+  if (!trimmedHook) return { post, hashtags };
+  if (trimmedHook.startsWith("#")) {
+    if (hashtags.includes(trimmedHook)) return { post, hashtags };
+    return { post, hashtags: [hashtags, trimmedHook].filter(Boolean).join(" ") };
+  }
+  if (post.startsWith(trimmedHook)) return { post, hashtags };
+  return { post: `${trimmedHook}\n\n${post}`, hashtags };
+}
+
 // Map audience → legacy objective field for the drafts table.
 function objectiveFromAudience(audience: string): string {
   switch (audience) {
@@ -123,6 +140,21 @@ export default function Capture() {
   const thoughtParam = params.get("thought") ?? "";
   const rawParam = params.get("raw") ?? "";
   const newsUrlParam = params.get("newsUrl") ?? "";
+  // Set by audience-tagged idea suggestions (e.g. a Recruiters-targeted brand
+  // angle) so tapping "Write this" opens Capture pre-set to that audience.
+  const audienceParam = params.get("audience") ?? "";
+  // Set when writing a part of a planned series (from the Series detail page).
+  const seriesIdParam = params.get("seriesId");
+  const seriesId = seriesIdParam ? parseInt(seriesIdParam) : null;
+  const seriesPartParam = params.get("seriesPart");
+  const seriesPart = seriesPartParam ? parseInt(seriesPartParam) : null;
+  const topicIdParam = params.get("topicId");
+  const topicId = topicIdParam ? parseInt(topicIdParam) : null;
+  // A recurring tag/tagline set on the series (e.g. "#JuniorPMDiaries") so every
+  // part carries the same recognisable marker — deterministic, not left to the
+  // model's discretion, since consistency across parts matters more here than
+  // natural-language phrasing.
+  const seriesHookParam = params.get("seriesHook") ?? "";
 
   const { user, preferences } = useAuth();
   const isDemo = user?.email === "demo@brandos.app";
@@ -131,13 +163,28 @@ export default function Capture() {
 
   // ── State ────────────────────────────────────────────────────────────────
   const [rawInput, setRawInput] = useState<string>(thoughtParam || rawParam || "");
-  const [audience, setAudience] = useState<string>(audienceFromObjective(preferences?.objective));
+  const [audience, setAudience] = useState<string>(
+    AUDIENCES.some((a) => a.key === audienceParam) ? audienceParam : audienceFromObjective(preferences?.objective)
+  );
   const [feeling, setFeeling] = useState<string>(feelingFromTone(preferences?.tone));
   const [tieToNews, setTieToNews] = useState<boolean>(!!newsUrlParam);
   const [content, setContent] = useState<GeneratedContent | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("post");
   const [editedPost, setEditedPost] = useState<string>("");
   const [hashtags, setHashtags] = useState<string>("");
+  // Version history — every AI-produced version of the Post is snapshotted so
+  // the user can flip back to a different tone / opener / length. In-memory
+  // for the editing session; manual typing isn't snapshotted (too noisy).
+  const [versions, setVersions] = useState<Array<{ id: number; label: string; post: string; hashtags: string }>>([]);
+  const versionSeq = useRef(0);
+  const addVersion = (label: string, post: string, tags: string) => {
+    if (!post.trim()) return;
+    setVersions((prev) => {
+      if (prev.some((v) => v.post === post)) return prev; // skip exact dupes
+      const next = [...prev, { id: ++versionSeq.current, label, post, hashtags: tags }];
+      return next.slice(-12); // keep the last 12
+    });
+  };
   const [savedDraftId, setSavedDraftId] = useState<number | null>(draftId);
   const [initialized, setInitialized] = useState(false);
   const [visualStyle, setVisualStyle] = useState<string>("new-yorker");
@@ -154,6 +201,30 @@ export default function Capture() {
   const [isApplyingFixes, setIsApplyingFixes] = useState(false);
   const [stressTestSourceTab, setStressTestSourceTab] = useState<"post" | "short">("post");
   const [pendingRefinedContent, setPendingRefinedContent] = useState<string | null>(null);
+  // The exact text last stress-tested, so we know when the cached result is
+  // stale (post edited since) and can reopen the result without re-spending.
+  const [stressTestedText, setStressTestedText] = useState<string | null>(null);
+
+  // ── Series context (banner + continuity for prompt) ────────────────────
+  const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
+  useEffect(() => {
+    if (!seriesId) return;
+    seriesApi.get(seriesId).then(setSeriesDetail).catch(() => {});
+  }, [seriesId]);
+
+  // Prior parts' post excerpts, woven into generation as continuity context
+  // so a later part builds on what's already been written (same "extra
+  // context block" pattern used for news context on the backend).
+  const continuityContext = useMemo(() => {
+    if (!seriesDetail || !seriesPart) return "";
+    const priorParts = seriesDetail.parts
+      .filter((p) => p.seriesPart !== null && p.seriesPart < seriesPart && p.postOutput)
+      .sort((a, b) => (a.seriesPart ?? 0) - (b.seriesPart ?? 0));
+    if (priorParts.length === 0) return "";
+    return priorParts
+      .map((p) => `Part ${p.seriesPart}: ${(p.postOutput ?? "").slice(0, 400)}`)
+      .join("\n\n");
+  }, [seriesDetail, seriesPart]);
 
   const { mutate: generateContent, isPending: isGenerating, error: generateError } = useGenerateContent();
   const { mutate: refineContent, isPending: isRefining } = useRefineContent();
@@ -213,6 +284,8 @@ export default function Capture() {
           tieToNews,
           ...(newsUrlParam ? { newsUrl: newsUrlParam } : {}),
           ...(overrides?.extraInstruction ? { extraInstruction: overrides.extraInstruction } : {}),
+          ...(seriesDetail ? { format: seriesDetail.format } : {}),
+          ...(continuityContext ? { continuityContext } : {}),
           // legacy fields kept for backend safety
           objective: objectiveFromAudience(effectiveAudience),
           persona: preferences?.persona ?? "Founder",
@@ -221,9 +294,13 @@ export default function Capture() {
       },
       {
         onSuccess: (data) => {
-          setContent(data);
-          setEditedPost(data.post);
-          setHashtags(data.hashtags ?? "");
+          const { post: hookedPost, hashtags: hookedHashtags } = seriesPart && seriesHookParam
+            ? applySeriesHook(data.post, data.hashtags ?? "", seriesHookParam)
+            : { post: data.post, hashtags: data.hashtags ?? "" };
+          setContent({ ...data, post: hookedPost, hashtags: hookedHashtags });
+          setEditedPost(hookedPost);
+          setHashtags(hookedHashtags);
+          addVersion(versions.length === 0 ? `${effectiveFeeling} · original` : effectiveFeeling, hookedPost, hookedHashtags);
           setActiveTab("post");
           setVisualImage(null);
           setIllustrationImage(null);
@@ -239,7 +316,7 @@ export default function Capture() {
   };
 
   // ── Refine: Shorter / Longer / Story / freeform ───────────────────────
-  const runRefine = (instruction: string, tab: TabType = "post") => {
+  const runRefine = (instruction: string, tab: TabType = "post", label?: string) => {
     if (!content) return;
     const source =
       tab === "short" ? (content.shortPost ?? "") :
@@ -255,6 +332,7 @@ export default function Capture() {
           if (tab === "post") {
             setEditedPost(refined);
             setContent((c) => c ? { ...c, post: refined } : c);
+            addVersion(label ?? "Refined", refined, hashtags);
           } else if (tab === "short") {
             setContent((c) => c ? { ...c, shortPost: refined } : c);
           } else if (tab === "visual") {
@@ -288,14 +366,30 @@ export default function Capture() {
     const updated = lines.join("\n");
     setEditedPost(updated);
     setContent((c) => c ? { ...c, post: updated } : c);
+    addVersion("New opener", updated, hashtags);
   };
 
   // ── Save / update draft ───────────────────────────────────────────────
   const buildStructuredBreakdown = (): StructuredBreakdown & Record<string, unknown> => {
     const existing = (existingDraft?.structuredBreakdown as Record<string, unknown> | undefined) ?? {};
+    // The save schema treats newsAnchor.url/sourceLine as optional strings (not
+    // nullable) — sending null fails validation. Drop null/empty fields so a
+    // news anchor with no URL still saves.
+    const rawAnchor = content?.newsAnchor;
+    const cleanAnchor = rawAnchor && rawAnchor.headline
+      ? {
+          headline: rawAnchor.headline,
+          ...(rawAnchor.url ? { url: rawAnchor.url } : {}),
+          ...(rawAnchor.sourceLine ? { sourceLine: rawAnchor.sourceLine } : {}),
+        }
+      : undefined;
+    // Title = the post's actual hook (first line of the final edited text),
+    // so edits to the post are reflected in Library/Studio titles. Falls back
+    // to the raw idea only before any post exists.
+    const hookLine = editedPost.split("\n").map((l) => l.trim()).find((l) => l.length > 0);
     return {
       ...existing,
-      topic: rawInput.slice(0, 100),
+      topic: (hookLine ?? rawInput).slice(0, 100),
       angle: feeling,
       coreMessage: rawInput,
       whyItMatters: "",
@@ -309,9 +403,17 @@ export default function Capture() {
       persona: preferences?.persona ?? "Founder",
       tone: toneFromFeeling(feeling),
       alternativeHooks: content?.alternativeHooks ?? [],
-      newsAnchor: content?.newsAnchor ?? null,
+      newsAnchor: cleanAnchor,
       infographic: content?.infographic ?? null,
     } as StructuredBreakdown & Record<string, unknown>;
+  };
+
+  // Shared across all three save payloads below (draft save, ship, and the
+  // silent stress-test auto-save) so a part always carries its series/topic tags.
+  const seriesFields = {
+    ...(topicId ? { topicId } : {}),
+    ...(seriesId ? { seriesId } : {}),
+    ...(seriesPart ? { seriesPart } : {}),
   };
 
   const handleSave = () => {
@@ -332,6 +434,7 @@ export default function Capture() {
       status: "draft" as const,
       visualStyle,
       contentSource: "capture" as CreateDraftBodyContentSource,
+      ...seriesFields,
     };
     if (savedDraftId) {
       updateDraft(
@@ -358,11 +461,28 @@ export default function Capture() {
     }
   };
 
+  // Best-time hint shown after shipping — reuses analytics the user already has.
+  const showBestTimeHint = () => {
+    analyticsApi.overview(90).then((a) => {
+      const combo = a.bestTimeToPost?.topCombination;
+      if (combo?.day && combo?.block) {
+        toast({ title: `💡 Your ${combo.day} ${combo.block.toLowerCase()} posts perform best — worth timing the next one.` });
+      }
+    }).catch(() => {});
+  };
+
   const handleSaveAndPublish = () => {
     if (!content) {
       toast({ title: "Nothing to save yet", variant: "destructive" });
       return;
     }
+
+    // Ship it: clipboard write + LinkedIn tab must fire synchronously inside
+    // the click handler (popup blockers), then we persist the status.
+    const shipText = [editedPost, content.hashtags ?? ""].filter(Boolean).join("\n\n");
+    void navigator.clipboard.writeText(shipText);
+    window.open("https://www.linkedin.com/feed/?shareActive=true", "_blank", "noopener");
+
     const payload = {
       rawInput,
       objective: objectiveFromAudience(audience),
@@ -376,14 +496,16 @@ export default function Capture() {
       status: "published" as const,
       visualStyle,
       contentSource: "capture" as CreateDraftBodyContentSource,
+      ...seriesFields,
     };
     if (savedDraftId) {
       updateDraft(
         { id: savedDraftId, data: payload },
         {
           onSuccess: () => {
-            toast({ title: "Published", description: "Draft saved and marked as published." });
+            toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
+            showBestTimeHint();
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -394,7 +516,8 @@ export default function Capture() {
         {
           onSuccess: (newDraft) => {
             setSavedDraftId(newDraft.id);
-            toast({ title: "Published", description: "Draft created and marked as published." });
+            toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
+            showBestTimeHint();
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -467,6 +590,7 @@ export default function Capture() {
       status: "draft" as const,
       visualStyle,
       contentSource: "capture" as CreateDraftBodyContentSource,
+      ...seriesFields,
     };
     return new Promise((resolve) => {
       createDraft(
@@ -489,6 +613,7 @@ export default function Capture() {
       const draftIdForTest = await ensureDraftSaved();
       const result = await agentApi.stressTest(postText, draftIdForTest);
       setStressTestResult(result);
+      setStressTestedText(postText);
     } catch (err) {
       toast({ title: "Stress test failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
       setStressTestOpen(false);
@@ -530,6 +655,9 @@ export default function Capture() {
     } else {
       setEditedPost(refined);
       setContent((c) => c ? { ...c, post: refined } : c);
+      // Snapshot the post-tab rewrite so the user can flip back to the
+      // pre-fix version from the Versions strip.
+      addVersion("Fixes applied", refined, hashtags);
     }
     // Re-score after applying
     setIsStressTestLoading(true);
@@ -537,6 +665,9 @@ export default function Capture() {
       const retestContent = isShort ? refined : `${refined}${hashtags ? `\n\n${hashtags}` : ""}`;
       const result = await agentApi.stressTest(retestContent, savedDraftId, true);
       setStressTestResult(result);
+      // Keep the cached-result tracker in sync so the new score isn't
+      // immediately flagged "edited since".
+      setStressTestedText(retestContent);
     } catch {
       // keep existing result if re-test fails
     } finally {
@@ -571,6 +702,15 @@ export default function Capture() {
           </h1>
         </div>
 
+        {seriesId && seriesPart && (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-2xl bg-indigo-50 border border-indigo-100">
+            <Layers className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+            <p className="text-xs font-bold text-indigo-700 truncate">
+              Part {seriesPart}{seriesDetail ? `${seriesDetail.plannedParts ? ` of ${seriesDetail.plannedParts}` : ""} — ${seriesDetail.title}` : ""}
+            </p>
+          </div>
+        )}
+
         {!showResult && (
           <CaptureForm
             rawInput={rawInput} setRawInput={setRawInput}
@@ -595,6 +735,8 @@ export default function Capture() {
             content={content}
             editedPost={editedPost} setEditedPost={setEditedPost}
             hashtags={hashtags} setHashtags={setHashtags}
+            versions={versions}
+            onRestoreVersion={(v) => { setEditedPost(v.post); setHashtags(v.hashtags); setContent((c) => c ? { ...c, post: v.post } : c); }}
             activeTab={activeTab} setActiveTab={setActiveTab}
             visualStyle={visualStyle} setVisualStyle={setVisualStyle}
             visualImage={visualImage} isLoadingVisual={isLoadingVisual}
@@ -625,6 +767,9 @@ export default function Capture() {
             onCopy={copy}
             onStressTest={handleStressTest}
             isStressTestLoading={isStressTestLoading}
+            cachedStressScore={stressTestResult?.score ?? null}
+            stressStale={!!stressTestResult && stressTestedText !== null && stressTestedText !== fullPost}
+            onViewStressTest={() => setStressTestOpen(true)}
           />
         )}
 
@@ -962,6 +1107,8 @@ interface ResultViewProps {
   content: GeneratedContent;
   editedPost: string; setEditedPost: (v: string) => void;
   hashtags: string; setHashtags: (v: string) => void;
+  versions: Array<{ id: number; label: string; post: string; hashtags: string }>;
+  onRestoreVersion: (v: { id: number; label: string; post: string; hashtags: string }) => void;
   activeTab: TabType; setActiveTab: (t: TabType) => void;
   visualStyle: string; setVisualStyle: (s: string) => void;
   visualImage: string | null; isLoadingVisual: boolean;
@@ -973,7 +1120,7 @@ interface ResultViewProps {
   isSaving: boolean;
   isDemo: boolean;
   onSwapHook: (hook: string) => void;
-  onRefine: (instruction: string, tab?: TabType) => void;
+  onRefine: (instruction: string, tab?: TabType, label?: string) => void;
   onTryAgain: () => void;
   onChangeFeeling: (newFeeling: string) => void;
   onChangeVisualStyle: (newStyle: string) => void;
@@ -985,12 +1132,16 @@ interface ResultViewProps {
   onSaveAndPublish?: () => void;
   onCopy: (text: string, label?: string) => void;
   onStressTest: (postText: string, sourceTab: "post" | "short") => void;
+  cachedStressScore: number | null;
+  stressStale: boolean;
+  onViewStressTest: () => void;
   isStressTestLoading: boolean;
 }
 
 function ResultView(props: ResultViewProps) {
   const {
     content, editedPost, setEditedPost, hashtags, setHashtags,
+    versions, onRestoreVersion,
     activeTab, setActiveTab, visualStyle, setVisualStyle,
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
@@ -998,6 +1149,7 @@ function ResultView(props: ResultViewProps) {
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration,
     onSave, onSaveAndPublish, onCopy, onStressTest, isStressTestLoading,
+    cachedStressScore, stressStale, onViewStressTest,
   } = props;
 
   return (
@@ -1108,6 +1260,7 @@ function ResultView(props: ResultViewProps) {
           <textarea
             value={editedPost}
             onChange={(e) => setEditedPost(e.target.value)}
+            spellCheck
             className="w-full min-h-[280px] p-4 rounded-2xl border border-gray-200 focus:border-primary focus:outline-none text-sm leading-relaxed font-mono"
           />
 
@@ -1115,17 +1268,46 @@ function ResultView(props: ResultViewProps) {
             value={hashtags}
             onChange={(e) => setHashtags(e.target.value)}
             placeholder="#hashtags"
+            spellCheck
             className="w-full p-3 rounded-xl border border-gray-200 focus:border-primary focus:outline-none text-sm"
           />
 
+          {/* Version history — flip between generated tones / openers / lengths */}
+          {versions.length > 1 && (
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Versions · tap to restore</p>
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                {versions.map((v, i) => {
+                  const isCurrent = v.post === editedPost;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => onRestoreVersion(v)}
+                      className={cn(
+                        "px-2.5 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap border transition-all flex-shrink-0",
+                        isCurrent ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40"
+                      )}
+                      title={v.post.slice(0, 80) + (v.post.length > 80 ? "…" : "")}
+                    >
+                      {i + 1}. {v.label}{isCurrent ? " ✓" : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Live algorithm tracker — fold line, counts, structure, hashtags, links */}
+          <PostMeter post={editedPost} hashtags={hashtags} />
+
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => onRefine("Make this shorter and punchier.")} disabled={isRefining}>
+            <Button variant="outline" onClick={() => onRefine("Make this shorter and punchier.", "post", "Shorter")} disabled={isRefining}>
               <ArrowUp className="w-3.5 h-3.5 mr-1" />Shorter
             </Button>
-            <Button variant="outline" onClick={() => onRefine("Add more depth and a personal example.")} disabled={isRefining}>
+            <Button variant="outline" onClick={() => onRefine("Add more depth and a personal example.", "post", "Longer")} disabled={isRefining}>
               <ArrowDown className="w-3.5 h-3.5 mr-1" />Longer
             </Button>
-            <Button variant="outline" onClick={() => onRefine("Reframe this as a personal story with a vivid opening scene.")} disabled={isRefining}>
+            <Button variant="outline" onClick={() => onRefine("Reframe this as a personal story with a vivid opening scene.", "post", "Story")} disabled={isRefining}>
               <BookOpen className="w-3.5 h-3.5 mr-1" />Story
             </Button>
             <Button variant="outline" onClick={onTryAgain} disabled={isRefining}>
@@ -1161,8 +1343,25 @@ function ResultView(props: ResultViewProps) {
             disabled={isStressTestLoading || isRefining}
           >
             <Zap className="w-3.5 h-3.5 mr-1.5" />
-            {isStressTestLoading ? "Analysing…" : "Stress Test"}
+            {isStressTestLoading ? "Analysing…" : cachedStressScore !== null ? "Re-run Stress Test" : "Stress Test"}
           </Button>
+          {cachedStressScore !== null && !isStressTestLoading && (
+            <button
+              onClick={onViewStressTest}
+              className={cn(
+                "col-span-2 flex items-center justify-center gap-2 text-xs font-bold py-2 rounded-xl border transition-colors",
+                stressStale
+                  ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  : "border-violet-100 bg-violet-50 text-violet-700 hover:bg-violet-100"
+              )}
+            >
+              <span className={cn(
+                "text-[10px] font-black px-1.5 py-0.5 rounded-full",
+                cachedStressScore >= 80 ? "bg-emerald-100 text-emerald-700" : cachedStressScore >= 60 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"
+              )}>{cachedStressScore}</span>
+              {stressStale ? "Post edited since — review or re-run" : "View last stress test"}
+            </button>
+          )}
         </div>
       )}
 

@@ -39,6 +39,8 @@ type OnboardingState = {
   brandAudience: string;
   brandBelief: string;
   contentPillars: string[];
+  proofPoints: string[];
+  aboutMe: string;
 };
 
 export default function Onboarding() {
@@ -53,6 +55,8 @@ export default function Onboarding() {
     brandAudience: "",
     brandBelief: "",
     contentPillars: [],
+    proofPoints: [],
+    aboutMe: "",
   });
 
   const { mutate: updatePreferences, isPending } = useUpdatePreferences();
@@ -70,6 +74,8 @@ export default function Onboarding() {
       persona: extracted.persona || d.persona,
       tone: extracted.tone || d.tone,
       contentPillars: extracted.contentPillars?.length ? extracted.contentPillars : d.contentPillars,
+      proofPoints: extracted.proofPoints?.length ? extracted.proofPoints : d.proofPoints,
+      aboutMe: extracted.summary ? extracted.summary.slice(0, 500) : d.aboutMe,
     }));
   };
 
@@ -85,6 +91,8 @@ export default function Onboarding() {
           brandBelief: data.brandBelief,
           onboarded: true,
           ...(data.contentPillars.length > 0 ? { contentPillars: data.contentPillars } : {}),
+          ...(data.proofPoints.length > 0 ? { proofPoints: data.proofPoints } : {}),
+          ...(data.aboutMe ? { aboutMe: data.aboutMe } : {}),
         },
       },
       {

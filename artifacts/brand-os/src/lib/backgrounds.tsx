@@ -4,7 +4,7 @@ import { useBackgroundTheme, usePageVisible, SPEED_MULT, DENSITY_MULT, BG_PALETT
 export interface BackgroundEntry {
   key: string;
   label: string;
-  category: "Minimal" | "Professional" | "Creative" | "Technical" | "Playful";
+  category: "Zen" | "Default" | "Minimal" | "Professional" | "Creative" | "Technical" | "Playful";
   component: React.ComponentType;
   interactive?: boolean;
 }
@@ -58,7 +58,12 @@ function Matrix() {
     resize();
     window.addEventListener("resize", resize);
 
-    const draw = () => {
+    let _lf1 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf1 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf1 = _now;
+
       if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
@@ -129,7 +134,12 @@ function Neural() {
     };
     window.addEventListener("click", onClick);
 
-    const draw = () => {
+    let _lf2 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf2 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf2 = _now;
+
       if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
@@ -241,7 +251,12 @@ function Particles() {
     };
     window.addEventListener("click", onClick);
 
-    const draw = () => {
+    let _lf3 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf3 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf3 = _now;
+
       if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
@@ -320,7 +335,12 @@ function Constellation() {
     init();
     window.addEventListener("resize", init);
 
-    const draw = () => {
+    let _lf4 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf4 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf4 = _now;
+
       if (document.hidden) return;
       const sp = Math.max(0.3, speedRef.current);
       const mouse = mouseRef.current;
@@ -423,28 +443,116 @@ function NeonGrid() {
 }
 
 // ── Wave ──────────────────────────────────────────────────────────────────────
-function Wave() {
+// ── ZenWaves: continuous layered sine waves on canvas — no SVG keyframe snap ──
+type WaveVariant = { sky: [string, string, string]; layers: Array<{ color: string; amp: number; period: number; speed: number; base: number }>; glow?: { color: string; x: number; y: number } };
+
+const WAVE_VARIANTS: Record<string, WaveVariant> = {
+  ocean: {
+    sky: ["#0a1a20", "#14333d", "#1d4a57"],
+    glow: { color: "rgba(160,220,235,0.10)", x: 0.72, y: 0.22 },
+    layers: [
+      { color: "rgba(6,182,212,0.13)",  amp: 22, period: 480, speed: 0.012, base: 0.62 },
+      { color: "rgba(8,145,178,0.16)",  amp: 28, period: 360, speed: -0.009, base: 0.72 },
+      { color: "rgba(14,116,144,0.22)", amp: 20, period: 300, speed: 0.016, base: 0.82 },
+    ],
+  },
+  sunset: {
+    sky: ["#150503", "#3d1206", "#6b2408"],
+    glow: { color: "rgba(255,150,60,0.16)", x: 0.5, y: 0.46 },
+    layers: [
+      { color: "rgba(230,95,25,0.16)",  amp: 22, period: 460, speed: 0.011, base: 0.62 },
+      { color: "rgba(245,130,40,0.12)", amp: 28, period: 340, speed: -0.008, base: 0.72 },
+      { color: "rgba(200,60,12,0.22)",  amp: 18, period: 280, speed: 0.015, base: 0.83 },
+    ],
+  },
+  arctic: {
+    sky: ["#02070f", "#051527", "#0a2440"],
+    glow: { color: "rgba(190,230,255,0.09)", x: 0.3, y: 0.18 },
+    layers: [
+      { color: "rgba(186,230,253,0.09)", amp: 20, period: 500, speed: 0.010, base: 0.62 },
+      { color: "rgba(150,210,245,0.07)", amp: 26, period: 370, speed: -0.007, base: 0.72 },
+      { color: "rgba(125,211,252,0.13)", amp: 18, period: 290, speed: 0.013, base: 0.83 },
+    ],
+  },
+  night: {
+    sky: ["#00030a", "#020617", "#040b26"],
+    glow: { color: "rgba(150,170,255,0.07)", x: 0.78, y: 0.16 },
+    layers: [
+      { color: "rgba(70,90,190,0.11)", amp: 22, period: 470, speed: 0.010, base: 0.63 },
+      { color: "rgba(50,65,170,0.09)", amp: 27, period: 350, speed: -0.008, base: 0.73 },
+      { color: "rgba(36,50,150,0.17)", amp: 18, period: 285, speed: 0.014, base: 0.84 },
+    ],
+  },
+};
+
+function ZenWaves({ variant }: { variant: keyof typeof WAVE_VARIANTS }) {
   const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#0f2027 0%,#203a43 50%,#2c5364 100%)",overflow:"hidden" }}>
-      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"60%" }}>
-        <path d="M0 80 Q150 20 300 80 T600 60 L600 200 L0 200Z" fill="rgba(6,182,212,0.15)">
-          <animate attributeName="d" dur={`${7/m}s`} repeatCount="indefinite"
-            values="M0 80 Q150 20 300 80 T600 60 L600 200 L0 200Z;M0 80 Q150 130 300 80 T600 100 L600 200 L0 200Z;M0 80 Q150 20 300 80 T600 60 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 110 Q150 60 300 110 T600 90 L600 200 L0 200Z" fill="rgba(6,182,212,0.10)">
-          <animate attributeName="d" dur={`${10/m}s`} repeatCount="indefinite"
-            values="M0 110 Q150 60 300 110 T600 90 L600 200 L0 200Z;M0 110 Q150 155 300 110 T600 130 L600 200 L0 200Z;M0 110 Q150 60 300 110 T600 90 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 140 Q150 100 300 140 T600 120 L600 200 L0 200Z" fill="rgba(14,116,144,0.2)">
-          <animate attributeName="d" dur={`${13/m}s`} repeatCount="indefinite"
-            values="M0 140 Q150 100 300 140 T600 120 L600 200 L0 200Z;M0 140 Q150 175 300 140 T600 155 L600 200 L0 200Z;M0 140 Q150 100 300 140 T600 120 L600 200 L0 200Z" />
-        </path>
-      </svg>
-    </div>
-  );
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const speedRef = useRef(SPEED_MULT[speed] ?? 1);
+  useEffect(() => { speedRef.current = SPEED_MULT[speed] ?? 1; }, [speed]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    const cfg = WAVE_VARIANTS[variant];
+    let raf: number;
+    let t = 0;
+
+    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    resize();
+    window.addEventListener("resize", resize);
+
+    let _lf5 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf5 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf5 = _now;
+
+      if (document.hidden) return;
+      const sp = speedRef.current;
+      t += sp;
+      const W = canvas.width, H = canvas.height;
+
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, cfg.sky[0]); sky.addColorStop(0.5, cfg.sky[1]); sky.addColorStop(1, cfg.sky[2]);
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+
+      if (cfg.glow) {
+        const g = ctx.createRadialGradient(W*cfg.glow.x, H*cfg.glow.y, 0, W*cfg.glow.x, H*cfg.glow.y, Math.min(W,H)*0.55);
+        g.addColorStop(0, cfg.glow.color); g.addColorStop(1, "transparent");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      cfg.layers.forEach((l, li) => {
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        for (let x = 0; x <= W; x += 6) {
+          const y = H * l.base
+            + Math.sin((x / l.period) * Math.PI * 2 + t * l.speed) * l.amp
+            + Math.sin((x / (l.period * 0.53)) * Math.PI * 2 - t * l.speed * 1.6 + li * 2) * (l.amp * 0.4);
+          ctx.lineTo(x, y);
+        }
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fillStyle = l.color;
+        ctx.fill();
+      });
+
+      raf = requestAnimationFrame(draw);
+    };
+    const onVisible = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener("visibilitychange", onVisible);
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); document.removeEventListener("visibilitychange", onVisible); };
+  }, [variant]);
+
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%" }} />;
 }
+
+function Wave() { return <ZenWaves variant="ocean" />; }
 
 // ── Fireflies (interactive: warm glowing orbs drift & pulse, scatter on hover) ──
 function Fireflies() {
@@ -480,7 +588,12 @@ function Fireflies() {
     init();
     window.addEventListener("resize", init);
 
-    const draw = () => {
+    let _lf6 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf6 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf6 = _now;
+
       if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
@@ -574,7 +687,12 @@ function Ripple() {
     };
     window.addEventListener("click", onClick);
 
-    const draw = () => {
+    let _lf7 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf7 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf7 = _now;
+
       if (document.hidden) return;
       const pal = palRef.current;
       const sp = Math.max(0.3, speedRef.current);
@@ -582,16 +700,19 @@ function Ripple() {
       ctx.fillStyle = "rgba(0,0,0,0.92)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      for (let y = 0; y < canvas.height; y += 36) {
-        ctx.strokeStyle = `hsla(${pal.hueBase},${pal.saturation}%,${pal.lightness}%,0.04)`;
-        ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
+      const vg = ctx.createRadialGradient(
+        canvas.width/2, canvas.height/2, Math.min(canvas.width, canvas.height) * 0.25,
+        canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height) * 0.75
+      );
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.35)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       autoTimer -= sp;
       if (autoTimer <= 0) {
         spawnRipple(Math.random() * canvas.width, Math.random() * canvas.height);
-        autoTimer = 55 / Math.max(0.4, sp) / dMult;
+        autoTimer = 110 / Math.max(0.4, sp) / dMult;
       }
 
       rings = rings.filter(r => r.alpha > 0.007);
@@ -600,11 +721,15 @@ function Ripple() {
         r.r += (1.6 + progress * 2.4) * sp;
         r.alpha *= (0.986 - 0.004 * sp);
 
+        ctx.save();
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `hsla(${r.hue},${pal.saturation}%,${pal.lightness}%,${r.alpha * 0.8})`;
         ctx.beginPath();
         ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
         ctx.strokeStyle = `hsla(${r.hue},${pal.saturation}%,${pal.lightness}%,${r.alpha})`;
         ctx.lineWidth = r.width * (1 - progress * 0.6);
         ctx.stroke();
+        ctx.restore();
 
         if (r.r > 14) {
           ctx.beginPath();
@@ -680,7 +805,12 @@ function Prismatic() {
     resize();
     window.addEventListener("resize", resize);
 
-    const draw = () => {
+    let _lf8 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf8 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf8 = _now;
+
       if (document.hidden) return;
       const pal = palRef.current;
       const mouse = mouseRef.current;
@@ -760,200 +890,244 @@ function ShootingStars() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     let raf: number;
-    interface StarPt { x:number; y:number; r:number; alpha:number; dAlpha:number }
-    interface Comet { x:number; y:number; tx:number; ty:number; len:number; maxLen:number; alpha:number; width:number }
+    interface StarPt { x:number; y:number; r:number; alpha:number; dAlpha:number; glow:boolean }
+    interface Comet { x:number; y:number; vx:number; vy:number; life:number; maxLife:number; width:number; hue:number }
     let stars: StarPt[] = [];
     let comets: Comet[] = [];
-    let nextComet = 90;
+    let nextComet = 140;
+
+    const paintSky = () => {
+      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      g.addColorStop(0, "#020414");
+      g.addColorStop(0.55, "#050a1e");
+      g.addColorStop(1, "#03061a");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
 
     const init = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
-      stars = Array.from({ length: Math.round(210 * (DENSITY_MULT[density] ?? 1)) }, () => ({
+      stars = Array.from({ length: Math.round(190 * (DENSITY_MULT[density] ?? 1)) }, () => ({
         x: Math.random() * canvas.width, y: Math.random() * canvas.height,
         r: Math.random() * 1.1 + 0.3,
-        alpha: Math.random() * 0.65 + 0.2,
-        dAlpha: (Math.random()-0.5) * 0.005,
+        alpha: Math.random() * 0.6 + 0.15,
+        dAlpha: (Math.random()-0.5) * 0.0022,
+        glow: Math.random() < 0.06,
       }));
+      paintSky();
     };
     init();
     window.addEventListener("resize", init);
 
     const spawnComet = () => {
-      const angle = (195 + Math.random()*50) * Math.PI / 180;
-      const spd = 7 + Math.random() * 7;
+      const fromLeft = Math.random() < 0.6;
+      const x = fromLeft ? -30 : canvas.width * (0.1 + Math.random() * 0.6);
+      const y = fromLeft ? canvas.height * (0.05 + Math.random() * 0.3) : -20;
+      const spd = 3.2 + Math.random() * 2.4;
+      const angle = (18 + Math.random() * 22) * Math.PI / 180;
       comets.push({
-        x: canvas.width * (0.2 + Math.random() * 0.8),
-        y: canvas.height * (Math.random() * 0.45),
-        tx: Math.cos(angle) * spd,
-        ty: Math.sin(angle) * spd,
-        len: 0, maxLen: 90 + Math.random() * 130,
-        alpha: 1, width: Math.random() * 1.5 + 0.5,
+        x, y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        life: 0,
+        maxLife: 150 + Math.random() * 110,
+        width: 1 + Math.random() * 1.2,
+        hue: 210 + Math.random() * 40,
       });
     };
 
-    const draw = () => {
+    let _lf9 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf9 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf9 = _now;
+
       if (document.hidden) return;
       const sp = speedRef.current;
       const mouse = mouseRef.current;
-      const mx = mouse ? (mouse.x - canvas.width/2) * 0.007 : 0;
-      const my = mouse ? (mouse.y - canvas.height/2) * 0.007 : 0;
+      const mx = mouse ? (mouse.x - canvas.width/2) * 0.004 : 0;
+      const my = mouse ? (mouse.y - canvas.height/2) * 0.004 : 0;
 
-      ctx.fillStyle = "rgba(3,6,20,0.93)";
+      // Low-alpha veil: frames linger, painting soft persistent comet trails
+      ctx.fillStyle = "rgba(3,6,22,0.16)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Comet spawning
-      nextComet--;
-      if (nextComet <= 0) {
-        spawnComet();
-        if (Math.random() < 0.25) { setTimeout(spawnComet, 300); }
-        nextComet = Math.floor((200 + Math.random()*220) / Math.max(0.5, sp) / (DENSITY_MULT[density] ?? 1));
-      }
+      const bandGrad = ctx.createLinearGradient(0, canvas.height * 0.1, canvas.width, canvas.height * 0.55);
+      bandGrad.addColorStop(0, "rgba(120,140,220,0)");
+      bandGrad.addColorStop(0.5, "rgba(140,160,235,0.018)");
+      bandGrad.addColorStop(1, "rgba(120,140,220,0)");
+      ctx.fillStyle = bandGrad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Stars with parallax
-      stars.forEach(s => {
-        s.alpha += s.dAlpha * sp;
-        if (s.alpha < 0.15) s.dAlpha = Math.abs(s.dAlpha);
-        if (s.alpha > 0.9) s.dAlpha = -Math.abs(s.dAlpha);
-        const px = s.x + mx * 1.8, py = s.y + my * 1.8;
-        ctx.beginPath(); ctx.arc(px, py, s.r, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(215,225,255,${s.alpha})`; ctx.fill();
+      stars.forEach(st => {
+        st.alpha += st.dAlpha * sp;
+        if (st.alpha < 0.1) st.dAlpha = Math.abs(st.dAlpha);
+        if (st.alpha > 0.8) st.dAlpha = -Math.abs(st.dAlpha);
+        const px = st.x + mx * 1.6, py = st.y + my * 1.6;
+        if (st.glow) {
+          const hg = ctx.createRadialGradient(px, py, 0, px, py, st.r * 6);
+          hg.addColorStop(0, `rgba(200,215,255,${st.alpha * 0.5})`);
+          hg.addColorStop(1, "transparent");
+          ctx.fillStyle = hg;
+          ctx.beginPath(); ctx.arc(px, py, st.r * 6, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(px, py, st.r, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(218,228,255,${st.alpha})`;
+        ctx.fill();
       });
 
-      // Comets
-      comets = comets.filter(c => c.alpha > 0.015);
+      nextComet -= sp;
+      if (nextComet <= 0) {
+        spawnComet();
+        nextComet = (380 + Math.random() * 420) / Math.max(0.5, sp);
+      }
+
+      comets = comets.filter(c => c.life < c.maxLife && c.x < canvas.width + 60 && c.y < canvas.height + 60);
       comets.forEach(c => {
-        c.x += c.tx * sp; c.y += c.ty * sp;
-        const dist = Math.sqrt(c.tx*c.tx + c.ty*c.ty);
-        c.len += dist * sp;
-        if (c.len > c.maxLen) c.alpha -= 0.028 * sp;
+        c.x += c.vx * sp;
+        c.y += c.vy * sp;
+        c.vy += 0.006 * sp;
+        c.life += sp;
 
-        const tailLen = Math.min(c.len, c.maxLen);
-        const normX = c.tx / dist, normY = c.ty / dist;
-        const tailX = c.x - normX * tailLen, tailY = c.y - normY * tailLen;
+        const t = c.life / c.maxLife;
+        const fade = t < 0.15 ? t / 0.15 : t > 0.7 ? Math.max(0, (1 - t) / 0.3) : 1;
 
-        const grad = ctx.createLinearGradient(tailX, tailY, c.x, c.y);
+        const halo = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 8);
+        halo.addColorStop(0, `hsla(${c.hue},80%,92%,${0.9 * fade})`);
+        halo.addColorStop(0.4, `hsla(${c.hue},75%,75%,${0.25 * fade})`);
+        halo.addColorStop(1, "transparent");
+        ctx.fillStyle = halo;
+        ctx.beginPath(); ctx.arc(c.x, c.y, 8, 0, Math.PI*2); ctx.fill();
+
+        const mag = Math.sqrt(c.vx*c.vx + c.vy*c.vy);
+        const nx = c.vx / mag, ny = c.vy / mag;
+        const coreLen = 26 * fade;
+        const grad = ctx.createLinearGradient(c.x - nx*coreLen, c.y - ny*coreLen, c.x, c.y);
         grad.addColorStop(0, "rgba(255,255,255,0)");
-        grad.addColorStop(0.6, `rgba(200,215,255,${c.alpha * 0.3})`);
-        grad.addColorStop(1, `rgba(255,255,255,${c.alpha})`);
-        ctx.beginPath(); ctx.strokeStyle = grad; ctx.lineWidth = c.width;
-        ctx.moveTo(tailX, tailY); ctx.lineTo(c.x, c.y); ctx.stroke();
-
-        // Head glow
-        const hg = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 5);
-        hg.addColorStop(0, `rgba(255,255,255,${c.alpha})`); hg.addColorStop(1, "transparent");
-        ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(c.x, c.y, 5, 0, Math.PI*2); ctx.fill();
+        grad.addColorStop(1, `hsla(${c.hue},85%,95%,${fade})`);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = c.width;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(c.x - nx*coreLen, c.y - ny*coreLen);
+        ctx.lineTo(c.x, c.y);
+        ctx.stroke();
       });
 
       raf = requestAnimationFrame(draw);
     };
-    const onVisible_shooting = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    const onVisible_shooting = () => { if (!document.hidden) { paintSky(); raf = requestAnimationFrame(draw); } };
     document.addEventListener('visibilitychange', onVisible_shooting);
     draw();
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", init); document.removeEventListener('visibilitychange', onVisible_shooting); };
   }, [mouseRef, density]);
 
-  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#030614" }} />;
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#020414" }} />;
 }
 
-// ── Wave Sunset (warm coral sky + orange-gold waves) ─────────────────────────
-function WaveSunset() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#0d0402 0%,#2a0d04 35%,#5c1a06 70%,#7c2e0a 100%)",overflow:"hidden" }}>
-      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"65%" }}>
-        <path d="M0 90 Q150 30 300 90 T600 70 L600 200 L0 200Z" fill="rgba(220,80,20,0.20)">
-          <animate attributeName="d" dur={`${7/m}s`} repeatCount="indefinite"
-            values="M0 90 Q150 30 300 90 T600 70 L600 200 L0 200Z;M0 90 Q150 140 300 90 T600 110 L600 200 L0 200Z;M0 90 Q150 30 300 90 T600 70 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 120 Q150 70 300 120 T600 100 L600 200 L0 200Z" fill="rgba(240,110,30,0.14)">
-          <animate attributeName="d" dur={`${10/m}s`} repeatCount="indefinite"
-            values="M0 120 Q150 70 300 120 T600 100 L600 200 L0 200Z;M0 120 Q150 160 300 120 T600 140 L600 200 L0 200Z;M0 120 Q150 70 300 120 T600 100 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 148 Q150 110 300 148 T600 130 L600 200 L0 200Z" fill="rgba(200,60,10,0.22)">
-          <animate attributeName="d" dur={`${13/m}s`} repeatCount="indefinite"
-            values="M0 148 Q150 110 300 148 T600 130 L600 200 L0 200Z;M0 148 Q150 178 300 148 T600 162 L600 200 L0 200Z;M0 148 Q150 110 300 148 T600 130 L600 200 L0 200Z" />
-        </path>
-      </svg>
-    </div>
-  );
-}
+function WaveSunset() { return <ZenWaves variant="sunset" />; }
+function WaveArctic() { return <ZenWaves variant="arctic" />; }
+function WaveNight() { return <ZenWaves variant="night" />; }
 
-// ── Wave Arctic (icy midnight ocean — pale blue waves on near-black) ──────────
-function WaveArctic() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#020810 0%,#041428 45%,#071e3a 100%)",overflow:"hidden" }}>
-      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"60%" }}>
-        <path d="M0 75 Q150 15 300 75 T600 55 L600 200 L0 200Z" fill="rgba(186,230,253,0.10)">
-          <animate attributeName="d" dur={`${8/m}s`} repeatCount="indefinite"
-            values="M0 75 Q150 15 300 75 T600 55 L600 200 L0 200Z;M0 75 Q150 125 300 75 T600 95 L600 200 L0 200Z;M0 75 Q150 15 300 75 T600 55 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 108 Q150 55 300 108 T600 88 L600 200 L0 200Z" fill="rgba(224,242,254,0.08)">
-          <animate attributeName="d" dur={`${11/m}s`} repeatCount="indefinite"
-            values="M0 108 Q150 55 300 108 T600 88 L600 200 L0 200Z;M0 108 Q150 152 300 108 T600 128 L600 200 L0 200Z;M0 108 Q150 55 300 108 T600 88 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 138 Q150 98 300 138 T600 118 L600 200 L0 200Z" fill="rgba(125,211,252,0.14)">
-          <animate attributeName="d" dur={`${14/m}s`} repeatCount="indefinite"
-            values="M0 138 Q150 98 300 138 T600 118 L600 200 L0 200Z;M0 138 Q150 172 300 138 T600 152 L600 200 L0 200Z;M0 138 Q150 98 300 138 T600 118 L600 200 L0 200Z" />
-        </path>
-      </svg>
-    </div>
-  );
-}
+// ── Aurora: slow drifting light ribbons over a starlit sky — pure zen ─────────
+function Aurora() {
+  const { speed, density } = useBackgroundTheme();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const speedRef = useRef(SPEED_MULT[speed] ?? 1);
+  useEffect(() => { speedRef.current = SPEED_MULT[speed] ?? 1; }, [speed]);
 
-// ── Wave Night (deep midnight ocean — near-black indigo waves) ────────────────
-function WaveNight() {
-  const { speed } = useBackgroundTheme();
-  const m = SPEED_MULT[speed] ?? 1;
-  return (
-    <div style={{ position:"absolute",inset:0,background:"linear-gradient(180deg,#000208 0%,#010414 40%,#02061f 100%)",overflow:"hidden" }}>
-      <svg viewBox="0 0 600 200" preserveAspectRatio="xMidYMid slice" style={{ position:"absolute",bottom:0,width:"100%",height:"62%" }}>
-        <path d="M0 85 Q150 25 300 85 T600 65 L600 200 L0 200Z" fill="rgba(60,80,180,0.12)">
-          <animate attributeName="d" dur={`${9/m}s`} repeatCount="indefinite"
-            values="M0 85 Q150 25 300 85 T600 65 L600 200 L0 200Z;M0 85 Q150 135 300 85 T600 105 L600 200 L0 200Z;M0 85 Q150 25 300 85 T600 65 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 115 Q150 65 300 115 T600 95 L600 200 L0 200Z" fill="rgba(40,55,160,0.09)">
-          <animate attributeName="d" dur={`${12/m}s`} repeatCount="indefinite"
-            values="M0 115 Q150 65 300 115 T600 95 L600 200 L0 200Z;M0 115 Q150 158 300 115 T600 135 L600 200 L0 200Z;M0 115 Q150 65 300 115 T600 95 L600 200 L0 200Z" />
-        </path>
-        <path d="M0 142 Q150 105 300 142 T600 124 L600 200 L0 200Z" fill="rgba(30,45,140,0.18)">
-          <animate attributeName="d" dur={`${15/m}s`} repeatCount="indefinite"
-            values="M0 142 Q150 105 300 142 T600 124 L600 200 L0 200Z;M0 142 Q150 174 300 142 T600 158 L600 200 L0 200Z;M0 142 Q150 105 300 142 T600 124 L600 200 L0 200Z" />
-        </path>
-      </svg>
-    </div>
-  );
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    let raf: number;
+    let t = 0;
+    interface StarPt { x:number; y:number; r:number; alpha:number; dAlpha:number }
+    let stars: StarPt[] = [];
+
+    const RIBBONS = [
+      { hue: 150, sat: 70, base: 0.32, amp: 0.07, period: 1.6, speed: 0.0042, width: 0.16, alpha: 0.16 },
+      { hue: 180, sat: 65, base: 0.42, amp: 0.06, period: 2.2, speed: -0.0031, width: 0.13, alpha: 0.12 },
+      { hue: 270, sat: 55, base: 0.28, amp: 0.08, period: 2.8, speed: 0.0024, width: 0.18, alpha: 0.09 },
+    ];
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+      stars = Array.from({ length: Math.round(110 * (DENSITY_MULT[density] ?? 1)) }, () => ({
+        x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+        r: Math.random() * 0.9 + 0.3,
+        alpha: Math.random() * 0.5 + 0.1,
+        dAlpha: (Math.random()-0.5) * 0.002,
+      }));
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    let _lf10 = 0;
+    const draw = (_t?: number) => {
+      const _now = _t ?? performance.now();
+      if (_now - _lf10 < 33) { raf = requestAnimationFrame(draw); return; }
+      _lf10 = _now;
+
+      if (document.hidden) return;
+      const sp = speedRef.current;
+      t += sp;
+      const W = canvas.width, H = canvas.height;
+
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "#010613"); sky.addColorStop(0.6, "#03102a"); sky.addColorStop(1, "#020a1c");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+
+      stars.forEach(st => {
+        st.alpha += st.dAlpha * sp;
+        if (st.alpha < 0.06) st.dAlpha = Math.abs(st.dAlpha);
+        if (st.alpha > 0.65) st.dAlpha = -Math.abs(st.dAlpha);
+        ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(210,225,255,${st.alpha})`;
+        ctx.fill();
+      });
+
+      RIBBONS.forEach((rb, ri) => {
+        const breathe = 0.75 + Math.sin(t * 0.0016 + ri * 2.1) * 0.25;
+        for (let x = 0; x <= W; x += 10) {
+          const yC = H * (rb.base + Math.sin((x / W) * Math.PI * rb.period + t * rb.speed) * rb.amp
+            + Math.sin((x / W) * Math.PI * rb.period * 2.3 - t * rb.speed * 1.7) * rb.amp * 0.35);
+          const h = H * rb.width * (0.8 + Math.sin((x / W) * 6 + t * 0.003 + ri) * 0.2);
+          const g = ctx.createLinearGradient(0, yC - h/2, 0, yC + h/2);
+          const a = rb.alpha * breathe;
+          g.addColorStop(0, `hsla(${rb.hue},${rb.sat}%,60%,0)`);
+          g.addColorStop(0.5, `hsla(${rb.hue},${rb.sat}%,62%,${a})`);
+          g.addColorStop(1, `hsla(${rb.hue},${rb.sat}%,60%,0)`);
+          ctx.fillStyle = g;
+          ctx.fillRect(x, yC - h/2, 10, h);
+        }
+      });
+
+      raf = requestAnimationFrame(draw);
+    };
+    const onVisible = () => { if (!document.hidden) raf = requestAnimationFrame(draw); };
+    document.addEventListener("visibilitychange", onVisible);
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); document.removeEventListener("visibilitychange", onVisible); };
+  }, [density]);
+
+  return <canvas ref={canvasRef} style={{ position:"absolute",inset:0,width:"100%",height:"100%",background:"#010613" }} />;
 }
 
 export const BACKGROUNDS: BackgroundEntry[] = [
-  // ── Minimal ──
-  { key: "particles",       label: "Particles",        category: "Minimal",       component: Particles,      interactive: true },
-  { key: "fireflies",       label: "Fireflies",        category: "Minimal",       component: Fireflies,      interactive: true },
-  { key: "custom",          label: "My Photo",         category: "Minimal",       component: CustomBg },
+  // ── Zen ──
+  { key: "shooting-stars",  label: "Night Sky",    category: "Zen", component: ShootingStars, interactive: true },
+  { key: "ripple",          label: "Still Water",  category: "Zen", component: Ripple,        interactive: true },
+  { key: "aurora",          label: "Aurora",       category: "Zen", component: Aurora },
+  { key: "wave",            label: "Ocean Wave",   category: "Zen", component: Wave },
+  { key: "wave-sunset",     label: "Sunset Wave",  category: "Zen", component: WaveSunset },
+  { key: "wave-arctic",     label: "Arctic Wave",  category: "Zen", component: WaveArctic },
+  { key: "wave-night",      label: "Night Wave",   category: "Zen", component: WaveNight },
 
-  // ── Professional ──
-  { key: "topographic",     label: "Topographic",      category: "Professional",  component: Topographic },
-
-  // ── Creative ──
-  { key: "constellation",   label: "Constellation",    category: "Creative",      component: Constellation,  interactive: true },
-  { key: "shooting-stars",  label: "Shooting Stars",   category: "Creative",      component: ShootingStars,  interactive: true },
-  { key: "ripple",          label: "Ripple",           category: "Creative",      component: Ripple,         interactive: true },
-  { key: "plasma",          label: "Plasma",           category: "Creative",      component: Plasma },
-  { key: "prismatic",       label: "Prismatic",        category: "Creative",      component: Prismatic,      interactive: true },
-
-  // ── Technical ──
-  { key: "matrix",          label: "Matrix",           category: "Technical",     component: Matrix,         interactive: true },
-  { key: "neural",          label: "Neural",           category: "Technical",     component: Neural,         interactive: true },
-
-  // ── Playful ──
-  { key: "neon-grid",       label: "Neon Grid",        category: "Playful",       component: NeonGrid },
-  { key: "wave",            label: "Ocean Wave",       category: "Playful",       component: Wave },
-  { key: "wave-sunset",     label: "Sunset Wave",      category: "Playful",       component: WaveSunset },
-  { key: "wave-arctic",     label: "Arctic Wave",      category: "Playful",       component: WaveArctic },
-  { key: "wave-night",      label: "Night Wave",       category: "Playful",       component: WaveNight },
+  // ── Default ──
+  { key: "custom",          label: "My Photo",     category: "Default", component: CustomBg },
 ];
 
 export function getBackground(key: string): BackgroundEntry | undefined {

@@ -919,6 +919,12 @@ components:
         extraInstruction:
           type: string
           description: Additional refinement instruction appended to the generation prompt (used by "Try a different angle" and similar refine actions in Capture)
+        format:
+          type: string
+          description: Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts
+        continuityContext:
+          type: string
+          description: Prior series parts' excerpts, woven in as continuity context when writing a later part of a series
         objective:
           type: string
           description: Legacy back-compat — derivable from audience; the server prefers `audience` when both are set
@@ -1122,6 +1128,12 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/PostDiagnosis"
+        topicId:
+          type: ["integer", "null"]
+        seriesId:
+          type: ["integer", "null"]
+        seriesPart:
+          type: ["integer", "null"]
       required:
         - id
         - rawInput
@@ -1166,6 +1178,12 @@ components:
           nullable: true
         shortPost:
           type: ["string", "null"]
+        topicId:
+          type: ["integer", "null"]
+        seriesId:
+          type: ["integer", "null"]
+        seriesPart:
+          type: ["integer", "null"]
       required:
         - rawInput
         - objective
@@ -1196,6 +1214,14 @@ components:
         visualType:
           type: string
           enum: [none, card, carousel, infographic, art]
+        isVoiceSample:
+          type: boolean
+        topicId:
+          type: ["integer", "null"]
+        seriesId:
+          type: ["integer", "null"]
+        seriesPart:
+          type: ["integer", "null"]
 
     LinkedinStatusResponse:
       type: object

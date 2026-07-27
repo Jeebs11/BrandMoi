@@ -57,6 +57,8 @@ export type ExtractedBrandVoice = {
   tone: string;
   summary: string;
   contentPillars: string[];
+  proofPoints: string[];
+  firstPostAngles: string[];
 };
 
 router.post(
@@ -101,22 +103,28 @@ Return this exact JSON (no markdown, no commentary):
 {
   "brandRole": "One sentence describing their professional role and what they do",
   "brandAudience": "Specific description of who they help or who they're targeting",
-  "brandBelief": "Their core professional belief, value proposition, or mission statement",
+  "brandBelief": "An opinionated, slightly contrarian professional stance this person would defend in public — NOT a value proposition or mission statement",
   "objective": "One of: Clients, Job, Authority, Documenting, Expert, Hiring",
   "persona": "One of: Operator, Founder, Career, Technical, Sales",
   "tone": "One of: Direct, Story, Educational, Bold",
-  "summary": "2-3 sentence plain English summary of what this person does and who they are professionally",
-  "contentPillars": ["pillar 1", "pillar 2", "pillar 3"]
+  "summary": "2-3 sentences describing how this person should come across on LinkedIn — their distinctive expertise and what makes their perspective worth following",
+  "contentPillars": ["pillar 1", "pillar 2", "pillar 3"],
+  "proofPoints": ["proof point 1", "proof point 2"],
+  "firstPostAngles": ["angle 1", "angle 2", "angle 3"]
 }
 
 Rules:
 - objective: Choose "Job" if this is a CV/resume, "Clients" if it's a business/service document, "Expert" if it's thought leadership or industry analysis, "Authority" if it's personal brand/story content, "Hiring" if focused on team building or employer brand
 - persona: Choose the closest match based on their role
-- tone: Infer from the document's writing style
+- tone: Infer from the document's writing style if it contains posts/articles; for CVs and resumes default to "Direct" (a CV's style says nothing about post-writing voice)
+- summary: write for content positioning, never recruiter-speak — do NOT mention job seeking, availability, or "looking for a role" even when the document is a CV
+- brandBelief: derive from what their career choices imply they believe. Good: "Most transformations fail because governance is bolted on after the fact, not designed in." Bad: "Delivering value through structured frameworks."
 - Keep brandRole under 120 characters
-- Keep brandAudience under 120 characters  
+- Keep brandAudience under 120 characters
 - Keep brandBelief under 150 characters
-- contentPillars: Extract 3-4 distinct recurring themes or topics this person writes about or is known for (e.g. "Leadership & team culture", "SaaS growth strategy", "Career transitions in tech"). Each pillar max 40 characters. These should reflect the person's actual content themes, not generic categories.`,
+- contentPillars: Extract 3-4 distinct recurring themes or topics this person writes about or is known for (e.g. "Leadership & team culture", "SaaS growth strategy", "Career transitions in tech"). Each pillar max 40 characters. These should reflect the person's actual content themes, not generic categories.
+- proofPoints: Extract 6-8 of the most concrete, quantified achievements from the document — each must contain a real number, name, scale, or timeframe taken from the document (budget figures, team sizes, programme names, % outcomes, durations). One sentence each, max 140 characters. These become specificity anchors for future posts. Never invent numbers.
+- firstPostAngles: 3 ready-to-write LinkedIn post angles drawn from real moments in this document — a specific decision, turnaround, client result, lesson, or contrarian observation their experience supports. Each max 15 words, phrased as the seed of a post (e.g. "The governance mistake that nearly sank a $30m programme"). Not generic topics.`,
         },
       ],
     });
@@ -144,6 +152,10 @@ Rules:
     if (!VALID_PERSONAS.includes(extracted.persona)) extracted.persona = "Founder";
     if (!VALID_TONES.includes(extracted.tone)) extracted.tone = "Direct";
     if (!Array.isArray(extracted.contentPillars)) extracted.contentPillars = [];
+    if (!Array.isArray(extracted.proofPoints)) extracted.proofPoints = [];
+    extracted.proofPoints = extracted.proofPoints.filter((p) => typeof p === "string" && p.trim()).slice(0, 8);
+    if (!Array.isArray(extracted.firstPostAngles)) extracted.firstPostAngles = [];
+    extracted.firstPostAngles = extracted.firstPostAngles.filter((a) => typeof a === "string" && a.trim()).slice(0, 3);
 
     res.json(extracted);
   }

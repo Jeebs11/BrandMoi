@@ -2,6 +2,8 @@ import { pgTable, text, serial, integer, timestamp, jsonb, boolean } from "drizz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
+import { topicsTable } from "./topics";
+import { seriesTable } from "./series";
 
 export const draftsTable = pgTable("drafts", {
   id: serial("id").primaryKey(),
@@ -25,6 +27,9 @@ export const draftsTable = pgTable("drafts", {
   mediaFormat: text("media_format"),
   linkedinUrl: text("linkedin_url"),
   isVoiceSample: boolean("is_voice_sample").notNull().default(false),
+  topicId: integer("topic_id").references(() => topicsTable.id, { onDelete: "set null" }),
+  seriesId: integer("series_id").references(() => seriesTable.id, { onDelete: "set null" }),
+  seriesPart: integer("series_part"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

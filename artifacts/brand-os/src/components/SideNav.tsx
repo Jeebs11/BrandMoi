@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight, Shield } from "lucide-react";
+import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight, Shield, FlaskConical, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useListDrafts } from "@workspace/api-client-react";
@@ -9,6 +9,7 @@ const BASE_NAV_ITEMS = [
   { href: "/capture", label: "Capture", icon: PenSquare },
   { href: "/vault", label: "Vault", icon: Lightbulb },
   { href: "/library", label: "Library", icon: BookOpen },
+  { href: "/series", label: "Series", icon: Layers },
 ];
 
 interface SideNavProps {
@@ -24,6 +25,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const NAV_ITEMS = [
     ...BASE_NAV_ITEMS,
     ...(hasPublished ? [{ href: "/analytics", label: "Analytics", icon: BarChart2 }] : []),
+    { href: "/studio", label: "Brand Studio", icon: FlaskConical },
   ];
 
   return (

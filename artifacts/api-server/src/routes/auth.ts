@@ -87,6 +87,11 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
+  if (user.blocked) {
+    res.status(403).json({ error: "This account has been blocked. Contact support." });
+    return;
+  }
+
   const token = signToken({ userId: user.id, email: user.email, displayName: user.displayName });
   res.cookie("brandos_token", token, COOKIE_OPTIONS);
   // Track login event (fire-and-forget, never block the response)
