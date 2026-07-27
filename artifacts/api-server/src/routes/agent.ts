@@ -3,17 +3,54 @@ import { z } from "zod";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable, ideaFeedbackTable } from "@workspace/db";
+import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable, ideaFeedbackTable, voiceSuggestionsTable, aiUsageTable, seriesTable, topicsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { buildVoiceDNA } from "../lib/voice-dna.js";
+import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
+import { buildLearnedPatterns, resonanceScore } from "../lib/learning.js";
+import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
+
+// Legacy-objective → modern-audience fallback for drafts saved before the
+// audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
+function deriveAudienceFallback(objective: unknown): string {
+  if (typeof objective !== "string") return "My audience";
+  const o = objective.toLowerCase();
+  if (o.includes("client")) return "Clients";
+  if (o === "hiring") return "My audience";
+  if (o.includes("job") || o.includes("recruit")) return "Recruiters & Headhunters";
+  if (o.includes("invest")) return "Investors";
+  if (o.includes("authority") || o.includes("expert") || o.includes("peer")) return "Peers";
+  return "My audience";
+}
 
 function parseJson(text: string): unknown {
   const cleaned = text
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Some models prepend a sentence before the JSON — fall back to the
+    // outermost braces.
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end <= start) throw new Error("No JSON object found in AI response");
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
+}
+
+
+// Map Anthropic rate-limit/overload errors to a 429 the UI can message
+// properly; everything else stays a generic 500.
+function respondAiError(res: { status: (n: number) => { json: (b: unknown) => void } }, err: unknown, fallback: string): void {
+  const status = (err as { status?: number })?.status;
+  if (status === 429 || status === 529) {
+    res.status(429).json({ error: "The AI is at its rate limit right now — try again in a minute or two." });
+    return;
+  }
+  res.status(500).json({ error: fallback });
 }
 
 const router: IRouter = Router();
@@ -68,6 +105,43 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       (o) => (objCounts[o] ?? 0) === 0
     );
 
+    // Audience mix (modern taxonomy) over the same recent window — used to
+    // bias brand-angle generation toward audiences the user hasn't been
+    // posting for lately (e.g. they've been all-Peers, nudge a Recruiters
+    // angle). No extra DB call or AI call — reuses recentDrafts already fetched.
+    const audienceCounts: Record<string, number> = {};
+    for (const d of recentDrafts.slice(0, 10)) {
+      const sb = d.structuredBreakdown as { audience?: string } | null;
+      const aud = (typeof sb?.audience === "string" && sb.audience) || deriveAudienceFallback(d.objective);
+      audienceCounts[aud] = (audienceCounts[aud] ?? 0) + 1;
+    }
+    const ALL_AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
+    // Every audience gets its own angle every time (see prompt below); this
+    // list is just used to flag which ones deserve extra sharpness because
+    // the user hasn't been posting there.
+    const underusedAudiences = ALL_AUDIENCES.filter((a) => !audienceCounts[a]);
+
+    // Series-in-progress nudge: one cheap extra query (few rows, indexed by
+    // user+status), then reuse recentDrafts (already fetched) to count parts
+    // written per series — no AI call involved in computing this.
+    const activeSeries = await db
+      .select()
+      .from(seriesTable)
+      .where(and(eq(seriesTable.userId, req.user!.userId), eq(seriesTable.status, "active")));
+    let seriesNudge: { seriesId: number; title: string; nextPart: number; plannedParts: number | null } | null = null;
+    if (activeSeries.length > 0) {
+      const partsBySeriesId: Record<number, number> = {};
+      for (const d of recentDrafts) {
+        if (d.seriesId) partsBySeriesId[d.seriesId] = (partsBySeriesId[d.seriesId] ?? 0) + 1;
+      }
+      // Endless series (plannedParts null) always have a "next part" to nudge toward.
+      const needingNext = activeSeries.find((s) => s.plannedParts === null || (partsBySeriesId[s.id] ?? 0) < s.plannedParts);
+      if (needingNext) {
+        const written = partsBySeriesId[needingNext.id] ?? 0;
+        seriesNudge = { seriesId: needingNext.id, title: needingNext.title, nextPart: written + 1, plannedParts: needingNext.plannedParts };
+      }
+    }
+
     // Web search for current news relevant to the user's role and audience
     let newsContext = "";
     let newsHeadline = "";
@@ -77,31 +151,9 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
     let newsSourceDomain = "";
     let newsDescription = "";
     try {
-      const { default: OpenAI } = await import("openai");
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const roleContext = [prefs?.brandRole, prefs?.brandAudience].filter(Boolean).join(" working with ");
-      const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${roleContext || "LinkedIn professional"}. It must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the exact publication date/time (e.g. "2 hours ago", "yesterday", or the specific date), and a 2-3 sentence summary of the key finding or development.`;
-      const searchResp = await openai.chat.completions.create({
-        model: "gpt-4o-search-preview" as Parameters<typeof openai.chat.completions.create>[0]["model"],
-        messages: [{ role: "user" as const, content: searchQuery }],
-        max_tokens: 350,
-      });
-      newsContext = searchResp.choices[0]?.message?.content ?? "";
-      // Extract the first cited URL and title from search annotations
-      const annotations = (searchResp.choices[0]?.message as Record<string, unknown>)?.annotations;
-      if (Array.isArray(annotations)) {
-        for (const ann of annotations) {
-          const a = ann as Record<string, unknown>;
-          if (a.type === "url_citation") {
-            const citation = a.url_citation as Record<string, unknown> | undefined;
-            const url = citation?.url ?? a.url;
-            if (typeof url === "string" && url.startsWith("http")) {
-              newsUrl = url;
-              break;
-            }
-          }
-        }
-      }
+      const news = await fetchMomentumNewsAnchor(req.user!.userId);
+      newsContext = news.context;
+      newsUrl = news.url ?? "";
     } catch {
       newsContext = "";
     }
@@ -120,24 +172,32 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
       recentTopics ? `\nRecent topics: ${recentTopics}` : "",
       daysSinceLast !== null ? `Days since last draft: ${daysSinceLast}` : "No drafts yet",
       underused.length > 0 ? `Underused objectives: ${underused.join(", ")}` : "",
+      underusedAudiences.length > 0 ? `Audiences not covered in recent posts — make these angles especially sharp since the user needs a reason to post there: ${underusedAudiences.join(", ")}` : "",
       `Total drafts: ${recentDrafts.length}`,
       likedIdeas.length > 0 ? `\nIdeas this user has liked (generate more in this direction):\n${likedIdeas.slice(0, 10).map((t) => `- ${t}`).join("\n")}` : "",
       dislikedIdeas.length > 0 ? `\nIdeas this user has disliked (avoid these angles and themes):\n${dislikedIdeas.slice(0, 10).map((t) => `- ${t}`).join("\n")}` : "",
       newsContext ? `\nToday's news context (use this to make angles timely):\n${newsContext}` : "",
+      seriesNudge ? `\nActive series "${seriesNudge.title}" needs part ${seriesNudge.nextPart}${seriesNudge.plannedParts ? ` of ${seriesNudge.plannedParts}` : ""} — factor this into the insight if it fits naturally.` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 600,
+      max_tokens: 750,
       system: `You are an AI creative director for a LinkedIn creator. Generate a personalized daily brief — like a smart chief-of-staff, not a motivational poster.
 
 Return JSON only (no markdown):
 {
   "headline": "One sharp directive about what to focus on today (max 12 words)",
   "insight": "One specific observation about their content gap or momentum (max 25 words)",
-  "angles": ["specific post angle 1 (max 10 words)", "angle 2 (max 10 words)", "angle 3 (max 10 words)"],
+  "angles": [
+    {"angle": "specific post angle for Clients (max 10 words)", "audience": "Clients"},
+    {"angle": "specific post angle for Peers (max 10 words)", "audience": "Peers"},
+    {"angle": "specific post angle for Recruiters & Headhunters (max 10 words)", "audience": "Recruiters & Headhunters"},
+    {"angle": "specific post angle for Investors (max 10 words)", "audience": "Investors"},
+    {"angle": "specific post angle for My audience (max 10 words)", "audience": "My audience"}
+  ],
   "teachAngles": ["FAQ or analogy seed 1 (max 12 words)", "FAQ or analogy seed 2 (max 12 words)", "FAQ or analogy seed 3 (max 12 words)"],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
   "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string.",
@@ -149,8 +209,10 @@ Return JSON only (no markdown):
 Rules:
 - headline must be specific to their actual brand or gap, not generic
 - insight must reference something concrete from their history or underused objectives
-- if news context is available, at least one angle should reference or be inspired by it
 - angles are real post ideas they could write today
+- return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
+- each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one
+- if news context is available, let it inspire whichever of the 5 angles it fits best — don't force it
 - teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Each should be a short prompt like "Why [common misconception] — an analogy for [audience]" or "The real reason [industry thing] fails (explained simply)". Never generic — always tied to their specific brand context.
 - tone: direct, peer-level, no fluff, no "great job"
 - newsHeadline, newsSourceLine, newsPublishedAt, newsSourceDomain, newsDescription must only be set when real news context was provided — not invented`,
@@ -187,19 +249,35 @@ Rules:
       const insight = typeof parsed.insight === "string" && parsed.insight.trim()
         ? parsed.insight.trim()
         : `Focus on your most underused content angle to build authority faster.`;
-      const rawAngles: string[] = Array.isArray(parsed.angles)
-        ? (parsed.angles as unknown[]).filter((a): a is string => typeof a === "string").slice(0, 3)
+      // Angles now come tagged with a target audience. Accept the new
+      // {angle, audience} shape; if the model (or an old cached shape)
+      // returns a bare string, default it to "My audience" rather than drop it.
+      const VALID_AUDIENCES = new Set(ALL_AUDIENCES);
+      const rawAngles: Array<{ angle: string; audience: string }> = Array.isArray(parsed.angles)
+        ? (parsed.angles as unknown[])
+            .map((a) => {
+              if (typeof a === "string") return { angle: a, audience: "My audience" };
+              if (a && typeof a === "object" && typeof (a as { angle?: unknown }).angle === "string") {
+                const obj = a as { angle: string; audience?: unknown };
+                const audience = typeof obj.audience === "string" && VALID_AUDIENCES.has(obj.audience) ? obj.audience : "My audience";
+                return { angle: obj.angle, audience };
+              }
+              return null;
+            })
+            .filter((a): a is { angle: string; audience: string } => a !== null)
         : [];
-      const FALLBACK_ANGLES = [
-        `Share a hard lesson from your ${role} experience`,
-        `Challenge the most common assumption in your field`,
-        `Teach one thing you wish you knew earlier in your career`,
-      ];
-      const angles: string[] = [
-        rawAngles[0] ?? FALLBACK_ANGLES[0],
-        rawAngles[1] ?? FALLBACK_ANGLES[1],
-        rawAngles[2] ?? FALLBACK_ANGLES[2],
-      ];
+      // Guarantee exactly one angle per audience, in ALL_AUDIENCES order —
+      // fill any the model missed or duplicated from a per-audience fallback.
+      const FALLBACK_BY_AUDIENCE: Record<string, string> = {
+        "Clients": `Show a prospective client how you think about their exact problem`,
+        "Peers": `Challenge the most common assumption in your field`,
+        "Recruiters & Headhunters": `Share a hard call you made under pressure at work`,
+        "Investors": `Share a non-consensus read on where your market is heading`,
+        "My audience": `Teach one thing you wish you knew earlier in your career`,
+      };
+      const angles: Array<{ angle: string; audience: string }> = ALL_AUDIENCES.map(
+        (aud) => rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud }
+      );
       res.json({
         headline,
         insight,
@@ -213,12 +291,20 @@ Rules:
           ...(newsSourceDomain ? { newsSourceDomain } : {}),
           ...(newsDescription ? { newsDescription } : {}),
         } : {}),
+        ...(seriesNudge ? { seriesNudge } : {}),
       });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
   } catch (err) {
     console.error("[agent-brief]", err);
+    // Surface Anthropic rate limits as 429 so the UI can say "try again in a
+    // minute" instead of a generic failure.
+    const status = (err as { status?: number })?.status;
+    if (status === 429 || status === 529) {
+      res.status(429).json({ error: "The AI is at its rate limit right now — try again in a minute or two." });
+      return;
+    }
     res.status(500).json({ error: "Failed to generate brief" });
   }
 });
@@ -263,7 +349,7 @@ Rules:
     }
   } catch (err) {
     console.error("[agent-coach]", err);
-    res.status(500).json({ error: "Failed to generate coaching note" });
+    respondAiError(res, err, "Failed to generate coaching note");
   }
 });
 
@@ -325,7 +411,7 @@ Return JSON only (no markdown):
     }
   } catch (err) {
     console.error("[agent-news-angles]", err);
-    res.status(500).json({ error: "Failed to generate news angles" });
+    respondAiError(res, err, "Failed to generate news angles");
   }
 });
 
@@ -405,7 +491,7 @@ Return JSON only (no markdown):
     }
   } catch (err) {
     console.error("[agent-hook-alternatives]", err);
-    res.status(500).json({ error: "Failed to generate hook alternatives" });
+    respondAiError(res, err, "Failed to generate hook alternatives");
   }
 });
 
@@ -420,7 +506,7 @@ router.get("/agent/pain-points", requireAuth, aiRateLimit, async (req, res): Pro
     ].filter(Boolean).join("\n");
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5",
       max_tokens: 700,
       system: `You are a LinkedIn content strategist. Given a creator's brand profile, identify the 4 most pressing pain points their target audience faces day-to-day.
 
@@ -449,7 +535,7 @@ Return JSON only (no markdown):
     }
   } catch (err) {
     console.error("[agent-pain-points]", err);
-    res.status(500).json({ error: "Failed to generate pain points" });
+    respondAiError(res, err, "Failed to generate pain points");
   }
 });
 
@@ -470,7 +556,7 @@ router.post("/agent/skill-angles", requireAuth, aiRateLimit, async (req, res): P
     ].filter(Boolean).join("\n");
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5",
       max_tokens: 600,
       system: `You are a LinkedIn content strategist. Given a professional's skill, generate 3 compelling post angles they could write.
 
@@ -496,7 +582,7 @@ Return JSON only (no markdown):
     }
   } catch (err) {
     console.error("[agent-skill-angles]", err);
-    res.status(500).json({ error: "Failed to generate skill angles" });
+    respondAiError(res, err, "Failed to generate skill angles");
   }
 });
 
@@ -513,7 +599,10 @@ router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Pr
   try {
     const userId = req.user!.userId;
     const { postContent, draftId, fixesApplied } = parsed.data;
-    const { dna } = await getUserAgentContext(userId);
+    const [{ dna }, learnedPatterns] = await Promise.all([
+      getUserAgentContext(userId),
+      buildLearnedPatterns(userId),
+    ]);
 
     // Verify draft ownership before any read/write using draftId (prevents IDOR)
     let verifiedDraftId: number | null = null;
@@ -550,102 +639,54 @@ router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Pr
 
     const charCount = postContent.length;
 
-    const systemPrompt = `You are a LinkedIn post quality analyser. Score this post against 6 evidence-based factors from studies of 1.8M+ LinkedIn posts. Return ONLY valid JSON — no markdown, no commentary.
+    const systemPrompt = `You are a LinkedIn content quality judge. Score this post on how well it aligns with LinkedIn's OWN published creator guidance — the principles LinkedIn states its feed rewards. A high score must mean "this is the kind of post LinkedIn says it promotes," NOT "this uses engagement hacks." Score 4 judgment-based factors. Return ONLY valid JSON — no markdown, no commentary.
 
-SCORING RUBRIC:
+These 4 factors are deliberately the QUALITATIVE ones a human editor must judge. Do NOT score length, hashtag count, or links here — a separate live tool already checks those mechanics; focus only on the judgment below.
 
-Factor 1 — Hook Power (max 25 points)
-LinkedIn truncates after ~140 chars. 90% of post performance is determined by whether the hook earns the "See more" click.
-- 25 pts: First line ≤140 chars, creates curiosity/tension/surprise via bold claim, specific stat, provocative question, or scene-setting opener. Does NOT start with "I ", "We ", "Today", "In this post", "Sharing", "I've been thinking".
-- 13 pts: Decent hook but not strong enough to guarantee "See more" click (weak question, vague premise).
-- 0-5 pts: Weak opener starting with "I've been thinking", "In today's world", "Let me tell you", "Sharing this because", or a generic greeting.
+SCORING RUBRIC (LinkedIn creator-guidance pillars):
 
-Factor 2 — Dwell Time Potential (max 20 points)
-Posts with 61+ sec dwell time achieve 15.6% engagement vs 1.2% at 0-3 sec. Formatted posts generate 40% longer dwell time and up to 3× more engagement vs walls of text (ContentIn 2025).
-- 20 pts: Short paragraphs (1-2 lines max), consistent line breaks between ideas, no walls of text, escalating value toward the end.
-- 10 pts: Some formatting but inconsistent — long blocks mixed with short ones.
-- 0 pts: Dense wall of text with no line breaks.
+Factor 1 — Expertise & Relevance (max 30 points)
+LinkedIn's knowledge/interest graph rewards demonstrated, topic-consistent expertise aimed at a clear audience. The platform explicitly favours people sharing genuine knowledge in their field.
+- 30 pts: Clearly written by someone with real expertise on this topic, aimed at an identifiable professional audience; teaches or reframes something only an insider would know.
+- 15 pts: On-topic and competent but generic — could be written by anyone; expertise is implied, not demonstrated.
+- 0-5 pts: Off-niche, surface-level, or could be AI-generic; no evidence of real expertise.
 
-Factor 3 — Comment Trigger (max 20 points)
-Comments weighted 2x-15x higher than likes. Comments with 15+ words valued 2.5x higher (2025 algorithm). Comment threads trigger aggressive reach expansion.
-- 20 pts: Ends with a specific, answerable question inviting real perspective or gentle disagreement. No engagement bait.
-- 10 pts: Has a CTA/question but it is generic, passive, or tacked on ("Let me know your thoughts", "Drop a comment").
-- 0 pts: No question/CTA, OR uses engagement bait phrases ("Comment YES if you agree", "Like and share if this helped", "Tag someone who needs this", "Repost this", "Follow me for more").
+Factor 2 — Original Perspective & Authenticity (max 25 points)
+LinkedIn states it rewards authentic, original, first-person content and down-ranks generic or inauthentic posts.
+- 25 pts: A clear, specific point of view or lived experience; says something the author actually believes, with a concrete anchor (real number, named situation, genuine lesson).
+- 13 pts: Has a viewpoint but it's safe/conventional, or specifics are thin.
+- 0-5 pts: Platitudes, regurgitated advice, or "thought-leader" filler with no real stance.
 
-Factor 4 — Specificity & Credibility (max 15 points)
-LinkedIn's 2025 Interest Graph rewards expertise-driven, topic-consistent, authority-signalling content.
-- 15 pts: Contains at least one concrete anchor — specific number, percentage, timeframe, named scenario, real outcome, or illustrative example.
-- 8 pts: Some specific elements but also vague generalisations that dilute credibility.
-- 0 pts: Entirely vague — no concrete numbers, no specific examples, no real scenario.
+Factor 3 — Meaningful Conversation (max 25 points)
+LinkedIn rewards posts that spark SUBSTANTIVE comments and replies, and actively penalises engagement bait. Quality of invited conversation matters, not volume of reactions.
+- 25 pts: Naturally invites thoughtful responses — a genuine question, a debatable stance, or an idea people will want to add to. No bait.
+- 13 pts: Some conversational pull but the prompt is generic ("thoughts?", "let me know") or weakly tied to the content.
+- 0-5 pts: No conversational hook, OR uses engagement bait ("Comment YES", "Tag someone", "Like & share", "Follow for more", "Repost this") — these are penalised by LinkedIn.
 
-Factor 5 — Length Optimisation (max 10 points)
-Cross-study consensus (621K posts — AuthoredUp, 372K posts — AuthoredUp 2025 update): 800-1,800 chars = peak engagement zone. Under 400 chars = low dwell, low perceived value.
-The post is ${charCount} characters.
-- 10 pts: 800–1,800 characters.
-- 6 pts: 400–800 chars or 1,800–2,500 chars.
-- 2 pts: Under 400 chars or over 2,500 chars.
-
-Factor 6 — LinkedIn Fit (max 10 points)
-External links in post body carry a 26.5% average reach penalty, growing from 5% in 2023 to 42% in 2025 (900K post study — Ordinal). Engagement bait triggers LinkedIn's spam classifier in the first 60 minutes. Optimal hashtags: 1-3. Diminishing returns above 5.
-- 10 pts: No external links in post body, no engagement bait, 0-5 hashtags, native-content feel throughout.
-- 5 pts: One minor issue (e.g. 6+ hashtags or one borderline phrase).
-- 0 pts: External link present in post body, or engagement bait detected, or multiple issues.
+Factor 4 — Hook & Readability (max 20 points)
+LinkedIn rewards dwell time. The opening must earn the "see more" expand, and the body must be easy to read on a phone.
+- 20 pts: First line creates curiosity/tension/value and clearly earns the expand; body is skimmable (short paragraphs, whitespace) and pulls the reader down.
+- 10 pts: Decent opener or readable body, but not both; some momentum lost.
+- 0-5 pts: Weak/generic opener ("I'm excited…", "Today…") or a dense wall of text that kills dwell.
 
 RULES:
-- publishReady MUST be true if and only if the total score is 85 or higher.
-- If publishReady is true: fixes array must be empty (or at most 1 minor polish note). Do NOT invent new problems.
-- If publishReady is false: surface at most 2-3 fixes, focused on the lowest-scoring factors only.
-- howToFix: only include for factors that are below their maximum score. Make it specific to THIS post, not generic advice.
-- why: 1-2 sentences grounded in the research data above — always include at least one specific stat or number from the rubric.
-- fixes: short (1 sentence each), actionable summaries of the most important changes needed.
+- score = sum of the 4 factor scores (max 100).
+- publishReady MUST be true if and only if score is 80 or higher.
+- If publishReady: fixes array empty (or 1 minor polish note). Do NOT invent problems.
+- If not publishReady: surface at most 2-3 fixes, focused on the lowest factors.
+- howToFix: only for factors below max; specific to THIS post, tied to the LinkedIn principle it serves.
+- why: 1-2 sentences naming the LinkedIn creator-guidance principle at play.
+- Reward alignment with guidance; never reward gimmicks. Engagement bait must score Factor 3 at 0-5 regardless of how "engaging" it seems.
 
 Return this exact JSON shape:
 {
   "score": <integer 0-100>,
   "publishReady": <boolean>,
   "factors": [
-    {
-      "name": "Hook Power",
-      "score": <integer 0-25>,
-      "maxScore": 25,
-      "why": "<1-2 sentences with research stat>",
-      "howToFix": "<specific actionable instruction, or omit if at max score>"
-    },
-    {
-      "name": "Dwell Time",
-      "score": <integer 0-20>,
-      "maxScore": 20,
-      "why": "<1-2 sentences with research stat>",
-      "howToFix": "<specific actionable instruction, or omit if at max score>"
-    },
-    {
-      "name": "Comment Trigger",
-      "score": <integer 0-20>,
-      "maxScore": 20,
-      "why": "<1-2 sentences with research stat>",
-      "howToFix": "<specific actionable instruction, or omit if at max score>"
-    },
-    {
-      "name": "Specificity",
-      "score": <integer 0-15>,
-      "maxScore": 15,
-      "why": "<1-2 sentences with research stat>",
-      "howToFix": "<specific actionable instruction, or omit if at max score>"
-    },
-    {
-      "name": "Length",
-      "score": <integer 0-10>,
-      "maxScore": 10,
-      "why": "<1-2 sentences with research stat>",
-      "howToFix": "<specific actionable instruction, or omit if at max score>"
-    },
-    {
-      "name": "LinkedIn Fit",
-      "score": <integer 0-10>,
-      "maxScore": 10,
-      "why": "<1-2 sentences with research stat>",
-      "howToFix": "<specific actionable instruction, or omit if at max score>"
-    }
+    { "name": "Expertise & Relevance", "score": <0-30>, "maxScore": 30, "why": "<names the LinkedIn principle>", "howToFix": "<specific, or omit if at max>" },
+    { "name": "Original Perspective", "score": <0-25>, "maxScore": 25, "why": "<names the LinkedIn principle>", "howToFix": "<specific, or omit if at max>" },
+    { "name": "Meaningful Conversation", "score": <0-25>, "maxScore": 25, "why": "<names the LinkedIn principle>", "howToFix": "<specific, or omit if at max>" },
+    { "name": "Hook & Readability", "score": <0-20>, "maxScore": 20, "why": "<names the LinkedIn principle>", "howToFix": "<specific, or omit if at max>" }
   ],
   "fixes": ["<fix 1>", "<fix 2>"],
   "personalInsight": "<optional: 1-2 sentences comparing to user's voice DNA or best posts. Omit if no voice data available.>"
@@ -655,23 +696,21 @@ Return this exact JSON shape:
       `Post draft (${charCount} characters):\n\n${postContent}`,
       dna ? `\nUser's writing DNA for personalInsight:\n${dna}` : "",
       resonanceContext ? `\nResonance/performance context (use in personalInsight if helpful):\n${resonanceContext}` : "",
+      learnedPatterns ? `\n${learnedPatterns}\nWhen this user's own measured patterns conflict with the generic rubric, weight the user's patterns — mention it in personalInsight.` : "",
     ].filter(Boolean).join("\n");
 
-    const { default: OpenAI } = await import("openai");
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
       max_tokens: 1500,
+      temperature: 0.2,
+      system: systemPrompt + "\n\nReturn ONLY valid JSON — no markdown fences, no commentary.",
+      messages: [{ role: "user", content: userMessage }],
     });
 
-    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const block = completion.content[0];
+    const raw = block?.type === "text"
+      ? block.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+      : "{}";
     const data = JSON.parse(raw) as {
       score?: number;
       publishReady?: boolean;
@@ -681,7 +720,7 @@ Return this exact JSON shape:
     };
 
     const validFactors = Array.isArray(data.factors) &&
-      data.factors.length === 6 &&
+      data.factors.length === 4 &&
       data.factors.every(
         (f: unknown) => f && typeof f === "object" && "name" in (f as object) &&
           typeof (f as { name: unknown }).name === "string" &&
@@ -700,11 +739,11 @@ Return this exact JSON shape:
     const validatedFactors = data.factors as Array<{ name: string; score: number; maxScore: number; why?: string; howToFix?: string }>;
 
     const normalizedScore = Math.min(100, Math.max(0, Number(data.score)));
-    const publishReady = normalizedScore >= 85;
+    const publishReady = normalizedScore >= 80;
     // When publish-ready, strip howToFix from every factor so the UI cannot
     // surface improvement suggestions after the 85+ threshold is reached.
     // Fallback defaults for why/name ensure UI never receives empty strings.
-    const factors = validatedFactors.slice(0, 6).map((f, i) => ({
+    const factors = validatedFactors.slice(0, 4).map((f, i) => ({
       name: typeof f.name === "string" && f.name.trim() ? f.name.trim() : `Factor ${i + 1}`,
       score: f.score,
       maxScore: f.maxScore,
@@ -744,7 +783,7 @@ Return this exact JSON shape:
     res.json({ ...result, ...(persistenceWarning ? { persistenceWarning } : {}) });
   } catch (err) {
     console.error("[agent-stress-test]", err);
-    res.status(500).json({ error: "Failed to run stress test" });
+    respondAiError(res, err, "Failed to run stress test");
   }
 });
 
@@ -763,7 +802,7 @@ router.get("/agent/stress-test/scores", requireAuth, async (req, res): Promise<v
       if (s.draftId && !scoreMap[String(s.draftId)]) {
         scoreMap[String(s.draftId)] = {
           score: s.overallScore,
-          publishReady: s.overallScore >= 85,
+          publishReady: s.overallScore >= 80,
           createdAt: s.createdAt.toISOString(),
           factors: s.factorScores,
         };
@@ -798,7 +837,7 @@ router.get("/agent/themes", requireAuth, async (req, res): Promise<void> => {
       .join("\n");
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5",
       max_tokens: 400,
       system: `You are a content strategist analyzing a LinkedIn creator's draft library for recurring themes that could become a series.
 
@@ -831,7 +870,405 @@ Rules:
     }
   } catch (err) {
     console.error("[agent-themes]", err);
-    res.status(500).json({ error: "Failed to analyze themes" });
+    respondAiError(res, err, "Failed to analyze themes");
+  }
+});
+
+// Dare mode: one spicy-but-defensible contrarian take the user is dared to
+// post within 24h. Capped at 3/day so it can't quietly burn API budget.
+router.post("/agent/dare", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  try {
+    const limit = await checkAndIncrementDailyLimit(userId, "dare", 3);
+    if (!limit.allowed) {
+      res.status(429).json({ error: "You've used your 3 dares for today. The algorithm gets a day off." });
+      return;
+    }
+
+    const { prefs, dna } = await getUserAgentContext(userId);
+    const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
+    const proofPoints = Array.isArray(prefs?.proofPoints) ? (prefs.proofPoints as string[]) : [];
+
+    const userMessage = [
+      prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
+      prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
+      prefs?.brandBelief ? `Core belief: ${prefs.brandBelief}` : "",
+      pillars.length > 0 ? `Content pillars: ${pillars.join(", ")}` : "",
+      proofPoints.length > 0 ? `Proof points they can back claims with:\n${proofPoints.map((p) => `- ${p}`).join("\n")}` : "",
+      dna ? `\nWriting DNA:\n${dna}` : "",
+    ].filter(Boolean).join("\n");
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 300,
+      system: `You are the mischievous side of a LinkedIn brand strategist. Generate ONE dare: the spiciest contrarian take this person's actual experience can defend. It must be provocative enough to make them hesitate, but professionally defensible — never offensive, never punching down, never fabricated.
+
+Return JSON only (no markdown):
+{
+  "dare": "The contrarian take, phrased as the opening line of a post (max 25 words)",
+  "why": "One sentence on why their experience earns them the right to say this (max 20 words)",
+  "risk": "One of: Mild, Medium, Spicy"
+}`,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    try {
+      const data = parseJson(block.text) as { dare?: string; why?: string; risk?: string };
+      if (!data.dare) throw new Error("bad shape");
+      res.json({
+        dare: data.dare,
+        why: data.why ?? "",
+        risk: ["Mild", "Medium", "Spicy"].includes(data.risk ?? "") ? data.risk : "Medium",
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        remaining: limit.remaining,
+      });
+    } catch {
+      res.status(500).json({ error: "Invalid AI response" });
+    }
+  } catch (err) {
+    console.error("[agent-dare]", err);
+    respondAiError(res, err, "Failed to generate dare");
+  }
+});
+
+const IdeasBody = z.object({ type: z.enum(["brand", "teach"]), topicId: z.number().int().nullish() });
+
+// Per-tab idea refresh: regenerates ONLY brand angles or teach angles, on
+// Haiku — much cheaper than re-running the whole daily brief (which also
+// re-fetches news). Used by the Idea Engine's per-tab refresh buttons.
+router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = IdeasBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "type must be brand or teach." }); return; }
+
+  try {
+    const { prefs, recentDrafts, ideaFeedback } = await getUserAgentContext(req.user!.userId);
+    const liked = ideaFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText).slice(0, 8);
+    const disliked = ideaFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText).slice(0, 8);
+    const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
+    const recentTopics = recentDrafts.slice(0, 8)
+      .map((d) => (d.structuredBreakdown as { topic?: string } | null)?.topic)
+      .filter(Boolean).join(", ");
+
+    const ALL_AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
+
+    let topicName: string | null = null;
+    if (parsed.data.topicId) {
+      const [topic] = await db.select().from(topicsTable)
+        .where(and(eq(topicsTable.id, parsed.data.topicId), eq(topicsTable.userId, req.user!.userId)));
+      topicName = topic?.name ?? null;
+    }
+
+    const isTeach = parsed.data.type === "teach";
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 450,
+      system: isTeach
+        ? `You generate "teach your audience" LinkedIn post seeds — analogy or FAQ ideas grounded in the creator's exact field. Each max 12 words, like "Why [misconception] — an analogy for [audience]". Return JSON only: {"angles": ["...", "...", "..."]}`
+        : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
+Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one.
+Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
+Return JSON only: {"angles": [{"angle": "...", "audience": "Clients"}, {"angle": "...", "audience": "Peers"}, {"angle": "...", "audience": "Recruiters & Headhunters"}, {"angle": "...", "audience": "Investors"}, {"angle": "...", "audience": "My audience"}]}`,
+      messages: [{
+        role: "user",
+        content: [
+          prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
+          prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
+          pillars.length > 0 ? `Content pillars: ${pillars.join(", ")}` : "",
+          topicName ? `Generate ideas specifically for this topic (all angles must fit it): ${topicName}` : "",
+          recentTopics ? `Recent topics (avoid repeating): ${recentTopics}` : "",
+          liked.length > 0 ? `Liked idea directions:\n${liked.map((t) => `- ${t}`).join("\n")}` : "",
+          disliked.length > 0 ? `Disliked directions (avoid):\n${disliked.map((t) => `- ${t}`).join("\n")}` : "",
+          isTeach ? "Generate 3 fresh angles. JSON only." : "Generate 5 fresh angles, one per audience. JSON only.",
+        ].filter(Boolean).join("\n"),
+      }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const data = parseJson(block.text) as { angles?: unknown };
+    if (!Array.isArray(data.angles)) throw new Error("bad shape");
+
+    if (isTeach) {
+      res.json({ angles: data.angles.filter((a): a is string => typeof a === "string").slice(0, 3) });
+      return;
+    }
+
+    const VALID_AUDIENCES = new Set(ALL_AUDIENCES);
+    const rawAngles = data.angles
+      .map((a) => {
+        if (typeof a === "string") return { angle: a, audience: "My audience" };
+        if (a && typeof a === "object" && typeof (a as { angle?: unknown }).angle === "string") {
+          const obj = a as { angle: string; audience?: unknown };
+          const audience = typeof obj.audience === "string" && VALID_AUDIENCES.has(obj.audience) ? obj.audience : "My audience";
+          return { angle: obj.angle, audience };
+        }
+        return null;
+      })
+      .filter((a): a is { angle: string; audience: string } => a !== null);
+
+    // Guarantee exactly one angle per audience — fill any the model missed
+    // or duplicated from a per-audience fallback.
+    const FALLBACK_BY_AUDIENCE: Record<string, string> = {
+      "Clients": `Show a prospective client how you think about their exact problem`,
+      "Peers": `Challenge the most common assumption in your field`,
+      "Recruiters & Headhunters": `Share a hard call you made under pressure at work`,
+      "Investors": `Share a non-consensus read on where your market is heading`,
+      "My audience": `Teach one thing you wish you knew earlier in your career`,
+    };
+    const angles = ALL_AUDIENCES.map(
+      (aud) => rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud }
+    );
+    res.json({ angles });
+  } catch (err) {
+    console.error("[agent-ideas]", err);
+    respondAiError(res, err, "Failed to generate ideas");
+  }
+});
+
+const ClassifyPostBody = z.object({ text: z.string().min(80).max(6000) });
+
+// Classify a pasted past post so imports get real audience/feeling/topic
+// labels instead of defaults. One small Haiku call.
+router.post("/agent/classify-post", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = ClassifyPostBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "text required (80-6000 chars)." }); return; }
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 250,
+      system: `You classify LinkedIn posts. Return JSON only (no markdown):
+{
+  "topic": "short topic label (max 70 chars, taken from what the post is actually about)",
+  "audience": "One of: Clients, Peers, Recruiters & Headhunters, Investors, My audience",
+  "feeling": "One of: Direct, Witty, Vulnerable, Story, Contrarian",
+  "objective": "One of: Clients, Job, Authority, Documenting, Expert, Hiring",
+  "tone": "One of: Direct, Witty, Vulnerable, Story, Contrarian"
+}
+Infer from the post's content, framing, and call-to-action. Pick the closest match; never invent values outside the lists.`,
+      messages: [{ role: "user", content: parsed.data.text }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const data = parseJson(block.text) as { topic?: string; audience?: string; feeling?: string; objective?: string; tone?: string };
+
+    const AUD = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
+    const FEEL = ["Direct", "Witty", "Vulnerable", "Story", "Contrarian"];
+    const OBJ = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
+
+    res.json({
+      topic: (data.topic ?? "").slice(0, 70) || null,
+      audience: AUD.includes(data.audience ?? "") ? data.audience : "My audience",
+      feeling: FEEL.includes(data.feeling ?? "") ? data.feeling : "Direct",
+      objective: OBJ.includes(data.objective ?? "") ? data.objective : "Authority",
+      tone: FEEL.includes(data.tone ?? "") ? data.tone : "Direct",
+    });
+  } catch (err) {
+    console.error("[classify-post]", err);
+    respondAiError(res, err, "Failed to classify post");
+  }
+});
+
+// ── Brand Studio ─────────────────────────────────────────────────────────
+
+// Health snapshot: when the brand was last tuned (last brand-analysis run)
+// and how many measured posts have landed since. No AI call.
+router.get("/agent/brand-health", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  try {
+    const [lastAnalysis] = await db
+      .select({ date: aiUsageTable.date })
+      .from(aiUsageTable)
+      .where(and(eq(aiUsageTable.userId, userId), eq(aiUsageTable.kind, "brand-analysis")))
+      .orderBy(desc(aiUsageTable.date))
+      .limit(1);
+
+    const published = await db
+      .select({ id: draftsTable.id, updatedAt: draftsTable.updatedAt })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
+
+    const signals = published.length > 0
+      ? await db
+          .select({ draftId: performanceSignalsTable.draftId })
+          .from(performanceSignalsTable)
+          .where(inArray(performanceSignalsTable.draftId, published.map((d) => d.id)))
+      : [];
+    const measured = new Set(signals.map((s) => s.draftId));
+
+    const since = lastAnalysis ? new Date(lastAnalysis.date + "T00:00:00Z").getTime() : 0;
+    const measuredSince = published.filter((d) => measured.has(d.id) && new Date(d.updatedAt).getTime() > since).length;
+
+    res.json({
+      lastAnalyzedAt: lastAnalysis?.date ?? null,
+      measuredPostsTotal: measured.size,
+      measuredPostsSince: measuredSince,
+    });
+  } catch (err) {
+    console.error("[brand-health]", err);
+    res.status(500).json({ error: "Failed to load brand health" });
+  }
+});
+
+// Published posts ranked by resonance for the analysis picker. No AI call.
+router.get("/agent/studio-posts", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  try {
+    const drafts = await db
+      .select({ id: draftsTable.id, structuredBreakdown: draftsTable.structuredBreakdown, postOutput: draftsTable.postOutput, updatedAt: draftsTable.updatedAt })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+      .orderBy(desc(draftsTable.updatedAt))
+      .limit(60);
+
+    const signals = drafts.length > 0
+      ? await db.select().from(performanceSignalsTable).where(inArray(performanceSignalsTable.draftId, drafts.map((d) => d.id)))
+      : [];
+    const perfMap = new Map(signals.map((s) => [s.draftId, s]));
+
+    const posts = drafts
+      .filter((d) => d.postOutput && d.postOutput.trim().length > 60)
+      .map((d) => {
+        const s = perfMap.get(d.id);
+        const bd = d.structuredBreakdown as { topic?: string; audience?: string; feeling?: string } | null;
+        return {
+          id: d.id,
+          topic: bd?.topic ?? d.postOutput!.split("\n").find((l) => l.trim())?.slice(0, 70) ?? `Post #${d.id}`,
+          resonance: s ? resonanceScore(s) : null,
+          hasData: !!s,
+          audience: bd?.audience ?? null,
+          feeling: bd?.feeling ?? null,
+        };
+      })
+      .sort((a, b) => (b.resonance ?? -1) - (a.resonance ?? -1));
+
+    res.json({ posts });
+  } catch (err) {
+    console.error("[studio-posts]", err);
+    res.status(500).json({ error: "Failed to load posts" });
+  }
+});
+
+const BrandAnalysisBody = z.object({
+  draftIds: z.array(z.number().int()).min(1).max(8),
+  // Optional lens: when the user filtered to a category (e.g. "Story posts to
+  // Peers"), the analysis frames its findings through that lens.
+  focus: z.string().max(120).optional(),
+});
+
+// The Brand Studio engine: deep-dive the selected posts vs the current brand
+// profile and emit a "brand diff" as pending voice suggestions. 2/day cap.
+router.post("/agent/brand-analysis", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsed = BrandAnalysisBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "draftIds required (1-8)." }); return; }
+  const userId = req.user!.userId;
+
+  try {
+    const limit = await checkAndIncrementDailyLimit(userId, "brand-analysis", 2);
+    if (!limit.allowed) {
+      res.status(429).json({ error: "You've used both brand analyses for today. Come back tomorrow." });
+      return;
+    }
+
+    const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
+    const drafts = await db
+      .select()
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), inArray(draftsTable.id, parsed.data.draftIds)));
+    if (drafts.length === 0) { res.status(404).json({ error: "No matching posts found." }); return; }
+
+    const signals = await db.select().from(performanceSignalsTable).where(inArray(performanceSignalsTable.draftId, drafts.map((d) => d.id)));
+    const perfMap = new Map(signals.map((s) => [s.draftId, s]));
+    const learnedPatterns = await buildLearnedPatterns(userId);
+
+    const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
+    const proofPoints = Array.isArray(prefs?.proofPoints) ? (prefs.proofPoints as string[]) : [];
+    const aspirational = Array.isArray(prefs?.aspirationalSamples) ? (prefs.aspirationalSamples as string[]) : [];
+
+    const postsBlock = drafts.map((d) => {
+      const s = perfMap.get(d.id);
+      const perf = s ? `resonance ${resonanceScore(s)} · ${s.impressions} impressions · ${s.reactions} reactions · ${s.comments} comments` : "no performance data";
+      return `[id:${d.id}] (${perf})\n${(d.postOutput ?? "").slice(0, 1200)}`;
+    }).join("\n\n---\n\n");
+
+    const profileBlock = [
+      `objective: ${prefs?.objective ?? ""}`,
+      `persona: ${prefs?.persona ?? ""}`,
+      `tone: ${prefs?.tone ?? ""}`,
+      `brandRole: ${prefs?.brandRole ?? ""}`,
+      `brandAudience: ${prefs?.brandAudience ?? ""}`,
+      `brandBelief: ${prefs?.brandBelief ?? ""}`,
+      `contentPillars: ${pillars.join(", ")}`,
+      proofPoints.length > 0 ? `proofPoints:\n${proofPoints.map((p) => `- ${p}`).join("\n")}` : "",
+      aspirational.length > 0 ? `aspirationalStyleTargets (the user is deliberately steering toward this writing style — recommendations should be compatible with this direction, not fight it):\n${aspirational.map((s) => `- "${s.slice(0, 200)}…"`).join("\n")}` : "",
+    ].filter(Boolean).join("\n");
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1200,
+      system: `You are a personal brand strategist doing a periodic tune-up. Compare what this creator's chosen posts prove is working against their declared brand profile, and recommend profile updates so the brand keeps evolving with the evidence.
+
+Return JSON only (no markdown):
+{"suggestions": [{"field": "...", "suggestedValue": "...", "rationale": "...", "evidenceDraftIds": [1,2]}]}
+
+Rules:
+- Allowed fields: tone, objective, persona, brandRole, brandAudience, brandBelief, contentPillars.
+- For contentPillars: suggestedValue is a comma-separated list of 3-6 pillars (each max 40 chars) — the FULL new set, not just additions.
+- For tone use only: Executive, Direct, Story, Contrarian, Witty, Vulnerable, Playful, Snappy. For objective only: Clients, Job, Authority, Documenting, Expert, Hiring.
+- Only suggest a change when the posts clearly contradict or outgrow the current value — quote the evidence in the rationale (reference what the posts actually do).
+- Maximum 4 suggestions. Zero suggestions is a valid answer if the profile already matches the evidence.
+- Never suggest a value identical to the current one.
+- rationale: 1-2 sentences, specific, citing the pattern in the selected posts.`,
+      messages: [{
+        role: "user",
+        content: `CURRENT BRAND PROFILE:\n${profileBlock}\n\n${learnedPatterns ? learnedPatterns + "\n\n" : ""}${parsed.data.focus ? `ANALYSIS LENS: the creator deliberately selected ${parsed.data.focus}. Frame findings through this lens — what does THIS category of post prove, and what should change because of it?\n\n` : ""}SELECTED POSTS (the creator's evidence of what works):\n${postsBlock}\n\nRecommend profile updates. JSON only.`,
+      }],
+    });
+
+    const block = msg.content[0];
+    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+
+    const data = parseJson(block.text) as { suggestions?: Array<{ field: string; suggestedValue: string; rationale: string; evidenceDraftIds?: number[] }> };
+    const currentMap: Record<string, string> = {
+      tone: prefs?.tone ?? "", objective: prefs?.objective ?? "", persona: prefs?.persona ?? "",
+      brandRole: prefs?.brandRole ?? "", brandAudience: prefs?.brandAudience ?? "", brandBelief: prefs?.brandBelief ?? "",
+      contentPillars: pillars.join(", "),
+    };
+    const ALLOWED = Object.keys(currentMap);
+    const valid = (data.suggestions ?? [])
+      .filter((s) => ALLOWED.includes(s.field) && s.suggestedValue && s.rationale)
+      .filter((s) => s.suggestedValue.trim().toLowerCase() !== (currentMap[s.field] ?? "").trim().toLowerCase())
+      .slice(0, 4);
+
+    if (valid.length === 0) {
+      res.json({ status: "ok", suggestions: [], remaining: limit.remaining });
+      return;
+    }
+
+    const snippetMap = new Map(drafts.map((d) => [d.id, (d.postOutput ?? "").slice(0, 120).replace(/\n/g, " ").trim()]));
+    const inserted = await db
+      .insert(voiceSuggestionsTable)
+      .values(valid.map((s) => {
+        const ids = (Array.isArray(s.evidenceDraftIds) ? s.evidenceDraftIds : []).filter((id) => snippetMap.has(id));
+        return {
+          userId,
+          field: s.field,
+          currentValue: currentMap[s.field] ?? "",
+          suggestedValue: s.suggestedValue,
+          rationale: s.rationale,
+          evidenceDraftIds: ids,
+          evidenceSnippets: ids.map((id) => snippetMap.get(id) ?? "").filter(Boolean),
+        };
+      }))
+      .returning();
+
+    res.json({ status: "ok", suggestions: inserted, remaining: limit.remaining });
+  } catch (err) {
+    console.error("[brand-analysis]", err);
+    respondAiError(res, err, "Failed to run brand analysis");
   }
 });
 
@@ -876,7 +1313,7 @@ router.get("/agent/saved-ideas", requireAuth, async (req, res): Promise<void> =>
 
 router.delete("/agent/saved-ideas/:id", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   try {
     await db
@@ -941,7 +1378,7 @@ Content preview: ${content}`;
     ].filter(Boolean).join("\n");
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-haiku-4-5",
       max_tokens: 800,
       system: `You are a LinkedIn content strategist. Given a creator's top-performing posts, analyse what made each one resonate and generate follow-up angle suggestions.
 
@@ -982,7 +1419,7 @@ Return JSON only (no markdown):
     }
   } catch (err) {
     console.error("[top-post-suggestions]", err);
-    res.status(500).json({ error: "Failed to generate top post suggestions" });
+    respondAiError(res, err, "Failed to generate top post suggestions");
   }
 });
 

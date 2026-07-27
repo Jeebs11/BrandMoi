@@ -59,6 +59,8 @@ export const thoughtsApi = {
     apiFetch<Thought>("/thoughts", { method: "POST", body: JSON.stringify({ content }) }),
   markDeveloped: (id: number) =>
     apiFetch<Thought>(`/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ developed: true }) }),
+  update: (id: number, content: string) =>
+    apiFetch<Thought>(`/thoughts/${id}`, { method: "PATCH", body: JSON.stringify({ content }) }),
   delete: (id: number) =>
     apiFetch<void>(`/thoughts/${id}`, { method: "DELETE" }),
 };
@@ -104,9 +106,33 @@ export const performanceApi = {
   },
 };
 
+export type VoiceSignalEntry = {
+  id: number;
+  draftId: number;
+  topic: string | null;
+  signals: {
+    sentenceStyle?: string;
+    punctuationStyle?: string;
+    openingStyle?: string;
+    vocabulary?: string[];
+    structurePattern?: string;
+    toneMarkers?: string[];
+  };
+  createdAt: string;
+};
+
+export type DareResult = {
+  dare: string;
+  why: string;
+  risk: "Mild" | "Medium" | "Spicy";
+  expiresAt: string;
+  remaining: number;
+};
+
 export const voiceApi = {
   getSummary: () => apiFetch<VoiceSummaryResult>("/user/voice-summary"),
   refresh: () => apiFetch<VoiceSummaryResult & { remaining: number }>("/user/voice-refresh", { method: "POST" }),
+  signals: () => apiFetch<{ signals: VoiceSignalEntry[] }>("/user/voice-signals"),
 };
 
 export type MomentumData = {
@@ -117,8 +143,100 @@ export type MomentumData = {
   cadenceAlerts: Array<{ type: string; message: string; daysSince: number; objective?: string }>;
 };
 
+export type AudienceMix = {
+  ready: boolean;
+  total: number;
+  counts: Record<string, number>;
+  topAudience?: string;
+  topPct?: number;
+  skewed?: boolean;
+  missing?: string[];
+};
+
 export const momentumApi = {
   get: () => apiFetch<MomentumData>("/momentum"),
+  audienceMix: () => apiFetch<AudienceMix>("/momentum/audience-mix"),
+};
+
+export type Topic = {
+  id: number;
+  name: string;
+  color: string | null;
+  createdAt: string;
+  draftCount: number;
+};
+
+export const topicsApi = {
+  list: () => apiFetch<Topic[]>("/topics"),
+  create: (name: string, color?: string | null) =>
+    apiFetch<Topic>("/topics", { method: "POST", body: JSON.stringify({ name, color }) }),
+  update: (id: number, data: { name?: string; color?: string | null }) =>
+    apiFetch<Topic>(`/topics/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: number) => apiFetch<void>(`/topics/${id}`, { method: "DELETE" }),
+};
+
+export type SeriesFormat = "standard" | "dialogue" | "letter" | "qa" | "story_arc";
+export type SeriesStatus = "planning" | "active" | "completed";
+
+export type SeriesPerformance = {
+  impressions: number;
+  reactions: number;
+  comments: number;
+  reposts: number;
+  saves: number;
+};
+
+export type Series = {
+  id: number;
+  title: string;
+  theme: string;
+  topicId: number | null;
+  targetAudience: string | null;
+  format: SeriesFormat;
+  // Null = endless — no fixed part count.
+  plannedParts: number | null;
+  status: SeriesStatus;
+  hook: string | null;
+  plannedAngles: Array<{ part: number; angle: string }> | null;
+  createdAt: string;
+  updatedAt: string;
+  partsWritten: number;
+  partsPublished: number;
+  performance: SeriesPerformance;
+};
+
+export type SeriesPart = {
+  id: number;
+  seriesPart: number | null;
+  status: string;
+  postOutput: string | null;
+  createdAt: string;
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  reposts: number | null;
+  saves: number | null;
+};
+
+export type SeriesDetail = Series & { parts: SeriesPart[] };
+
+export type PlannedPart = { part: number; angle: string };
+
+export const seriesApi = {
+  list: () => apiFetch<Series[]>("/series"),
+  get: (id: number) => apiFetch<SeriesDetail>(`/series/${id}`),
+  create: (data: { title: string; theme: string; topicId?: number | null; targetAudience?: string | null; format: SeriesFormat; plannedParts: number | null; hook?: string | null }) =>
+    apiFetch<Series>("/series", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: number, data: Partial<{ title: string; theme: string; topicId: number | null; targetAudience: string | null; format: SeriesFormat; plannedParts: number | null; status: SeriesStatus; hook: string | null; plannedAngles: PlannedPart[] | null }>) =>
+    apiFetch<Series>(`/series/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: number) => apiFetch<void>(`/series/${id}`, { method: "DELETE" }),
+  inferFormat: (title: string, theme?: string) =>
+    apiFetch<{ format: SeriesFormat; rationale: string }>("/series/infer-format", {
+      method: "POST",
+      body: JSON.stringify({ title, theme }),
+    }),
+  plan: (id: number, options?: { scope?: "all" | "remaining"; guidance?: string }) =>
+    apiFetch<{ parts: PlannedPart[] }>(`/series/${id}/plan`, { method: "POST", body: JSON.stringify(options ?? {}) }),
 };
 
 export type ExtractedBrandVoice = {
@@ -130,6 +248,8 @@ export type ExtractedBrandVoice = {
   tone: string;
   summary: string;
   contentPillars: string[];
+  proofPoints: string[];
+  firstPostAngles: string[];
 };
 
 export const smartImportApi = {
@@ -209,10 +329,12 @@ export type SkillAngle = {
   hook: string;
 };
 
+export type BrandAngle = { angle: string; audience: string };
+
 export type AgentBrief = {
   headline: string;
   insight: string;
-  angles: string[];
+  angles: BrandAngle[];
   teachAngles: string[];
   newsHeadline?: string;
   newsSourceLine?: string;
@@ -220,6 +342,7 @@ export type AgentBrief = {
   newsPublishedAt?: string;
   newsSourceDomain?: string;
   newsDescription?: string;
+  seriesNudge?: { seriesId: number; title: string; nextPart: number; plannedParts: number | null };
 };
 
 export type AgentCoach = {
@@ -287,6 +410,11 @@ export type TopPostSuggestion = {
 
 export const agentApi = {
   brief: () => apiFetch<AgentBrief>("/agent/brief"),
+  dare: () => apiFetch<DareResult>("/agent/dare", { method: "POST" }),
+  brandIdeas: (topicId?: number | null) =>
+    apiFetch<{ angles: BrandAngle[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "brand", topicId: topicId ?? undefined }) }),
+  teachIdeas: () =>
+    apiFetch<{ angles: string[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "teach" }) }),
   coach: (postText: string) =>
     apiFetch<AgentCoach>("/agent/coach", {
       method: "POST",
@@ -356,6 +484,29 @@ export type AnalyticsOverview = {
   };
   hashtagPerformance: { hashtag: string; count: number; avgResonance: number | null }[];
   byMediaFormat: { format: string; count: number; avgResonance: number | null; sampledCount: number }[];
+};
+
+export type CheckinEntry = { id: number; topic: string; ageDays: number };
+
+export type BrandHealth = { lastAnalyzedAt: string | null; measuredPostsTotal: number; measuredPostsSince: number };
+export type StudioPost = { id: number; topic: string; resonance: number | null; hasData: boolean; audience: string | null; feeling: string | null };
+
+export type PostClassification = { topic: string | null; audience: string; feeling: string; objective: string; tone: string };
+
+export const studioApi = {
+  classifyPost: (text: string) =>
+    apiFetch<PostClassification>("/agent/classify-post", { method: "POST", body: JSON.stringify({ text }) }),
+  health: () => apiFetch<BrandHealth>("/agent/brand-health"),
+  posts: () => apiFetch<{ posts: StudioPost[] }>("/agent/studio-posts"),
+  analyze: (draftIds: number[], focus?: string) =>
+    apiFetch<{ status: string; suggestions: VoiceSuggestion[]; remaining: number }>("/agent/brand-analysis", {
+      method: "POST",
+      body: JSON.stringify({ draftIds, ...(focus ? { focus } : {}) }),
+    }),
+};
+
+export const checkinsApi = {
+  list: () => apiFetch<{ checkins: CheckinEntry[] }>("/checkins"),
 };
 
 export const analyticsApi = {

@@ -84,10 +84,6 @@ export interface UpdatePreferencesBody {
   bgPalette?: string | null;
   /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
   siteTheme?: string | null;
-  /** User's 3-4 primary content themes extracted from smart import */
-  contentPillars?: string[] | null;
-  /** Pinned writing samples used as highest-authority voice anchors in AI generation */
-  writingSamples?: string[] | null;
 }
 
 export interface SuggestionItem {
@@ -202,6 +198,10 @@ export interface GenerateContentBody {
   newsUrl?: string | null;
   /** Additional refinement instruction appended to the generation prompt (used by "Try a different angle" and similar refine actions in Capture) */
   extraInstruction?: string;
+  /** Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts */
+  format?: string;
+  /** Prior series parts' excerpts, woven in as continuity context when writing a later part of a series */
+  continuityContext?: string;
   /** Legacy back-compat — derivable from audience; the server prefers `audience` when both are set */
   objective?: string;
   /** Legacy back-compat — kept so older callers/saved drafts still work */
@@ -381,6 +381,12 @@ export interface Draft {
   postType?: string | null;
   /** Cached AI post diagnosis (null if not yet generated) */
   diagnosis?: PostDiagnosis | null;
+  /** @nullable */
+  topicId?: number | null;
+  /** @nullable */
+  seriesId?: number | null;
+  /** @nullable */
+  seriesPart?: number | null;
 }
 
 export type CreateDraftBodyStatus =
@@ -433,6 +439,12 @@ export interface CreateDraftBody {
   selectedHook?: string | null;
   /** @nullable */
   shortPost?: string | null;
+  /** @nullable */
+  topicId?: number | null;
+  /** @nullable */
+  seriesId?: number | null;
+  /** @nullable */
+  seriesPart?: number | null;
 }
 
 export type UpdateDraftBodyStatus =
@@ -481,6 +493,12 @@ export interface UpdateDraftBody {
   contentSource?: UpdateDraftBodyContentSource;
   visualType?: UpdateDraftBodyVisualType;
   isVoiceSample?: boolean;
+  /** @nullable */
+  topicId?: number | null;
+  /** @nullable */
+  seriesId?: number | null;
+  /** @nullable */
+  seriesPart?: number | null;
 }
 
 export interface LinkedinStatusResponse {

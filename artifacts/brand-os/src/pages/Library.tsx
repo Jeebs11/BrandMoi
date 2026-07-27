@@ -2,12 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
 import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle, Star } from "lucide-react";
-import { useListDrafts, useDeleteDraft, useUpdateDraft } from "@workspace/api-client-react";
+import { useListDrafts, useDeleteDraft, useUpdateDraft, useCreateDraft } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, studioApi, topicsApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor, type Topic } from "@/lib/api";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
@@ -92,10 +94,13 @@ export default function Library() {
   const [audienceFilter, setAudienceFilter] = useState("All");
   const [feelingFilter, setFeelingFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [topicFilter, setTopicFilter] = useState<number | "All">("All");
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [viewDraft, setViewDraft] = useState<{ id: number; topic: string; postOutput: string | null; shortPost: string | null; status: string; audience: string; feeling: string } | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [resonanceMap, setResonanceMap] = useState<Record<string, number>>({});
   const [stressScoreMap, setStressScoreMap] = useState<Record<string, StressTestScoreEntry>>({});
   const [diagnosisPanel, setDiagnosisPanel] = useState<{ draftId: number; topic: string; diagnosis: PostDiagnosis | null; loading: boolean } | null>(null);
@@ -117,6 +122,7 @@ export default function Library() {
   };
 
   useEffect(() => { loadResonanceMap(); loadStressScoreMap(); }, []);
+  useEffect(() => { topicsApi.list().then(setTopics).catch(() => {}); }, []);
 
   const openDiagnosis = async (draftId: number, topic: string, cachedDiagnosis?: PostDiagnosis | null) => {
     if (cachedDiagnosis) {
@@ -147,6 +153,7 @@ export default function Library() {
       if (draftFeeling !== feelingFilter) return false;
     }
     if (statusFilter !== "All" && d.status !== statusFilter) return false;
+    if (topicFilter !== "All" && d.topicId !== topicFilter) return false;
     return true;
   });
 
@@ -186,14 +193,25 @@ export default function Library() {
               <BookOpen className="w-5 h-5 text-primary" />
               <h1 className="text-xl font-extrabold text-gray-900">Library</h1>
             </div>
-            <button
-              onClick={() => setShowHeatmap((v) => !v)}
-              className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all",
-                showHeatmap ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40")}
-            >
-              <CalendarDays className="w-3.5 h-3.5" />
-              Rhythm
-            </button>
+            <div className="flex items-center gap-2">
+              {!isDemo && (
+                <button
+                  onClick={() => setImportOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Add past post
+                </button>
+              )}
+              <button
+                onClick={() => setShowHeatmap((v) => !v)}
+                className={cn("flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all",
+                  showHeatmap ? "bg-primary text-white border-primary" : "bg-white text-gray-500 border-gray-200 hover:border-primary/40")}
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                Rhythm
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -220,6 +238,20 @@ export default function Library() {
                 >{s}</button>
               ))}
             </div>
+            {topics.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                <button onClick={() => setTopicFilter("All")}
+                  className={cn("px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border",
+                    topicFilter === "All" ? "bg-sky-600 text-white border-sky-600" : "bg-white text-gray-500 border-gray-200 hover:border-sky-400")}
+                >All topics</button>
+                {topics.map((t) => (
+                  <button key={t.id} onClick={() => setTopicFilter(t.id)}
+                    className={cn("px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border",
+                      topicFilter === t.id ? "bg-sky-600 text-white border-sky-600" : "bg-white text-gray-500 border-gray-200 hover:border-sky-400")}
+                  >{t.name}</button>
+                ))}
+              </div>
+            )}
           </div>
         </header>
 
@@ -270,6 +302,11 @@ export default function Library() {
                         {draft.externalId && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
                             via LinkedIn {draft.postType === "article" ? "· Article" : "· Post"}
+                          </span>
+                        )}
+                        {draft.seriesId && draft.seriesPart && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
+                            Part {draft.seriesPart}
                           </span>
                         )}
                         <span className="text-[10px] text-gray-300">
@@ -414,6 +451,13 @@ export default function Library() {
             modal={perfModal}
             onClose={() => setPerfModal(null)}
             onSuccess={handlePerfSuccess}
+          />
+        )}
+
+        {importOpen && (
+          <ImportPastPostModal
+            onClose={() => setImportOpen(false)}
+            onSuccess={() => { setImportOpen(false); void refetch(); }}
           />
         )}
 
@@ -1023,7 +1067,7 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
             {impressions > 0 && (
               <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl mb-4">
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Resonance Score</p>
+                  <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Impact Score</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-black text-violet-700">{resonanceScore}</span>
                     <span className="text-xs text-violet-400 font-bold">/100</span>
@@ -1069,5 +1113,142 @@ function NumberInput({ label, value, onChange }: { label: string; value: number;
         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors"
       />
     </div>
+  );
+}
+
+// ── Import a past LinkedIn post ─────────────────────────────────────────────
+// Two-step verification flow: paste the post text, then upload its LinkedIn
+// single-post analytics .xlsx. The export is only available to the post's
+// author, so a successful parse doubles as ownership verification — the post
+// only becomes "published" evidence after the upload succeeds. If the upload
+// fails, the draft is deleted so unverified text never enters the voice DNA.
+function ImportPastPostModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const { toast } = useToast();
+  const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { mutateAsync: createDraftAsync } = useCreateDraft();
+  const { mutateAsync: updateDraftAsync } = useUpdateDraft();
+  const { mutateAsync: deleteDraftAsync } = useDeleteDraft();
+
+  const handleImport = async () => {
+    if (busy || text.trim().length < 80 || !file) return;
+    setBusy(true);
+    const trimmed = text.trim();
+    const fallbackTopic = trimmed.split("\n").find((l) => l.trim())?.slice(0, 80) ?? "Past LinkedIn post";
+
+    // Classify the post so it gets real audience/feeling/topic labels instead
+    // of defaults. Best-effort — a failed classification never blocks import.
+    const cls = await studioApi.classifyPost(trimmed).catch(() => null);
+    const topic = cls?.topic ?? fallbackTopic;
+
+    let draftId: number | null = null;
+    try {
+      const draft = await createDraftAsync({
+        data: {
+          rawInput: trimmed,
+          objective: cls?.objective ?? "Authority",
+          persona: "Founder",
+          tone: cls?.tone ?? "Direct",
+          structuredBreakdown: {
+            topic,
+            angle: "Imported past post",
+            coreMessage: trimmed.slice(0, 200),
+            whyItMatters: "Imported with verified LinkedIn analytics",
+            hooks: [{ text: topic }],
+            narrativeFlow: [],
+            ...(cls ? { audience: cls.audience, feeling: cls.feeling } : {}),
+          },
+          postOutput: trimmed,
+          status: "draft",
+          contentSource: "linkedin",
+        },
+      });
+      draftId = draft.id;
+
+      // Ownership gate: the analytics export must parse before this counts.
+      await performanceApi.uploadXlsx(draft.id, file);
+      await updateDraftAsync({ id: draft.id, data: { status: "published" } });
+
+      toast({ title: "✓ Post verified & imported", description: "Performance attached — it now feeds your voice DNA and learned patterns." });
+      onSuccess();
+    } catch (err: unknown) {
+      // Roll back the unverified draft
+      if (draftId) { try { await deleteDraftAsync({ id: draftId }); } catch { /* already gone */ } }
+      const msg = err instanceof Error ? err.message : "Import failed.";
+      toast({ title: "Couldn't verify this post", description: msg, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl shadow-2xl flex flex-col" style={{ maxHeight: "88vh" }}>
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-emerald-600" />
+            <h3 className="font-extrabold text-gray-900">Add a past post</h3>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              <span className="font-bold">Your own posts only.</span> The post is verified by uploading its LinkedIn analytics export — only the author can download that file. It won't count toward your voice or brand evidence until verification succeeds.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Step 1 · Paste the post</p>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Paste the full text of a LinkedIn post you published…"
+              maxLength={5000}
+              rows={7}
+              className="w-full text-sm rounded-2xl border border-gray-200 px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white placeholder-gray-300"
+            />
+            <p className="text-[10px] text-gray-300 text-right">{text.length}/5000</p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Step 2 · Verify with its analytics export</p>
+            <label className={cn(
+              "w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all text-sm font-bold",
+              file ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-400 hover:border-emerald-300"
+            )}>
+              <input
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              <Upload className="w-4 h-4" />
+              {file ? file.name : "Upload the post's LinkedIn analytics .xlsx"}
+            </label>
+            <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">On LinkedIn: open your post → View analytics → Export. The numbers attach automatically.</p>
+          </div>
+        </div>
+
+        <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex gap-3">
+          <Button variant="outline" className="flex-1 h-12 rounded-2xl text-sm font-bold border-gray-200 text-gray-600" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="flex-[2] h-12 rounded-2xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => void handleImport()}
+            disabled={busy || text.trim().length < 80 || !file}
+          >
+            {busy ? "Verifying…" : "Verify & import"}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

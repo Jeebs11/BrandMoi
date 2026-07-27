@@ -1,6 +1,7 @@
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { draftsTable, performanceSignalsTable, dailyActivityTable, preferencesTable } from "@workspace/db";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 
@@ -21,8 +22,6 @@ export async function fetchMomentumNewsAnchor(
   context: string;
   url: string | null;
 }> {
-  if (!process.env.OPENAI_API_KEY) return { context: "", url: null };
-
   const [prefs] = await db
     .select({
       brandRole: preferencesTable.brandRole,
@@ -46,35 +45,35 @@ export async function fetchMomentumNewsAnchor(
   const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${persona}${topicTail} The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
 
   try {
-    const { default: OpenAI } = await import("openai");
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const searchResp = await openai.chat.completions.create({
-      model: "gpt-4o-search-preview" as Parameters<
-        typeof openai.chat.completions.create
-      >[0]["model"],
-      messages: [{ role: "user" as const, content: searchQuery }],
-      max_tokens: 350,
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      // max_uses 1: each search round adds thousands of input tokens, which
+      // starves the follow-up brief call on low rate-limit tiers.
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
+      messages: [{ role: "user", content: searchQuery }],
     });
-    const context = searchResp.choices[0]?.message?.content ?? "";
 
+    // Collect text output and the first cited URL from the search results.
+    let context = "";
     let url: string | null = null;
-    const annotations = (searchResp.choices[0]?.message as unknown as Record<string, unknown>)
-      ?.annotations;
-    if (Array.isArray(annotations)) {
-      for (const ann of annotations) {
-        const a = ann as Record<string, unknown>;
-        if (a.type === "url_citation") {
-          const citation = a.url_citation as Record<string, unknown> | undefined;
-          const u = citation?.url ?? a.url;
-          if (typeof u === "string" && u.startsWith("http")) {
-            url = u;
-            break;
+    for (const block of message.content) {
+      if (block.type === "text") {
+        context += block.text;
+        if (!url && Array.isArray(block.citations)) {
+          for (const c of block.citations) {
+            const u = (c as { url?: string }).url;
+            if (typeof u === "string" && u.startsWith("http")) {
+              url = u;
+              break;
+            }
           }
         }
       }
     }
-    return { context, url };
-  } catch {
+    return { context: context.trim(), url };
+  } catch (err) {
+    console.warn("News anchor fetch failed:", err);
     return { context: "", url: null };
   }
 }

@@ -110,14 +110,45 @@ router.get("/drafts", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
-  if (isDemoUser(req.user!.email)) {
-    res.status(403).json({ error: "Demo accounts cannot save drafts. Sign up to save your posts." });
-    return;
-  }
-
   const parsed = CreateDraftBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  // Demo accounts get a success-shaped ephemeral draft so the generate→save
+  // flow works, without writing to (and polluting) the shared demo data.
+  if (isDemoUser(req.user!.email)) {
+    const now = new Date();
+    const synthetic = {
+      id: 1_000_000_000 + Math.floor(Math.random() * 1_000_000),
+      userId: req.user!.userId,
+      rawInput: parsed.data.rawInput,
+      objective: parsed.data.objective,
+      persona: parsed.data.persona,
+      tone: parsed.data.tone,
+      structuredBreakdown: parsed.data.structuredBreakdown as object,
+      selectedHook: parsed.data.selectedHook ?? null,
+      postOutput: parsed.data.postOutput ?? null,
+      shortPost: parsed.data.shortPost ?? null,
+      carouselOutput: parsed.data.carouselOutput ?? null,
+      visualOutput: parsed.data.visualOutput ?? null,
+      status: parsed.data.status ?? "draft",
+      contentSource: parsed.data.contentSource ?? null,
+      visualType: parsed.data.visualType ?? null,
+      externalId: null,
+      postType: null,
+      diagnosis: null,
+      mediaFormat: null,
+      linkedinUrl: null,
+      isVoiceSample: false,
+      topicId: parsed.data.topicId ?? null,
+      seriesId: parsed.data.seriesId ?? null,
+      seriesPart: parsed.data.seriesPart ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    res.status(201).json(GetDraftResponse.parse(normalizeDraft(synthetic)));
     return;
   }
 
@@ -138,6 +169,9 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       status: parsed.data.status ?? "draft",
       contentSource: parsed.data.contentSource ?? null,
       visualType: parsed.data.visualType ?? null,
+      topicId: parsed.data.topicId ?? null,
+      seriesId: parsed.data.seriesId ?? null,
+      seriesPart: parsed.data.seriesPart ?? null,
     })
     .returning();
 
@@ -167,11 +201,6 @@ router.get("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
-  if (isDemoUser(req.user!.email)) {
-    res.status(403).json({ error: "Demo accounts cannot edit drafts. Sign up to save your posts." });
-    return;
-  }
-
   const params = UpdateDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -194,6 +223,25 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.contentSource !== undefined) updateData.contentSource = parsed.data.contentSource;
   if (parsed.data.visualType !== undefined) updateData.visualType = parsed.data.visualType;
   if (parsed.data.isVoiceSample !== undefined) updateData.isVoiceSample = parsed.data.isVoiceSample;
+  if (parsed.data.topicId !== undefined) updateData.topicId = parsed.data.topicId;
+  if (parsed.data.seriesId !== undefined) updateData.seriesId = parsed.data.seriesId;
+  if (parsed.data.seriesPart !== undefined) updateData.seriesPart = parsed.data.seriesPart;
+
+  // Demo accounts: apply the edit in-memory and echo it back without persisting,
+  // so the editing flow works but shared demo data stays untouched.
+  if (isDemoUser(req.user!.email)) {
+    const [existing] = await db
+      .select()
+      .from(draftsTable)
+      .where(and(eq(draftsTable.id, params.data.id), eq(draftsTable.userId, req.user!.userId)));
+    if (!existing) {
+      res.status(404).json({ error: "Draft not found" });
+      return;
+    }
+    const merged = { ...existing, ...updateData, updatedAt: new Date() };
+    res.json(UpdateDraftResponse.parse(normalizeDraft(merged)));
+    return;
+  }
 
   const [draft] = await db
     .update(draftsTable)
@@ -210,14 +258,15 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.delete("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
-  if (isDemoUser(req.user!.email)) {
-    res.status(403).json({ error: "Demo accounts cannot delete drafts." });
-    return;
-  }
-
   const params = DeleteDraftParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  // Demo accounts: acknowledge without persisting so shared demo data survives.
+  if (isDemoUser(req.user!.email)) {
+    res.sendStatus(204);
     return;
   }
 
@@ -420,6 +469,49 @@ Return JSON only — no markdown, no explanation:
   }
 
   res.json({ signal, parsed, ...(analysis ? { analysis } : {}) });
+});
+
+// Published drafts that have no performance data yet, 2–14 days old — the
+// window where LinkedIn numbers are worth logging. Powers the dashboard
+// check-in nudge that feeds the learning loop.
+router.get("/checkins", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  const drafts = await db
+    .select({
+      id: draftsTable.id,
+      structuredBreakdown: draftsTable.structuredBreakdown,
+      postOutput: draftsTable.postOutput,
+      updatedAt: draftsTable.updatedAt,
+    })
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+    .orderBy(desc(draftsTable.updatedAt))
+    .limit(30);
+
+  const withSignals = drafts.length > 0
+    ? await db
+        .select({ draftId: performanceSignalsTable.draftId })
+        .from(performanceSignalsTable)
+        .where(inArray(performanceSignalsTable.draftId, drafts.map((d) => d.id)))
+    : [];
+  const logged = new Set(withSignals.map((s) => s.draftId));
+
+  const now = Date.now();
+  const checkins = drafts
+    .filter((d) => {
+      if (logged.has(d.id)) return false;
+      const ageDays = (now - new Date(d.updatedAt).getTime()) / 86400000;
+      return ageDays >= 2 && ageDays <= 14;
+    })
+    .slice(0, 2)
+    .map((d) => {
+      const bd = d.structuredBreakdown as { topic?: string } | null;
+      const topic = bd?.topic ?? d.postOutput?.split("\n").find((l) => l.trim())?.slice(0, 60) ?? `Post #${d.id}`;
+      const ageDays = Math.floor((now - new Date(d.updatedAt).getTime()) / 86400000);
+      return { id: d.id, topic, ageDays };
+    });
+
+  res.json({ checkins });
 });
 
 router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> => {

@@ -1,43 +1,33 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp, Loader2, FlaskConical } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type AudienceMix, type BrandAngle } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 import { useToast } from "@/hooks/use-toast";
 
-function todayKey() {
-  return `brand_os_brief_v2_${new Date().toISOString().slice(0, 10)}`;
+function dayUserKey(name: string, userId: number | string) {
+  return `bos_${name}_v3_${userId}_${new Date().toISOString().slice(0, 10)}`;
 }
 
-function loadCachedBrief(): AgentBrief | null {
+function loadDayCache<T>(name: string, userId: number | string): T | null {
   try {
-    const raw = sessionStorage.getItem(todayKey());
+    const raw = localStorage.getItem(dayUserKey(name, userId));
     if (!raw) return null;
-    return JSON.parse(raw) as AgentBrief;
+    return JSON.parse(raw) as T;
   } catch { return null; }
 }
 
-function saveBriefCache(brief: AgentBrief) {
-  try { sessionStorage.setItem(todayKey(), JSON.stringify(brief)); } catch { /* noop */ }
+function saveDayCache(name: string, userId: number | string, value: unknown) {
+  try { localStorage.setItem(dayUserKey(name, userId), JSON.stringify(value)); } catch { /* noop */ }
 }
 
-function painPointsCacheKey() {
-  return `brand_os_pp_v1_${new Date().toISOString().slice(0, 10)}`;
-}
-function loadCachedPainPoints(): PainPoint[] | null {
-  try {
-    const raw = sessionStorage.getItem(painPointsCacheKey());
-    if (!raw) return null;
-    return JSON.parse(raw) as PainPoint[];
-  } catch { return null; }
-}
-function savePainPointsCache(points: PainPoint[]) {
-  try { sessionStorage.setItem(painPointsCacheKey(), JSON.stringify(points)); } catch { /* noop */ }
+function clearDayCache(name: string, userId: number | string) {
+  try { localStorage.removeItem(dayUserKey(name, userId)); } catch { /* noop */ }
 }
 
 function formatNewsAge(publishedAt: string | undefined): string | null {
@@ -69,6 +59,16 @@ const OBJECTIVE_COLORS: Record<string, string> = {
   Documenting: "bg-emerald-50 text-emerald-700",
 };
 
+// Small tag on each "For your brand" idea showing which audience it targets
+// — restructures suggestions by audience without adding a new top-level tab.
+const AUDIENCE_TAG_COLORS: Record<string, string> = {
+  "Clients": "bg-amber-50 text-amber-700",
+  "Peers": "bg-violet-50 text-violet-700",
+  "Recruiters & Headhunters": "bg-sky-50 text-sky-700",
+  "Investors": "bg-emerald-50 text-emerald-700",
+  "My audience": "bg-gray-100 text-gray-500",
+};
+
 
 const MOMENTUM_STYLES: Record<string, { bg: string; text: string; label: string; bar: string }> = {
   Strong:   { bg: "bg-emerald-500", text: "text-emerald-600", label: "bg-emerald-50 border-emerald-100", bar: "bg-emerald-500" },
@@ -77,12 +77,171 @@ const MOMENTUM_STYLES: Record<string, { bg: string; text: string; label: string;
   Silent:   { bg: "bg-gray-400",    text: "text-gray-500",    label: "bg-gray-50 border-gray-200",     bar: "bg-gray-400" },
 };
 
+const MOMENTUM_LINES: Record<string, string> = {
+  Strong:   "Your brand is compounding — keep the rhythm.",
+  Building: "Momentum is building. Stay on the cadence.",
+  Fading:   "Momentum fading — one post brings it back.",
+  Silent:   "It's quiet out there. One small post breaks the silence.",
+};
+
 const BREAKDOWN_LABELS: Record<string, { label: string; weight: string }> = {
   recency:   { label: "Recency",   weight: "30%" },
   variety:   { label: "Variety",   weight: "25%" },
   volume:    { label: "Volume",    weight: "25%" },
   resonance: { label: "Resonance", weight: "20%" },
 };
+
+// Living flame: intensity, colour, and flicker speed track the momentum
+// score. Pure CSS/SVG — no API cost. The brand "dims" visibly when the user
+// goes quiet, which is the whole point.
+function MomentumFlame({ score }: { score: number }) {
+  // 0-24 ember · 25-49 low flame · 50-74 healthy · 75+ blazing
+  const tier = score >= 75 ? 3 : score >= 50 ? 2 : score >= 25 ? 1 : 0;
+  const colors = [
+    { outer: "#64748b", inner: "#94a3b8", glow: "rgba(100,116,139,0.25)" },   // ember (cold)
+    { outer: "#f59e0b", inner: "#fbbf24", glow: "rgba(245,158,11,0.35)" },    // low
+    { outer: "#f97316", inner: "#fde047", glow: "rgba(249,115,22,0.45)" },    // healthy
+    { outer: "#ef4444", inner: "#fef08a", glow: "rgba(239,68,68,0.55)" },     // blazing
+  ][tier];
+  const speed = [3.2, 2.2, 1.5, 0.9][tier];
+  const scale = [0.62, 0.78, 0.9, 1][tier];
+
+  return (
+    <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-end justify-center overflow-hidden flex-shrink-0 relative">
+      <div className="absolute inset-0 rounded-2xl" style={{ boxShadow: `inset 0 -8px 16px ${colors.glow}` }} />
+      <svg viewBox="0 0 40 48" className="w-9 h-11 origin-bottom" style={{ transform: `scale(${scale})` }}>
+        <g style={{ animation: `flame-flicker ${speed}s ease-in-out infinite`, transformOrigin: "50% 100%" }}>
+          <path d="M20 4 C26 14 32 18 32 30 C32 39 26.6 45 20 45 C13.4 45 8 39 8 30 C8 21 14 16 16 8 C17.5 12 19 13 20 4 Z" fill={colors.outer} opacity="0.9" />
+          <path d="M20 18 C23.5 23 26 25.5 26 32 C26 37.5 23.3 41 20 41 C16.7 41 14 37.5 14 32 C14 27 17 24.5 18 20 C18.8 22.5 19.5 23 20 18 Z" fill={colors.inner} />
+        </g>
+      </svg>
+      <span className="absolute bottom-0.5 inset-x-0 text-center text-[10px] font-black text-white/90">{score}</span>
+      <style>{`@keyframes flame-flicker { 0%,100% { transform: scaleY(1) scaleX(1); } 25% { transform: scaleY(1.06) scaleX(0.96) rotate(-1deg); } 50% { transform: scaleY(0.95) scaleX(1.03); } 75% { transform: scaleY(1.04) scaleX(0.97) rotate(1deg); } }`}</style>
+    </div>
+  );
+}
+
+// Dare mode: one provocative-but-defensible take with a 24h post-it-or-lose-it
+// timer. The dare persists in localStorage so the countdown survives reloads;
+// the API call happens only when the user explicitly asks to be dared (3/day).
+const DARE_STORAGE_KEY = "brandos-dare";
+
+function DareCard({ onWrite }: { onWrite: (raw: string) => void }) {
+  const { toast } = useToast();
+  const [dare, setDare] = useState<DareResult | null>(() => {
+    try {
+      const raw = localStorage.getItem(DARE_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as DareResult;
+      return new Date(parsed.expiresAt).getTime() > Date.now() ? parsed : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  // Active dares render as a slim strip until tapped — keeps the page calm.
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!dare) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [dare]);
+
+  const msLeft = dare ? new Date(dare.expiresAt).getTime() - now : 0;
+  const expired = dare !== null && msLeft <= 0;
+
+  useEffect(() => {
+    if (expired) {
+      localStorage.removeItem(DARE_STORAGE_KEY);
+      setDare(null);
+      toast({ title: "The dare expired. The algorithm wins this round. 😏" });
+    }
+  }, [expired]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const requestDare = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const d = await agentApi.dare();
+      localStorage.setItem(DARE_STORAGE_KEY, JSON.stringify(d));
+      setDare(d);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Couldn't fetch a dare — try again.";
+      toast({ title: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hh = Math.floor(msLeft / 3600000);
+  const mm = Math.floor((msLeft % 3600000) / 60000);
+  const ss = Math.floor((msLeft % 60000) / 1000);
+  const riskColor = dare?.risk === "Spicy" ? "text-red-500 bg-red-50 border-red-100"
+    : dare?.risk === "Medium" ? "text-orange-500 bg-orange-50 border-orange-100"
+    : "text-yellow-600 bg-yellow-50 border-yellow-100";
+
+  return (
+    <div className="rounded-3xl border border-red-100 bg-white overflow-hidden">
+      {!dare ? (
+        <button
+          onClick={requestDare}
+          disabled={loading}
+          className="w-full px-5 py-4 flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="text-base">😈</span>
+            <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Dare mode</span>
+            <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">· The take you've been avoiding</span>
+          </div>
+          {loading
+            ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
+            : <span className="text-xs font-bold text-red-400 group-hover:text-red-600 transition-colors">Dare me →</span>}
+        </button>
+      ) : !expanded ? (
+        <button
+          onClick={() => setExpanded(true)}
+          className="w-full px-5 py-3 flex items-center gap-2.5 text-left hover:bg-red-50/40 transition-colors"
+        >
+          <span className="text-sm flex-shrink-0">😈</span>
+          <span className="flex-1 text-xs font-bold text-gray-800 truncate">“{dare.dare}”</span>
+          <span className="text-[11px] font-mono font-bold text-red-500 tabular-nums flex-shrink-0">
+            {String(hh).padStart(2, "0")}:{String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 text-red-300 flex-shrink-0" />
+        </button>
+      ) : (
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpanded(false)}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-base">😈</span>
+              <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Dare mode</span>
+              <span className={cn("text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border", riskColor)}>{dare.risk}</span>
+            </div>
+            <span className="text-xs font-mono font-bold text-red-500 tabular-nums">
+              {String(hh).padStart(2, "0")}:{String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
+            </span>
+          </div>
+          <p className="text-sm font-bold text-gray-900 leading-snug">“{dare.dare}”</p>
+          {dare.why && <p className="text-[11px] text-gray-400 leading-relaxed italic">{dare.why}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { localStorage.removeItem(DARE_STORAGE_KEY); setDare(null); }}
+              className="flex-1 py-2 rounded-xl border border-gray-200 text-gray-400 text-xs font-bold hover:border-gray-300 transition-colors"
+            >
+              Chicken out
+            </button>
+            <button
+              onClick={() => onWrite(dare.dare)}
+              className="flex-[2] py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white text-xs font-bold transition-colors"
+            >
+              Post it or lose it →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MomentumCard({ data }: { data: MomentumData }) {
   const [expanded, setExpanded] = useState(false);
@@ -95,9 +254,7 @@ function MomentumCard({ data }: { data: MomentumData }) {
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-4">
-          <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black text-xl flex-shrink-0", style.bg)}>
-            {data.score}
-          </div>
+          <MomentumFlame score={data.score} />
           <div className="text-left">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Momentum Score</p>
             <p className={cn("text-base font-extrabold", style.text)}>{data.label}</p>
@@ -130,7 +287,7 @@ function MomentumCard({ data }: { data: MomentumData }) {
             );
           })}
           <p className="text-[10px] text-gray-400 pt-1">
-            Recency · Variety of objectives · Volume of posts · Resonance from performance data
+            Recency · Variety of objectives · Volume of posts · Impact from performance data
           </p>
         </div>
       )}
@@ -140,15 +297,24 @@ function MomentumCard({ data }: { data: MomentumData }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const uid = user?.id ?? "anon";
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { data: drafts, isLoading: draftsLoading } = useListDrafts();
   const [ripeThoughts, setRipeThoughts] = useState<Thought[]>([]);
   const [thoughtsLoading, setThoughtsLoading] = useState(true);
   const [momentum, setMomentum] = useState<MomentumData | null>(null);
+  const [checkins, setCheckins] = useState<CheckinEntry[]>([]);
+  const [momOpen, setMomOpen] = useState(false);
+  const [ideaTab, setIdeaTab] = useState<"brand" | "teach" | "best" | "pain" | "skills">("brand");
+  // Per-tab refreshed angles override the daily brief's set — so refreshing
+  // one tab never re-runs the whole brief (or its news fetch).
+  const [brandAnglesOverride, setBrandAnglesOverride] = useState<BrandAngle[] | null>(null);
+  const [teachAnglesOverride, setTeachAnglesOverride] = useState<string[] | null>(null);
+  const [tabRefreshing, setTabRefreshing] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-  const [brief, setBrief] = useState<AgentBrief | null>(loadCachedBrief());
-  const [briefLoading, setBriefLoading] = useState(!loadCachedBrief());
+  const [brief, setBrief] = useState<AgentBrief | null>(() => loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
+  const [briefLoading, setBriefLoading] = useState(() => !loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
   const [themes, setThemes] = useState<AgentTheme[]>([]);
   const [themesLoading, setThemesLoading] = useState(true);
   const [newsAngles, setNewsAngles] = useState<string[] | null>(null);
@@ -163,8 +329,8 @@ export default function Dashboard() {
   const [voiceSuggestionsLoading, setVoiceSuggestionsLoading] = useState(true);
   const [voiceInsightsGenerating, setVoiceInsightsGenerating] = useState(false);
   const [scoredPostCount, setScoredPostCount] = useState<number>(0);
-  const [painPoints, setPainPoints] = useState<PainPoint[] | null>(loadCachedPainPoints());
-  const [painPointsLoading, setPainPointsLoading] = useState<boolean>(!loadCachedPainPoints());
+  const [painPoints, setPainPoints] = useState<PainPoint[] | null>(() => loadDayCache<PainPoint[]>("pain", user?.id ?? "anon"));
+  const [painPointsLoading, setPainPointsLoading] = useState<boolean>(false);
   const [expandedPainPoint, setExpandedPainPoint] = useState<number | null>(null);
   const [skillInput, setSkillInput] = useState<string>("");
   const [skillAngles, setSkillAngles] = useState<SkillAngle[] | null>(null);
@@ -173,8 +339,8 @@ export default function Dashboard() {
   const [ideaFeedback, setIdeaFeedback] = useState<Record<string, "like" | "dislike">>({});
   const [savedIdeas, setSavedIdeas] = useState<SavedIdea[]>([]);
   const [savedIdeasOpen, setSavedIdeasOpen] = useState(false);
-  const [topSuggestions, setTopSuggestions] = useState<TopPostSuggestion[] | null>(null);
-  const [topSuggestionsLoading, setTopSuggestionsLoading] = useState(true);
+  const [topSuggestions, setTopSuggestions] = useState<TopPostSuggestion[] | null>(() => loadDayCache<TopPostSuggestion[]>("top", user?.id ?? "anon"));
+  const [topSuggestionsLoading, setTopSuggestionsLoading] = useState(false);
   const [expandedTopSuggestion, setExpandedTopSuggestion] = useState<number | null>(null);
 
   // Section open/collapsed state — all collapsed by default
@@ -188,6 +354,9 @@ export default function Dashboard() {
   const [ripeOpen, setRipeOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [audienceMix, setAudienceMix] = useState<AudienceMix | null>(null);
+  const [audienceMixDismissed, setAudienceMixDismissed] = useState(false);
+  const [seriesNudgeDismissed, setSeriesNudgeDismissed] = useState(false);
 
   useEffect(() => {
     thoughtsApi.list().then((all) => {
@@ -201,11 +370,15 @@ export default function Dashboard() {
 
     momentumApi.get().then(setMomentum).catch(() => {});
 
-    const cached = loadCachedBrief();
+    checkinsApi.list().then((r) => setCheckins(r.checkins)).catch(() => {});
+
+    momentumApi.audienceMix().then(setAudienceMix).catch(() => {});
+
+    const cached = loadDayCache<AgentBrief>("brief", uid);
     if (!cached) {
       agentApi.brief().then((b) => {
         setBrief(b);
-        saveBriefCache(b);
+        saveDayCache("brief", uid, b);
       }).catch(() => {}).finally(() => setBriefLoading(false));
     } else {
       setBriefLoading(false);
@@ -222,23 +395,8 @@ export default function Dashboard() {
       if (suggestions.length > 0) setVoiceSuggestions(suggestions);
     }).finally(() => setVoiceSuggestionsLoading(false));
 
-    const cachedPP = loadCachedPainPoints();
-    if (cachedPP) {
-      setPainPoints(cachedPP);
-      setPainPointsLoading(false);
-    } else {
-      agentApi.painPoints().then((r) => {
-        setPainPoints(r.painPoints);
-        savePainPointsCache(r.painPoints);
-      }).catch(() => {}).finally(() => setPainPointsLoading(false));
-    }
-
     agentApi.savedIdeas().then((r) => setSavedIdeas(r.ideas)).catch(() => {});
 
-    agentApi.topPostSuggestions()
-      .then((r) => setTopSuggestions(r.suggestions.length > 0 ? r.suggestions : null))
-      .catch(() => setTopSuggestions(null))
-      .finally(() => setTopSuggestionsLoading(false));
   }, []);
 
   const handleIdeaFeedback = async (ideaText: string, ideaType: "brand" | "teach", signal: "like" | "dislike") => {
@@ -280,26 +438,56 @@ export default function Dashboard() {
     setTopSuggestions(null);
     setExpandedTopSuggestion(null);
     agentApi.topPostSuggestions()
-      .then((r) => setTopSuggestions(r.suggestions.length > 0 ? r.suggestions : null))
-      .catch(() => setTopSuggestions(null))
+      .then((r) => { const v = r.suggestions.length > 0 ? r.suggestions : []; setTopSuggestions(v); saveDayCache("top", uid, v); })
+      .catch((err: unknown) => { setTopSuggestions(null); aiErrorToast(err); })
       .finally(() => setTopSuggestionsLoading(false));
+  };
+
+  const aiErrorToast = (err: unknown) => {
+    const msg = err instanceof Error && err.message.includes("rate limit")
+      ? "The AI is at its rate limit — try again in a minute or two."
+      : "Couldn't refresh right now — try again shortly.";
+    toast({ title: msg, variant: "destructive" });
   };
 
   const refreshPainPoints = () => {
     setPainPointsLoading(true);
     agentApi.painPoints()
-      .then((r) => { setPainPoints(r.painPoints); savePainPointsCache(r.painPoints); })
-      .catch(() => {})
+      .then((r) => { setPainPoints(r.painPoints); saveDayCache("pain", uid, r.painPoints); })
+      .catch(aiErrorToast)
       .finally(() => setPainPointsLoading(false));
+  };
+
+  const refreshTabIdeas = (type: "brand" | "teach") => {
+    if (tabRefreshing) return;
+    setTabRefreshing(true);
+    const request = type === "brand" ? agentApi.brandIdeas() : agentApi.teachIdeas();
+    request
+      .then((r) => {
+        if (type === "brand") { setBrandAnglesOverride(r.angles as BrandAngle[]); setExpandedBriefAngle(null); }
+        else { setTeachAnglesOverride(r.angles as string[]); setExpandedTeachAngle(null); }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error && err.message.includes("rate limit")
+          ? "The AI is at its rate limit — try again in a minute or two."
+          : "Couldn't refresh this tab — try again shortly.";
+        toast({ title: msg, variant: "destructive" });
+      })
+      .finally(() => setTabRefreshing(false));
   };
 
   const refreshBrief = () => {
     setBriefLoading(true);
-    sessionStorage.removeItem(todayKey());
+    clearDayCache("brief", uid);
     agentApi.brief().then((b) => {
       setBrief(b);
-      saveBriefCache(b);
-    }).catch(() => {}).finally(() => setBriefLoading(false));
+      saveDayCache("brief", uid, b);
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error && err.message.includes("rate limit")
+        ? "The AI is at its rate limit — try again in a minute or two."
+        : "Couldn't refresh right now — try again shortly.";
+      toast({ title: msg, variant: "destructive" });
+    }).finally(() => setBriefLoading(false));
   };
 
   const openLengthPicker = (raw: string, extra = "") => {
@@ -366,15 +554,12 @@ export default function Dashboard() {
 
   return (
     <AppShell>
+
+
         {/* Header */}
-        <header className="px-6 pt-12 pb-6 bg-white border-b border-gray-100 sticky top-0 z-10">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">BrandMe</p>
-              <h1 className="text-xl font-extrabold text-gray-900">
-                {firstName ? `Hey, ${firstName}` : "Dashboard"}
-              </h1>
-            </div>
+        <header className="px-6 pt-10 pb-4 bg-white/80 backdrop-blur border-b border-gray-100 sticky top-0 z-10">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <p className="text-sm font-black tracking-tight text-gray-900">Brand<span className="text-gray-300">Me</span></p>
             <div className="flex items-center gap-2">
               {momentum && momentum.streak >= 2 && (
                 <div className="flex items-center gap-1 bg-orange-50 border border-orange-100 px-2.5 py-1.5 rounded-xl">
@@ -382,14 +567,15 @@ export default function Dashboard() {
                   <span className="text-xs font-bold text-orange-600">{momentum.streak}-day streak</span>
                 </div>
               )}
-              <Link href="/settings" className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
-                <Settings className="w-4.5 h-4.5" />
+              <Link href="/settings" className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                <Settings className="w-4 h-4" />
               </Link>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 px-6 py-6 space-y-4">
+        <main className="flex-1 px-6 py-6">
+          <div className="max-w-5xl mx-auto space-y-4">
           {/* Cadence alerts */}
           {visibleAlerts.length > 0 && (
             <div className="space-y-2">
@@ -411,13 +597,107 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Momentum Score Card */}
-          {momentum ? (
-            <MomentumCard data={momentum} />
-          ) : (
-            <Skeleton className="h-20 rounded-3xl" />
+
+
+          {/* Hero — greeting, flame, momentum status */}
+          <section
+            className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950 px-6 py-6 cursor-pointer select-none"
+            onClick={() => setMomOpen((v) => !v)}
+          >
+            <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase mb-1">
+                  {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"}
+                </p>
+                <h1 className="text-2xl font-extrabold text-white tracking-tight truncate">{firstName ?? "Creator"}</h1>
+                <p className="text-xs text-white/55 mt-1.5 font-medium">
+                  {momentum ? (MOMENTUM_LINES[momentum.label] ?? "Tap to see your momentum breakdown.") : "Loading your momentum…"}
+                </p>
+              </div>
+              {momentum ? (
+                <MomentumFlame score={momentum.score} />
+              ) : (
+                <Skeleton className="w-14 h-14 rounded-2xl bg-white/10 flex-shrink-0" />
+              )}
+            </div>
+          </section>
+          {momOpen && momentum && <MomentumCard data={momentum} />}
+
+          {/* Performance check-in nudges — published posts with no logged stats */}
+          {checkins.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => navigate(`/library?highlight=${c.id}`)}
+              className="w-full rounded-3xl border border-sky-100 bg-sky-50/60 px-5 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-sky-50 transition-colors"
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-sky-500 uppercase tracking-widest mb-0.5">Performance check-in</p>
+                <p className="text-sm font-bold text-gray-800 truncate">How did “{c.topic}” do?</p>
+                <p className="text-[11px] text-gray-400">Published {c.ageDays} day{c.ageDays !== 1 ? "s" : ""} ago — logging the numbers makes your AI smarter.</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-sky-400 flex-shrink-0" />
+            </button>
+          ))}
+
+          {/* Audience-mix nudge — flags when recent posts heavily skew one
+              audience, so the user notices if e.g. Recruiters is empty. */}
+          {audienceMix?.ready && audienceMix.skewed && !audienceMixDismissed && (
+            <div className="w-full rounded-3xl border border-indigo-100 bg-indigo-50/60 px-5 py-3.5 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-0.5">Audience mix</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {audienceMix.topPct}% of your last {audienceMix.total} posts were for {audienceMix.topAudience}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  {audienceMix.missing && audienceMix.missing.length > 0
+                    ? `You haven't posted for ${audienceMix.missing.slice(0, 2).join(" or ")} recently — try one this week if that's an audience you want attention from.`
+                    : "Consider mixing in a post for a different audience this week."}
+                </p>
+              </div>
+              <button
+                onClick={() => openLengthPicker("", "")}
+                className="flex-shrink-0 text-[11px] font-bold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap"
+              >
+                Write one
+              </button>
+              <button
+                onClick={() => setAudienceMixDismissed(true)}
+                className="flex-shrink-0 p-1 rounded-lg text-indigo-300 hover:text-indigo-500 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
 
+          {/* Series-in-progress nudge — points at the next unwritten part of
+              whichever active series needs it, pulled from the daily brief's
+              already-computed rollup (no extra AI call). */}
+          {brief?.seriesNudge && !seriesNudgeDismissed && (
+            <div className="w-full rounded-3xl border border-indigo-100 bg-indigo-50/60 px-5 py-3.5 flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-0.5">Series in progress</p>
+                <p className="text-sm font-bold text-gray-800 truncate">
+                  Part {brief.seriesNudge.nextPart}{brief.seriesNudge.plannedParts ? ` of ${brief.seriesNudge.plannedParts}` : ""} — {brief.seriesNudge.title}
+                </p>
+              </div>
+              <button
+                onClick={() => navigate(`/capture?seriesId=${brief.seriesNudge!.seriesId}&seriesPart=${brief.seriesNudge!.nextPart}`)}
+                className="flex-shrink-0 text-[11px] font-bold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap"
+              >
+                Write it
+              </button>
+              <button
+                onClick={() => setSeriesNudgeDismissed(true)}
+                className="flex-shrink-0 p-1 rounded-lg text-indigo-300 hover:text-indigo-500 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <div className="md:grid md:grid-cols-5 md:gap-5 md:items-start space-y-4 md:space-y-0">
+          <div className="md:col-span-3 space-y-4">
           {/* Write your own — primary CTA always visible */}
           <button
             onClick={() => openLengthPicker("", "")}
@@ -437,6 +717,370 @@ export default function Dashboard() {
             </div>
           </button>
 
+          {/* ── Idea Engine — one card, four lenses ── */}
+          <div className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-gray-900" />
+                <span className="text-[10px] font-bold text-gray-900 uppercase tracking-widest">Idea Engine</span>
+              </div>
+              {ideaTab !== "skills" && (
+                <button
+                  onClick={() => (ideaTab === "pain" ? refreshPainPoints() : ideaTab === "best" ? refreshTopPosts() : refreshTabIdeas(ideaTab))}
+                  disabled={tabRefreshing || (ideaTab === "pain" && painPointsLoading) || (ideaTab === "best" && topSuggestionsLoading)}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 hover:text-gray-700 disabled:opacity-50 transition-colors"
+                  title="Regenerates only this tab — other tabs are untouched"
+                >
+                  <RefreshCw className={cn("w-3 h-3", (tabRefreshing || (ideaTab === "pain" && painPointsLoading) || (ideaTab === "best" && topSuggestionsLoading)) && "animate-spin")} />
+                  {ideaTab === "brand" ? "New brand ideas" : ideaTab === "teach" ? "New teach ideas" : ideaTab === "best" ? "New angles from best posts" : "New pain points"}
+                </button>
+              )}
+            </div>
+            <div className="px-5 pb-3 flex gap-1.5 overflow-x-auto no-scrollbar">
+              {([["brand", "For your brand"], ["teach", "Teach"], ["best", "Best posts"], ["pain", "Pain points"], ["skills", "Skills"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setIdeaTab(key);
+                    // Lazy-load: first visit to a data tab fetches once; after
+                    // that it's the day cache until the user hits refresh.
+                    if (key === "pain" && painPoints === null && !painPointsLoading) refreshPainPoints();
+                    if (key === "best" && topSuggestions === null && !topSuggestionsLoading) refreshTopPosts();
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all",
+                    ideaTab === key ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {ideaTab === "brand" && ((brandAnglesOverride ?? brief?.angles ?? []).length > 0 ? (
+
+                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-gray-50 pt-3">
+                  {(brandAnglesOverride ?? brief?.angles ?? []).map((item, i) => {
+                    const isOpen = expandedBriefAngle === i;
+                    const fbKey = `brand:${item.angle}`;
+                    const fb = ideaFeedback[fbKey];
+                    return (
+                      <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
+                        <div className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="flex-1 text-left flex items-start gap-2 px-3 py-2.5 min-w-0">
+                            <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                              {item.audience === "Recruiters & Headhunters" ? "Recruiters" : item.audience}
+                            </span>
+                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                          </button>
+                          <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(item.angle, "brand", "like"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3 h-3" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(item.angle, "brand", "dislike"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3 h-3" /></button>
+                          </div>
+                        </div>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
+                            <button onClick={() => openLengthPicker(item.angle, `audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+            ) : (
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">{briefLoading ? "Generating ideas…" : "Ideas appear once your daily brief loads."}</p>
+            ))}
+
+            {ideaTab === "teach" && ((teachAnglesOverride ?? brief?.teachAngles ?? []).length > 0 ? (
+
+                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-indigo-50 pt-3">
+                  {(teachAnglesOverride ?? brief?.teachAngles ?? []).map((angle, i) => {
+                    const isOpen = expandedTeachAngle === i;
+                    const fbKey = `teach:${angle}`;
+                    const fb = ideaFeedback[fbKey];
+                    return (
+                      <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
+                        <div className="flex items-center gap-1 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
+                          <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="flex-1 text-left flex items-start justify-between gap-2 px-3 py-2.5">
+                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{angle}</span>
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                          </button>
+                          <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "like"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3 h-3" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "dislike"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3 h-3" /></button>
+                          </div>
+                        </div>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100">
+                            <button onClick={() => openLengthPicker(angle, "teacherMode=true")} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors">Write this →</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+            ) : (
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">{briefLoading ? "Generating ideas…" : "Teaching angles appear once your daily brief loads."}</p>
+            ))}
+
+            {ideaTab === "best" && (topSuggestionsLoading ? (
+              <div className="px-5 pb-5 pt-2 flex justify-center"><span className="w-4 h-4 rounded-full border border-gray-300 border-t-transparent animate-spin" /></div>
+            ) : topSuggestions && topSuggestions.length > 0 ? (
+<div className="px-5 pb-5 flex flex-col gap-3 border-t border-orange-50 pt-3">
+                  {topSuggestions.map((s, i) => {
+                    const isOpen = expandedTopSuggestion === i;
+                    return (
+                      <div key={i} className="rounded-xl border border-orange-100 overflow-hidden">
+                        <button onClick={() => setExpandedTopSuggestion(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-orange-50/50 hover:bg-orange-50 px-3 py-2.5 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-900 text-xs font-bold leading-snug">{s.originalTopic}</p>
+                            {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{s.why}</p>}
+                          </div>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-orange-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2 bg-white border-t border-orange-100 space-y-2.5">
+                            <div className="bg-orange-50 rounded-lg px-2.5 py-2">
+                              <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wide mb-0.5">Why it performed</p>
+                              <p className="text-xs text-gray-700">{s.why}</p>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              {s.angles.map((a, j) => (
+                                <div key={j} className="rounded-lg border border-orange-100 overflow-hidden">
+                                  <div className="flex items-center gap-2 bg-orange-50/40 px-2.5 py-2">
+                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide flex-shrink-0">{a.label}</span>
+                                    <p className="flex-1 text-xs text-gray-700 leading-snug">{a.angle}</p>
+                                    <button onClick={() => openLengthPicker(a.angle)} className="flex-shrink-0 text-[10px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+            ) : (
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2 leading-relaxed">
+                {topSuggestions === null
+                  ? "Tap refresh to mine your best posts for fresh angles."
+                  : "Needs posts with logged engagement — log performance on a few posts, then refresh."}
+              </p>
+            ))}
+
+            {ideaTab === "pain" && (painPointsLoading ? (
+              <div className="px-5 pb-5 pt-2 flex justify-center"><span className="w-4 h-4 rounded-full border border-gray-300 border-t-transparent animate-spin" /></div>
+            ) : painPoints && painPoints.length > 0 ? (
+
+                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-rose-50 pt-3">
+                  {painPoints.map((pp, i) => {
+                    const isOpen = expandedPainPoint === i;
+                    return (
+                      <div key={i} className="rounded-xl border border-rose-100 overflow-hidden">
+                        <button onClick={() => setExpandedPainPoint(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-rose-50/60 hover:bg-rose-100/60 px-3 py-2.5 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-gray-900 text-xs font-bold leading-snug">{pp.title}</p>
+                            {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{pp.description}</p>}
+                          </div>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 pb-3 pt-2 bg-white border-t border-rose-100 space-y-2.5">
+                            <p className="text-xs text-gray-600 leading-relaxed">{pp.description}</p>
+                            <div className="bg-rose-50 rounded-lg px-2.5 py-2">
+                              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wide mb-0.5">Post angle</p>
+                              <p className="text-xs text-gray-700 font-medium">{pp.angle}</p>
+                            </div>
+                            <button onClick={() => openLengthPicker(pp.angle)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors">Write about this →</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+            ) : (
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">No pain points yet — tap refresh.</p>
+            ))}
+
+            {ideaTab === "skills" && (
+              <div>
+
+              <div className="border-t border-amber-50">
+                <div className="px-5 pt-4 pb-4">
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-3">What skill do you want to post about?</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={skillInput}
+                      onChange={(e) => setSkillInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && void handleGenerateSkillAngles()}
+                      placeholder="e.g. Negotiation, Data storytelling, Cold outreach…"
+                      className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 focus:border-amber-400 focus:outline-none text-sm"
+                    />
+                    <button
+                      onClick={() => void handleGenerateSkillAngles()}
+                      disabled={skillAnglesLoading || !skillInput.trim()}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white text-xs font-bold transition-colors whitespace-nowrap"
+                    >
+                      {skillAnglesLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      {skillAnglesLoading ? "Generating…" : "Generate"}
+                    </button>
+                  </div>
+                </div>
+                {skillAngles && skillAngles.length > 0 && (
+                  <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-amber-100 pt-4">
+                    {skillAngles.map((sa, i) => {
+                      const isOpen = expandedSkillAngle === i;
+                      const labels = ["Personal story", "Contrarian take", "Tactical how-to"];
+                      return (
+                        <div key={i} className="rounded-xl border border-amber-100 overflow-hidden">
+                          <button onClick={() => setExpandedSkillAngle(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-amber-50/60 hover:bg-amber-100/60 px-3 py-2.5 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">{labels[i] ?? `Angle ${i + 1}`}</span>
+                              <p className={cn("text-gray-800 text-xs font-medium leading-snug mt-0.5", !isOpen && "line-clamp-1")}>{sa.angle}</p>
+                            </div>
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-1 transition-transform duration-200", isOpen && "rotate-180")} />
+                          </button>
+                          {isOpen && (
+                            <div className="px-3 pb-3 pt-2 bg-white border-t border-amber-100 space-y-2.5">
+                              <div className="bg-amber-50 rounded-lg px-2.5 py-2">
+                                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">Opening hook</p>
+                                <p className="text-xs text-gray-700 font-medium italic">"{sa.hook}"</p>
+                              </div>
+                              <button onClick={() => openLengthPicker(sa.angle, `extraInstruction=${encodeURIComponent(`Open with: "${sa.hook}"`)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-colors">Use this angle →</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              </div>
+            )}
+          </div>
+
+          {/* ── Voice Insights ── */}
+          {!voiceSuggestionsLoading && scoredPostCount >= 1 && scoredPostCount < 5 && (
+            <div className="flex items-center gap-3 bg-violet-50 border border-violet-100 rounded-2xl px-4 py-3">
+              <Lightbulb className="w-4 h-4 text-violet-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-violet-800">Voice Insights unlocks at 5 posts</p>
+                <p className="text-[11px] text-violet-500 mt-0.5">Log performance on {5 - scoredPostCount} more post{5 - scoredPostCount !== 1 ? "s" : ""} to unlock AI-powered brand voice suggestions.</p>
+              </div>
+            </div>
+          )}
+          {!voiceSuggestionsLoading && scoredPostCount >= 5 && (
+            <div className="bg-white rounded-3xl border border-violet-100 shadow-sm overflow-hidden">
+              <div
+                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
+                onClick={() => setVoiceOpen((v) => !v)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Lightbulb className="w-3.5 h-3.5 text-violet-500" />
+                  <span className="text-[10px] font-bold text-violet-700 uppercase tracking-widest">Voice Insights</span>
+                  {voiceSuggestions.length > 0 && (
+                    <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">{voiceSuggestions.length}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); void handleGenerateInsights(); }}
+                    disabled={voiceInsightsGenerating}
+                    className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 hover:text-violet-500 disabled:opacity-50 transition-colors"
+                    title="Analyse my voice (2/day)"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    {voiceInsightsGenerating ? "Analysing…" : "Analyse"}
+                  </button>
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", voiceOpen && "rotate-180")} />
+                </div>
+              </div>
+              {voiceOpen && (
+                <div className="px-5 pb-5 border-t border-violet-50 pt-4">
+                  {voiceSuggestions.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-3">No suggestions yet — tap Analyse above.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {voiceSuggestions.map((s) => (
+                        <div key={s.id} className="bg-gray-50 rounded-2xl border border-violet-100 p-4">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{s.field}</span>
+                            <span className="text-[10px] text-gray-400 line-through truncate max-w-[80px]">{s.currentValue || "not set"}</span>
+                            <ChevronRight className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                            <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">{s.suggestedValue}</span>
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed mb-3">{s.rationale}</p>
+                          {Array.isArray(s.evidenceSnippets) && s.evidenceSnippets.length > 0 && (
+                            <div className="mb-3 space-y-1">
+                              {(s.evidenceSnippets as string[]).slice(0, 2).map((snippet, i) => (
+                                <p key={i} className="text-[10px] text-gray-400 italic leading-snug border-l-2 border-violet-200 pl-2">&ldquo;{snippet}&rdquo;</p>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <button onClick={() => void handleAcceptSuggestion(s.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-colors"><Check className="w-3 h-3" /> Apply</button>
+                            <button onClick={() => void handleDismissSuggestion(s.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors"><X className="w-3 h-3" /> Dismiss</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+
+
+          {/* ── Saved Ideas tray ── */}
+          {savedIdeas.length > 0 && (
+            <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
+              <div
+                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
+                onClick={() => setSavedIdeasOpen((v) => !v)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Saved Ideas</span>
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">{savedIdeas.length}</span>
+                </div>
+                <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", savedIdeasOpen && "rotate-180")} />
+              </div>
+              {savedIdeasOpen && (
+                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-emerald-50 pt-3">
+                  {savedIdeas.map((idea) => (
+                    <div key={idea.id} className="rounded-xl border border-emerald-100 overflow-hidden">
+                      <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-2.5">
+                        <span className="flex-1 text-gray-800 text-xs font-medium leading-snug">{idea.text}</span>
+                        <button onClick={() => openLengthPicker(idea.text, idea.type === "teach" ? "teacherMode=true" : "")} className="flex-shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
+                        <button
+                          onClick={() => {
+                            setSavedIdeas((prev) => prev.filter((i) => i.id !== idea.id));
+                            agentApi.deleteSavedIdea(idea.id).catch(() => { setSavedIdeas((prev) => [idea, ...prev]); });
+                          }}
+                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          </div>
+
+          <div className="md:col-span-2 space-y-4">
           {/* ── Today's Brief ── */}
           {briefLoading ? (
             <div className="rounded-3xl overflow-hidden bg-gray-900 p-5 space-y-3">
@@ -452,8 +1096,8 @@ export default function Dashboard() {
                 onClick={() => setBriefOpen((v) => !v)}
               >
                 <div className="flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Today's Brief</span>
+                  <Bot className="w-3.5 h-3.5 text-white/70" />
+                  <span className="text-[10px] font-bold text-white/80 uppercase tracking-widest">In the news</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -468,6 +1112,16 @@ export default function Dashboard() {
               </div>
               {briefOpen && (
                 <div className="px-5 pb-5">
+                  {!brief.newsHeadline && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); refreshBrief(); }}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-3 py-2.5 mb-3 flex items-center gap-2 text-left hover:bg-white/10 transition-colors"
+                    >
+                      <Newspaper className="w-3.5 h-3.5 text-white/30 flex-shrink-0" />
+                      <span className="text-[11px] text-white/45 leading-snug">No fresh headline matched on the last fetch — tap to retry.</span>
+                      <RefreshCw className="w-3 h-3 text-white/30 flex-shrink-0 ml-auto" />
+                    </button>
+                  )}
                   {brief.newsHeadline && (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-3 py-2.5 mb-3">
                       <div className="flex items-start gap-2">
@@ -554,423 +1208,21 @@ export default function Dashboard() {
             </div>
           ) : null}
 
-          {/* ── Post Ideas for Your Brand ── */}
-          {brief && brief.angles.length > 0 && (
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <div
-                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setPostIdeasOpen((v) => !v)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Post ideas for your brand</span>
-                  <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">· From your voice &amp; gaps</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); refreshBrief(); }}
-                    className="text-gray-300 hover:text-gray-500 transition-colors"
-                    title="Refresh ideas"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                  <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", postIdeasOpen && "rotate-180")} />
-                </div>
-              </div>
-              {postIdeasOpen && (
-                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-gray-50 pt-3">
-                  {brief.angles.map((angle, i) => {
-                    const isOpen = expandedBriefAngle === i;
-                    const fbKey = `brand:${angle}`;
-                    const fb = ideaFeedback[fbKey];
-                    return (
-                      <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
-                        <div className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="flex-1 text-left flex items-start justify-between gap-2 px-3 py-2.5">
-                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{angle}</span>
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                          </button>
-                          <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "brand", "like"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3 h-3" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "brand", "dislike"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                        {isOpen && (
-                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
-                            <button onClick={() => openLengthPicker(angle)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+{/* ── Dare Mode ── */}
+          <DareCard onWrite={(raw) => openLengthPicker(raw)} />
 
-          {/* ── Teach Your Audience ── */}
-          {brief && brief.teachAngles && brief.teachAngles.length > 0 && (
-            <div className="bg-white rounded-3xl border border-indigo-100 shadow-sm overflow-hidden">
-              <div
-                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setTeachOpen((v) => !v)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Teach your audience</span>
-                  <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">· Analogy &amp; FAQ ideas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); refreshBrief(); }}
-                    className="text-gray-300 hover:text-indigo-400 transition-colors"
-                    title="Refresh ideas"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                  <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", teachOpen && "rotate-180")} />
-                </div>
-              </div>
-              {teachOpen && (
-                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-indigo-50 pt-3">
-                  {brief.teachAngles.map((angle, i) => {
-                    const isOpen = expandedTeachAngle === i;
-                    const fbKey = `teach:${angle}`;
-                    const fb = ideaFeedback[fbKey];
-                    return (
-                      <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
-                        <div className="flex items-center gap-1 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
-                          <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="flex-1 text-left flex items-start justify-between gap-2 px-3 py-2.5">
-                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{angle}</span>
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                          </button>
-                          <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "like"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3 h-3" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "dislike"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3 h-3" /></button>
-                          </div>
-                        </div>
-                        {isOpen && (
-                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100">
-                            <button onClick={() => openLengthPicker(angle, "teacherMode=true")} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors">Write this →</button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+          {/* ── Brand Studio entry — mobile only; desktop reaches it via the sidebar ── */}
+          <button
+            onClick={() => navigate("/studio")}
+            className="md:hidden w-full rounded-3xl border border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 px-5 py-4 flex items-center justify-between gap-3 text-left hover:from-violet-100 hover:to-purple-100 transition-colors group"
+          >
+            <div>
+              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mb-0.5">Brand Studio</p>
+              <p className="text-sm font-extrabold text-gray-900">Tune your brand with what's working</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Analyze top posts · update your profile · set style targets</p>
             </div>
-          )}
-
-          {/* ── From Your Best Posts ── */}
-          {topSuggestionsLoading ? (
-            <div className="bg-white rounded-3xl border border-orange-100 shadow-sm overflow-hidden">
-              <div className="px-5 pt-5 pb-4 flex items-center gap-2">
-                <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
-                <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">From Your Best Posts</span>
-                <span className="w-3 h-3 rounded-full border border-orange-300 border-t-transparent animate-spin ml-auto" />
-              </div>
-            </div>
-          ) : topSuggestions && topSuggestions.length > 0 ? (
-            <div className="bg-white rounded-3xl border border-orange-100 shadow-sm overflow-hidden">
-              <div
-                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setTopPostsOpen((v) => !v)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-orange-500" />
-                  <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">From Your Best Posts</span>
-                  <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded-full">Fresh angles</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); refreshTopPosts(); }}
-                    className="text-gray-300 hover:text-orange-400 transition-colors"
-                    title="Refresh top post angles"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                  <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", topPostsOpen && "rotate-180")} />
-                </div>
-              </div>
-              {topPostsOpen && (
-                <div className="px-5 pb-5 flex flex-col gap-3 border-t border-orange-50 pt-3">
-                  {topSuggestions.map((s, i) => {
-                    const isOpen = expandedTopSuggestion === i;
-                    return (
-                      <div key={i} className="rounded-xl border border-orange-100 overflow-hidden">
-                        <button onClick={() => setExpandedTopSuggestion(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-orange-50/50 hover:bg-orange-50 px-3 py-2.5 transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-gray-900 text-xs font-bold leading-snug">{s.originalTopic}</p>
-                            {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{s.why}</p>}
-                          </div>
-                          <ChevronDown className={cn("w-3.5 h-3.5 text-orange-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                        </button>
-                        {isOpen && (
-                          <div className="px-3 pb-3 pt-2 bg-white border-t border-orange-100 space-y-2.5">
-                            <div className="bg-orange-50 rounded-lg px-2.5 py-2">
-                              <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wide mb-0.5">Why it performed</p>
-                              <p className="text-xs text-gray-700">{s.why}</p>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              {s.angles.map((a, j) => (
-                                <div key={j} className="rounded-lg border border-orange-100 overflow-hidden">
-                                  <div className="flex items-center gap-2 bg-orange-50/40 px-2.5 py-2">
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide flex-shrink-0">{a.label}</span>
-                                    <p className="flex-1 text-xs text-gray-700 leading-snug">{a.angle}</p>
-                                    <button onClick={() => openLengthPicker(a.angle)} className="flex-shrink-0 text-[10px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {/* ── Audience Pain Points ── */}
-          {painPointsLoading ? (
-            <div className="bg-white rounded-3xl border border-rose-100 shadow-sm overflow-hidden">
-              <div className="px-5 pt-5 pb-4 flex items-center gap-2">
-                <Brain className="w-3.5 h-3.5 text-rose-500" />
-                <span className="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Audience Pain Points</span>
-                <span className="w-3 h-3 rounded-full border border-rose-300 border-t-transparent animate-spin ml-auto" />
-              </div>
-            </div>
-          ) : painPoints && painPoints.length > 0 ? (
-            <div className="bg-white rounded-3xl border border-rose-100 shadow-sm overflow-hidden">
-              <div
-                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setPainPointsOpen((v) => !v)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Brain className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-[10px] font-bold text-rose-600 uppercase tracking-widest">Audience Pain Points</span>
-                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full">What they struggle with</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); refreshPainPoints(); }}
-                    className="text-gray-300 hover:text-rose-400 transition-colors"
-                    title="Refresh pain points"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                  <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", painPointsOpen && "rotate-180")} />
-                </div>
-              </div>
-              {painPointsOpen && (
-                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-rose-50 pt-3">
-                  {painPoints.map((pp, i) => {
-                    const isOpen = expandedPainPoint === i;
-                    return (
-                      <div key={i} className="rounded-xl border border-rose-100 overflow-hidden">
-                        <button onClick={() => setExpandedPainPoint(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-rose-50/60 hover:bg-rose-100/60 px-3 py-2.5 transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-gray-900 text-xs font-bold leading-snug">{pp.title}</p>
-                            {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{pp.description}</p>}
-                          </div>
-                          <ChevronDown className={cn("w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                        </button>
-                        {isOpen && (
-                          <div className="px-3 pb-3 pt-2 bg-white border-t border-rose-100 space-y-2.5">
-                            <p className="text-xs text-gray-600 leading-relaxed">{pp.description}</p>
-                            <div className="bg-rose-50 rounded-lg px-2.5 py-2">
-                              <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wide mb-0.5">Post angle</p>
-                              <p className="text-xs text-gray-700 font-medium">{pp.angle}</p>
-                            </div>
-                            <button onClick={() => openLengthPicker(pp.angle)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors">Write about this →</button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {/* ── Voice Insights ── */}
-          {!voiceSuggestionsLoading && scoredPostCount >= 1 && scoredPostCount < 5 && (
-            <div className="flex items-center gap-3 bg-violet-50 border border-violet-100 rounded-2xl px-4 py-3">
-              <Lightbulb className="w-4 h-4 text-violet-400 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-violet-800">Voice Insights unlocks at 5 posts</p>
-                <p className="text-[11px] text-violet-500 mt-0.5">Log performance on {5 - scoredPostCount} more post{5 - scoredPostCount !== 1 ? "s" : ""} to unlock AI-powered brand voice suggestions.</p>
-              </div>
-            </div>
-          )}
-          {!voiceSuggestionsLoading && scoredPostCount >= 5 && (
-            <div className="bg-white rounded-3xl border border-violet-100 shadow-sm overflow-hidden">
-              <div
-                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setVoiceOpen((v) => !v)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Lightbulb className="w-3.5 h-3.5 text-violet-500" />
-                  <span className="text-[10px] font-bold text-violet-700 uppercase tracking-widest">Voice Insights</span>
-                  {voiceSuggestions.length > 0 && (
-                    <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">{voiceSuggestions.length}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void handleGenerateInsights(); }}
-                    disabled={voiceInsightsGenerating}
-                    className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 hover:text-violet-500 disabled:opacity-50 transition-colors"
-                    title="Analyse my voice (2/day)"
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    {voiceInsightsGenerating ? "Analysing…" : "Analyse"}
-                  </button>
-                  <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", voiceOpen && "rotate-180")} />
-                </div>
-              </div>
-              {voiceOpen && (
-                <div className="px-5 pb-5 border-t border-violet-50 pt-4">
-                  {voiceSuggestions.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-3">No suggestions yet — tap Analyse above.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {voiceSuggestions.map((s) => (
-                        <div key={s.id} className="bg-gray-50 rounded-2xl border border-violet-100 p-4">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{s.field}</span>
-                            <span className="text-[10px] text-gray-400 line-through truncate max-w-[80px]">{s.currentValue || "not set"}</span>
-                            <ChevronRight className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                            <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full truncate max-w-[120px]">{s.suggestedValue}</span>
-                          </div>
-                          <p className="text-xs text-gray-600 leading-relaxed mb-3">{s.rationale}</p>
-                          {Array.isArray(s.evidenceSnippets) && s.evidenceSnippets.length > 0 && (
-                            <div className="mb-3 space-y-1">
-                              {(s.evidenceSnippets as string[]).slice(0, 2).map((snippet, i) => (
-                                <p key={i} className="text-[10px] text-gray-400 italic leading-snug border-l-2 border-violet-200 pl-2">&ldquo;{snippet}&rdquo;</p>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <button onClick={() => void handleAcceptSuggestion(s.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-colors"><Check className="w-3 h-3" /> Apply</button>
-                            <button onClick={() => void handleDismissSuggestion(s.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors"><X className="w-3 h-3" /> Dismiss</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Skills Workshop ── */}
-          <div className="bg-white rounded-3xl border border-amber-100 shadow-sm overflow-hidden">
-            <div
-              className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-              onClick={() => setSkillsOpen((v) => !v)}
-            >
-              <div className="flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Skills Workshop</span>
-                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full hidden sm:inline">Turn a skill into post angles</span>
-              </div>
-              <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", skillsOpen && "rotate-180")} />
-            </div>
-            {skillsOpen && (
-              <div className="border-t border-amber-50">
-                <div className="px-5 pt-4 pb-4">
-                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-3">What skill do you want to post about?</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={skillInput}
-                      onChange={(e) => setSkillInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && void handleGenerateSkillAngles()}
-                      placeholder="e.g. Negotiation, Data storytelling, Cold outreach…"
-                      className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 focus:border-amber-400 focus:outline-none text-sm"
-                    />
-                    <button
-                      onClick={() => void handleGenerateSkillAngles()}
-                      disabled={skillAnglesLoading || !skillInput.trim()}
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white text-xs font-bold transition-colors whitespace-nowrap"
-                    >
-                      {skillAnglesLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                      {skillAnglesLoading ? "Generating…" : "Generate"}
-                    </button>
-                  </div>
-                </div>
-                {skillAngles && skillAngles.length > 0 && (
-                  <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-amber-100 pt-4">
-                    {skillAngles.map((sa, i) => {
-                      const isOpen = expandedSkillAngle === i;
-                      const labels = ["Personal story", "Contrarian take", "Tactical how-to"];
-                      return (
-                        <div key={i} className="rounded-xl border border-amber-100 overflow-hidden">
-                          <button onClick={() => setExpandedSkillAngle(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-amber-50/60 hover:bg-amber-100/60 px-3 py-2.5 transition-colors">
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">{labels[i] ?? `Angle ${i + 1}`}</span>
-                              <p className={cn("text-gray-800 text-xs font-medium leading-snug mt-0.5", !isOpen && "line-clamp-1")}>{sa.angle}</p>
-                            </div>
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-1 transition-transform duration-200", isOpen && "rotate-180")} />
-                          </button>
-                          {isOpen && (
-                            <div className="px-3 pb-3 pt-2 bg-white border-t border-amber-100 space-y-2.5">
-                              <div className="bg-amber-50 rounded-lg px-2.5 py-2">
-                                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">Opening hook</p>
-                                <p className="text-xs text-gray-700 font-medium italic">"{sa.hook}"</p>
-                              </div>
-                              <button onClick={() => openLengthPicker(sa.angle, `extraInstruction=${encodeURIComponent(`Open with: "${sa.hook}"`)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-colors">Use this angle →</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── Saved Ideas tray ── */}
-          {savedIdeas.length > 0 && (
-            <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
-              <div
-                className="px-5 pt-5 pb-4 flex items-center justify-between cursor-pointer"
-                onClick={() => setSavedIdeasOpen((v) => !v)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Saved Ideas</span>
-                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">{savedIdeas.length}</span>
-                </div>
-                <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", savedIdeasOpen && "rotate-180")} />
-              </div>
-              {savedIdeasOpen && (
-                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-emerald-50 pt-3">
-                  {savedIdeas.map((idea) => (
-                    <div key={idea.id} className="rounded-xl border border-emerald-100 overflow-hidden">
-                      <div className="flex items-center gap-2 bg-emerald-50/50 px-3 py-2.5">
-                        <span className="flex-1 text-gray-800 text-xs font-medium leading-snug">{idea.text}</span>
-                        <button onClick={() => openLengthPicker(idea.text, idea.type === "teach" ? "teacherMode=true" : "")} className="flex-shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
-                        <button
-                          onClick={() => {
-                            setSavedIdeas((prev) => prev.filter((i) => i.id !== idea.id));
-                            agentApi.deleteSavedIdea(idea.id).catch(() => { setSavedIdeas((prev) => [idea, ...prev]); });
-                          }}
-                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            <FlaskConical className="w-6 h-6 text-violet-400 group-hover:scale-110 transition-transform flex-shrink-0" />
+          </button>
 
           {/* ── Ripe for Developing ── */}
           {!thoughtsLoading && ripeThoughts.length > 0 && (
@@ -1097,6 +1349,9 @@ export default function Dashboard() {
                 )}
               </div>
             )}
+          </div>
+          </div>
+          </div>
           </div>
         </main>
 

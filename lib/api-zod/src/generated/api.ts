@@ -240,6 +240,18 @@ export const GenerateContentBody = zod.object({
     .describe(
       'Additional refinement instruction appended to the generation prompt (used by \"Try a different angle\" and similar refine actions in Capture)',
     ),
+  format: zod
+    .string()
+    .optional()
+    .describe(
+      "Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts",
+    ),
+  continuityContext: zod
+    .string()
+    .optional()
+    .describe(
+      "Prior series parts' excerpts, woven in as continuity context when writing a later part of a series",
+    ),
   objective: zod
     .string()
     .optional()
@@ -867,6 +879,9 @@ export const ListDraftsResponseItem = zod.object({
     })
     .nullish()
     .describe("Cached AI post diagnosis (null if not yet generated)"),
+  topicId: zod.number().nullish(),
+  seriesId: zod.number().nullish(),
+  seriesPart: zod.number().nullish(),
 });
 export const ListDraftsResponse = zod.array(ListDraftsResponseItem);
 
@@ -970,6 +985,9 @@ export const CreateDraftBody = zod.object({
     .optional(),
   selectedHook: zod.string().nullish(),
   shortPost: zod.string().nullish(),
+  topicId: zod.number().nullish(),
+  seriesId: zod.number().nullish(),
+  seriesPart: zod.number().nullish(),
 });
 
 /**
@@ -1145,6 +1163,9 @@ export const GetDraftResponse = zod.object({
     })
     .nullish()
     .describe("Cached AI post diagnosis (null if not yet generated)"),
+  topicId: zod.number().nullish(),
+  seriesId: zod.number().nullish(),
+  seriesPart: zod.number().nullish(),
 });
 
 /**
@@ -1249,6 +1270,9 @@ export const UpdateDraftBody = zod.object({
     .enum(["none", "card", "carousel", "infographic", "art"])
     .optional(),
   isVoiceSample: zod.boolean().optional(),
+  topicId: zod.number().nullish(),
+  seriesId: zod.number().nullish(),
+  seriesPart: zod.number().nullish(),
 });
 
 export const UpdateDraftResponse = zod.object({
@@ -1417,6 +1441,9 @@ export const UpdateDraftResponse = zod.object({
     })
     .nullish()
     .describe("Cached AI post diagnosis (null if not yet generated)"),
+  topicId: zod.number().nullish(),
+  seriesId: zod.number().nullish(),
+  seriesPart: zod.number().nullish(),
 });
 
 /**

@@ -126,7 +126,7 @@ export function SmartImportButton({ onApply }: Props) {
           <div className="p-4 space-y-3">
             {FIELD_LABELS.map(({ key, label, sub }) => {
               const val = state.data[key];
-              if (!val) return null;
+              if (!val || Array.isArray(val)) return null;
               return (
                 <div key={key} className={cn(sub ? "pb-3 border-b border-gray-100" : "")}>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">{label}</p>
@@ -134,6 +134,34 @@ export function SmartImportButton({ onApply }: Props) {
                 </div>
               );
             })}
+
+            {(state.data.proofPoints?.length ?? 0) > 0 && (
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Proof points — fuels specific posts</p>
+                <ul className="space-y-1.5">
+                  {state.data.proofPoints.map((p, i) => (
+                    <li key={i} className="text-xs text-gray-700 leading-relaxed flex gap-1.5">
+                      <span className="text-primary font-bold flex-shrink-0">•</span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(state.data.firstPostAngles?.length ?? 0) > 0 && (
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Your first posts could be…</p>
+                <ul className="space-y-1.5">
+                  {state.data.firstPostAngles.map((a, i) => (
+                    <li key={i} className="text-xs font-medium text-gray-800 leading-relaxed flex gap-1.5">
+                      <Sparkles className="w-3 h-3 text-primary flex-shrink-0 mt-0.5" />
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="px-4 pb-4 flex gap-2">

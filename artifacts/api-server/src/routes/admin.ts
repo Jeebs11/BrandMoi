@@ -4,7 +4,10 @@ import { db, pool } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { requireAdmin } from "../middleware/admin.js";
+import { setBlockedLocal } from "../lib/blocklist.js";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
 
 const DEMO_EMAIL = "demo@brandos.app";
 const ADMIN_EMAIL = "odmlawal@gmail.com";
@@ -111,7 +114,7 @@ router.get("/admin/users", async (req, res): Promise<void> => {
     const baseExclude = [DEMO_EMAIL, ADMIN_EMAIL];
 
     const userSelectCols = `
-      u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt",
+      u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt", u.blocked,
       COALESCE(p.onboarded, false) AS onboarded,
       p.tone, p.persona, p.objective,
       p.brand_role AS "brandRole", p.brand_audience AS "brandAudience", p.brand_belief AS "brandBelief",
@@ -169,7 +172,7 @@ router.get("/admin/users/:id", async (req, res): Promise<void> => {
 
     const user = (await pool.query(`
       SELECT
-        u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt",
+        u.id, u.email, u.display_name AS "displayName", u.created_at AS "createdAt", u.blocked,
         COALESCE(p.onboarded, false) AS onboarded,
         p.tone, p.persona, p.objective,
         p.brand_role AS "brandRole", p.brand_audience AS "brandAudience", p.brand_belief AS "brandBelief",
@@ -196,6 +199,55 @@ router.get("/admin/users/:id", async (req, res): Promise<void> => {
   } catch (err) {
     console.error("[admin/users/:id]", err);
     res.status(500).json({ error: "Failed to load user detail" });
+  }
+});
+
+// ── Set a user's password ─────────────────────────────────────────────────────
+const SetPasswordBody = z.object({ newPassword: z.string().min(8).max(200) });
+
+router.patch("/admin/users/:id/password", async (req, res): Promise<void> => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
+    const parsed = SetPasswordBody.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "Password must be at least 8 characters" }); return; }
+
+    const [user] = await db.select({ id: usersTable.id, email: usersTable.email })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.email === DEMO_EMAIL) { res.status(400).json({ error: "Cannot change the demo account password" }); return; }
+
+    const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+    await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, userId));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[admin/set-password]", err);
+    res.status(500).json({ error: "Failed to set password" });
+  }
+});
+
+// ── Block / unblock a user ─────────────────────────────────────────────────────
+const BlockBody = z.object({ blocked: z.boolean() });
+
+router.patch("/admin/users/:id/block", async (req, res): Promise<void> => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user id" }); return; }
+    const parsed = BlockBody.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "blocked (boolean) required" }); return; }
+
+    const [user] = await db.select({ id: usersTable.id, email: usersTable.email })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.email === DEMO_EMAIL) { res.status(400).json({ error: "Cannot block the demo account" }); return; }
+    if (user.email === ADMIN_EMAIL) { res.status(400).json({ error: "Cannot block the admin account" }); return; }
+
+    await db.update(usersTable).set({ blocked: parsed.data.blocked }).where(eq(usersTable.id, userId));
+    setBlockedLocal(userId, parsed.data.blocked);
+    res.json({ ok: true, blocked: parsed.data.blocked });
+  } catch (err) {
+    console.error("[admin/block]", err);
+    res.status(500).json({ error: "Failed to update block status" });
   }
 });
 

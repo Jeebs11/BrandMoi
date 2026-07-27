@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
@@ -9,21 +9,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { signToken } from "../lib/jwt.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { extractVoiceDNA } from "./ai.js";
+import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 
-// Per-user voice analysis rate limit — 2 per day, in-memory (resets on restart)
-const voiceAnalysisLimit = new Map<number, { date: string; count: number }>();
 const ANALYSIS_LIMIT_PER_DAY = 2;
-function checkAndIncrementVoiceLimit(userId: number): { allowed: boolean; remaining: number } {
-  const today = new Date().toISOString().slice(0, 10);
-  const entry = voiceAnalysisLimit.get(userId);
-  if (!entry || entry.date !== today) {
-    voiceAnalysisLimit.set(userId, { date: today, count: 1 });
-    return { allowed: true, remaining: ANALYSIS_LIMIT_PER_DAY - 1 };
-  }
-  if (entry.count >= ANALYSIS_LIMIT_PER_DAY) return { allowed: false, remaining: 0 };
-  entry.count++;
-  return { allowed: true, remaining: ANALYSIS_LIMIT_PER_DAY - entry.count };
-}
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -52,6 +40,8 @@ const UpdatePreferencesBody = z.object({
     "particles", "fireflies", "custom",
     // Professional
     "topographic",
+    // Zen
+    "aurora",
     // Creative
     "constellation", "shooting-stars", "ripple", "plasma", "prismatic",
     // Technical
@@ -67,6 +57,8 @@ const UpdatePreferencesBody = z.object({
   bgPalette: z.enum(["ocean", "sunset", "forest", "void", "ember", "rose", "arctic", "gold"]).optional(),
   contentPillars: z.array(z.string().max(60)).max(6).optional(),
   writingSamples: z.array(z.string().max(3000)).max(5).optional(),
+  proofPoints: z.array(z.string().max(200)).max(8).optional(),
+  aspirationalSamples: z.array(z.string().max(3000)).max(3).optional(),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
@@ -120,6 +112,8 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.bgPalette !== undefined) updateData.bgPalette = parsed.data.bgPalette;
   if (parsed.data.contentPillars !== undefined) updateData.contentPillars = parsed.data.contentPillars;
   if (parsed.data.writingSamples !== undefined) updateData.writingSamples = parsed.data.writingSamples;
+  if (parsed.data.proofPoints !== undefined) updateData.proofPoints = parsed.data.proofPoints;
+  if (parsed.data.aspirationalSamples !== undefined) updateData.aspirationalSamples = parsed.data.aspirationalSamples;
 
   const [prefs] = await db
     .update(preferencesTable)
@@ -142,12 +136,20 @@ router.get("/user/suggestions", requireAuth, async (req, res): Promise<void> => 
   res.json(suggestions);
 });
 
-// Always returns cached voice summary — never calls Claude automatically.
-// Use POST /user/voice-refresh to trigger a fresh analysis (rate-limited).
+// Returns the cached voice summary, and silently kicks off a background
+// refresh when it has gone stale (3+ new published posts since the last
+// analysis, or no summary yet with enough posts to build one). The auto
+// refresh is capped at once per day per user and doesn't consume the
+// user's manual refresh allowance.
+const voiceAutoRefreshInFlight = new Set<number>();
+
 router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
   const [[prefs], publishedRows] = await Promise.all([
-    db.select({ brandVoiceSummary: preferencesTable.brandVoiceSummary })
+    db.select({
+      brandVoiceSummary: preferencesTable.brandVoiceSummary,
+      voiceSummaryDraftCount: preferencesTable.voiceSummaryDraftCount,
+    })
       .from(preferencesTable)
       .where(eq(preferencesTable.userId, userId))
       .limit(1),
@@ -155,23 +157,33 @@ router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> =
       .from(draftsTable)
       .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published"))),
   ]);
-  res.json({ summary: prefs?.brandVoiceSummary ?? null, draftCount: publishedRows.length });
+
+  const draftCount = publishedRows.length;
+  const summary = prefs?.brandVoiceSummary ?? null;
+  const analyzedCount = prefs?.voiceSummaryDraftCount ?? 0;
+  const stale = (summary === null && draftCount >= 5) || draftCount >= analyzedCount + 3;
+
+  if (stale && !isDemoUser(req.user!.email) && !voiceAutoRefreshInFlight.has(userId)) {
+    voiceAutoRefreshInFlight.add(userId);
+    void (async () => {
+      try {
+        const limit = await checkAndIncrementDailyLimit(userId, "voice-auto-refresh", 1);
+        if (limit.allowed) await runVoiceAnalysis(userId);
+      } catch (err) {
+        console.warn(`Voice auto-refresh failed for user ${userId}:`, err);
+      } finally {
+        voiceAutoRefreshInFlight.delete(userId);
+      }
+    })();
+  }
+
+  res.json({ summary, draftCount });
 });
 
-// Manual voice analysis — extracts signals from unanalysed published posts,
-// regenerates the summary, and returns it. Rate-limited to 2 per day.
-router.post("/user/voice-refresh", requireAuth, async (req, res): Promise<void> => {
-  if (isDemoUser(req.user!.email)) {
-    res.status(403).json({ error: "Demo accounts cannot run analysis." });
-    return;
-  }
-  const userId = req.user!.userId;
-  const limit = checkAndIncrementVoiceLimit(userId);
-  if (!limit.allowed) {
-    res.status(429).json({ error: "You've used your 2 analyses for today. Come back tomorrow.", remaining: 0 });
-    return;
-  }
-
+// Core voice analysis: extracts signals from unanalysed published posts and
+// regenerates the brand voice summary. Shared by the manual refresh endpoint
+// and the automatic staleness-triggered refresh.
+async function runVoiceAnalysis(userId: number): Promise<{ summary: string | null; draftCount: number }> {
   const [publishedPosts, existingSignals] = await Promise.all([
     db.select({ id: draftsTable.id, postOutput: draftsTable.postOutput })
       .from(draftsTable)
@@ -188,47 +200,52 @@ router.post("/user/voice-refresh", requireAuth, async (req, res): Promise<void> 
     (p) => !analyzedIds.has(p.id) && p.postOutput && p.postOutput.trim().length > 100,
   );
 
-  // Extract signals for up to 10 unanalysed posts (parallel, non-blocking)
   await Promise.allSettled(unanalyzed.slice(0, 10).map((p) => extractVoiceDNA(userId, p.id, p.postOutput!)));
 
-  const [prefs, signals] = await Promise.all([
-    db.select({ brandVoiceSummary: preferencesTable.brandVoiceSummary })
-      .from(preferencesTable)
-      .where(eq(preferencesTable.userId, userId))
-      .limit(1),
-    db.select()
-      .from(brandVoiceSignalsTable)
-      .where(eq(brandVoiceSignalsTable.userId, userId))
-      .orderBy(desc(brandVoiceSignalsTable.createdAt))
-      .limit(20),
-  ]);
+  const signals = await db.select()
+    .from(brandVoiceSignalsTable)
+    .where(eq(brandVoiceSignalsTable.userId, userId))
+    .orderBy(desc(brandVoiceSignalsTable.createdAt))
+    .limit(20);
 
-  if (signals.length === 0) {
-    res.json({ summary: null, draftCount: publishedPosts.length, remaining: limit.remaining });
+  if (signals.length === 0) return { summary: null, draftCount: publishedPosts.length };
+
+  const signalsText = signals.map((s) => JSON.stringify(s.signals)).join("\n");
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 512,
+    system: "You are a brand voice analyst. Based on writing pattern signals extracted from a user's LinkedIn posts, write a plain-language voice profile. Return 3-5 bullet points starting with 'You'. Be specific, descriptive, and flattering. Focus on what makes their writing distinctive and effective.",
+    messages: [{ role: "user", content: `Writing signals from ${signals.length} posts:\n${signalsText}\n\nReturn 3-5 bullet points about this person's writing voice.` }],
+  });
+
+  const t = message.content[0];
+  if (t.type !== "text") return { summary: null, draftCount: publishedPosts.length };
+
+  const summary = t.text.trim();
+  await db.update(preferencesTable)
+    .set({ brandVoiceSummary: summary, voiceSummaryDraftCount: publishedPosts.length })
+    .where(eq(preferencesTable.userId, userId));
+
+  return { summary, draftCount: publishedPosts.length };
+}
+
+// Manual voice analysis — extracts signals from unanalysed published posts,
+// regenerates the summary, and returns it. Rate-limited to 2 per day.
+router.post("/user/voice-refresh", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    res.status(403).json({ error: "Demo accounts cannot run analysis." });
+    return;
+  }
+  const userId = req.user!.userId;
+  const limit = await checkAndIncrementDailyLimit(userId, "voice-refresh", ANALYSIS_LIMIT_PER_DAY);
+  if (!limit.allowed) {
+    res.status(429).json({ error: "You've used your 2 analyses for today. Come back tomorrow.", remaining: 0 });
     return;
   }
 
   try {
-    const signalsText = signals.map((s) => JSON.stringify(s.signals)).join("\n");
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 512,
-      system: "You are a brand voice analyst. Based on writing pattern signals extracted from a user's LinkedIn posts, write a plain-language voice profile. Return 3-5 bullet points starting with 'You'. Be specific, descriptive, and flattering. Focus on what makes their writing distinctive and effective.",
-      messages: [{ role: "user", content: `Writing signals from ${signals.length} posts:\n${signalsText}\n\nReturn 3-5 bullet points about this person's writing voice.` }],
-    });
-
-    const t = message.content[0];
-    if (t.type !== "text") {
-      res.json({ summary: prefs[0]?.brandVoiceSummary ?? null, draftCount: publishedPosts.length, remaining: limit.remaining });
-      return;
-    }
-
-    const summary = t.text.trim();
-    await db.update(preferencesTable)
-      .set({ brandVoiceSummary: summary, voiceSummaryDraftCount: publishedPosts.length })
-      .where(eq(preferencesTable.userId, userId));
-
-    res.json({ summary, draftCount: publishedPosts.length, remaining: limit.remaining });
+    const result = await runVoiceAnalysis(userId);
+    res.json({ ...result, remaining: limit.remaining });
   } catch {
     res.status(500).json({ error: "Analysis failed. Please try again." });
   }
@@ -318,6 +335,47 @@ function buildSuggestions(drafts: DraftRow[]): Array<{ id: string; type: string;
   return suggestions.slice(0, 4);
 }
 
+// Raw voice DNA signals for the constellation visualization — read-only,
+// no AI call. Joined with draft topics so tapping a node can show which
+// post taught the system that trait.
+router.get("/user/voice-signals", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+  const signals = await db
+    .select({
+      id: brandVoiceSignalsTable.id,
+      draftId: brandVoiceSignalsTable.draftId,
+      signals: brandVoiceSignalsTable.signals,
+      createdAt: brandVoiceSignalsTable.createdAt,
+    })
+    .from(brandVoiceSignalsTable)
+    .where(eq(brandVoiceSignalsTable.userId, userId))
+    .orderBy(desc(brandVoiceSignalsTable.createdAt))
+    .limit(30);
+
+  const draftIds = [...new Set(signals.map((s) => s.draftId))];
+  const drafts = draftIds.length > 0
+    ? await db
+        .select({ id: draftsTable.id, structuredBreakdown: draftsTable.structuredBreakdown, postOutput: draftsTable.postOutput })
+        .from(draftsTable)
+        .where(and(eq(draftsTable.userId, userId), inArray(draftsTable.id, draftIds)))
+    : [];
+  const topicMap = new Map(drafts.map((d) => {
+    const bd = d.structuredBreakdown as { topic?: string } | null;
+    const topic = bd?.topic ?? d.postOutput?.split("\n")[0]?.slice(0, 60) ?? `Post #${d.id}`;
+    return [d.id, topic];
+  }));
+
+  res.json({
+    signals: signals.map((s) => ({
+      id: s.id,
+      draftId: s.draftId,
+      topic: topicMap.get(s.draftId) ?? null,
+      signals: s.signals,
+      createdAt: s.createdAt,
+    })),
+  });
+});
+
 router.get("/voice-suggestions", requireAuth, async (req, res): Promise<void> => {
   const suggestions = await db
     .select()
@@ -343,7 +401,7 @@ router.patch("/voice-suggestions/:id/accept", requireAuth, async (req, res): Pro
 
   if (!suggestion) { res.status(404).json({ error: "Not found" }); return; }
 
-  const ALLOWED_FIELDS = ["tone", "objective", "persona", "brandRole", "brandAudience", "brandBelief"] as const;
+  const ALLOWED_FIELDS = ["tone", "objective", "persona", "brandRole", "brandAudience", "brandBelief", "contentPillars"] as const;
   type AllowedField = typeof ALLOWED_FIELDS[number];
 
   if (!ALLOWED_FIELDS.includes(suggestion.field as AllowedField)) {
@@ -351,9 +409,14 @@ router.patch("/voice-suggestions/:id/accept", requireAuth, async (req, res): Pro
     return;
   }
 
+  // contentPillars suggestions carry a comma-separated list as suggestedValue
+  const value = suggestion.field === "contentPillars"
+    ? suggestion.suggestedValue.split(",").map((p) => p.trim()).filter(Boolean).slice(0, 6)
+    : suggestion.suggestedValue;
+
   await db
     .update(preferencesTable)
-    .set({ [suggestion.field]: suggestion.suggestedValue })
+    .set({ [suggestion.field]: value })
     .where(eq(preferencesTable.userId, userId));
 
   const [updated] = await db

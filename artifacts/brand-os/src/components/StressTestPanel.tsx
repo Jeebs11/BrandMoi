@@ -36,13 +36,13 @@ interface StressTestPanelProps {
 function ScoreRing({ score, publishReady }: { score: number; publishReady: boolean }) {
   const color = publishReady
     ? "text-emerald-600"
-    : score >= 65
+    : score >= 60
     ? "text-amber-500"
     : "text-red-500";
 
   const barColor = publishReady
     ? "bg-emerald-500"
-    : score >= 65
+    : score >= 60
     ? "bg-amber-500"
     : "bg-red-500";
 
@@ -69,16 +69,40 @@ function FactorStatusIcon({ score, maxScore }: { score: number; maxScore: number
   return <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />;
 }
 
-function FactorRow({ factor }: { factor: StressTestFactor }) {
+// Each factor is a "round" against the algorithm: rounds reveal one at a
+// time with a verdict chip. Same data, pure theatre.
+function roundVerdict(score: number, maxScore: number): { label: string; cls: string } {
+  const pct = score / maxScore;
+  if (pct >= 1) return { label: "CLEAN HIT", cls: "bg-emerald-100 text-emerald-700" };
+  if (pct >= 0.6) return { label: "GLANCING", cls: "bg-amber-100 text-amber-700" };
+  return { label: "TOOK A HIT", cls: "bg-red-100 text-red-600" };
+}
+
+function FactorRow({ factor, round }: { factor: StressTestFactor; round: number }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
   const isFullScore = factor.score >= factor.maxScore;
+  const verdict = roundVerdict(factor.score, factor.maxScore);
 
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
+    <motion.div
+      className="border border-gray-100 rounded-xl overflow-hidden"
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.45 + round * 0.4, duration: 0.3 }}
+    >
       <div className="flex items-center gap-2.5 px-3 py-2.5 bg-white">
+        <span className="text-[9px] font-black text-gray-300 tabular-nums w-7 flex-shrink-0">R{round + 1}</span>
         <FactorStatusIcon score={factor.score} maxScore={factor.maxScore} />
         <span className="flex-1 text-sm font-semibold text-gray-800">{factor.name}</span>
+        <motion.span
+          className={cn("text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider", verdict.cls)}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.65 + round * 0.4, type: "spring", stiffness: 400, damping: 15 }}
+        >
+          {verdict.label}
+        </motion.span>
         <span className={cn(
           "text-xs font-bold tabular-nums",
           isFullScore ? "text-emerald-600" : factor.score / factor.maxScore >= 0.6 ? "text-amber-600" : "text-red-500"
@@ -146,7 +170,28 @@ function FactorRow({ factor }: { factor: StressTestFactor }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
+  );
+}
+
+// Fight verdict banner — the headline moment after the rounds play out.
+function VerdictBanner({ score, publishReady }: { score: number; publishReady: boolean }) {
+  const verdict = publishReady
+    ? { emoji: "🏆", title: "STRONG — READY TO PUBLISH", sub: "Well aligned with LinkedIn's creator guidance. Ship it.", cls: "from-emerald-500 to-teal-500" }
+    : score >= 60
+    ? { emoji: "🥊", title: "SOLID", sub: "Good post — a few tweaks lift it into publish-ready.", cls: "from-amber-500 to-orange-500" }
+    : { emoji: "😵", title: "NEEDS WORK", sub: "Some of LinkedIn's guidance isn't met yet. Fix and re-check.", cls: "from-red-500 to-rose-500" };
+
+  return (
+    <motion.div
+      className={cn("rounded-2xl bg-gradient-to-r text-white text-center py-3 px-4", verdict.cls)}
+      initial={{ scale: 0.7, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: 3.1, type: "spring", stiffness: 260, damping: 18 }}
+    >
+      <p className="text-lg font-black tracking-wide">{verdict.emoji} {verdict.title}</p>
+      <p className="text-[11px] text-white/85 font-medium">{verdict.sub}</p>
+    </motion.div>
   );
 }
 
@@ -236,9 +281,16 @@ export function StressTestPanel({
               <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                 {isLoading && (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
-                    <Loader2 className="w-7 h-7 text-violet-400 animate-spin" />
-                    <p className="text-sm text-gray-500 font-medium">Analysing your post…</p>
-                    <p className="text-xs text-gray-400 text-center">Checking 6 LinkedIn algorithm factors from research across 1.8M+ posts</p>
+                    <motion.span
+                      className="text-4xl"
+                      animate={{ rotate: [0, -12, 10, -6, 0] }}
+                      transition={{ duration: 0.9, repeat: Infinity }}
+                    >
+                      🥊
+                    </motion.span>
+                    <p className="text-sm text-gray-700 font-bold">Your post steps into the ring…</p>
+                    <p className="text-xs text-gray-400 text-center">vs LINKEDIN'S CREATOR GUIDANCE · 4 rounds · scored on what LinkedIn says it rewards</p>
+                    <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
                   </div>
                 )}
 
@@ -253,20 +305,14 @@ export function StressTestPanel({
                       {summaryLine()}
                     </p>
 
-                    {result.publishReady && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
-                        <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                        <p className="text-sm font-bold text-emerald-800">Strong across all signals</p>
-                        <p className="text-xs text-emerald-700 mt-1">This post is optimised for LinkedIn's algorithm. Time to publish.</p>
-                      </div>
-                    )}
-
                     <div className="space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Factor breakdown — tap to expand</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Alignment with LinkedIn creator guidance — 4 rounds</p>
                       {result.factors.map((f, i) => (
-                        <FactorRow key={i} factor={f} />
+                        <FactorRow key={i} factor={f} round={i} />
                       ))}
                     </div>
+
+                    <VerdictBanner score={result.score} publishReady={result.publishReady} />
 
                     {result.personalInsight && (
                       <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
@@ -298,7 +344,7 @@ export function StressTestPanel({
                     ) : (
                       <>
                         <Zap className="w-4 h-4 mr-2" />
-                        Apply fixes &amp; regenerate
+                        Apply fixes &amp; demand a rematch
                       </>
                     )}
                   </Button>

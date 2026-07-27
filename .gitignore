@@ -47,3 +47,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Secrets — never commit
+.env
+.env.*
+
+# Local machine-specific tooling (paths are specific to this Mac, not portable)
+.claude/
+.config/
