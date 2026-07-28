@@ -745,7 +745,7 @@ function ViewPostModal({
             className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl font-bold text-sm bg-primary text-white hover:bg-primary/90 transition-all"
           >
             <Pencil className="w-4 h-4" />
-            Edit in BrandMe
+            Edit in BrandMoi
           </button>
         </div>
       </div>

@@ -40,7 +40,7 @@ export default function Login() {
         <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center text-white font-black text-xs">B</div>
-            <span className="font-extrabold text-[#0F1F3D] text-base tracking-tight">BrandMe</span>
+            <span className="font-extrabold text-[#0F1F3D] text-base tracking-tight">BrandMoi</span>
           </div>
           <div className="flex items-center gap-6">
             <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-500 hover:text-gray-800 transition-colors hidden sm:block">LinkedIn</a>
@@ -55,7 +55,7 @@ export default function Login() {
           <div className="mb-8">
             <div className="w-10 h-10 bg-primary rounded-2xl mb-5" />
             <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Welcome back</h1>
-            <p className="text-gray-500 text-sm">Log in to your BrandMe account.</p>
+            <p className="text-gray-500 text-sm">Log in to your BrandMoi account.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

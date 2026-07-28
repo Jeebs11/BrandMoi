@@ -35,7 +35,7 @@ export default function Landing() {
             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-sm" style={{ background: "#0F1F3D" }}>B</div>
             <span className="tracking-tight text-lg">
               <span style={{ fontWeight: 800, color: "#0F1F3D" }}>Brand</span>
-              <span style={{ fontWeight: 300, color: "#0F1F3D", opacity: 0.45 }}>Me</span>
+              <span style={{ fontWeight: 300, color: "#0F1F3D", opacity: 0.45 }}>Moi</span>
             </span>
           </div>
           <button
@@ -75,7 +75,7 @@ export default function Landing() {
             className="text-xl md:text-2xl font-light max-w-2xl mx-auto leading-relaxed mb-12 lp-hidden lp-animate-in lp-delay-200"
             style={{ color: "#4A5568" }}
           >
-            Stop sounding like an AI generated your thoughts. BrandMe learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
+            Stop sounding like an AI generated your thoughts. BrandMoi learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
           </p>
 
           <div className="flex flex-col items-center gap-4 lp-hidden lp-animate-in lp-delay-300">
@@ -136,7 +136,7 @@ export default function Landing() {
       </main>
 
       <footer className="py-8 text-center text-sm border-t" style={{ color: "#8A97A8", background: "#F7F8FA", borderColor: "#E2E6EC" }}>
-        <p>© 2025 BrandMe. Built for people who care.</p>
+        <p>© 2025 BrandMoi. Built for people who care.</p>
       </footer>
     </div>
   );

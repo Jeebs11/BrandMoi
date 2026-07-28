@@ -55,7 +55,7 @@ export function VariantD() {
           </h1>
           
           <p className="text-xl md:text-2xl font-light max-w-2xl mx-auto leading-relaxed mb-12 opacity-0-init animate-fade-in-up delay-200" style={{ color: "#4A5568" }}>
-            Stop sounding like an AI generated your thoughts. BrandMe learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
+            Stop sounding like an AI generated your thoughts. BrandMoi learns your voice DNA and turns raw ideas into posts that feel undeniably yours.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 opacity-0-init animate-fade-in-up delay-300">
@@ -104,7 +104,7 @@ export function VariantD() {
       </main>
 
       <footer className="py-8 text-center text-sm border-t" style={{ color: "#8A97A8", background: "#F7F8FA", borderColor: "#E2E6EC" }}>
-        <p>© 2025 BrandMe. Built for people who care.</p>
+        <p>© 2025 BrandMoi. Built for people who care.</p>
       </footer>
     </div>
   );
