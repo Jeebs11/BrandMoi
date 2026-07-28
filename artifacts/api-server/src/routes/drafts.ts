@@ -553,7 +553,7 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
   const engagementRateOf = (draftId: number): number | null => {
     const p = perfMap.get(draftId);
     if (!p || p.impressions === 0) return null;
-    return Math.round(((p.reactions + p.comments) / p.impressions) * 10000) / 100;
+    return Math.round(((p.reactions + p.comments + p.reposts) / p.impressions) * 10000) / 100;
   };
 
   const resonanceValues = allDrafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
@@ -619,16 +619,23 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     .filter((x): x is { d: typeof allDrafts[0]; r: number } => x.r !== null)
     .sort((a, b) => b.r - a.r)
     .slice(0, 5);
-  const topPosts = withResonance.map(({ d, r }) => ({
-    id: d.id,
-    topic: ((d.structuredBreakdown as Record<string, unknown>)?.topic as string | undefined) ?? "Untitled",
-    resonance: r,
-    engagementRate: engagementRateOf(d.id),
-    tone: d.tone,
-    contentSource: (d.contentSource as string | null) || "capture",
-    visualType: (d.visualType as string | null) || "none",
-    publishedAt: d.updatedAt.toISOString(),
-  }));
+  const topPosts = withResonance.map(({ d, r }) => {
+    const p = perfMap.get(d.id);
+    return {
+      id: d.id,
+      topic: ((d.structuredBreakdown as Record<string, unknown>)?.topic as string | undefined) ?? "Untitled",
+      resonance: r,
+      engagementRate: engagementRateOf(d.id),
+      impressions: p?.impressions ?? 0,
+      reactions: p?.reactions ?? 0,
+      comments: p?.comments ?? 0,
+      reposts: p?.reposts ?? 0,
+      tone: d.tone,
+      contentSource: (d.contentSource as string | null) || "capture",
+      visualType: (d.visualType as string | null) || "none",
+      publishedAt: d.updatedAt.toISOString(),
+    };
+  });
 
   const now = new Date();
   const cutoffs = { 30: new Date(now.getTime() - 30 * 86400000), 60: new Date(now.getTime() - 60 * 86400000), 90: new Date(now.getTime() - 91 * 86400000) };
@@ -905,7 +912,7 @@ router.get("/analytics/resonance-map", requireAuth, async (req, res): Promise<vo
     .from(performanceSignalsTable)
     .where(inArray(performanceSignalsTable.draftId, draftIds));
 
-  const map: Record<number, number> = {};
+  const map: Record<number, { resonance: number; engagementRate: number | null; impressions: number; reactions: number; comments: number; reposts: number }> = {};
   for (const s of signals) {
     const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4 + s.saves * 8;
     const reach = s.membersReached > 0 ? s.membersReached : s.impressions;
@@ -917,7 +924,10 @@ router.get("/analytics/resonance-map", requireAuth, async (req, res): Promise<vo
     } else {
       score = Math.min(100, Math.round(Math.log2(1 + w) * 12));
     }
-    map[s.draftId] = score;
+    const engagementRate = s.impressions > 0
+      ? Math.round(((s.reactions + s.comments + s.reposts) / s.impressions) * 10000) / 100
+      : null;
+    map[s.draftId] = { resonance: score, engagementRate, impressions: s.impressions, reactions: s.reactions, comments: s.comments, reposts: s.reposts };
   }
 
   res.json(map);

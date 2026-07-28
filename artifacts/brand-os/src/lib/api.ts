@@ -141,6 +141,9 @@ export type MomentumData = {
   breakdown: { recency: number; variety: number; volume: number; resonance: number };
   streak: number;
   cadenceAlerts: Array<{ type: string; message: string; daysSince: number; objective?: string }>;
+  weeklyWall: Array<{ weekStart: string; posted: boolean }>;
+  currentWeekDays: boolean[];
+  weekStreak: number;
 };
 
 export type AudienceMix = {
@@ -468,7 +471,7 @@ export type AnalyticsOverview = {
   byContentSource: { source: string; count: number; avgResonance: number | null; sampledCount: number }[];
   byVisualType: { type: string; count: number; avgResonance: number | null; sampledCount: number }[];
   byObjective: { objective: string; count: number; avgResonance: number | null; sampledCount: number }[];
-  topPosts: { id: number; topic: string; resonance: number; engagementRate: number | null; tone: string | null; contentSource: string; visualType: string; publishedAt: string }[];
+  topPosts: { id: number; topic: string; resonance: number; engagementRate: number | null; impressions: number; reactions: number; comments: number; reposts: number; tone: string | null; contentSource: string; visualType: string; publishedAt: string }[];
   weeklyTrend: { week: string; count: number }[];
   weeklyResonanceTrend: { week: string; avgResonance: number; sampleCount: number }[];
   last30: number;
@@ -545,8 +548,10 @@ export const diagnosisApi = {
     apiFetch<{ diagnosis: PostDiagnosis }>(`/ai/post-diagnosis/${draftId}`, { method: "POST" }),
 };
 
+export type ResonanceMapEntry = { resonance: number; engagementRate: number | null; impressions: number; reactions: number; comments: number; reposts: number };
+
 export const resonanceMapApi = {
-  get: () => apiFetch<Record<string, number>>("/analytics/resonance-map"),
+  get: () => apiFetch<Record<string, ResonanceMapEntry>>("/analytics/resonance-map"),
 };
 
 export type LinkedinStatus =

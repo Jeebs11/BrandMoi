@@ -10,6 +10,7 @@ import { buildVoiceDNA } from "../lib/voice-dna.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 import { buildLearnedPatterns, resonanceScore } from "../lib/learning.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
+import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 
 // Legacy-objective → modern-audience fallback for drafts saved before the
 // audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
@@ -81,6 +82,11 @@ async function getUserAgentContext(userId: number) {
 }
 
 router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
+  if (isDemoUser(req.user!.email)) {
+    await demoDelay();
+    res.json(getDemoBrief());
+    return;
+  }
   try {
     const { prefs, recentDrafts, dna, ideaFeedback: _ideaFeedback } = await getUserAgentContext(req.user!.userId);
 
@@ -878,6 +884,11 @@ Rules:
 // post within 24h. Capped at 3/day so it can't quietly burn API budget.
 router.post("/agent/dare", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
+  if (isDemoUser(req.user!.email)) {
+    await demoDelay();
+    res.json(getDemoDare());
+    return;
+  }
   try {
     const limit = await checkAndIncrementDailyLimit(userId, "dare", 3);
     if (!limit.allowed) {
@@ -941,6 +952,12 @@ const IdeasBody = z.object({ type: z.enum(["brand", "teach"]), topicId: z.number
 router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = IdeasBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "type must be brand or teach." }); return; }
+
+  if (isDemoUser(req.user!.email)) {
+    await demoDelay();
+    res.json(getDemoIdeas(parsed.data.type));
+    return;
+  }
 
   try {
     const { prefs, recentDrafts, ideaFeedback } = await getUserAgentContext(req.user!.userId);

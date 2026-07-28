@@ -90,12 +90,26 @@ export async function upsertDailyActivity(userId: number): Promise<void> {
     .onConflictDoNothing();
 }
 
+function mondayOf(d: Date): Date {
+  const day = d.getUTCDay(); // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  const m = new Date(d);
+  m.setUTCDate(d.getUTCDate() + diff);
+  m.setUTCHours(0, 0, 0, 0);
+  return m;
+}
+
+const WEEKLY_WALL_WEEKS = 6;
+
 export async function computeMomentum(userId: number): Promise<{
   score: number;
   label: string;
   breakdown: { recency: number; variety: number; volume: number; resonance: number };
   streak: number;
   cadenceAlerts: Array<{ type: string; message: string; daysSince: number; objective?: string }>;
+  weeklyWall: Array<{ weekStart: string; posted: boolean }>;
+  currentWeekDays: boolean[];
+  weekStreak: number;
 }> {
   const now = Date.now();
   const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
@@ -216,6 +230,35 @@ export async function computeMomentum(userId: number): Promise<{
     }
   }
 
+  // Weekly wall: last WEEKLY_WALL_WEEKS Mon–Sun weeks, oldest first, each
+  // marked posted if any day in that week has a dailyActivityTable row.
+  const thisMonday = mondayOf(new Date(now));
+  const weeklyWall: Array<{ weekStart: string; posted: boolean }> = [];
+  for (let i = WEEKLY_WALL_WEEKS - 1; i >= 0; i--) {
+    const monday = new Date(thisMonday.getTime() - i * 7 * 86400000);
+    let posted = false;
+    for (let d = 0; d < 7; d++) {
+      const dateStr = new Date(monday.getTime() + d * 86400000).toISOString().slice(0, 10);
+      if (activityDates.has(dateStr)) {
+        posted = true;
+        break;
+      }
+    }
+    weeklyWall.push({ weekStart: monday.toISOString().slice(0, 10), posted });
+  }
+
+  const currentWeekDays: boolean[] = [];
+  for (let d = 0; d < 7; d++) {
+    const dateStr = new Date(thisMonday.getTime() + d * 86400000).toISOString().slice(0, 10);
+    currentWeekDays.push(activityDates.has(dateStr));
+  }
+
+  let weekStreak = 0;
+  for (let i = weeklyWall.length - 1; i >= 0; i--) {
+    if (weeklyWall[i].posted) weekStreak++;
+    else break;
+  }
+
   return {
     score,
     label,
@@ -227,5 +270,8 @@ export async function computeMomentum(userId: number): Promise<{
     },
     streak,
     cadenceAlerts,
+    weeklyWall,
+    currentWeekDays,
+    weekStreak,
   };
 }

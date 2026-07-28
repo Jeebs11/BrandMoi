@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, ChevronUp, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp, Loader2, FlaskConical } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp, Loader2, FlaskConical } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type AudienceMix, type BrandAngle } from "@/lib/api";
@@ -70,53 +71,61 @@ const AUDIENCE_TAG_COLORS: Record<string, string> = {
 };
 
 
-const MOMENTUM_STYLES: Record<string, { bg: string; text: string; label: string; bar: string }> = {
-  Strong:   { bg: "bg-emerald-500", text: "text-emerald-600", label: "bg-emerald-50 border-emerald-100", bar: "bg-emerald-500" },
-  Building: { bg: "bg-primary",     text: "text-primary",     label: "bg-blue-50 border-blue-100",     bar: "bg-primary" },
-  Fading:   { bg: "bg-amber-500",   text: "text-amber-600",   label: "bg-amber-50 border-amber-100",   bar: "bg-amber-400" },
-  Silent:   { bg: "bg-gray-400",    text: "text-gray-500",    label: "bg-gray-50 border-gray-200",     bar: "bg-gray-400" },
+const WEEK_STREAK_LINES = (weekStreak: number): string => {
+  if (weekStreak === 0) return "Post once this week to start the wall.";
+  if (weekStreak === 1) return "1-week streak — lay the next brick.";
+  if (weekStreak < 6) return `${weekStreak}-week streak — the wall is holding.`;
+  return `Full wall — ${weekStreak} weeks strong.`;
 };
 
-const MOMENTUM_LINES: Record<string, string> = {
-  Strong:   "Your brand is compounding — keep the rhythm.",
-  Building: "Momentum is building. Stay on the cadence.",
-  Fading:   "Momentum fading — one post brings it back.",
-  Silent:   "It's quiet out there. One small post breaks the silence.",
-};
+const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
-const BREAKDOWN_LABELS: Record<string, { label: string; weight: string }> = {
-  recency:   { label: "Recency",   weight: "30%" },
-  variety:   { label: "Variety",   weight: "25%" },
-  volume:    { label: "Volume",    weight: "25%" },
-  resonance: { label: "Resonance", weight: "20%" },
-};
-
-// Living flame: intensity, colour, and flicker speed track the momentum
-// score. Pure CSS/SVG — no API cost. The brand "dims" visibly when the user
-// goes quiet, which is the whole point.
-function MomentumFlame({ score }: { score: number }) {
-  // 0-24 ember · 25-49 low flame · 50-74 healthy · 75+ blazing
-  const tier = score >= 75 ? 3 : score >= 50 ? 2 : score >= 25 ? 1 : 0;
-  const colors = [
-    { outer: "#64748b", inner: "#94a3b8", glow: "rgba(100,116,139,0.25)" },   // ember (cold)
-    { outer: "#f59e0b", inner: "#fbbf24", glow: "rgba(245,158,11,0.35)" },    // low
-    { outer: "#f97316", inner: "#fde047", glow: "rgba(249,115,22,0.45)" },    // healthy
-    { outer: "#ef4444", inner: "#fef08a", glow: "rgba(239,68,68,0.55)" },     // blazing
-  ][tier];
-  const speed = [3.2, 2.2, 1.5, 0.9][tier];
-  const scale = [0.62, 0.78, 0.9, 1][tier];
-
+// Compact 7-day tracker for the current week: filled = posted that day,
+// dashed outline = today (not yet posted), plain outline = future/past-empty.
+function WeekDayTracker({ days }: { days: boolean[] }) {
+  const todayIdx = (new Date().getDay() + 6) % 7; // 0=Mon .. 6=Sun
   return (
-    <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-end justify-center overflow-hidden flex-shrink-0 relative">
-      <div className="absolute inset-0 rounded-2xl" style={{ boxShadow: `inset 0 -8px 16px ${colors.glow}` }} />
-      <svg viewBox="0 0 40 48" className="w-9 h-11 origin-bottom" style={{ transform: `scale(${scale})` }}>
-        <g style={{ animation: `flame-flicker ${speed}s ease-in-out infinite`, transformOrigin: "50% 100%" }}>
-          <path d="M20 4 C26 14 32 18 32 30 C32 39 26.6 45 20 45 C13.4 45 8 39 8 30 C8 21 14 16 16 8 C17.5 12 19 13 20 4 Z" fill={colors.outer} opacity="0.9" />
-          <path d="M20 18 C23.5 23 26 25.5 26 32 C26 37.5 23.3 41 20 41 C16.7 41 14 37.5 14 32 C14 27 17 24.5 18 20 C18.8 22.5 19.5 23 20 18 Z" fill={colors.inner} />
-        </g>
-      </svg>
-      <span className="absolute bottom-0.5 inset-x-0 text-center text-[10px] font-black text-white/90">{score}</span>
-      <style>{`@keyframes flame-flicker { 0%,100% { transform: scaleY(1) scaleX(1); } 25% { transform: scaleY(1.06) scaleX(0.96) rotate(-1deg); } 50% { transform: scaleY(0.95) scaleX(1.03); } 75% { transform: scaleY(1.04) scaleX(0.97) rotate(1deg); } }`}</style>
+    <div className="flex items-center gap-1 flex-shrink-0">
+      {days.map((posted, i) => (
+        <div
+          key={i}
+          className={cn(
+            "w-6 h-6 rounded-md flex items-center justify-center text-[9px] font-bold flex-shrink-0",
+            posted
+              ? "bg-emerald-400 text-emerald-950"
+              : i === todayIdx
+                ? "border border-dashed border-white/40 text-white/50"
+                : "bg-white/10 text-white/25"
+          )}
+        >
+          {posted ? <Check className="w-3 h-3" /> : DAY_LABELS[i]}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The "wall": one brick per past week, oldest to newest. A week with no
+// posts cracks/greys out — a gap shows exactly where momentum broke instead
+// of an abstract score.
+function MomentumWall({ weeklyWall }: { weeklyWall: MomentumData["weeklyWall"] }) {
+  return (
+    <div className="flex items-stretch gap-1.5">
+      {weeklyWall.map((w, i) => (
+        <div
+          key={w.weekStart}
+          className={cn(
+            "flex-1 h-9 rounded-lg flex items-center justify-center transition-colors",
+            w.posted
+              ? "bg-gradient-to-br from-violet-500 to-fuchsia-500"
+              : "bg-gray-100 border border-dashed border-gray-300"
+          )}
+          title={w.weekStart}
+        >
+          {!w.posted && <span className="text-gray-300 text-xs leading-none">×</span>}
+          {i === weeklyWall.length - 1 && <span className="sr-only">This week</span>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -244,53 +253,24 @@ function DareCard({ onWrite }: { onWrite: (raw: string) => void }) {
 }
 
 function MomentumCard({ data }: { data: MomentumData }) {
-  const [expanded, setExpanded] = useState(false);
-  const style = MOMENTUM_STYLES[data.label] ?? MOMENTUM_STYLES.Silent;
-
   return (
-    <div className={cn("rounded-3xl border overflow-hidden", style.label)}>
-      <button
-        className="w-full px-5 py-4 flex items-center justify-between"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <div className="flex items-center gap-4">
-          <MomentumFlame score={data.score} />
-          <div className="text-left">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Momentum Score</p>
-            <p className={cn("text-base font-extrabold", style.text)}>{data.label}</p>
-            <p className="text-xs text-gray-400 mt-0.5">Tap to see breakdown</p>
-          </div>
+    <div className="rounded-3xl border border-gray-100 bg-white overflow-hidden px-5 py-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          <InfoTooltip content="Each brick is one week — filled if you posted at least once that week, cracked if you didn't. A run of filled bricks is your streak.">
+            This week
+          </InfoTooltip>
+        </p>
+        <p className="text-xs text-gray-400">{data.currentWeekDays.filter(Boolean).length} of 7 days</p>
+      </div>
+      <WeekDayTracker days={data.currentWeekDays} />
+      <div className="border-t border-gray-100 pt-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last 6 weeks</p>
+          <p className="text-xs font-bold text-violet-600">{data.weekStreak}-week streak</p>
         </div>
-        {expanded
-          ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-      </button>
-
-      {expanded && (
-        <div className="px-5 pb-4 space-y-3 border-t border-gray-100 pt-3">
-          {(Object.entries(data.breakdown) as [string, number][]).map(([key, val]) => {
-            const info = BREAKDOWN_LABELS[key];
-            if (!info) return null;
-            return (
-              <div key={key}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-gray-600">{info.label}</span>
-                  <span className="text-xs text-gray-400">{val}/100 · {info.weight}</span>
-                </div>
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full transition-all duration-500", style.bar)}
-                    style={{ width: `${val}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-          <p className="text-[10px] text-gray-400 pt-1">
-            Recency · Variety of objectives · Volume of posts · Impact from performance data
-          </p>
-        </div>
-      )}
+        <MomentumWall weeklyWall={data.weeklyWall} />
+      </div>
     </div>
   );
 }
@@ -443,10 +423,13 @@ export default function Dashboard() {
       .finally(() => setTopSuggestionsLoading(false));
   };
 
+  // Surfaces the server's actual error message instead of a flat generic
+  // string — /agent/* routes already send a specific reason ("Invalid AI
+  // response", "Failed to generate ideas", a rate-limit message, etc.) via
+  // apiFetch's thrown Error, so show that directly rather than discarding it.
   const aiErrorToast = (err: unknown) => {
-    const msg = err instanceof Error && err.message.includes("rate limit")
-      ? "The AI is at its rate limit — try again in a minute or two."
-      : "Couldn't refresh right now — try again shortly.";
+    console.error(err);
+    const msg = err instanceof Error && err.message ? err.message : "Couldn't refresh right now — try again shortly.";
     toast({ title: msg, variant: "destructive" });
   };
 
@@ -467,12 +450,7 @@ export default function Dashboard() {
         if (type === "brand") { setBrandAnglesOverride(r.angles as BrandAngle[]); setExpandedBriefAngle(null); }
         else { setTeachAnglesOverride(r.angles as string[]); setExpandedTeachAngle(null); }
       })
-      .catch((err: unknown) => {
-        const msg = err instanceof Error && err.message.includes("rate limit")
-          ? "The AI is at its rate limit — try again in a minute or two."
-          : "Couldn't refresh this tab — try again shortly.";
-        toast({ title: msg, variant: "destructive" });
-      })
+      .catch(aiErrorToast)
       .finally(() => setTabRefreshing(false));
   };
 
@@ -482,12 +460,7 @@ export default function Dashboard() {
     agentApi.brief().then((b) => {
       setBrief(b);
       saveDayCache("brief", uid, b);
-    }).catch((err: unknown) => {
-      const msg = err instanceof Error && err.message.includes("rate limit")
-        ? "The AI is at its rate limit — try again in a minute or two."
-        : "Couldn't refresh right now — try again shortly.";
-      toast({ title: msg, variant: "destructive" });
-    }).finally(() => setBriefLoading(false));
+    }).catch(aiErrorToast).finally(() => setBriefLoading(false));
   };
 
   const openLengthPicker = (raw: string, extra = "") => {
@@ -561,10 +534,9 @@ export default function Dashboard() {
           <div className="max-w-5xl mx-auto flex items-center justify-between">
             <p className="text-sm font-black tracking-tight text-gray-900">Brand<span className="text-gray-300">Me</span></p>
             <div className="flex items-center gap-2">
-              {momentum && momentum.streak >= 2 && (
-                <div className="flex items-center gap-1 bg-orange-50 border border-orange-100 px-2.5 py-1.5 rounded-xl">
-                  <Flame className="w-3.5 h-3.5 text-orange-500" />
-                  <span className="text-xs font-bold text-orange-600">{momentum.streak}-day streak</span>
+              {momentum && momentum.weekStreak >= 2 && (
+                <div className="flex items-center gap-1 bg-violet-50 border border-violet-100 px-2.5 py-1.5 rounded-xl">
+                  <span className="text-xs font-bold text-violet-600">{momentum.weekStreak}-week streak</span>
                 </div>
               )}
               <Link href="/settings" className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
@@ -599,7 +571,7 @@ export default function Dashboard() {
 
 
 
-          {/* Hero — greeting, flame, momentum status */}
+          {/* Hero — greeting + this week's post tracker */}
           <section
             className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950 px-6 py-6 cursor-pointer select-none"
             onClick={() => setMomOpen((v) => !v)}
@@ -612,13 +584,13 @@ export default function Dashboard() {
                 </p>
                 <h1 className="text-2xl font-extrabold text-white tracking-tight truncate">{firstName ?? "Creator"}</h1>
                 <p className="text-xs text-white/55 mt-1.5 font-medium">
-                  {momentum ? (MOMENTUM_LINES[momentum.label] ?? "Tap to see your momentum breakdown.") : "Loading your momentum…"}
+                  {momentum ? WEEK_STREAK_LINES(momentum.weekStreak) : "Loading your week…"}
                 </p>
               </div>
               {momentum ? (
-                <MomentumFlame score={momentum.score} />
+                <WeekDayTracker days={momentum.currentWeekDays} />
               ) : (
-                <Skeleton className="w-14 h-14 rounded-2xl bg-white/10 flex-shrink-0" />
+                <Skeleton className="w-44 h-6 rounded-md bg-white/10 flex-shrink-0" />
               )}
             </div>
           </section>

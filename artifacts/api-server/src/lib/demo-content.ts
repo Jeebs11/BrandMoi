@@ -105,6 +105,100 @@ export function getDemoGenerateResponse(rawInput: string) {
   return DEMO_GENERATE_RESPONSES[idx];
 }
 
+const DEMO_BRIEFS = [
+  {
+    headline: "Turn last week's hiring post into a client-facing angle today.",
+    insight: "You've posted twice for Peers this week but nothing for Clients or Investors — that gap is costing you reach with decision-makers.",
+    angles: [
+      { angle: "Show a client exactly how you triage a messy backlog in week one", audience: "Clients" },
+      { angle: "Challenge the '10x engineer' myth with a hiring story", audience: "Peers" },
+      { angle: "Share the interview question that revealed real judgment, not rehearsed answers", audience: "Recruiters & Headhunters" },
+      { angle: "Explain why you're betting on boring infrastructure over hype this year", audience: "Investors" },
+      { angle: "Teach the one thing you wish someone told you before your first exec hire", audience: "My audience" },
+    ],
+    teachAngles: [
+      "Why 'move fast' quietly breaks onboarding — an analogy for new managers",
+      "The real reason standups fail (explained simply)",
+      "What a roadmap actually is, for someone who's never owned one",
+    ],
+  },
+  {
+    headline: "You're due for a Recruiters & Headhunters post — it's been 12 days.",
+    insight: "Your last 5 posts skew heavily toward Peers. A capability-proof post for recruiters would balance the mix.",
+    angles: [
+      { angle: "Break down how you'd fix a stalled product launch in 30 days", audience: "Clients" },
+      { angle: "Call out the 'growth at all costs' era as officially over", audience: "Peers" },
+      { angle: "Describe the hardest call you made under pressure last quarter", audience: "Recruiters & Headhunters" },
+      { angle: "Explain the market shift you're quietly positioning the business around", audience: "Investors" },
+      { angle: "Share the career mistake that taught you the most", audience: "My audience" },
+    ],
+    teachAngles: [
+      "Why 'data-driven' often means 'afraid to decide' — explained simply",
+      "The onboarding checklist nobody writes down, for first-time managers",
+      "What 'technical debt' actually costs, in plain English",
+    ],
+  },
+];
+
+export function getDemoBrief() {
+  const idx = Math.floor(Date.now() / 86400000) % DEMO_BRIEFS.length;
+  return DEMO_BRIEFS[idx];
+}
+
+const DEMO_IDEAS_BRAND: Array<{ angle: string; audience: string }>[] = [
+  [
+    { angle: "Show how you'd triage a messy backlog in a client's first week", audience: "Clients" },
+    { angle: "Challenge the assumption that more meetings mean more alignment", audience: "Peers" },
+    { angle: "Share a hiring decision you'd defend even under pushback", audience: "Recruiters & Headhunters" },
+    { angle: "Explain the contrarian bet you're making on the market this year", audience: "Investors" },
+    { angle: "Teach the lesson from your first failed hire", audience: "My audience" },
+  ],
+  [
+    { angle: "Walk through the exact framework you use to scope a new client", audience: "Clients" },
+    { angle: "Call out the 'thought leadership' posts that are just good formatting", audience: "Peers" },
+    { angle: "Describe a hard call you made under pressure that paid off", audience: "Recruiters & Headhunters" },
+    { angle: "Share why you're avoiding the obvious growth lever everyone else is chasing", audience: "Investors" },
+    { angle: "Teach the one system that saved your sanity as you scaled", audience: "My audience" },
+  ],
+];
+
+const DEMO_IDEAS_TEACH: string[][] = [
+  [
+    "Why 'move fast' quietly breaks onboarding — an analogy for new managers",
+    "The real reason standups fail (explained simply)",
+    "What a roadmap actually is, for someone who's never owned one",
+  ],
+  [
+    "Why 'data-driven' often means 'afraid to decide' — explained simply",
+    "The onboarding checklist nobody writes down, for first-time managers",
+    "What 'technical debt' actually costs, in plain English",
+  ],
+];
+
+export function getDemoIdeas(type: "brand" | "teach") {
+  const idx = Math.floor(Date.now() / 3600000) % 2;
+  if (type === "teach") return { angles: DEMO_IDEAS_TEACH[idx] };
+  return { angles: DEMO_IDEAS_BRAND[idx] };
+}
+
+const DEMO_DARES = [
+  { dare: "Most 'thought leadership' on LinkedIn is just good formatting, not good thinking.", why: "You've shipped enough real decisions to back this up without flinching.", risk: "Medium" },
+  { dare: "Hustle culture is a symptom of founders who never built real systems.", why: "You've made the systems-over-hustle case in your own scaling story.", risk: "Spicy" },
+  { dare: "Most hiring processes optimize for confidence, not competence.", why: "You've walked back a gut-feel hire before — you've earned the right to say this.", risk: "Mild" },
+];
+
+export function getDemoDare() {
+  const idx = Math.floor(Date.now() / 86400000) % DEMO_DARES.length;
+  const d = DEMO_DARES[idx]!;
+  return {
+    dare: d.dare,
+    why: d.why,
+    risk: d.risk,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    remaining: 2,
+  };
+}
+
 export const DEMO_EXPLORE_DIRECTIONS = {
   directions: [
     {

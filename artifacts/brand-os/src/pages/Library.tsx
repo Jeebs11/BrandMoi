@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle, Star } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle, Star, ThumbsUp, MessageCircle, Repeat2, Users } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft, useCreateDraft } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, studioApi, topicsApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor, type Topic } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, studioApi, topicsApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor, type Topic, type ResonanceMapEntry } from "@/lib/api";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
   DropdownMenu,
@@ -99,9 +100,10 @@ export default function Library() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [viewDraft, setViewDraft] = useState<{ id: number; topic: string; postOutput: string | null; shortPost: string | null; status: string; audience: string; feeling: string } | null>(null);
   const [perfModal, setPerfModal] = useState<PerformanceModalState | null>(null);
+  const [perfViewDraft, setPerfViewDraft] = useState<{ topic: string; entry: ResonanceMapEntry } | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [resonanceMap, setResonanceMap] = useState<Record<string, number>>({});
+  const [resonanceMap, setResonanceMap] = useState<Record<string, ResonanceMapEntry>>({});
   const [stressScoreMap, setStressScoreMap] = useState<Record<string, StressTestScoreEntry>>({});
   const [diagnosisPanel, setDiagnosisPanel] = useState<{ draftId: number; topic: string; diagnosis: PostDiagnosis | null; loading: boolean } | null>(null);
 
@@ -317,10 +319,12 @@ export default function Library() {
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                               ◈ logged
                             </span>
-                            {resonanceMap[String(draft.id)] > 0 && (
-                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", resonanceMap[String(draft.id)] >= 60 ? "bg-violet-50 text-violet-700" : "bg-gray-50 text-gray-500")}>
-                                {resonanceMap[String(draft.id)]} resonance
-                              </span>
+                            {resonanceMap[String(draft.id)].engagementRate !== null && (
+                              <InfoTooltip content="Engagement rate — reactions + comments + reposts, divided by impressions. LinkedIn's own measure of how well a post did relative to how many people saw it.">
+                                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", resonanceMap[String(draft.id)].resonance >= 60 ? "bg-violet-50 text-violet-700" : "bg-gray-50 text-gray-500")}>
+                                  {resonanceMap[String(draft.id)].engagementRate}% engagement
+                                </span>
+                              </InfoTooltip>
                             )}
                           </>
                         )}
@@ -337,7 +341,7 @@ export default function Library() {
                           </span>
                         )}
                       </div>
-                      {(resonanceMap[String(draft.id)] ?? 0) >= 60 && (
+                      {(resonanceMap[String(draft.id)]?.resonance ?? 0) >= 60 && (
                         <button
                           onClick={() => void openDiagnosis(draft.id, topic, draft.diagnosis)}
                           className="mt-2 flex items-center gap-1 text-xs text-violet-600 font-semibold hover:text-violet-800 transition-colors"
@@ -383,6 +387,11 @@ export default function Library() {
                         )}
                         {!isDemo && draft.status === "published" && (
                           <>
+                            {resonanceMap[String(draft.id)] !== undefined && (
+                              <DropdownMenuItem onClick={() => setPerfViewDraft({ topic, entry: resonanceMap[String(draft.id)]! })}>
+                                <BarChart2 className="w-4 h-4 mr-2 text-emerald-500" /> View performance
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => void openPerfModal(draft.id, topic, "upload")}>
                               <Upload className="w-4 h-4 mr-2 text-violet-500" /> Upload LinkedIn analytics
                             </DropdownMenuItem>
@@ -451,6 +460,14 @@ export default function Library() {
             modal={perfModal}
             onClose={() => setPerfModal(null)}
             onSuccess={handlePerfSuccess}
+          />
+        )}
+
+        {perfViewDraft && (
+          <PerformanceViewModal
+            topic={perfViewDraft.topic}
+            entry={perfViewDraft.entry}
+            onClose={() => setPerfViewDraft(null)}
           />
         )}
 
@@ -775,6 +792,9 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
     if (reach > 0) return Math.min(100, Math.round((w / reach) * 1000));
     return 0;
   })();
+  const engagementRate = impressions > 0
+    ? Math.round(((reactions + comments + reposts) / impressions) * 10000) / 100
+    : null;
 
   const handleFileStage = (file: File) => {
     setStagedFile(file);
@@ -1067,11 +1087,17 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
             {impressions > 0 && (
               <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl mb-4">
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Impact Score</p>
+                  <InfoTooltip
+                    className="mb-0.5"
+                    content="Engagement rate — reactions + comments + reposts, divided by impressions. LinkedIn's own measure of how well a post did relative to how many people saw it."
+                  >
+                    <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider">Engagement rate</p>
+                  </InfoTooltip>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-violet-700">{resonanceScore}</span>
-                    <span className="text-xs text-violet-400 font-bold">/100</span>
+                    <span className="text-2xl font-black text-violet-700">{engagementRate ?? 0}</span>
+                    <span className="text-xs text-violet-400 font-bold">%</span>
                   </div>
+                  <p className="text-[10px] text-violet-400 mt-0.5">{reactions + comments + reposts} reactions, comments &amp; reposts · {impressions.toLocaleString()} impressions</p>
                 </div>
                 <div className="w-16 h-16 relative flex items-center justify-center">
                   <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
@@ -1113,6 +1139,75 @@ function NumberInput({ label, value, onChange }: { label: string; value: number;
         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors"
       />
     </div>
+  );
+}
+
+// ── Quick performance breakdown ─────────────────────────────────────────────
+// Read-only view opened from the "···" menu once a post has logged
+// performance — reuses the same ResonanceMapEntry the list badge already
+// fetched, no extra request. Impressions is shown as reach (not a bar, since
+// it's the denominator and dwarfs the others); reactions/comments/reposts get
+// bars scaled against each other so their relative weight is legible.
+function PerformanceViewModal({ topic, entry, onClose }: { topic: string; entry: ResonanceMapEntry; onClose: () => void }) {
+  const rows = [
+    { label: "Reactions", value: entry.reactions, icon: ThumbsUp, color: "bg-violet-500" },
+    { label: "Comments", value: entry.comments, icon: MessageCircle, color: "bg-sky-500" },
+    { label: "Reposts", value: entry.reposts, icon: Repeat2, color: "bg-emerald-500" },
+  ];
+  const max = Math.max(...rows.map((r) => r.value), 1);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <BarChart2 className="w-4 h-4 text-emerald-500" />
+              <h3 className="font-extrabold text-gray-900">Performance</h3>
+            </div>
+            <p className="text-xs text-gray-400 ml-6 truncate max-w-[280px]">{topic}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="bg-violet-50 rounded-2xl p-4 mb-5 flex items-center justify-between">
+          <div>
+            <InfoTooltip content="Reactions + comments + reposts, divided by impressions. LinkedIn's own measure of how well a post did relative to how many people saw it.">
+              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">Engagement rate</p>
+            </InfoTooltip>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-black text-violet-700">{entry.engagementRate ?? 0}</span>
+              <span className="text-sm text-violet-400 font-bold">%</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1.5 text-gray-500">
+              <Users className="w-3.5 h-3.5" />
+              <span className="text-lg font-extrabold text-gray-800 tabular-nums">{entry.impressions.toLocaleString()}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Impressions</p>
+          </div>
+        </div>
+
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Engagement breakdown</p>
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <div key={r.label} className="flex items-center gap-3">
+              <r.icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="text-xs text-gray-600 font-medium w-20 flex-shrink-0">{r.label}</span>
+              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className={cn("h-full rounded-full", r.color)} style={{ width: `${Math.round((r.value / max) * 100)}%` }} />
+              </div>
+              <span className="text-xs font-extrabold text-gray-800 tabular-nums w-8 text-right flex-shrink-0">{r.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

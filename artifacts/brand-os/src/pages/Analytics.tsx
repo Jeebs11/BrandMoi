@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import { cn } from "@/lib/utils";
 import { analyticsApi, seriesApi, topicsApi, type AnalyticsOverview, type KpiTrend, type Series, type Topic } from "@/lib/api";
 
@@ -205,8 +206,17 @@ function EmptyState() {
   );
 }
 
+const BREAKDOWN_TABS = [
+  { key: "tone", label: "Tone" },
+  { key: "source", label: "Content source" },
+  { key: "visual", label: "Visual format" },
+  { key: "objective", label: "Objective" },
+] as const;
+type BreakdownKey = (typeof BREAKDOWN_TABS)[number]["key"];
+
 function Content({ data, trendWindow, seriesList, topicsList }: { data: AnalyticsOverview; trendWindow: 30 | 60 | 90; seriesList?: Series[]; topicsList?: Topic[] }) {
   const [, navigate] = useLocation();
+  const [activeBreakdown, setActiveBreakdown] = useState<BreakdownKey>("tone");
 
   const hasResonanceData = data.loggedPerformanceCount > 0;
 
@@ -252,18 +262,22 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         <div className="absolute -top-20 -right-10 w-56 h-56 rounded-full bg-violet-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex items-end justify-between gap-4 mb-1">
           <div>
-            <p className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase mb-1.5">
-              {hasResonanceData ? "Average impact" : "Posts published"} · last {trendWindow} days
+            <p className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase mb-1.5 flex items-center gap-1">
+              {hasResonanceData ? (
+                <InfoTooltip content="Reactions + comments + reposts, divided by impressions. This is LinkedIn's own way of measuring how well a post performed relative to its reach.">
+                  Engagement rate
+                </InfoTooltip>
+              ) : "Posts published"} · last {trendWindow} days
             </p>
             <div className="flex items-baseline gap-2.5">
               <span className="text-5xl font-black text-white tabular-nums tracking-tight">
-                {hasResonanceData ? (data.kpiTrends.avgResonance.current ?? data.avgResonance) : (data.kpiTrends.totalPublished.current ?? data.totalPublished)}
+                {hasResonanceData ? (data.kpiTrends.avgEngagementRate.current ?? data.avgEngagementRate ?? 0) : (data.kpiTrends.totalPublished.current ?? data.totalPublished)}
               </span>
-              {hasResonanceData && <span className="text-xs text-white/40 font-bold">/ 100</span>}
-              {(hasResonanceData ? data.kpiTrends.avgResonance : data.kpiTrends.totalPublished).trend === "up" && (
+              {hasResonanceData && <span className="text-xs text-white/40 font-bold">%</span>}
+              {(hasResonanceData ? data.kpiTrends.avgEngagementRate : data.kpiTrends.totalPublished).trend === "up" && (
                 <span className="text-[11px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">▲ climbing</span>
               )}
-              {(hasResonanceData ? data.kpiTrends.avgResonance : data.kpiTrends.totalPublished).trend === "down" && (
+              {(hasResonanceData ? data.kpiTrends.avgEngagementRate : data.kpiTrends.totalPublished).trend === "down" && (
                 <span className="text-[11px] font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">▼ dipped</span>
               )}
             </div>
@@ -335,8 +349,16 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Personal best</p>
               <p className="text-xs font-bold text-gray-800 truncate">{champion.topic}</p>
+              {champion.impressions > 0 && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {champion.impressions.toLocaleString()} impressions · {champion.reactions + champion.comments} reactions & comments
+                </p>
+              )}
             </div>
-            <span className="text-xl font-black text-amber-500 tabular-nums flex-shrink-0">{champion.resonance}</span>
+            <div className="text-right flex-shrink-0">
+              <span className="text-xl font-black text-amber-500 tabular-nums">{champion.engagementRate !== null ? `${champion.engagementRate}%` : "—"}</span>
+              <p className="text-[9px] font-bold text-amber-500/70 uppercase tracking-wider">Engagement</p>
+            </div>
           </div>
         </button>
       )}
@@ -425,7 +447,11 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-3.5 h-3.5 text-violet-500" />
-            <SectionTitle>Best time to post</SectionTitle>
+            <SectionTitle>
+              <InfoTooltip content="Shows which days and time blocks your posts tend to perform best in, based on your logged engagement.">
+                Best time to post
+              </InfoTooltip>
+            </SectionTitle>
           </div>
           {data.bestTimeToPost.topCombination && (
             <div className="bg-violet-50 border border-violet-100 rounded-xl px-3 py-2 mb-3">
@@ -522,10 +548,26 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         </div>
       )}
 
-      {/* Tone breakdown */}
-      {data.byTone.length > 0 && (
+      {/* Consolidated breakdowns: tone / content source / visual format / objective */}
+      {(data.byTone.length > 0 || data.byContentSource.length > 0 || data.byVisualType.length > 0 || data.byObjective.length > 0) && (
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>By tone</SectionTitle>
+          <div className="flex items-center justify-between mb-3">
+            <SectionTitle>Breakdown by category</SectionTitle>
+          </div>
+          <div className="flex gap-1 bg-gray-50 rounded-full p-0.5 mb-3 overflow-x-auto">
+            {BREAKDOWN_TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setActiveBreakdown(t.key)}
+                className={cn("text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap transition-all", activeBreakdown === t.key ? "bg-gray-900 text-white shadow-sm" : "text-gray-400 hover:text-gray-600")}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {activeBreakdown === "tone" && data.byTone.length > 0 && (
+          <>
           {tonesWithResonance.length >= 2 ? (
             <>
               {bestTone && (
@@ -586,13 +628,10 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
               </div>
             ))}
           </div>
-        </div>
-      )}
+          </>
+          )}
 
-      {/* Content source */}
-      {data.byContentSource.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>Content source</SectionTitle>
+          {activeBreakdown === "source" && data.byContentSource.length > 0 && (
           <div className="space-y-2.5">
             {data.byContentSource.map((s, i) => {
               const pct = Math.round((s.count / data.totalPublished) * 100);
@@ -614,6 +653,55 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
               );
             })}
           </div>
+          )}
+
+          {activeBreakdown === "visual" && data.byVisualType.length > 0 && (
+          <div className="space-y-2.5">
+            {data.byVisualType.map((v, i) => {
+              const pct = Math.round((v.count / data.totalPublished) * 100);
+              return (
+                <div key={v.type}>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs text-gray-600 flex-1 font-medium">{VISUAL_EMOJI[v.type] ?? ""} {VISUAL_LABELS[v.type] ?? v.type}</span>
+                    <span className="text-[10px] text-gray-400 tabular-nums">{v.count} post{v.count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#10b981" : "#d1fae5" }} />
+                    </div>
+                    {v.sampledCount < 2 ? <SparseLabel /> : (
+                      <span className="text-[10px] font-bold text-emerald-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {v.avgResonance}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          )}
+
+          {activeBreakdown === "objective" && data.byObjective.length > 0 && (
+          <div className="space-y-2.5">
+            {data.byObjective.map((o, i) => {
+              const pct = Math.round((o.count / data.totalPublished) * 100);
+              return (
+                <div key={o.objective}>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs text-gray-600 flex-1 font-medium">{o.objective}</span>
+                    <span className="text-[10px] text-gray-400 tabular-nums">{o.count} post{o.count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#f59e0b" : "#fef3c7" }} />
+                    </div>
+                    {o.sampledCount < 2 ? <SparseLabel /> : (
+                      <span className="text-[10px] font-bold text-amber-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {o.avgResonance}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          )}
         </div>
       )}
 
@@ -705,74 +793,22 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         </div>
       )}
 
-      {/* Visual type */}
-      {data.byVisualType.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>Visual format used</SectionTitle>
-          <div className="space-y-2.5">
-            {data.byVisualType.map((v, i) => {
-              const pct = Math.round((v.count / data.totalPublished) * 100);
-              return (
-                <div key={v.type}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs text-gray-600 flex-1 font-medium">{VISUAL_EMOJI[v.type] ?? ""} {VISUAL_LABELS[v.type] ?? v.type}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">{v.count} post{v.count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#10b981" : "#d1fae5" }} />
-                    </div>
-                    {v.sampledCount < 2 ? <SparseLabel /> : (
-                      <span className="text-[10px] font-bold text-emerald-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {v.avgResonance}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Objective */}
-      {data.byObjective.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>By objective</SectionTitle>
-          <div className="space-y-2.5">
-            {data.byObjective.map((o, i) => {
-              const pct = Math.round((o.count / data.totalPublished) * 100);
-              return (
-                <div key={o.objective}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs text-gray-600 flex-1 font-medium">{o.objective}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">{o.count} post{o.count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#f59e0b" : "#fef3c7" }} />
-                    </div>
-                    {o.sampledCount < 2 ? <SparseLabel /> : (
-                      <span className="text-[10px] font-bold text-amber-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {o.avgResonance}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Top posts */}
       {data.topPosts.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>Your greatest hits</SectionTitle>
+          <SectionTitle>
+            <InfoTooltip content="Engagement rate — reactions + comments + reposts, divided by impressions. LinkedIn's own measure of how well a post did relative to how many people saw it.">
+              Best performing posts
+            </InfoTooltip>
+          </SectionTitle>
           <div className="space-y-3">
             {data.topPosts.map((p, i) => (
               <button
                 key={p.id}
                 onClick={() => navigate(`/library?highlight=${p.id}`)}
-                className="w-full flex items-center gap-3 text-left hover:bg-gray-50 rounded-xl p-1 -mx-1 transition-colors"
+                className="w-full flex items-start gap-3 text-left hover:bg-gray-50 rounded-xl p-1 -mx-1 transition-colors"
               >
-                <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold flex-shrink-0", i === 0 ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-500")}>
+                <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-extrabold flex-shrink-0 mt-0.5", i === 0 ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-500")}>
                   {i + 1}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -791,18 +827,18 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
                         {VISUAL_EMOJI[p.visualType] ?? ""} {VISUAL_LABELS[p.visualType] ?? p.visualType}
                       </span>
                     )}
-                    {p.engagementRate !== null && (
-                      <span className="text-[10px] bg-sky-50 text-sky-600 px-1.5 py-0.5 rounded-full font-medium">
-                        {p.engagementRate}% eng
-                      </span>
-                    )}
                   </div>
+                  {p.impressions > 0 && (
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {p.impressions.toLocaleString()} impressions · {p.reactions} reactions · {p.comments} comments{p.reposts > 0 ? ` · ${p.reposts} reposts` : ""}
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-violet-500 rounded-full" style={{ width: `${p.resonance}%` }} />
-                  </div>
-                  <span className="text-xs font-extrabold text-violet-700 tabular-nums">{p.resonance}</span>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-sm font-extrabold text-violet-700 tabular-nums">
+                    {p.engagementRate !== null ? `${p.engagementRate}%` : "—"}
+                  </span>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Eng. rate</p>
                 </div>
               </button>
             ))}
