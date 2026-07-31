@@ -477,8 +477,9 @@ export type AnalyticsOverview = {
   last30: number;
   last60: number;
   last90: number;
-  kpiTrends: { avgResonance: KpiTrend; totalPublished: KpiTrend; avgEngagementRate: KpiTrend };
+  kpiTrends: { avgResonance: KpiTrend; totalPublished: KpiTrend; avgEngagementRate: KpiTrend; totalImpressions: KpiTrend };
   avgEngagementRate: number | null;
+  totalImpressions: number;
   postingConsistency: { avgDaysBetweenPosts: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };
   bestTimeToPost: {
     byDayOfWeek: { day: string; count: number; avgResonance: number | null }[];

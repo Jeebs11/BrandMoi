@@ -699,18 +699,25 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     return vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null;
   };
 
+  const sumImpressionsOf = (drafts: typeof allDrafts): number =>
+    drafts.reduce((sum, d) => sum + (perfMap.get(d.id)?.impressions ?? 0), 0);
+
   const currAvgRes = avgResOf(windowDrafts);
   const priorAvgRes = avgResOf(priorDrafts);
   const currEngRate = avgEngRateOf(windowDrafts);
   const priorEngRate = avgEngRateOf(priorDrafts);
+  const currImpressions = sumImpressionsOf(windowDrafts);
+  const priorImpressions = sumImpressionsOf(priorDrafts);
 
   const kpiTrends = {
     avgResonance: { current: currAvgRes, prior: priorAvgRes, trend: trendDir(currAvgRes, priorAvgRes) },
     totalPublished: { current: windowDrafts.length, prior: priorDrafts.length, trend: trendDir(windowDrafts.length, priorDrafts.length) },
     avgEngagementRate: { current: currEngRate, prior: priorEngRate, trend: trendDir(currEngRate, priorEngRate) },
+    totalImpressions: { current: currImpressions, prior: priorImpressions, trend: trendDir(currImpressions, priorImpressions) },
   };
 
   const avgEngagementRate = currEngRate;
+  const totalImpressions = sumImpressionsOf(allDrafts);
 
   // Posting consistency
   const computeConsistency = (drafts: typeof allDrafts): number | null => {
@@ -859,6 +866,7 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     last90,
     kpiTrends,
     avgEngagementRate,
+    totalImpressions,
     postingConsistency,
     bestTimeToPost,
     hashtagPerformance,

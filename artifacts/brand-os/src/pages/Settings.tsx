@@ -349,8 +349,10 @@ export default function Settings() {
             setIsSavingAccount(false);
           }
         },
-        onError: () => {
-          toast({ title: "Failed to save settings.", variant: "destructive" });
+        onError: (err: unknown) => {
+          console.error(err);
+          const msg = err instanceof Error && err.message ? err.message : "Failed to save settings.";
+          toast({ title: msg, variant: "destructive" });
           setIsSavingAccount(false);
         },
       }
@@ -379,6 +381,35 @@ export default function Settings() {
         </header>
 
         <main className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          {/* Profile strength — same four fields that get injected into every
+              generation prompt (About You, role, audience, belief below).
+              Updates live as you type, before you've even hit Save. */}
+          {(() => {
+            const fields = [
+              { done: !!brandRole.trim(), label: "your role" },
+              { done: !!brandAudience.trim(), label: "your audience" },
+              { done: !!brandBelief.trim(), label: "your core belief" },
+              { done: !!aboutMe.trim(), label: "a short bio" },
+            ];
+            const missing = fields.filter((f) => !f.done);
+            if (missing.length === 0) return null;
+            const pct = Math.round(((fields.length - missing.length) / fields.length) * 100);
+            return (
+              <section className="rounded-3xl border border-violet-100 bg-violet-50/60 px-4 py-3.5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Profile strength</p>
+                  <p className="text-[10px] font-bold text-violet-600 tabular-nums">{pct}%</p>
+                </div>
+                <div className="h-1.5 bg-violet-100 rounded-full overflow-hidden mb-1.5">
+                  <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-xs text-gray-600">
+                  Add <span className="font-bold text-gray-800">{missing[0]!.label}</span> below — every post is written using this, so filling it in sharpens what you get.
+                </p>
+              </section>
+            );
+          })()}
+
           {/* Smart Import — top of page so it can auto-fill everything */}
           <section>
             <SmartImportButton onApply={handleSmartImport} />
@@ -932,9 +963,9 @@ export default function Settings() {
             <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-4">
               <p className="text-xs text-gray-400 leading-relaxed">These colours are used for carousel slides and visual cards.</p>
               <div className="flex gap-4">
-                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                <label className="flex flex-col gap-2 flex-1 min-w-0 cursor-pointer">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Background</span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start gap-1.5 min-w-0">
                     <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
                       <div className="absolute inset-0" style={{ background: brandBgColor }} />
                       <input
@@ -944,12 +975,12 @@ export default function Settings() {
                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                       />
                     </div>
-                    <code className="text-xs text-gray-400 font-mono">{brandBgColor}</code>
+                    <code className="text-[10px] text-gray-400 font-mono truncate max-w-full">{brandBgColor}</code>
                   </div>
                 </label>
-                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                <label className="flex flex-col gap-2 flex-1 min-w-0 cursor-pointer">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Accent</span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start gap-1.5 min-w-0">
                     <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
                       <div className="absolute inset-0" style={{ background: brandAccentColor }} />
                       <input
@@ -959,12 +990,12 @@ export default function Settings() {
                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                       />
                     </div>
-                    <code className="text-xs text-gray-400 font-mono">{brandAccentColor}</code>
+                    <code className="text-[10px] text-gray-400 font-mono truncate max-w-full">{brandAccentColor}</code>
                   </div>
                 </label>
-                <label className="flex flex-col gap-2 flex-1 cursor-pointer">
+                <label className="flex flex-col gap-2 flex-1 min-w-0 cursor-pointer">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Text</span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start gap-1.5 min-w-0">
                     <div className="relative w-10 h-10 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0">
                       <div className="absolute inset-0" style={{ background: brandTextColor }} />
                       <input
@@ -974,7 +1005,7 @@ export default function Settings() {
                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                       />
                     </div>
-                    <code className="text-xs text-gray-400 font-mono">{brandTextColor}</code>
+                    <code className="text-[10px] text-gray-400 font-mono truncate max-w-full">{brandTextColor}</code>
                   </div>
                 </label>
               </div>

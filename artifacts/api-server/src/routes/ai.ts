@@ -22,6 +22,7 @@ import {
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
+import { respondAiError } from "../lib/ai-errors.js";
 import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
 import { buildFeedbackContext, buildLearnedPatterns, buildTopHashtags } from "../lib/learning.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
@@ -248,7 +249,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     res.json(validated.data);
   } catch (err) {
     console.error("[ai-generate] failed", err);
-    res.status(500).json({ error: "Failed to generate content" });
+    respondAiError(res, err, "Failed to generate content");
   }
 });
 
@@ -931,7 +932,7 @@ RULES:
     res.json(validated.data);
   } catch (err) {
     console.error("[explore-directions]", err);
-    res.status(500).json({ error: "Failed to explore directions" });
+    respondAiError(res, err, "Failed to explore directions");
   }
 });
 

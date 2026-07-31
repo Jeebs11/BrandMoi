@@ -107,7 +107,11 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
         */}
         <div
           className={cn(
-            "w-full min-h-screen shadow-2xl flex flex-col",
+            // [&>*]:min-w-0 — every page renders one root child here; without this,
+            // that child is a flex item with the default min-width:auto, so any
+            // unwrapped content inside it (a wide row, long badge, etc.) can force
+            // the whole shell wider than the viewport instead of shrinking/wrapping.
+            "w-full min-w-0 min-h-screen shadow-2xl flex flex-col [&>*]:min-w-0",
             "max-w-[430px]",
             !noNav && "pb-20 md:pb-8 md:max-w-[700px] lg:max-w-[900px] md:shadow-xl",
             hasFrost

@@ -143,15 +143,15 @@ export default function BrandStudio() {
 
   return (
     <AppShell>
-      <div className="px-5 pt-4 pb-28 space-y-7 max-w-[430px] mx-auto">
+      <div className="px-5 pt-4 pb-28 space-y-7 max-w-[430px] mx-auto min-w-0 w-full">
         {/* Header */}
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-400">
+        <div className="flex items-center gap-2 min-w-0">
+          <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-400 flex-shrink-0">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2">
-              <FlaskConical className="w-5 h-5 text-violet-500" />
+              <FlaskConical className="w-5 h-5 text-violet-500 flex-shrink-0" />
               Brand Studio
             </h1>
             <p className="text-xs text-gray-400">Tune your brand with evidence from what actually worked.</p>
@@ -162,7 +162,7 @@ export default function BrandStudio() {
         <section className="rounded-3xl bg-gray-900 px-5 py-4">
           {health ? (
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1">Brand health</p>
                 <p className="text-sm font-bold text-white">
                   {health.lastAnalyzedAt

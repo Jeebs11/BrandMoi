@@ -84,6 +84,14 @@ export interface UpdatePreferencesBody {
   bgPalette?: string | null;
   /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
   siteTheme?: string | null;
+  /** @maxItems 6 */
+  contentPillars?: string[];
+  /** @maxItems 5 */
+  writingSamples?: string[];
+  /** @maxItems 8 */
+  proofPoints?: string[];
+  /** @maxItems 3 */
+  aspirationalSamples?: string[];
 }
 
 export interface SuggestionItem {

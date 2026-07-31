@@ -298,25 +298,31 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
             </ResponsiveContainer>
           </div>
         )}
-        <div className="relative flex gap-4 pt-3 border-t border-white/10">
-          <div className="flex-1">
+        <div className="relative grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 pt-3 border-t border-white/10">
+          <div>
             <p className="text-lg font-extrabold text-white tabular-nums">{data.kpiTrends.totalPublished.current ?? data.totalPublished}</p>
             <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Published</p>
           </div>
           {data.avgEngagementRate !== null && (
-            <div className="flex-1">
+            <div>
               <p className="text-lg font-extrabold text-white tabular-nums">{data.avgEngagementRate}%</p>
               <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Engagement</p>
             </div>
           )}
+          {data.totalImpressions > 0 && (
+            <div>
+              <p className="text-lg font-extrabold text-white tabular-nums">{data.totalImpressions.toLocaleString()}</p>
+              <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Impressions</p>
+            </div>
+          )}
           {data.postingConsistency.avgDaysBetweenPosts !== null && (
-            <div className="flex-1">
+            <div>
               <p className="text-lg font-extrabold text-white tabular-nums">~{data.postingConsistency.avgDaysBetweenPosts}d</p>
               <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Cadence</p>
             </div>
           )}
           {bestTone && (
-            <div className="flex-1">
+            <div>
               <p className="text-lg font-extrabold text-white">{TONE_EMOJI[bestTone.tone] ?? ""} {bestTone.tone}</p>
               <p className="text-[9px] font-bold text-white/35 uppercase tracking-wider">Best tone</p>
             </div>

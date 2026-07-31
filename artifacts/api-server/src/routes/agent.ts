@@ -11,6 +11,7 @@ import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 import { buildLearnedPatterns, resonanceScore } from "../lib/learning.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
+import { respondAiError } from "../lib/ai-errors.js";
 
 // Legacy-objective → modern-audience fallback for drafts saved before the
 // audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
@@ -42,17 +43,6 @@ function parseJson(text: string): unknown {
   }
 }
 
-
-// Map Anthropic rate-limit/overload errors to a 429 the UI can message
-// properly; everything else stays a generic 500.
-function respondAiError(res: { status: (n: number) => { json: (b: unknown) => void } }, err: unknown, fallback: string): void {
-  const status = (err as { status?: number })?.status;
-  if (status === 429 || status === 529) {
-    res.status(429).json({ error: "The AI is at its rate limit right now — try again in a minute or two." });
-    return;
-  }
-  res.status(500).json({ error: fallback });
-}
 
 const router: IRouter = Router();
 

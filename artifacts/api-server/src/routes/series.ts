@@ -7,6 +7,7 @@ import { seriesTable, draftsTable, performanceSignalsTable, topicsTable, ideaFee
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { AUDIENCE_OVERLAYS, FORMATS, FORMAT_INSTRUCTIONS } from "../lib/ai-prompts.js";
+import { respondAiError } from "../lib/ai-errors.js";
 
 const router: IRouter = Router();
 
@@ -20,15 +21,6 @@ function parseJson(text: string): unknown {
     if (start === -1 || end <= start) throw new Error("No JSON object found in AI response");
     return JSON.parse(cleaned.slice(start, end + 1));
   }
-}
-
-function respondAiError(res: { status: (n: number) => { json: (b: unknown) => void } }, err: unknown, fallback: string): void {
-  const status = (err as { status?: number })?.status;
-  if (status === 429 || status === 529) {
-    res.status(429).json({ error: "The AI is at its rate limit right now — try again in a minute or two." });
-    return;
-  }
-  res.status(500).json({ error: fallback });
 }
 
 const FORMAT_SET = new Set<string>(FORMATS);

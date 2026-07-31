@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Settings, ArrowRight, Clock, Flame, ChevronDown, AlertCircle, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp, Loader2, FlaskConical } from "lucide-react";
+import { Settings, ArrowRight, Clock, Flame, ChevronDown, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp, Loader2 } from "lucide-react";
 import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type AudienceMix, type BrandAngle } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type BrandAngle } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 import { useToast } from "@/hooks/use-toast";
 
@@ -204,7 +204,7 @@ function DareCard({ onWrite }: { onWrite: (raw: string) => void }) {
           </div>
           {loading
             ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
-            : <span className="text-xs font-bold text-red-400 group-hover:text-red-600 transition-colors">Dare me →</span>}
+            : <span className="text-xs font-bold text-red-400 group-hover:text-red-600 transition-colors">Give me a bold take →</span>}
         </button>
       ) : !expanded ? (
         <button
@@ -275,8 +275,48 @@ function MomentumCard({ data }: { data: MomentumData }) {
   );
 }
 
+// Profile completeness nudge: these four fields are the ones actually
+// injected into every generation prompt (voice context, audience overlay,
+// belief framing) — an incomplete profile means generically-voiced output,
+// not a cosmetic gap. Disappears entirely once all four are filled in.
+type ProfileFields = { brandRole?: string; brandAudience?: string; brandBelief?: string; aboutMe?: string };
+
+function ProfileStrengthCard({ preferences, onComplete }: { preferences: ProfileFields | undefined; onComplete: () => void }) {
+  if (!preferences) return null;
+  const fields: Array<{ key: keyof ProfileFields; label: string }> = [
+    { key: "brandRole", label: "your role" },
+    { key: "brandAudience", label: "your audience" },
+    { key: "brandBelief", label: "your core belief" },
+    { key: "aboutMe", label: "a short bio" },
+  ];
+  const missing = fields.filter((f) => !preferences[f.key]?.trim());
+  if (missing.length === 0) return null;
+  const pct = Math.round(((fields.length - missing.length) / fields.length) * 100);
+
+  return (
+    <button
+      onClick={onComplete}
+      className="w-full rounded-3xl border border-violet-100 bg-violet-50/60 px-5 py-3.5 flex items-center gap-3 text-left hover:bg-violet-50 transition-colors"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Profile strength</p>
+          <p className="text-[10px] font-bold text-violet-600 tabular-nums">{pct}%</p>
+        </div>
+        <div className="h-1.5 bg-violet-100 rounded-full overflow-hidden mb-1.5">
+          <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="text-xs text-gray-600">
+          Add <span className="font-bold text-gray-800">{missing[0]!.label}</span> — every post is written using this, so filling it in sharpens what you get.
+        </p>
+      </div>
+      <ChevronRight className="w-4 h-4 text-violet-400 flex-shrink-0" />
+    </button>
+  );
+}
+
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, preferences } = useAuth();
   const uid = user?.id ?? "anon";
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -292,7 +332,6 @@ export default function Dashboard() {
   const [brandAnglesOverride, setBrandAnglesOverride] = useState<BrandAngle[] | null>(null);
   const [teachAnglesOverride, setTeachAnglesOverride] = useState<string[] | null>(null);
   const [tabRefreshing, setTabRefreshing] = useState(false);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [brief, setBrief] = useState<AgentBrief | null>(() => loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
   const [briefLoading, setBriefLoading] = useState(() => !loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
   const [themes, setThemes] = useState<AgentTheme[]>([]);
@@ -334,8 +373,6 @@ export default function Dashboard() {
   const [ripeOpen, setRipeOpen] = useState(false);
   const [recentOpen, setRecentOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [audienceMix, setAudienceMix] = useState<AudienceMix | null>(null);
-  const [audienceMixDismissed, setAudienceMixDismissed] = useState(false);
   const [seriesNudgeDismissed, setSeriesNudgeDismissed] = useState(false);
 
   useEffect(() => {
@@ -351,8 +388,6 @@ export default function Dashboard() {
     momentumApi.get().then(setMomentum).catch(() => {});
 
     checkinsApi.list().then((r) => setCheckins(r.checkins)).catch(() => {});
-
-    momentumApi.audienceMix().then(setAudienceMix).catch(() => {});
 
     const cached = loadDayCache<AgentBrief>("brief", uid);
     if (!cached) {
@@ -521,10 +556,6 @@ export default function Dashboard() {
   const recentDrafts = drafts?.slice(0, 5) ?? [];
   const firstName = user?.displayName ? user.displayName.split(" ")[0] : null;
 
-  const visibleAlerts = momentum?.cadenceAlerts.filter(
-    (a) => !dismissedAlerts.has(a.type + (a.objective ?? ""))
-  ) ?? [];
-
   return (
     <AppShell>
 
@@ -532,7 +563,7 @@ export default function Dashboard() {
         {/* Header */}
         <header className="px-6 pt-10 pb-4 bg-white/80 backdrop-blur border-b border-gray-100 sticky top-0 z-10">
           <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <p className="text-sm font-black tracking-tight text-gray-900">Brand<span className="text-gray-300">Me</span></p>
+            <p className="text-sm font-black tracking-tight text-gray-900">Brand<span className="text-gray-300">Moi</span></p>
             <div className="flex items-center gap-2">
               {momentum && momentum.weekStreak >= 2 && (
                 <div className="flex items-center gap-1 bg-violet-50 border border-violet-100 px-2.5 py-1.5 rounded-xl">
@@ -548,29 +579,6 @@ export default function Dashboard() {
 
         <main className="flex-1 px-6 py-6">
           <div className="max-w-5xl mx-auto space-y-4">
-          {/* Cadence alerts */}
-          {visibleAlerts.length > 0 && (
-            <div className="space-y-2">
-              {visibleAlerts.map((alert) => {
-                const key = alert.type + (alert.objective ?? "");
-                return (
-                  <div key={key} className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-                    <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-800 font-medium flex-1 leading-relaxed">{alert.message}</p>
-                    <button
-                      onClick={() => setDismissedAlerts((s) => new Set([...s, key]))}
-                      className="text-amber-400 hover:text-amber-600 flex-shrink-0"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-
-
           {/* Hero — greeting + this week's post tracker */}
           <section
             className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950 px-6 py-6 cursor-pointer select-none"
@@ -596,6 +604,8 @@ export default function Dashboard() {
           </section>
           {momOpen && momentum && <MomentumCard data={momentum} />}
 
+          <ProfileStrengthCard preferences={preferences} onComplete={() => navigate("/settings")} />
+
           {/* Performance check-in nudges — published posts with no logged stats */}
           {checkins.map((c) => (
             <button
@@ -611,36 +621,6 @@ export default function Dashboard() {
               <ChevronRight className="w-4 h-4 text-sky-400 flex-shrink-0" />
             </button>
           ))}
-
-          {/* Audience-mix nudge — flags when recent posts heavily skew one
-              audience, so the user notices if e.g. Recruiters is empty. */}
-          {audienceMix?.ready && audienceMix.skewed && !audienceMixDismissed && (
-            <div className="w-full rounded-3xl border border-indigo-100 bg-indigo-50/60 px-5 py-3.5 flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-0.5">Audience mix</p>
-                <p className="text-sm font-bold text-gray-800">
-                  {audienceMix.topPct}% of your last {audienceMix.total} posts were for {audienceMix.topAudience}
-                </p>
-                <p className="text-[11px] text-gray-400">
-                  {audienceMix.missing && audienceMix.missing.length > 0
-                    ? `You haven't posted for ${audienceMix.missing.slice(0, 2).join(" or ")} recently — try one this week if that's an audience you want attention from.`
-                    : "Consider mixing in a post for a different audience this week."}
-                </p>
-              </div>
-              <button
-                onClick={() => openLengthPicker("", "")}
-                className="flex-shrink-0 text-[11px] font-bold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap"
-              >
-                Write one
-              </button>
-              <button
-                onClick={() => setAudienceMixDismissed(true)}
-                className="flex-shrink-0 p-1 rounded-lg text-indigo-300 hover:text-indigo-500 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
 
           {/* Series-in-progress nudge — points at the next unwritten part of
               whichever active series needs it, pulled from the daily brief's
@@ -738,22 +718,20 @@ export default function Dashboard() {
                     const fb = ideaFeedback[fbKey];
                     return (
                       <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
-                        <div className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="flex-1 text-left flex items-start gap-2 px-3 py-2.5 min-w-0">
-                            <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
-                              {item.audience === "Recruiters & Headhunters" ? "Recruiters" : item.audience}
-                            </span>
-                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                          </button>
-                          <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(item.angle, "brand", "like"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3 h-3" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(item.angle, "brand", "dislike"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3 h-3" /></button>
-                          </div>
-                        </div>
+                        <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 px-3 py-2.5 min-w-0 bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                            {item.audience === "Recruiters & Headhunters" ? "Recruiters" : item.audience}
+                          </span>
+                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
                         {isOpen && (
-                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100">
+                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100 space-y-2">
                             <button onClick={() => openLengthPicker(item.angle, `audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
+                            <div className="flex gap-2">
+                              <button onClick={() => void handleIdeaFeedback(item.angle, "brand", "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
+                              <button onClick={() => void handleIdeaFeedback(item.angle, "brand", "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -774,19 +752,17 @@ export default function Dashboard() {
                     const fb = ideaFeedback[fbKey];
                     return (
                       <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
-                        <div className="flex items-center gap-1 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
-                          <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="flex-1 text-left flex items-start justify-between gap-2 px-3 py-2.5">
-                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{angle}</span>
-                            <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                          </button>
-                          <div className="flex items-center gap-0.5 pr-2 flex-shrink-0">
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "like"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "like" ? "text-emerald-600 bg-emerald-50" : "text-gray-300 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3 h-3" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); void handleIdeaFeedback(angle, "teach", "dislike"); }} className={cn("w-6 h-6 flex items-center justify-center rounded-lg transition-colors", fb === "dislike" ? "text-rose-500 bg-rose-50" : "text-gray-300 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3 h-3" /></button>
-                          </div>
-                        </div>
+                        <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 px-3 py-2.5 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
+                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{angle}</span>
+                          <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                        </button>
                         {isOpen && (
-                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100">
+                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100 space-y-2">
                             <button onClick={() => openLengthPicker(angle, "teacherMode=true")} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors">Write this →</button>
+                            <div className="flex gap-2">
+                              <button onClick={() => void handleIdeaFeedback(angle, "teach", "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
+                              <button onClick={() => void handleIdeaFeedback(angle, "teach", "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1182,19 +1158,6 @@ export default function Dashboard() {
 
 {/* ── Dare Mode ── */}
           <DareCard onWrite={(raw) => openLengthPicker(raw)} />
-
-          {/* ── Brand Studio entry — mobile only; desktop reaches it via the sidebar ── */}
-          <button
-            onClick={() => navigate("/studio")}
-            className="md:hidden w-full rounded-3xl border border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 px-5 py-4 flex items-center justify-between gap-3 text-left hover:from-violet-100 hover:to-purple-100 transition-colors group"
-          >
-            <div>
-              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mb-0.5">Brand Studio</p>
-              <p className="text-sm font-extrabold text-gray-900">Tune your brand with what's working</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">Analyze top posts · update your profile · set style targets</p>
-            </div>
-            <FlaskConical className="w-6 h-6 text-violet-400 group-hover:scale-110 transition-transform flex-shrink-0" />
-          </button>
 
           {/* ── Ripe for Developing ── */}
           {!thoughtsLoading && ripeThoughts.length > 0 && (

@@ -78,12 +78,34 @@ export const GetPreferencesResponse = zod.object({
     .string()
     .nullish()
     .describe("Animation speed; slow | normal | fast"),
+  bgDensity: zod
+    .string()
+    .nullish()
+    .describe("Animation particle density; low | normal | high"),
+  bgPanelOpacity: zod
+    .string()
+    .nullish()
+    .describe("Content panel opacity; solid | frosted | semi | glass"),
+  bgCustomImageUrl: zod
+    .string()
+    .nullish()
+    .describe("Base64 data URL of user-uploaded custom background image"),
+  bgPalette: zod
+    .string()
+    .nullish()
+    .describe(
+      "Named colour palette for Ripple\/Plasma\/Prismatic; ocean | sunset | forest | void | ember | rose | arctic | gold",
+    ),
   siteTheme: zod
     .string()
     .nullish()
     .describe(
       "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
     ),
+  contentPillars: zod.array(zod.string()).nullish(),
+  writingSamples: zod.array(zod.string()).nullish(),
+  proofPoints: zod.array(zod.string()).nullish(),
+  aspirationalSamples: zod.array(zod.string()).nullish(),
 });
 
 /**
@@ -141,6 +163,10 @@ export const UpdatePreferencesBody = zod.object({
     .describe(
       "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
     ),
+  contentPillars: zod.array(zod.string().max(60)).max(6).optional(),
+  writingSamples: zod.array(zod.string().max(3000)).max(5).optional(),
+  proofPoints: zod.array(zod.string().max(200)).max(8).optional(),
+  aspirationalSamples: zod.array(zod.string().max(3000)).max(3).optional(),
 });
 
 export const UpdatePreferencesResponse = zod.object({
@@ -441,6 +467,10 @@ export const GetAnalyticsOverviewResponse = zod.object({
       topic: zod.string(),
       resonance: zod.number(),
       engagementRate: zod.number().nullable(),
+      impressions: zod.number(),
+      reactions: zod.number(),
+      comments: zod.number(),
+      reposts: zod.number(),
       tone: zod.string().nullable(),
       contentSource: zod.string(),
       visualType: zod.string(),
@@ -500,8 +530,21 @@ export const GetAnalyticsOverviewResponse = zod.object({
         ])
         .nullable(),
     }),
+    totalImpressions: zod.object({
+      current: zod.number().nullable(),
+      prior: zod.number().nullable(),
+      trend: zod
+        .union([
+          zod.literal("up"),
+          zod.literal("down"),
+          zod.literal("flat"),
+          zod.literal(null),
+        ])
+        .nullable(),
+    }),
   }),
   avgEngagementRate: zod.number().nullable(),
+  totalImpressions: zod.number(),
   postingConsistency: zod.object({
     avgDaysBetweenPosts: zod.number().nullable(),
     prior: zod.number().nullable(),

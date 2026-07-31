@@ -41,7 +41,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         <div className="w-8 h-8 bg-primary rounded-xl flex-shrink-0 flex items-center justify-center text-white font-black text-sm">B</div>
         {!collapsed && (
           <span className="text-base tracking-tight whitespace-nowrap">
-            <span className="font-extrabold text-gray-900">Brand</span><span className="font-light text-gray-400">Me</span>
+            <span className="font-extrabold text-gray-900">Brand</span><span className="font-light text-gray-400">Moi</span>
           </span>
         )}
       </div>
