@@ -1372,9 +1372,12 @@ router.get("/agent/top-post-suggestions", requireAuth, aiRateLimit, async (req, 
       const topic = breakdown?.topic ?? p.rawInput.slice(0, 80);
       const angle = breakdown?.angle ?? "";
       const content = (p.postOutput ?? p.rawInput).slice(0, 400);
-      const engagement = p.reactions + p.comments * 2 + p.reposts;
+      const reactions = p.reactions ?? 0;
+      const comments = p.comments ?? 0;
+      const reposts = p.reposts ?? 0;
+      const engagement = reactions + comments * 2 + reposts;
       return `Post ${i + 1}: "${topic}"${angle ? ` (angle: ${angle})` : ""}
-Engagement score: ${engagement} (${p.reactions} reactions, ${p.comments} comments, ${p.reposts} reposts)
+Engagement score: ${engagement} (${reactions} reactions, ${comments} comments, ${reposts} reposts)
 Content preview: ${content}`;
     }).join("\n\n");
 
@@ -1419,9 +1422,18 @@ Return JSON only (no markdown):
     if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { suggestions?: unknown };
-      if (!Array.isArray(data.suggestions)) throw new Error("bad shape");
-      res.json({ suggestions: data.suggestions.slice(0, 5) });
-    } catch {
+      // Tolerate the AI returning the array at the top level or nested
+      const suggestions =
+        Array.isArray(data) ? data :
+        Array.isArray(data.suggestions) ? data.suggestions :
+        null;
+      if (!suggestions) {
+        console.error("[top-post-suggestions] unexpected shape. raw text:", block.text.slice(0, 500));
+        throw new Error("bad shape");
+      }
+      res.json({ suggestions: suggestions.slice(0, 5) });
+    } catch (parseErr) {
+      console.error("[top-post-suggestions] parse failed:", parseErr);
       res.status(500).json({ error: "Invalid AI response" });
     }
   } catch (err) {
