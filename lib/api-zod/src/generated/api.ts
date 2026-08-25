@@ -1031,6 +1031,7 @@ export const CreateDraftBody = zod.object({
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
+  aiOriginalPost: zod.string().nullish(),
 });
 
 /**
@@ -1209,6 +1210,13 @@ export const GetDraftResponse = zod.object({
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
+  authenticityCheck: zod
+    .object({
+      editPct: zod.number().nullable(),
+      flags: zod.array(zod.string()),
+    })
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -1487,6 +1495,13 @@ export const UpdateDraftResponse = zod.object({
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
+  authenticityCheck: zod
+    .object({
+      editPct: zod.number().nullable(),
+      flags: zod.array(zod.string()),
+    })
+    .nullable()
+    .optional(),
 });
 
 /**

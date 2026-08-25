@@ -428,6 +428,7 @@ export default function Capture() {
       tone: toneFromFeeling(feeling),
       structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
       postOutput: editedPost,
+      aiOriginalPost: versions[0]?.post ?? null,
       shortPost: content.shortPost ?? "",
       carouselOutput: JSON.stringify(content.carousel ?? []),
       visualOutput: content.visual ?? "",
@@ -471,6 +472,21 @@ export default function Capture() {
     }).catch(() => {});
   };
 
+  // Rule-based, publish-time-only nudge from the backend (see
+  // authenticity-check.ts) — non-blocking, only fires when there's actually
+  // something worth surfacing (low edit % from the AI draft, or a generic
+  // pattern still present).
+  const showAuthenticityNudge = (check: { editPct: number | null; flags: string[] } | null | undefined) => {
+    if (!check) return;
+    if (check.editPct !== null && check.editPct < 0.1) {
+      toast({ title: "This is close to the original AI draft — a real personal pass tends to read (and perform) better." });
+      return;
+    }
+    if (check.flags.length > 0) {
+      toast({ title: `Still has ${check.flags[0]} — worth a quick look before it's out there.` });
+    }
+  };
+
   const handleSaveAndPublish = () => {
     if (!content) {
       toast({ title: "Nothing to save yet", variant: "destructive" });
@@ -490,6 +506,7 @@ export default function Capture() {
       tone: toneFromFeeling(feeling),
       structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
       postOutput: editedPost,
+      aiOriginalPost: versions[0]?.post ?? null,
       shortPost: content.shortPost ?? "",
       carouselOutput: JSON.stringify(content.carousel ?? []),
       visualOutput: content.visual ?? "",
@@ -502,10 +519,11 @@ export default function Capture() {
       updateDraft(
         { id: savedDraftId, data: payload },
         {
-          onSuccess: () => {
+          onSuccess: (updated) => {
             toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
             showBestTimeHint();
+            showAuthenticityNudge(updated.authenticityCheck);
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -518,6 +536,7 @@ export default function Capture() {
             setSavedDraftId(newDraft.id);
             toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             showBestTimeHint();
+            showAuthenticityNudge(newDraft.authenticityCheck);
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -584,6 +603,7 @@ export default function Capture() {
       tone: toneFromFeeling(feeling),
       structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
       postOutput: editedPost,
+      aiOriginalPost: versions[0]?.post ?? null,
       shortPost: content.shortPost ?? "",
       carouselOutput: JSON.stringify(content.carousel ?? []),
       visualOutput: content.visual ?? "",

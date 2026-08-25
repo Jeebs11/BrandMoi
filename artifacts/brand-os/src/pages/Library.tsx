@@ -89,6 +89,7 @@ export default function Library() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const isDemo = user?.email === "demo@brandos.app";
+  const { toast } = useToast();
   const search = useSearch();
   const highlightId = (() => { const m = new URLSearchParams(search).get("highlight"); return m ? Number(m) : null; })();
   const highlightRef = useRef<HTMLDivElement | null>(null);
@@ -173,7 +174,21 @@ export default function Library() {
   const handleStatusChange = (id: number, status: "draft" | "ready" | "published") => {
     updateDraft(
       { id, data: { status } },
-      { onSuccess: () => void refetch() }
+      {
+        onSuccess: (updated) => {
+          void refetch();
+          // Same rule-based, publish-time-only nudge as Capture.tsx's ship
+          // flow — both hit the same PATCH endpoint, so this covers
+          // "Mark as Published" too, not just Ship it.
+          const check = updated.authenticityCheck;
+          if (!check) return;
+          if (check.editPct !== null && check.editPct < 0.1) {
+            toast({ title: "This is close to the original AI draft — a real personal pass tends to read (and perform) better." });
+          } else if (check.flags.length > 0) {
+            toast({ title: `Still has ${check.flags[0]} — worth a quick look before it's out there.` });
+          }
+        },
+      }
     );
   };
 

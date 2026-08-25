@@ -20,6 +20,7 @@ import {
 import { requireAuth } from "../middleware/auth.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { upsertDailyActivity } from "../lib/momentum.js";
+import { runAuthenticityCheck } from "../lib/authenticity-check.js";
 
 const router: IRouter = Router();
 
@@ -116,6 +117,11 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // A brand-new draft can be created directly with status "published" (e.g.
+  // first-ever "Ship it" with no prior Save) — the authenticity check needs
+  // to run here too, not just on PATCH, or that path never gets checked.
+  const isPublishingOnCreate = parsed.data.status === "published";
+
   // Demo accounts get a success-shaped ephemeral draft so the generate→save
   // flow works, without writing to (and polluting) the shared demo data.
   if (isDemoUser(req.user!.email)) {
@@ -130,6 +136,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       structuredBreakdown: parsed.data.structuredBreakdown as object,
       selectedHook: parsed.data.selectedHook ?? null,
       postOutput: parsed.data.postOutput ?? null,
+      aiOriginalPost: parsed.data.aiOriginalPost ?? null,
       shortPost: parsed.data.shortPost ?? null,
       carouselOutput: parsed.data.carouselOutput ?? null,
       visualOutput: parsed.data.visualOutput ?? null,
@@ -148,7 +155,8 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       createdAt: now,
       updatedAt: now,
     };
-    res.status(201).json(GetDraftResponse.parse(normalizeDraft(synthetic)));
+    const authenticityCheck = isPublishingOnCreate ? runAuthenticityCheck(synthetic.aiOriginalPost, synthetic.postOutput ?? "") : undefined;
+    res.status(201).json(GetDraftResponse.parse({ ...normalizeDraft(synthetic), authenticityCheck }));
     return;
   }
 
@@ -163,6 +171,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       structuredBreakdown: parsed.data.structuredBreakdown as object,
       selectedHook: parsed.data.selectedHook ?? null,
       postOutput: parsed.data.postOutput ?? null,
+      aiOriginalPost: parsed.data.aiOriginalPost ?? null,
       shortPost: parsed.data.shortPost ?? null,
       carouselOutput: parsed.data.carouselOutput ?? null,
       visualOutput: parsed.data.visualOutput ?? null,
@@ -175,7 +184,8 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
     })
     .returning();
 
-  res.status(201).json(GetDraftResponse.parse(draft));
+  const authenticityCheck = isPublishingOnCreate ? runAuthenticityCheck(draft.aiOriginalPost, draft.postOutput ?? "") : undefined;
+  res.status(201).json(GetDraftResponse.parse({ ...draft, authenticityCheck }));
 
   void upsertDailyActivity(req.user!.userId);
 });
@@ -227,6 +237,13 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.seriesId !== undefined) updateData.seriesId = parsed.data.seriesId;
   if (parsed.data.seriesPart !== undefined) updateData.seriesPart = parsed.data.seriesPart;
 
+  // Rule-based, publish-time-only nudge — never blocks, only attached to the
+  // response when there's actually something worth surfacing (see
+  // runAuthenticityCheck). Runs once here so it applies identically whether
+  // the publish came from Capture's "Ship it" or Library's "Mark as
+  // Published" — both hit this same endpoint.
+  const isPublishing = parsed.data.status === "published";
+
   // Demo accounts: apply the edit in-memory and echo it back without persisting,
   // so the editing flow works but shared demo data stays untouched.
   if (isDemoUser(req.user!.email)) {
@@ -239,7 +256,8 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
       return;
     }
     const merged = { ...existing, ...updateData, updatedAt: new Date() };
-    res.json(UpdateDraftResponse.parse(normalizeDraft(merged)));
+    const authenticityCheck = isPublishing ? runAuthenticityCheck(merged.aiOriginalPost, merged.postOutput ?? "") : undefined;
+    res.json(UpdateDraftResponse.parse({ ...normalizeDraft(merged), authenticityCheck }));
     return;
   }
 
@@ -254,7 +272,8 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(UpdateDraftResponse.parse(normalizeDraft(draft)));
+  const authenticityCheck = isPublishing ? runAuthenticityCheck(draft.aiOriginalPost, draft.postOutput ?? "") : undefined;
+  res.json(UpdateDraftResponse.parse({ ...normalizeDraft(draft), authenticityCheck }));
 });
 
 router.delete("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
