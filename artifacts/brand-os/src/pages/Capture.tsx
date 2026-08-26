@@ -9,8 +9,9 @@ import {
   ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, Zap, CheckCircle2,
 } from "lucide-react";
 import { StressTestPanel, type StressTestResult } from "@/components/StressTestPanel";
+import { BrandReviewPanel } from "@/components/BrandReviewPanel";
 import { PostMeter } from "@/components/PostMeter";
-import { agentApi, analyticsApi, authenticityApi, seriesApi, type SeriesDetail } from "@/lib/api";
+import { agentApi, analyticsApi, authenticityApi, seriesApi, type BrandReviewRecommendation, type BrandReviewResult, type SeriesDetail } from "@/lib/api";
 import {
   useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
@@ -209,6 +210,11 @@ export default function Capture() {
   // The exact text last stress-tested, so we know when the cached result is
   // stale (post edited since) and can reopen the result without re-spending.
   const [stressTestedText, setStressTestedText] = useState<string | null>(null);
+  const [brandReviewOpen, setBrandReviewOpen] = useState(false);
+  const [brandReviewResult, setBrandReviewResult] = useState<BrandReviewResult | null>(null);
+  const [isBrandReviewLoading, setIsBrandReviewLoading] = useState(false);
+  const [isApplyingBrandReviewId, setIsApplyingBrandReviewId] = useState<string | null>(null);
+  const [pendingBrandChange, setPendingBrandChange] = useState<{ recommendation: BrandReviewRecommendation; content: string } | null>(null);
   const [authenticityReviewOpen, setAuthenticityReviewOpen] = useState(false);
   const [authenticityReview, setAuthenticityReview] = useState<AuthenticityReview>(null);
   const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
@@ -745,6 +751,67 @@ export default function Capture() {
     setPendingRefinedContent(null);
   };
 
+  // ── Draft Brand Review ─────────────────────────────────────────────────
+  const handleBrandReview = async (postText: string) => {
+    if (!postText.trim() || isBrandReviewLoading) return;
+    setBrandReviewOpen(true);
+    setBrandReviewResult(null);
+    setPendingBrandChange(null);
+    setIsBrandReviewLoading(true);
+    try {
+      const result = await agentApi.brandReview(postText);
+      setBrandReviewResult(result);
+    } catch (err) {
+      toast({ title: "Brand review failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+      setBrandReviewOpen(false);
+    } finally {
+      setIsBrandReviewLoading(false);
+    }
+  };
+
+  const handleApplyBrandRecommendation = (recommendation: BrandReviewRecommendation) => {
+    if (!editedPost.trim() || isApplyingBrandReviewId) return;
+    setIsApplyingBrandReviewId(recommendation.id);
+    refineContent(
+      {
+        data: {
+          content: editedPost,
+          instruction: `Apply only this Brand Review recommendation to the draft: ${recommendation.instruction}. Preserve the topic, useful details, and the author's voice. Return the complete revised post only.`,
+          tab: "post",
+        },
+      },
+      {
+        onSuccess: (data) => {
+          setPendingBrandChange({ recommendation, content: data.content ?? editedPost });
+          setIsApplyingBrandReviewId(null);
+        },
+        onError: (err) => {
+          toast({ title: "Could not prepare that change", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+          setIsApplyingBrandReviewId(null);
+        },
+      },
+    );
+  };
+
+  const handleApproveBrandChange = () => {
+    if (!pendingBrandChange) return;
+    const { recommendation, content: revisedPost } = pendingBrandChange;
+    setEditedPost(revisedPost);
+    setContent((current) => current ? { ...current, post: revisedPost } : current);
+    addVersion(`Brand review · ${recommendation.title}`, revisedPost, hashtags);
+    setBrandReviewResult((current) => current
+      ? { ...current, recommendations: current.recommendations.filter((item) => item.id !== recommendation.id) }
+      : current);
+    setPendingBrandChange(null);
+    toast({ title: "Change applied to this draft", description: "Your Brand DNA was not changed." });
+  };
+
+  const handleEditDraftManually = () => {
+    setBrandReviewOpen(false);
+    setPendingBrandChange(null);
+    window.setTimeout(() => document.getElementById("draft-post-editor")?.focus(), 0);
+  };
+
   // ── Render ──────────────────────────────────────────────────────────
   const showResult = !!content;
   const fullPost = useMemo(() => `${editedPost}${hashtags ? `\n\n${hashtags}` : ""}`, [editedPost, hashtags]);
@@ -838,6 +905,8 @@ export default function Capture() {
             cachedStressScore={stressTestResult?.score ?? null}
             stressStale={!!stressTestResult && stressTestedText !== null && stressTestedText !== fullPost}
             onViewStressTest={() => setStressTestOpen(true)}
+            onBrandReview={handleBrandReview}
+            isBrandReviewLoading={isBrandReviewLoading}
           />
         )}
 
@@ -851,6 +920,20 @@ export default function Capture() {
             pendingContent={pendingRefinedContent}
             onApprove={handleApproveRefinement}
             onDiscard={handleDiscardRefinement}
+          />
+        )}
+
+        {brandReviewOpen && (
+          <BrandReviewPanel
+            result={brandReviewResult}
+            isLoading={isBrandReviewLoading}
+            isApplyingId={isApplyingBrandReviewId}
+            pendingChange={pendingBrandChange}
+            onClose={() => { setBrandReviewOpen(false); setPendingBrandChange(null); }}
+            onApplyRecommendation={handleApplyBrandRecommendation}
+            onApprove={handleApproveBrandChange}
+            onDiscard={() => setPendingBrandChange(null)}
+            onEditManually={handleEditDraftManually}
           />
         )}
 
@@ -1218,6 +1301,8 @@ interface ResultViewProps {
   stressStale: boolean;
   onViewStressTest: () => void;
   isStressTestLoading: boolean;
+  onBrandReview: (postText: string) => void;
+  isBrandReviewLoading: boolean;
 }
 
 function ResultView(props: ResultViewProps) {
@@ -1231,7 +1316,7 @@ function ResultView(props: ResultViewProps) {
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
     onSave, onSaveAndPublish, onCopy, onStressTest, isStressTestLoading,
-    cachedStressScore, stressStale, onViewStressTest,
+    cachedStressScore, stressStale, onViewStressTest, onBrandReview, isBrandReviewLoading,
   } = props;
 
   return (
@@ -1340,6 +1425,7 @@ function ResultView(props: ResultViewProps) {
           )}
 
           <textarea
+            id="draft-post-editor"
             value={editedPost}
             onChange={(e) => setEditedPost(e.target.value)}
             spellCheck
@@ -1444,6 +1530,15 @@ function ResultView(props: ResultViewProps) {
               {stressStale ? "Post edited since — review or re-run" : "View last stress test"}
             </button>
           )}
+          <Button
+            variant="outline"
+            className="w-full border-sky-200 text-sky-700 hover:bg-sky-50 hover:border-sky-400"
+            onClick={() => onBrandReview(fullPost)}
+            disabled={isBrandReviewLoading || isRefining}
+          >
+            <Target className="w-3.5 h-3.5 mr-1.5" />
+            {isBrandReviewLoading ? "Reviewing brand fit…" : "Brand Review"}
+          </Button>
         </div>
       )}
 

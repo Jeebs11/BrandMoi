@@ -14,3 +14,9 @@ For structured AI responses, size the output budget for the full requested colle
 **Why:** A multi-item Best Posts response was truncated at its output limit, so the client only saw a generic invalid-response error even though the AI call itself completed.
 
 **How to apply:** Recalculate token needs when changing item counts, explanation lengths, or nested fields. Keep strict shape checks after parsing; parser hardening should recover formatting noise, not accept incomplete data.
+
+Draft-level Brand Review should remain separate from permanent Brand DNA tuning: evaluate the current post for generalism, specificity, positioning fit, and voice alignment, then require preview and author approval before changing that draft.
+
+**Why:** Users need to act on a recommendation immediately while retaining control over the stable profile that guides future posts.
+
+**How to apply:** Keep Brand Studio for accepted profile updates and Capture for post-specific refinements. Applying a draft recommendation must never silently update preferences.
