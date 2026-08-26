@@ -121,6 +121,13 @@ const DEMO_BRIEFS = [
       "The real reason standups fail (explained simply)",
       "What a roadmap actually is, for someone who's never owned one",
     ],
+    newsHeadline: "Remote-first companies are quietly rewriting their hiring bars",
+    newsSourceLine: "Worth watching if you're hiring — the bar for 'senior' is shifting toward async communication skills.",
+    trendingTopics: [
+      { headline: "Remote-first companies are quietly rewriting their hiring bars", sourceLine: "The bar for 'senior' is shifting toward async communication skills." },
+      { headline: "LinkedIn's algorithm now favors dwell time over reactions", sourceLine: "Longer, slower-reading posts are starting to outperform quick-hit ones." },
+      { headline: "Layoff-driven job searches are getting more public, not less", sourceLine: "Openly documenting a search is becoming normalized rather than stigmatized." },
+    ],
   },
   {
     headline: "You're due for a Recruiters & Headhunters post — it's been 12 days.",
@@ -136,6 +143,13 @@ const DEMO_BRIEFS = [
       "Why 'data-driven' often means 'afraid to decide' — explained simply",
       "The onboarding checklist nobody writes down, for first-time managers",
       "What 'technical debt' actually costs, in plain English",
+    ],
+    newsHeadline: "Boards are pushing back on 'growth at all costs' roadmaps",
+    newsSourceLine: "A useful signal if you're positioning a post around discipline over speed.",
+    trendingTopics: [
+      { headline: "Boards are pushing back on 'growth at all costs' roadmaps", sourceLine: "Discipline-over-speed narratives are landing better with investors right now." },
+      { headline: "AI-generated LinkedIn posts are getting easier to spot", sourceLine: "Generic structure and stock phrasing are the biggest tells reported so far." },
+      { headline: "Mid-level hiring is quietly picking back up", sourceLine: "A good moment for a capability-proof post aimed at recruiters." },
     ],
   },
 ];

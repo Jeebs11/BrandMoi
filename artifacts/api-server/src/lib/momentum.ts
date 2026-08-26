@@ -36,13 +36,15 @@ export async function fetchMomentumNewsAnchor(
     .join(" working with ");
   const persona = roleContext || "LinkedIn professional";
 
-  const topicTail = opts?.topicHint
-    ? ` that connects to this idea: "${opts.topicHint.trim().slice(0, 240)}".${
+  // Tie-to-news (topicHint present) only needs one strong anchor for a
+  // single post; the daily brief needs enough raw material to also surface
+  // a short trending-topics list, so it asks for three distinct articles in
+  // the same search instead of firing a second call.
+  const searchQuery = opts?.topicHint
+    ? `Find the single most relevant news article published in the last 48 hours for a ${persona} that connects to this idea: "${opts.topicHint.trim().slice(0, 240)}".${
         opts.audience ? ` The post will be aimed at ${opts.audience}.` : ""
-      }`
-    : ".";
-
-  const searchQuery = `Find the single most relevant news article published in the last 48 hours for a ${persona}${topicTail} The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
+      } The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`
+    : `Find the 3 most relevant, genuinely distinct news articles published in the last 48 hours for a ${persona}. Each must be genuinely new — published today or yesterday. For each: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
 
   try {
     const message = await anthropic.messages.create({

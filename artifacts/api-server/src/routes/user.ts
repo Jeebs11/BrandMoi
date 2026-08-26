@@ -136,13 +136,8 @@ router.get("/user/suggestions", requireAuth, async (req, res): Promise<void> => 
   res.json(suggestions);
 });
 
-// Returns the cached voice summary, and silently kicks off a background
-// refresh when it has gone stale (3+ new published posts since the last
-// analysis, or no summary yet with enough posts to build one). The auto
-// refresh is capped at once per day per user and doesn't consume the
-// user's manual refresh allowance.
-const voiceAutoRefreshInFlight = new Set<number>();
-
+// Returns the cached voice summary. Refreshing it is a separate, explicit
+// user action — see POST /user/voice-refresh below.
 router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
   const [[prefs], publishedRows] = await Promise.all([
@@ -160,22 +155,6 @@ router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> =
 
   const draftCount = publishedRows.length;
   const summary = prefs?.brandVoiceSummary ?? null;
-  const analyzedCount = prefs?.voiceSummaryDraftCount ?? 0;
-  const stale = (summary === null && draftCount >= 5) || draftCount >= analyzedCount + 3;
-
-  if (stale && !isDemoUser(req.user!.email) && !voiceAutoRefreshInFlight.has(userId)) {
-    voiceAutoRefreshInFlight.add(userId);
-    void (async () => {
-      try {
-        const limit = await checkAndIncrementDailyLimit(userId, "voice-auto-refresh", 1);
-        if (limit.allowed) await runVoiceAnalysis(userId);
-      } catch (err) {
-        console.warn(`Voice auto-refresh failed for user ${userId}:`, err);
-      } finally {
-        voiceAutoRefreshInFlight.delete(userId);
-      }
-    })();
-  }
 
   res.json({ summary, draftCount });
 });
