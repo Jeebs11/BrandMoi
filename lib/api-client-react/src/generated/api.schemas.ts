@@ -395,6 +395,8 @@ export interface Draft {
   seriesId?: number | null;
   /** @nullable */
   seriesPart?: number | null;
+  /** Rule-based, publish-time-only signal — null/omitted when nothing to report. */
+  authenticityCheck?: { editPct: number | null; flags: string[] } | null;
 }
 
 export type CreateDraftBodyStatus =
@@ -453,6 +455,8 @@ export interface CreateDraftBody {
   seriesId?: number | null;
   /** @nullable */
   seriesPart?: number | null;
+  /** Immutable original AI draft snapshot — set once at creation, ignored on update. @nullable */
+  aiOriginalPost?: string | null;
 }
 
 export type UpdateDraftBodyStatus =

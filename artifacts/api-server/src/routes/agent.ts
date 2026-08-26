@@ -71,7 +71,7 @@ async function getUserAgentContext(userId: number) {
   return { prefs, recentDrafts, dna, ideaFeedback };
 }
 
-router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
+router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   if (isDemoUser(req.user!.email)) {
     await demoDelay();
     res.json(getDemoBrief());
@@ -146,6 +146,7 @@ router.get("/agent/brief", requireAuth, async (req, res): Promise<void> => {
     let newsPublishedAt = "";
     let newsSourceDomain = "";
     let newsDescription = "";
+    let trendingTopics: Array<{ headline: string; sourceLine: string }> = [];
     try {
       const news = await fetchMomentumNewsAnchor(req.user!.userId);
       newsContext = news.context;
@@ -199,7 +200,8 @@ Return JSON only (no markdown):
   "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string.",
   "newsPublishedAt": "If today's news context includes a date or time (e.g. '2 hours ago', 'April 3', 'yesterday'), convert it to an ISO 8601 datetime string (e.g. '2026-04-03T10:00:00Z'). Use today's date as the reference. If no date mentioned, empty string.",
   "newsSourceDomain": "If today's news context includes a publication name (e.g. 'Reuters', 'TechCrunch', 'Harvard Business Review'), extract it as a clean short name. Otherwise empty string.",
-  "newsDescription": "If today's news context was provided, write 2-3 sentences (max 60 words) summarising the key finding or development — this will be used as context for post angle generation. Otherwise empty string."
+  "newsDescription": "If today's news context was provided, write 2-3 sentences (max 60 words) summarising the key finding or development — this will be used as context for post angle generation. Otherwise empty string.",
+  "trendingTopics": "If today's news context includes multiple distinct articles, return up to 3 as an array of {headline, sourceLine} — headline is the article's headline (max 12 words), sourceLine is one sentence (max 20 words) on what it means for their field. Otherwise empty array."
 }
 
 Rules:
@@ -211,7 +213,7 @@ Rules:
 - if news context is available, let it inspire whichever of the 5 angles it fits best — don't force it
 - teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Each should be a short prompt like "Why [common misconception] — an analogy for [audience]" or "The real reason [industry thing] fails (explained simply)". Never generic — always tied to their specific brand context.
 - tone: direct, peer-level, no fluff, no "great job"
-- newsHeadline, newsSourceLine, newsPublishedAt, newsSourceDomain, newsDescription must only be set when real news context was provided — not invented`,
+- newsHeadline, newsSourceLine, newsPublishedAt, newsSourceDomain, newsDescription, trendingTopics must only be set when real news context was provided — not invented`,
       messages: [{ role: "user", content: userMessage }],
     });
 
@@ -224,6 +226,18 @@ Rules:
       newsPublishedAt = typeof parsed.newsPublishedAt === "string" ? parsed.newsPublishedAt.trim() : "";
       newsSourceDomain = typeof parsed.newsSourceDomain === "string" ? parsed.newsSourceDomain.trim() : "";
       newsDescription = typeof parsed.newsDescription === "string" ? parsed.newsDescription.trim() : "";
+      trendingTopics = Array.isArray(parsed.trendingTopics)
+        ? (parsed.trendingTopics as unknown[])
+            .map((t) => {
+              if (t && typeof t === "object" && typeof (t as { headline?: unknown }).headline === "string") {
+                const obj = t as { headline: string; sourceLine?: unknown };
+                return { headline: obj.headline.trim(), sourceLine: typeof obj.sourceLine === "string" ? obj.sourceLine.trim() : "" };
+              }
+              return null;
+            })
+            .filter((t): t is { headline: string; sourceLine: string } => t !== null && t.headline.length > 0)
+            .slice(0, 3)
+        : [];
       const role = prefs?.brandRole ?? "professional";
       const audience = prefs?.brandAudience ?? "your audience";
       const FALLBACK_TEACH_ANGLES = [
@@ -286,6 +300,7 @@ Rules:
           ...(newsPublishedAt ? { newsPublishedAt } : {}),
           ...(newsSourceDomain ? { newsSourceDomain } : {}),
           ...(newsDescription ? { newsDescription } : {}),
+          ...(trendingTopics.length > 0 ? { trendingTopics } : {}),
         } : {}),
         ...(seriesNudge ? { seriesNudge } : {}),
       });
@@ -812,7 +827,7 @@ router.get("/agent/stress-test/scores", requireAuth, async (req, res): Promise<v
   }
 });
 
-router.get("/agent/themes", requireAuth, async (req, res): Promise<void> => {
+router.get("/agent/themes", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   try {
     const recentDrafts = await db
       .select()

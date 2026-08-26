@@ -333,9 +333,9 @@ export default function Dashboard() {
   const [teachAnglesOverride, setTeachAnglesOverride] = useState<string[] | null>(null);
   const [tabRefreshing, setTabRefreshing] = useState(false);
   const [brief, setBrief] = useState<AgentBrief | null>(() => loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
-  const [briefLoading, setBriefLoading] = useState(() => !loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
-  const [themes, setThemes] = useState<AgentTheme[]>([]);
-  const [themesLoading, setThemesLoading] = useState(true);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [themes, setThemes] = useState<AgentTheme[]>(() => loadDayCache<AgentTheme[]>("themes", user?.id ?? "anon") ?? []);
+  const [themesLoading, setThemesLoading] = useState(false);
   const [newsAngles, setNewsAngles] = useState<string[] | null>(null);
   const [newsAnglesLoading, setNewsAnglesLoading] = useState(false);
   const [expandedNewsAngle, setExpandedNewsAngle] = useState<number | null>(null);
@@ -360,6 +360,9 @@ export default function Dashboard() {
   const [savedIdeasOpen, setSavedIdeasOpen] = useState(false);
   const [topSuggestions, setTopSuggestions] = useState<TopPostSuggestion[] | null>(() => loadDayCache<TopPostSuggestion[]>("top", user?.id ?? "anon"));
   const [topSuggestionsLoading, setTopSuggestionsLoading] = useState(false);
+  // Distinct from topSuggestions === null (never tried) — a failed request
+  // should say why it failed, not silently look identical to "not tried yet".
+  const [topSuggestionsError, setTopSuggestionsError] = useState<string | null>(null);
   const [expandedTopSuggestion, setExpandedTopSuggestion] = useState<number | null>(null);
 
   // Section open/collapsed state — all collapsed by default
@@ -388,18 +391,6 @@ export default function Dashboard() {
     momentumApi.get().then(setMomentum).catch(() => {});
 
     checkinsApi.list().then((r) => setCheckins(r.checkins)).catch(() => {});
-
-    const cached = loadDayCache<AgentBrief>("brief", uid);
-    if (!cached) {
-      agentApi.brief().then((b) => {
-        setBrief(b);
-        saveDayCache("brief", uid, b);
-      }).catch(() => {}).finally(() => setBriefLoading(false));
-    } else {
-      setBriefLoading(false);
-    }
-
-    agentApi.themes().then((r) => setThemes(r.themes ?? [])).catch(() => {}).finally(() => setThemesLoading(false));
 
     Promise.all([
       voiceInsightsApi.list().catch(() => [] as VoiceSuggestion[]),
@@ -451,10 +442,15 @@ export default function Dashboard() {
   const refreshTopPosts = () => {
     setTopSuggestionsLoading(true);
     setTopSuggestions(null);
+    setTopSuggestionsError(null);
     setExpandedTopSuggestion(null);
     agentApi.topPostSuggestions()
       .then((r) => { const v = r.suggestions.length > 0 ? r.suggestions : []; setTopSuggestions(v); saveDayCache("top", uid, v); })
-      .catch((err: unknown) => { setTopSuggestions(null); aiErrorToast(err); })
+      .catch((err: unknown) => {
+        setTopSuggestions(null);
+        setTopSuggestionsError(getAiErrorMessage(err));
+        aiErrorToast(err);
+      })
       .finally(() => setTopSuggestionsLoading(false));
   };
 
@@ -462,10 +458,12 @@ export default function Dashboard() {
   // string — /agent/* routes already send a specific reason ("Invalid AI
   // response", "Failed to generate ideas", a rate-limit message, etc.) via
   // apiFetch's thrown Error, so show that directly rather than discarding it.
+  const getAiErrorMessage = (err: unknown): string =>
+    err instanceof Error && err.message ? err.message : "Couldn't refresh right now — try again shortly.";
+
   const aiErrorToast = (err: unknown) => {
     console.error(err);
-    const msg = err instanceof Error && err.message ? err.message : "Couldn't refresh right now — try again shortly.";
-    toast({ title: msg, variant: "destructive" });
+    toast({ title: getAiErrorMessage(err), variant: "destructive" });
   };
 
   const refreshPainPoints = () => {
@@ -496,6 +494,14 @@ export default function Dashboard() {
       setBrief(b);
       saveDayCache("brief", uid, b);
     }).catch(aiErrorToast).finally(() => setBriefLoading(false));
+  };
+
+  const refreshThemes = () => {
+    setThemesLoading(true);
+    agentApi.themes()
+      .then((r) => { const v = r.themes ?? []; setThemes(v); saveDayCache("themes", uid, v); })
+      .catch(aiErrorToast)
+      .finally(() => setThemesLoading(false));
   };
 
   const openLengthPicker = (raw: string, extra = "") => {
@@ -692,13 +698,7 @@ export default function Dashboard() {
               {([["brand", "For your brand"], ["teach", "Teach"], ["best", "Best posts"], ["pain", "Pain points"], ["skills", "Skills"]] as const).map(([key, label]) => (
                 <button
                   key={key}
-                  onClick={() => {
-                    setIdeaTab(key);
-                    // Lazy-load: first visit to a data tab fetches once; after
-                    // that it's the day cache until the user hits refresh.
-                    if (key === "pain" && painPoints === null && !painPointsLoading) refreshPainPoints();
-                    if (key === "best" && topSuggestions === null && !topSuggestionsLoading) refreshTopPosts();
-                  }}
+                  onClick={() => setIdeaTab(key)}
                   className={cn(
                     "px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all",
                     ideaTab === key ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
@@ -740,7 +740,7 @@ export default function Dashboard() {
                 </div>
 
             ) : (
-              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">{briefLoading ? "Generating ideas…" : "Ideas appear once your daily brief loads."}</p>
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">Tap "New brand ideas" above to get started.</p>
             ))}
 
             {ideaTab === "teach" && ((teachAnglesOverride ?? brief?.teachAngles ?? []).length > 0 ? (
@@ -771,7 +771,7 @@ export default function Dashboard() {
                 </div>
 
             ) : (
-              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">{briefLoading ? "Generating ideas…" : "Teaching angles appear once your daily brief loads."}</p>
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">Tap "New teach ideas" above to get started.</p>
             ))}
 
             {ideaTab === "best" && (topSuggestionsLoading ? (
@@ -813,6 +813,10 @@ export default function Dashboard() {
                   })}
                 </div>
 
+            ) : topSuggestionsError ? (
+              <p className="text-xs text-rose-500 text-center px-5 pb-5 pt-2 leading-relaxed">
+                Couldn't load — {topSuggestionsError}
+              </p>
             ) : (
               <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2 leading-relaxed">
                 {topSuggestions === null
@@ -1149,12 +1153,50 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
+                  {brief.trendingTopics && brief.trendingTopics.length > 0 && (
+                    <div className="mb-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Also trending</p>
+                      {brief.trendingTopics.map((topic, i) => (
+                        <button
+                          key={i}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (newsAnglesLoading) return;
+                            setNewsAnglesLoading(true);
+                            agentApi.newsAngles({ newsHeadline: topic.headline, newsSourceLine: topic.sourceLine })
+                              .then((r) => setNewsAngles(r.angles)).catch(() => {}).finally(() => setNewsAnglesLoading(false));
+                          }}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 flex items-start gap-2 text-left hover:bg-white/10 transition-colors"
+                        >
+                          <Newspaper className="w-3 h-3 text-white/30 flex-shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-white/70 text-[11px] font-medium leading-snug">{topic.headline}</p>
+                            {topic.sourceLine && <p className="text-white/35 text-[10px] leading-snug italic mt-0.5">{topic.sourceLine}</p>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-white font-extrabold text-base leading-snug mb-1">{brief.headline}</p>
                   <p className="text-white/50 text-xs leading-relaxed">{brief.insight}</p>
                 </div>
               )}
             </div>
-          ) : null}
+          ) : (
+            <button
+              onClick={refreshBrief}
+              className="w-full rounded-3xl overflow-hidden bg-gray-900 px-5 py-5 flex items-center justify-between gap-3 text-left hover:bg-gray-800 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Newspaper className="w-4 h-4 text-white/40 flex-shrink-0" />
+                <div>
+                  <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5">In the news</p>
+                  <p className="text-white/70 text-xs font-medium">Load today's brief for news, angles, and post ideas.</p>
+                </div>
+              </div>
+              <RefreshCw className="w-3.5 h-3.5 text-white/30 flex-shrink-0" />
+            </button>
+          )}
 
 {/* ── Dare Mode ── */}
           <DareCard onWrite={(raw) => openLengthPicker(raw)} />
@@ -1228,6 +1270,28 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {themes.length === 0 && (
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 pt-5 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Content Threads</span>
+                </div>
+                <button
+                  onClick={refreshThemes}
+                  disabled={themesLoading}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 hover:text-gray-700 disabled:opacity-50 transition-colors"
+                >
+                  <RefreshCw className={cn("w-3 h-3", themesLoading && "animate-spin")} />
+                  Refresh
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-1">
+                {themesLoading ? "Finding patterns…" : "Tap refresh to find patterns in your drafts."}
+              </p>
             </div>
           )}
 

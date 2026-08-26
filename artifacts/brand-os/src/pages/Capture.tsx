@@ -428,6 +428,7 @@ export default function Capture() {
       tone: toneFromFeeling(feeling),
       structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
       postOutput: editedPost,
+      aiOriginalPost: versions[0]?.post ?? null,
       shortPost: content.shortPost ?? "",
       carouselOutput: JSON.stringify(content.carousel ?? []),
       visualOutput: content.visual ?? "",
@@ -471,6 +472,21 @@ export default function Capture() {
     }).catch(() => {});
   };
 
+  // Rule-based, publish-time-only nudge from the backend (see
+  // authenticity-check.ts) — non-blocking, only fires when there's actually
+  // something worth surfacing (low edit % from the AI draft, or a generic
+  // pattern still present).
+  const showAuthenticityNudge = (check: { editPct: number | null; flags: string[] } | null | undefined) => {
+    if (!check) return;
+    if (check.editPct !== null && check.editPct < 0.1) {
+      toast({ title: "This is close to the original AI draft — a real personal pass tends to read (and perform) better." });
+      return;
+    }
+    if (check.flags.length > 0) {
+      toast({ title: `Still has ${check.flags[0]} — worth a quick look before it's out there.` });
+    }
+  };
+
   const handleSaveAndPublish = () => {
     if (!content) {
       toast({ title: "Nothing to save yet", variant: "destructive" });
@@ -490,6 +506,7 @@ export default function Capture() {
       tone: toneFromFeeling(feeling),
       structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
       postOutput: editedPost,
+      aiOriginalPost: versions[0]?.post ?? null,
       shortPost: content.shortPost ?? "",
       carouselOutput: JSON.stringify(content.carousel ?? []),
       visualOutput: content.visual ?? "",
@@ -502,10 +519,11 @@ export default function Capture() {
       updateDraft(
         { id: savedDraftId, data: payload },
         {
-          onSuccess: () => {
+          onSuccess: (updated) => {
             toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
             showBestTimeHint();
+            showAuthenticityNudge(updated.authenticityCheck);
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -518,6 +536,7 @@ export default function Capture() {
             setSavedDraftId(newDraft.id);
             toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             showBestTimeHint();
+            showAuthenticityNudge(newDraft.authenticityCheck);
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -525,15 +544,15 @@ export default function Capture() {
     }
   };
 
-  // ── Lazy-load visual image when Visual tab opens ──────────────────────
-  useEffect(() => {
-    if (activeTab !== "visual" || !content?.visual || visualImage || isLoadingVisual) return;
+  // ── Generate visual image on demand (triggered by user, not auto-fired) ─
+  const generateVisual = () => {
+    if (!content?.visual || isLoadingVisual) return;
     setIsLoadingVisual(true);
     imageGenApi.generate(content.visual, "photo")
       .then(({ imageBase64 }) => setVisualImage(imageBase64))
       .catch((err) => toast({ title: "Visual failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }))
       .finally(() => setIsLoadingVisual(false));
-  }, [activeTab, content?.visual, visualImage, isLoadingVisual, toast]);
+  };
 
   // ── Generate illustration on demand (triggered by user, not auto-fired) ─
   const generateIllustration = () => {
@@ -584,6 +603,7 @@ export default function Capture() {
       tone: toneFromFeeling(feeling),
       structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
       postOutput: editedPost,
+      aiOriginalPost: versions[0]?.post ?? null,
       shortPost: content.shortPost ?? "",
       carouselOutput: JSON.stringify(content.carousel ?? []),
       visualOutput: content.visual ?? "",
@@ -762,6 +782,7 @@ export default function Capture() {
             setIllustrationScene={setIllustrationScene}
             onGenerateIllustration={generateIllustration}
             onRegenIllustration={regenIllustrationWithScene}
+            onGenerateVisual={generateVisual}
             onSave={handleSave}
             onSaveAndPublish={handleSaveAndPublish}
             onCopy={copy}
@@ -1128,6 +1149,7 @@ interface ResultViewProps {
   setIllustrationScene: (v: string) => void;
   onGenerateIllustration: () => void;
   onRegenIllustration: (scene: string) => void;
+  onGenerateVisual: () => void;
   onSave: () => void;
   onSaveAndPublish?: () => void;
   onCopy: (text: string, label?: string) => void;
@@ -1147,7 +1169,7 @@ function ResultView(props: ResultViewProps) {
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
     fullPost, audience, feeling, isRefining, isSaving, isDemo,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
-    setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration,
+    setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
     onSave, onSaveAndPublish, onCopy, onStressTest, isStressTestLoading,
     cachedStressScore, stressStale, onViewStressTest,
   } = props;
@@ -1409,6 +1431,15 @@ function ResultView(props: ResultViewProps) {
       {activeTab === "visual" && (
         <div className="space-y-3">
           <p className="text-xs text-gray-500">{content.visual}</p>
+          {!visualImage && !isLoadingVisual && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <p className="text-sm text-gray-500 text-center">Generate a photo-style visual for this post.</p>
+              <Button onClick={onGenerateVisual} className="px-6">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate image
+              </Button>
+            </div>
+          )}
           {isLoadingVisual && <p className="text-sm text-gray-500 text-center py-8">Generating image…</p>}
           {visualImage && (
             <>
