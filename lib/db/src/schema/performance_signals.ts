@@ -16,6 +16,12 @@ export const performanceSignalsTable = pgTable("performance_signals", {
   demographics: jsonb("demographics"),
   linkedinUrl: text("linkedin_url"),
   linkedinPostDate: text("linkedin_post_date"),
+  // LinkedIn does not include this field in every export. "unknown" means
+  // the export did not contain enough information to make a claim.
+  linkedinFeedbackStatus: text("linkedin_feedback_status").notNull().default("unknown"),
+  linkedinFeedbackLabel: text("linkedin_feedback_label"),
+  linkedinFeedbackSource: text("linkedin_feedback_source"),
+  linkedinFeedbackRaw: text("linkedin_feedback_raw"),
   loggedAt: timestamp("logged_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

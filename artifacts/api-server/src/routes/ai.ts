@@ -23,9 +23,10 @@ import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
-import { buildVoiceDNA, computeJaccard } from "../lib/voice-dna.js";
-import { buildFeedbackContext, buildLearnedPatterns, buildTopHashtags } from "../lib/learning.js";
+import { computeJaccard } from "../lib/voice-dna.js";
+import { buildLearnedPatterns, buildTopHashtags } from "../lib/learning.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
+import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 
 const InfographicDataSchema = z.object({
   headline: z.string(),
@@ -39,61 +40,6 @@ const CarouselSlideSchema = z.array(z.object({
 }));
 
 const router: IRouter = Router();
-
-async function getUserBrandContext(userId: number): Promise<{ context: string; objective: string | null }> {
-  const [[prefs], dna] = await Promise.all([
-    db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
-    buildVoiceDNA(userId),
-  ]);
-
-  const parts: string[] = [];
-
-  if (prefs) {
-    const p = prefs as typeof prefs & { aboutMe?: string };
-    const aboutMe = p.aboutMe?.trim() ?? "";
-    if (aboutMe) {
-      const lines = [`About this creator: ${aboutMe}`];
-      if (prefs.brandBelief) lines.push(`Core belief: ${prefs.brandBelief}`);
-      parts.push(lines.join("\n"));
-    } else {
-      const voiceLines: string[] = [];
-      if (prefs.objective) voiceLines.push(`- Objective: ${prefs.objective}`);
-      if (prefs.persona) voiceLines.push(`- Persona: ${prefs.persona}`);
-      if (prefs.brandRole) voiceLines.push(`- Role: ${prefs.brandRole}`);
-      if (prefs.brandAudience) voiceLines.push(`- Audience: ${prefs.brandAudience}`);
-      if (prefs.brandBelief) voiceLines.push(`- Core belief: ${prefs.brandBelief}`);
-      if (voiceLines.length > 0) parts.push("Creator context:\n" + voiceLines.join("\n"));
-    }
-  }
-
-  // Quantified career proof points — the generator should reach for these
-  // when a post needs a concrete anchor, instead of inventing vague claims.
-  const proofPoints = (prefs?.proofPoints ?? []) as string[];
-  if (proofPoints.length > 0) {
-    parts.push([
-      "Proof points from this creator's real career (use ONE when the post needs a concrete anchor — never invent numbers, never cram several in):",
-      ...proofPoints.map((p) => `- ${p}`),
-    ].join("\n"));
-  }
-
-  // Aspirational style targets — STYLE ONLY. The guardrail wording matters:
-  // these may be other people's posts; topics and claims must never leak.
-  const aspirational = (prefs?.aspirationalSamples ?? []) as string[];
-  if (aspirational.length > 0) {
-    const lines = [
-      "Aspirational style targets (the author wants to LEAN toward this writing energy — match the rhythm, sentence length patterns, and structural moves. These are NOT the author's posts: NEVER reuse their topics, stories, claims, or specific phrases):",
-    ];
-    aspirational.slice(0, 3).forEach((s, i) => {
-      const preview = s.trim().slice(0, 600) + (s.trim().length > 600 ? "…" : "");
-      lines.push(`Style target ${i + 1}:\n"${preview}"`);
-    });
-    parts.push(lines.join("\n"));
-  }
-
-  if (dna) parts.push(dna);
-
-  return { context: parts.join("\n\n"), objective: prefs?.objective ?? null };
-}
 
 const NEW_FLOW_AUDIENCES = new Set(["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"]);
 
@@ -151,13 +97,13 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const [brand, performanceContext, feedbackContext, learnedPatterns, topHashtags] = await Promise.all([
-    getUserBrandContext(userId),
+  const [brand, performanceContext, learnedPatterns, topHashtags] = await Promise.all([
+    buildCanonicalBrandContext(userId),
     buildPerformanceContext(userId),
-    buildFeedbackContext(userId),
     buildLearnedPatterns(userId),
     buildTopHashtags(userId),
   ]);
+  const feedbackContext = brand.feedbackContext;
   const voiceContext = brand.context;
   const fallbackBrand = buildBrandContext(objective ?? "", persona ?? "", tone ?? "");
   const effectiveObjective = objective || brand.objective || "";
@@ -269,10 +215,14 @@ router.post("/ai/refine", requireAuth, aiRateLimit, async (req, res): Promise<vo
     return;
   }
 
+  const brandContext = await buildCanonicalBrandContext(req.user!.userId);
+
   // Carousel: Claude returns a JSON array of slides, not a plain string.
   // Handle separately so the response shape matches what the frontend expects.
   if (tab === "carousel") {
-    const carouselMessage = `You are refining a LinkedIn carousel. Here are the current slides as JSON:
+     const carouselMessage = `${brandContext.context}
+
+You are refining a LinkedIn carousel. Here are the current slides as JSON:
 
 ${content}
 
@@ -316,7 +266,9 @@ Return ONLY the updated slides as a JSON array — no markdown fences, no extra 
 
   // Infographic: Claude returns { headline, bullets } JSON, not a plain string
   if (tab === "infographic") {
-    const infoMessage = `You are refining a LinkedIn infographic card. Current data as JSON:
+     const infoMessage = `${brandContext.context}
+
+You are refining a LinkedIn infographic card. Current data as JSON:
 
 ${content}
 
@@ -359,7 +311,9 @@ Return ONLY the updated infographic as JSON — no markdown fences, no extra tex
 
   // Post and visual: return plain text — wrapping in JSON ourselves avoids
   // parse failures when Claude's output contains quotes or special characters.
-  const userMessage = `Refine this ${tab} content:
+   const userMessage = `${brandContext.context}
+
+Refine this ${tab} content:
 
 ${content}
 

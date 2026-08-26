@@ -1,0 +1,1 @@
+- [Voice signal precedence](voice-signal-precedence.md) — direct author evidence outranks inferred, performance, and external feedback; missing LinkedIn fields remain unknown.

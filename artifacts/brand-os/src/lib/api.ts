@@ -24,6 +24,10 @@ export type PerformanceSignal = {
   demographics: unknown;
   linkedinUrl: string | null;
   linkedinPostDate: string | null;
+  linkedinFeedbackStatus: "reported" | "not_reported" | "unknown";
+  linkedinFeedbackLabel: string | null;
+  linkedinFeedbackSource: string | null;
+  linkedinFeedbackRaw: string | null;
   loggedAt: string;
 };
 
@@ -34,6 +38,14 @@ export type AngleCheckResult =
 export type VoiceSummaryResult = {
   summary: string | null;
   draftCount: number;
+  confidence: "starting" | "developing" | "grounded";
+  evidence: {
+    writingSamples: number;
+    proofPoints: number;
+    contentPillars: number;
+    hasAboutMe: boolean;
+    hasVoiceDNA: boolean;
+  };
 };
 
 export type AuthenticityCheck = {
@@ -95,6 +107,11 @@ export const performanceApi = {
     reposts?: number; saves?: number; sends?: number;
     membersReached?: number; followersGained?: number; linkEngagements?: number;
     linkedinUrl?: string | null;
+    linkedinPostDate?: string | null;
+    linkedinFeedbackStatus?: "reported" | "not_reported" | "unknown";
+    linkedinFeedbackLabel?: string | null;
+    linkedinFeedbackSource?: string | null;
+    linkedinFeedbackRaw?: string | null;
   }) =>
     apiFetch<PerformanceSignal>(`/drafts/${draftId}/performance`, {
       method: "POST",

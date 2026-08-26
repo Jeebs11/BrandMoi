@@ -61,12 +61,18 @@ export async function buildVoiceDNA(userId: number): Promise<string> {
     const toneMarkers = [...new Set(allSignals.flatMap((s) => s.toneMarkers ?? []))].slice(0, 5);
     const vocabulary = [...new Set(allSignals.flatMap((s) => s.vocabulary ?? []))].slice(0, 8);
     const openingStyles = allSignals.map((s) => s.openingStyle).filter(Boolean);
+      const punctuationStyles = allSignals.map((s) => s.punctuationStyle).filter(Boolean);
+      const structurePatterns = allSignals.map((s) => s.structurePattern).filter(Boolean);
     const dominantSentenceStyle = mostCommon(sentenceStyles);
     const dominantOpeningStyle = mostCommon(openingStyles);
+      const dominantPunctuationStyle = mostCommon(punctuationStyles);
+      const dominantStructurePattern = mostCommon(structurePatterns);
 
     const dnaLines: string[] = ["Voice DNA (writing style patterns from published posts):"];
     if (dominantSentenceStyle) dnaLines.push(`- Sentence style: ${dominantSentenceStyle}`);
     if (dominantOpeningStyle) dnaLines.push(`- Typical opening: ${dominantOpeningStyle}`);
+      if (dominantPunctuationStyle) dnaLines.push(`- Punctuation habits: ${dominantPunctuationStyle}`);
+      if (dominantStructurePattern) dnaLines.push(`- Structure pattern: ${dominantStructurePattern}`);
     if (toneMarkers.length > 0) dnaLines.push(`- Tone markers: ${toneMarkers.join(", ")}`);
     if (vocabulary.length > 0) dnaLines.push(`- Vocabulary fingerprint: ${vocabulary.join(", ")}`);
     parts.push(dnaLines.join("\n"));

@@ -329,7 +329,7 @@ export default function Settings() {
 
     setIsSavingAccount(true);
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples: writingSamples.length > 0 ? writingSamples : undefined, ...{ proofPoints, contentPillars } } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples, proofPoints, contentPillars } },
       {
         onSuccess: async () => {
           try {
@@ -535,12 +535,24 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-black text-violet-400 uppercase tracking-wider">Based on {voiceData.draftCount} published post{voiceData.draftCount !== 1 ? "s" : ""}</p>
+                  <span className={cn(
+                    "text-[10px] font-black uppercase tracking-wider rounded-full px-2 py-1",
+                    voiceData.confidence === "grounded" ? "bg-emerald-100 text-emerald-700" :
+                      voiceData.confidence === "developing" ? "bg-amber-100 text-amber-700" :
+                        "bg-gray-100 text-gray-500"
+                  )}>
+                    {voiceData.confidence} signal
+                  </span>
                 </div>
                 <div className="space-y-2">
                   {voiceData.summary.split("\n").filter(Boolean).map((line, i) => (
                     <p key={i} className="text-sm text-violet-900 leading-relaxed">{line}</p>
                   ))}
                 </div>
+                <p className="text-[10px] text-violet-500/80 mt-3 leading-relaxed">
+                  Confidence reflects the amount of direct evidence available—not whether the writing is “good” or “bad”.
+                  {voiceData.evidence.writingSamples > 0 && ` ${voiceData.evidence.writingSamples} pinned sample${voiceData.evidence.writingSamples === 1 ? "" : "s"} included.`}
+                </p>
               </div>
             ) : (
               <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">

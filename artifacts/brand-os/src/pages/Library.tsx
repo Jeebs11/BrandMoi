@@ -850,6 +850,8 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
   const [reposts, setReposts] = useState(modal.existing?.reposts ?? 0);
   const [saves, setSaves] = useState(modal.existing?.saves ?? 0);
   const [linkedinUrl, setLinkedinUrl] = useState(modal.existing?.linkedinUrl ?? "");
+  const [linkedinFeedbackStatus, setLinkedinFeedbackStatus] = useState<"reported" | "not_reported" | "unknown">(modal.existing?.linkedinFeedbackStatus ?? "unknown");
+  const [linkedinFeedbackLabel, setLinkedinFeedbackLabel] = useState(modal.existing?.linkedinFeedbackLabel ?? "");
   const [parsedLinkedinUrl, setParsedLinkedinUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -858,6 +860,7 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
   const [stagedFile, setStagedFile] = useState<File | null>(null);
   const [uploadAnalysis, setUploadAnalysis] = useState<{
     metrics: { impressions: number; reactions: number; comments: number; reposts: number; saves: number; membersReached: number };
+    linkedinFeedback: { status: "reported" | "not_reported" | "unknown"; label: string | null };
     strengths: string[];
     takeaways: string[];
     futureImprovement: string;
@@ -902,6 +905,8 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
       setComments(signal.comments);
       setReposts(signal.reposts);
       setSaves(signal.saves);
+      setLinkedinFeedbackStatus(signal.linkedinFeedbackStatus ?? "unknown");
+      setLinkedinFeedbackLabel(signal.linkedinFeedbackLabel ?? "");
       if (signal.linkedinUrl) {
         setParsedLinkedinUrl(signal.linkedinUrl);
         if (!linkedinUrl.trim()) setLinkedinUrl(signal.linkedinUrl);
@@ -914,6 +919,10 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
           reposts: signal.reposts,
           saves: signal.saves,
           membersReached: signal.membersReached,
+        },
+        linkedinFeedback: {
+          status: signal.linkedinFeedbackStatus ?? "unknown",
+          label: signal.linkedinFeedbackLabel ?? null,
         },
         strengths: result.analysis?.strengths ?? [],
         takeaways: result.analysis?.takeaways ?? [],
@@ -933,6 +942,10 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
       await performanceApi.log(modal.draftId, {
         impressions, reactions, comments, reposts, saves,
         linkedinUrl: linkedinUrl.trim() || null,
+        linkedinFeedbackStatus,
+        linkedinFeedbackLabel: linkedinFeedbackStatus === "reported" ? linkedinFeedbackLabel.trim() || null : null,
+        linkedinFeedbackSource: linkedinFeedbackStatus === "unknown" ? null : "manual",
+        linkedinFeedbackRaw: linkedinFeedbackStatus === "reported" ? linkedinFeedbackLabel.trim() || null : null,
       });
       setSaved(true);
       onSuccess();
@@ -1016,6 +1029,26 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
                     {urlMatchStatus === "parsed-only" && <><span>→</span> URL auto-filled from file</>}
                   </div>
                 )}
+
+                <div className={cn(
+                  "mb-4 rounded-2xl border p-3.5",
+                  uploadAnalysis.linkedinFeedback.status === "reported"
+                    ? "border-amber-100 bg-amber-50"
+                    : uploadAnalysis.linkedinFeedback.status === "not_reported"
+                      ? "border-emerald-100 bg-emerald-50"
+                      : "border-gray-100 bg-gray-50"
+                )}>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">LinkedIn member feedback</p>
+                  {uploadAnalysis.linkedinFeedback.status === "reported" ? (
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Reported in this export: <strong>{uploadAnalysis.linkedinFeedback.label ?? "feedback provided"}</strong>. This is a post-level distribution signal, not an AI-authorship verdict.
+                    </p>
+                  ) : uploadAnalysis.linkedinFeedback.status === "not_reported" ? (
+                    <p className="text-xs text-emerald-800 leading-relaxed">The export included the feedback field and did not report a member-feedback flag for this post.</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 leading-relaxed">This export did not include a member-feedback field, so the outcome is unknown.</p>
+                  )}
+                </div>
 
                 {/* AI diagnosis */}
                 {uploadAnalysis.strengths.length > 0 && (
@@ -1170,6 +1203,29 @@ function PerformanceModal({ modal, onClose, onSuccess }: { modal: PerformanceMod
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors placeholder:font-normal placeholder:text-gray-300"
                 />
               </div>
+               <div>
+                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">LinkedIn member feedback (optional)</p>
+                 <select
+                   value={linkedinFeedbackStatus}
+                   onChange={(e) => setLinkedinFeedbackStatus(e.target.value as "reported" | "not_reported" | "unknown")}
+                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold outline-none focus:border-primary transition-colors bg-white"
+                 >
+                   <option value="unknown">Unknown / not included</option>
+                   <option value="reported">Feedback was reported</option>
+                   <option value="not_reported">Field included, no feedback reported</option>
+                 </select>
+                 {linkedinFeedbackStatus === "reported" && (
+                   <input
+                     type="text"
+                     maxLength={300}
+                     placeholder="e.g. Seems like AI slop"
+                     value={linkedinFeedbackLabel}
+                     onChange={(e) => setLinkedinFeedbackLabel(e.target.value)}
+                     className="w-full mt-2 px-4 py-3 border-2 border-gray-200 rounded-xl text-sm outline-none focus:border-primary transition-colors placeholder:text-gray-300"
+                   />
+                 )}
+                 <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">Use this only when you saw the feedback in LinkedIn but the export did not include it.</p>
+               </div>
             </div>
 
             {impressions > 0 && (

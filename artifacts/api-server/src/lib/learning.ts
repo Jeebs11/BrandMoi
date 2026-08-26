@@ -5,6 +5,7 @@ import {
   performanceSignalsTable,
   voiceSuggestionsTable,
   ideaFeedbackTable,
+  preferencesTable,
 } from "@workspace/db";
 
 // Shared resonance formula (same as routes/ai.ts) — kept here so learned
@@ -30,7 +31,8 @@ export function resonanceScore(s: {
  * agent's output actually changes as the user teaches it.
  */
 export async function buildFeedbackContext(userId: number): Promise<string> {
-  const [acceptedSuggestions, ideaFeedback, draftFeedback] = await Promise.all([
+  const [[prefs], acceptedSuggestions, ideaFeedback, draftFeedback] = await Promise.all([
+    db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
     db.select()
       .from(voiceSuggestionsTable)
       .where(and(eq(voiceSuggestionsTable.userId, userId), eq(voiceSuggestionsTable.status, "accepted")))
@@ -50,9 +52,20 @@ export async function buildFeedbackContext(userId: number): Promise<string> {
 
   const parts: string[] = [];
 
-  if (acceptedSuggestions.length > 0) {
-    const lines = ["## LEARNED VOICE ADJUSTMENTS (the user accepted these data-driven changes — honor them):"];
-    for (const s of acceptedSuggestions) {
+  const activeAcceptedSuggestions = acceptedSuggestions.filter((suggestion) => {
+    if (!prefs) return true;
+    const currentValue = (prefs as Record<string, unknown>)[suggestion.field];
+    const normalise = (value: unknown) => Array.isArray(value)
+      ? value.map((item) => String(item).trim().toLowerCase()).filter(Boolean).sort().join(",")
+      : String(value ?? "").trim().toLowerCase();
+    // An accepted suggestion remains valid only while the profile still
+    // contains the value the user accepted. A later manual edit wins.
+    return normalise(currentValue) === normalise(suggestion.suggestedValue);
+  });
+
+  if (activeAcceptedSuggestions.length > 0) {
+    const lines = ["## SECONDARY LEARNED VOICE ADJUSTMENTS (accepted by the user; current manual settings and direct feedback outrank these):"];
+    for (const s of activeAcceptedSuggestions) {
       lines.push(`- ${s.field}: now "${s.suggestedValue}" (was "${s.currentValue}"). Why: ${s.rationale}`);
     }
     parts.push(lines.join("\n"));

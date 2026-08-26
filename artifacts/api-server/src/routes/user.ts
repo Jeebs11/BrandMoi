@@ -10,6 +10,7 @@ import { signToken } from "../lib/jwt.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { extractVoiceDNA } from "./ai.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
+import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 
 const ANALYSIS_LIMIT_PER_DAY = 2;
 
@@ -140,7 +141,7 @@ router.get("/user/suggestions", requireAuth, async (req, res): Promise<void> => 
 // user action — see POST /user/voice-refresh below.
 router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.userId;
-  const [[prefs], publishedRows] = await Promise.all([
+  const [[prefs], publishedRows, context] = await Promise.all([
     db.select({
       brandVoiceSummary: preferencesTable.brandVoiceSummary,
       voiceSummaryDraftCount: preferencesTable.voiceSummaryDraftCount,
@@ -151,12 +152,13 @@ router.get("/user/voice-summary", requireAuth, async (req, res): Promise<void> =
     db.select({ id: draftsTable.id })
       .from(draftsTable)
       .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published"))),
+    buildCanonicalBrandContext(userId),
   ]);
 
   const draftCount = publishedRows.length;
   const summary = prefs?.brandVoiceSummary ?? null;
 
-  res.json({ summary, draftCount });
+  res.json({ summary, draftCount, confidence: context.confidence, evidence: context.evidence });
 });
 
 // Core voice analysis: extracts signals from unanalysed published posts and

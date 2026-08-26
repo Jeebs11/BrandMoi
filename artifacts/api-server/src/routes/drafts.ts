@@ -344,6 +344,10 @@ const PerformanceBody = z.object({
   linkedinUrl: z.string().max(2000).optional().nullable(),
   linkedinPostDate: z.string().max(50).optional().nullable(),
   demographics: z.record(z.unknown()).optional().nullable(),
+  linkedinFeedbackStatus: z.enum(["reported", "not_reported", "unknown"]).optional(),
+  linkedinFeedbackLabel: z.string().max(300).optional().nullable(),
+  linkedinFeedbackSource: z.enum(["manual", "linkedin_xlsx"]).optional().nullable(),
+  linkedinFeedbackRaw: z.string().max(500).optional().nullable(),
 });
 
 const xlsxUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
@@ -389,6 +393,10 @@ router.post("/drafts/:id/performance", requireAuth, async (req, res): Promise<vo
     ...(parsed.data.linkedinUrl !== undefined ? { linkedinUrl: parsed.data.linkedinUrl } : {}),
     ...(parsed.data.linkedinPostDate !== undefined ? { linkedinPostDate: parsed.data.linkedinPostDate } : {}),
     ...(parsed.data.demographics !== undefined ? { demographics: parsed.data.demographics } : {}),
+    ...(parsed.data.linkedinFeedbackStatus !== undefined ? { linkedinFeedbackStatus: parsed.data.linkedinFeedbackStatus } : {}),
+    ...(parsed.data.linkedinFeedbackLabel !== undefined ? { linkedinFeedbackLabel: parsed.data.linkedinFeedbackLabel } : {}),
+    ...(parsed.data.linkedinFeedbackSource !== undefined ? { linkedinFeedbackSource: parsed.data.linkedinFeedbackSource } : {}),
+    ...(parsed.data.linkedinFeedbackRaw !== undefined ? { linkedinFeedbackRaw: parsed.data.linkedinFeedbackRaw } : {}),
   };
 
   let signal;
@@ -459,6 +467,10 @@ router.post("/drafts/:id/performance/upload", requireAuth, xlsxUpload.single("fi
     demographics: parsed.demographics as Record<string, unknown>,
     linkedinUrl: parsed.linkedinUrl ?? undefined,
     linkedinPostDate: parsed.linkedinPostDate ?? undefined,
+    linkedinFeedbackStatus: parsed.linkedinFeedback.status,
+    linkedinFeedbackLabel: parsed.linkedinFeedback.label,
+    linkedinFeedbackSource: "linkedin_xlsx",
+    linkedinFeedbackRaw: parsed.linkedinFeedback.raw,
   };
 
   const [existing] = await db

@@ -6,9 +6,9 @@ import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable, ideaFeedbackTable, voiceSuggestionsTable, aiUsageTable, seriesTable, topicsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
-import { buildVoiceDNA } from "../lib/voice-dna.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 import { buildLearnedPatterns, resonanceScore } from "../lib/learning.js";
+import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
@@ -67,8 +67,8 @@ async function getUserAgentContext(userId: number) {
     .orderBy(desc(ideaFeedbackTable.createdAt))
     .limit(40);
 
-  const dna = await buildVoiceDNA(userId);
-  return { prefs, recentDrafts, dna, ideaFeedback };
+  const brandContext = await buildCanonicalBrandContext(userId);
+  return { prefs, recentDrafts, dna: brandContext.context, ideaFeedback };
 }
 
 router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<void> => {

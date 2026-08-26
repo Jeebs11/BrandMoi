@@ -12,6 +12,12 @@ export interface LinkedinAnalyticsData {
   sends: number;
   linkEngagements: number;
   followersGained: number;
+  linkedinFeedback: {
+    status: "reported" | "not_reported" | "unknown";
+    label: string | null;
+    raw: string | null;
+    fieldFound: boolean;
+  };
   demographics: {
     jobTitles: { value: string; pct: string }[];
     locations: { value: string; pct: string }[];
@@ -54,6 +60,56 @@ const SECTION_HEADERS = new Set([
   "category", "value", "%",
   "job title", "location", "seniority", "company", "industry", "company size",
 ]);
+
+const FEEDBACK_FIELD_PATTERNS = [
+  /\bmember\s+feedback\b/i,
+  /\bai[\s-]*(?:generated|written)\s+(?:content|feedback)\b/i,
+  /\bcontent\s+feedback\b/i,
+  /\bfeedback\s+on\s+(?:this\s+)?post\b/i,
+];
+
+const FEEDBACK_VALUE_PATTERNS = [
+  /seems\s+like\s+ai\s+slop/i,
+  /ai[\s-]*(?:generated|slop|written)/i,
+  /no\s+feedback/i,
+  /not\s+reported/i,
+  /^\s*(?:none|no|0|false)\s*$/i,
+];
+
+function isFeedbackField(value: string): boolean {
+  return FEEDBACK_FIELD_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function isFeedbackValue(value: string): boolean {
+  return FEEDBACK_VALUE_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function extractLinkedinFeedback(strings: string[]): LinkedinAnalyticsData["linkedinFeedback"] {
+  const fieldIndex = strings.findIndex(isFeedbackField);
+  if (fieldIndex >= 0) {
+    const rawValue = strings[fieldIndex + 1]?.trim() || null;
+    if (!rawValue || isFeedbackField(rawValue)) {
+      return { status: "not_reported", label: null, raw: rawValue, fieldFound: true };
+    }
+    if (isFeedbackValue(rawValue)) {
+      const negative = /no\s+feedback|not\s+reported|^\s*(?:none|no|0|false)\s*$/i.test(rawValue);
+      return {
+        status: negative ? "not_reported" : "reported",
+        label: negative ? null : rawValue,
+        raw: rawValue,
+        fieldFound: true,
+      };
+    }
+    return { status: "reported", label: rawValue, raw: rawValue, fieldFound: true };
+  }
+
+  // Some exports may put the member-facing message in a value column without
+  // repeating a field label. Treat that as reported, but never infer absence.
+  const value = strings.find((item) => /seems\s+like\s+ai\s+slop/i.test(item));
+  if (value) return { status: "reported", label: value, raw: value, fieldFound: false };
+
+  return { status: "unknown", label: null, raw: null, fieldFound: false };
+}
 
 function extractDemoRows(strings: string[], sectionLabel: string): { value: string; pct: string }[] {
   const idx = strings.findIndex(s => s?.toLowerCase() === sectionLabel.toLowerCase());
@@ -118,6 +174,7 @@ export function parseLinkedinAnalytics(buffer: Buffer): LinkedinAnalyticsData {
     sends: extractNum(strings, "Sends on LinkedIn"),
     linkEngagements: extractNum(strings, "Link engagements"),
     followersGained: extractNum(strings, "Followers gained from this post"),
+    linkedinFeedback: extractLinkedinFeedback(strings),
     demographics: {
       jobTitles: extractDemoRows(strings, "Job title"),
       locations: extractDemoRows(strings, "Location"),
