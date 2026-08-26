@@ -9,9 +9,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, studioApi, topicsApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor, type Topic, type ResonanceMapEntry } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, studioApi, topicsApi, authenticityApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor, type Topic, type ResonanceMapEntry } from "@/lib/api";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
+import {
+  AuthenticityReviewDialog,
+  type AuthenticityFeedback,
+  type AuthenticityReview,
+} from "@/components/AuthenticityReviewDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,6 +112,10 @@ export default function Library() {
   const [resonanceMap, setResonanceMap] = useState<Record<string, ResonanceMapEntry>>({});
   const [stressScoreMap, setStressScoreMap] = useState<Record<string, StressTestScoreEntry>>({});
   const [diagnosisPanel, setDiagnosisPanel] = useState<{ draftId: number; topic: string; diagnosis: PostDiagnosis | null; loading: boolean } | null>(null);
+  const [publishReview, setPublishReview] = useState<{ draftId: number; feedback: AuthenticityFeedback } | null>(null);
+  const [publishReviewCheck, setPublishReviewCheck] = useState<AuthenticityReview>(null);
+  const [isCheckingPublish, setIsCheckingPublish] = useState(false);
+  const [isSavingAuthenticityFeedback, setIsSavingAuthenticityFeedback] = useState(false);
 
   const { data: drafts, isLoading, refetch } = useListDrafts();
 
@@ -177,18 +186,64 @@ export default function Library() {
       {
         onSuccess: (updated) => {
           void refetch();
-          // Same rule-based, publish-time-only nudge as Capture.tsx's ship
-          // flow — both hit the same PATCH endpoint, so this covers
-          // "Mark as Published" too, not just Ship it.
-          const check = updated.authenticityCheck;
-          if (!check) return;
-          if (check.editPct !== null && check.editPct < 0.1) {
-            toast({ title: "This is close to the original AI draft — a real personal pass tends to read (and perform) better." });
-          } else if (check.flags.length > 0) {
-            toast({ title: `Still has ${check.flags[0]} — worth a quick look before it's out there.` });
-          }
+          if (status === "published") toast({ title: "Marked as published" });
         },
       }
+    );
+  };
+
+  const openPublishReview = async (draft: { id: number; authenticityFeedback?: AuthenticityFeedback }) => {
+    if (isCheckingPublish) return;
+    setIsCheckingPublish(true);
+    try {
+      const { check } = await authenticityApi.check({ draftId: draft.id });
+      setPublishReviewCheck(check);
+      setPublishReview({ draftId: draft.id, feedback: draft.authenticityFeedback ?? null });
+    } catch (err) {
+      toast({
+        title: "Couldn't run the review",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingPublish(false);
+    }
+  };
+
+  const savePublishFeedback = (feedback: AuthenticityFeedback) => {
+    if (!publishReview) return;
+    const previous = publishReview.feedback;
+    setPublishReview((current) => current ? { ...current, feedback } : current);
+    setIsSavingAuthenticityFeedback(true);
+    updateDraft(
+      { id: publishReview.draftId, data: { authenticityFeedback: feedback } },
+      {
+        onSuccess: () => {
+          setIsSavingAuthenticityFeedback(false);
+          void refetch();
+        },
+        onError: () => {
+          setPublishReview((current) => current ? { ...current, feedback: previous } : current);
+          setIsSavingAuthenticityFeedback(false);
+          toast({ title: "Couldn't save voice preference", variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  const completePublishReview = () => {
+    if (!publishReview) return;
+    const { draftId } = publishReview;
+    updateDraft(
+      { id: draftId, data: { status: "published" } },
+      {
+        onSuccess: () => {
+          setPublishReview(null);
+          void refetch();
+          toast({ title: "Marked as published" });
+        },
+        onError: (err) => toast({ title: "Couldn't update the status", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
+      },
     );
   };
 
@@ -429,7 +484,10 @@ export default function Library() {
                               </DropdownMenuItem>
                             )}
                             {draft.status !== "published" && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(draft.id, "published")}>
+                              <DropdownMenuItem onClick={() => void openPublishReview({
+                                id: draft.id,
+                                authenticityFeedback: (draft.authenticityFeedback as AuthenticityFeedback | undefined) ?? null,
+                              })}>
                                 <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" /> Mark as Published
                               </DropdownMenuItem>
                             )}
@@ -492,6 +550,21 @@ export default function Library() {
             onSuccess={() => { setImportOpen(false); void refetch(); }}
           />
         )}
+
+        <AuthenticityReviewDialog
+          open={publishReview !== null}
+          check={publishReviewCheck}
+          feedback={publishReview?.feedback ?? null}
+          isSavingFeedback={isSavingAuthenticityFeedback}
+          continueLabel="Mark as published"
+          onOpenChange={(open) => { if (!open) setPublishReview(null); }}
+          onEdit={() => {
+            if (publishReview) navigate(`/capture?draftId=${publishReview.draftId}`);
+            setPublishReview(null);
+          }}
+          onContinue={completePublishReview}
+          onFeedback={savePublishFeedback}
+        />
 
         {diagnosisPanel && createPortal(
           <div className="fixed inset-0 z-50 flex items-end justify-center">

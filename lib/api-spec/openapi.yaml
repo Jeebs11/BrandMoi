@@ -500,6 +500,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Draft"
 
+  /drafts/authenticity-check:
+    post:
+      operationId: checkDraftAuthenticity
+      tags: [drafts]
+      summary: Run a non-AI, pre-publish authenticity review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckDraftAuthenticityBody"
+      responses:
+        "200":
+          description: Authenticity review result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckDraftAuthenticityResponse"
+
   /drafts/{id}:
     get:
       operationId: getDraft
@@ -742,6 +761,30 @@ components:
           type: string
           nullable: true
           description: App colour theme preset; indigo | violet | sky | emerald | rose | amber
+        contentPillars:
+          type: array
+          items:
+            type: string
+            maxLength: 60
+          maxItems: 6
+        writingSamples:
+          type: array
+          items:
+            type: string
+            maxLength: 3000
+          maxItems: 5
+        proofPoints:
+          type: array
+          items:
+            type: string
+            maxLength: 200
+          maxItems: 8
+        aspirationalSamples:
+          type: array
+          items:
+            type: string
+            maxLength: 3000
+          maxItems: 3
 
     SuggestionItem:
       type: object
@@ -1100,6 +1143,9 @@ components:
           type: ["string", "null"]
         visualOutput:
           type: ["string", "null"]
+        authenticityFeedback:
+          type: ["string", "null"]
+          enum: [sounds_like_me, too_generic, needs_specificity, too_polished]
         visualType:
           type: ["string", "null"]
           enum: [none, card, carousel, infographic, art]
@@ -1164,6 +1210,9 @@ components:
           type: ["string", "null"]
         visualOutput:
           type: ["string", "null"]
+        aiOriginalPost:
+          type: ["string", "null"]
+          description: Immutable original AI draft snapshot — set once at creation, ignored on update.
         status:
           type: string
           enum: [draft, ready, published]
@@ -1178,6 +1227,9 @@ components:
           nullable: true
         shortPost:
           type: ["string", "null"]
+        authenticityFeedback:
+          type: ["string", "null"]
+          enum: [sounds_like_me, too_generic, needs_specificity, too_polished]
         topicId:
           type: ["integer", "null"]
         seriesId:
@@ -1191,6 +1243,34 @@ components:
         - tone
         - structuredBreakdown
         - status
+
+    CheckDraftAuthenticityBody:
+      type: object
+      properties:
+        draftId:
+          type: integer
+        aiOriginalPost:
+          type: ["string", "null"]
+        postOutput:
+          type: string
+
+    CheckDraftAuthenticityResponse:
+      type: object
+      properties:
+        check:
+          type: ["object", "null"]
+          properties:
+            editPct:
+              type: ["number", "null"]
+            flags:
+              type: array
+              items:
+                type: string
+            severity:
+              type: string
+              enum: [low, medium, high]
+          required: [editPct, flags, severity]
+      required: [check]
 
     UpdateDraftBody:
       type: object
@@ -1216,6 +1296,9 @@ components:
           enum: [none, card, carousel, infographic, art]
         isVoiceSample:
           type: boolean
+        authenticityFeedback:
+          type: ["string", "null"]
+          enum: [sounds_like_me, too_generic, needs_specificity, too_polished]
         topicId:
           type: ["integer", "null"]
         seriesId:

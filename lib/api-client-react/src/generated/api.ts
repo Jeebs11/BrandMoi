@@ -19,6 +19,8 @@ import type {
 import type {
   AgentBriefResponse,
   AnalyticsOverviewResponse,
+  CheckDraftAuthenticityBody,
+  CheckDraftAuthenticityResponse,
   CreateDraftBody,
   Draft,
   ErrorResponse,
@@ -2195,6 +2197,96 @@ export const useCreateDraft = <
   TContext
 > => {
   return useMutation(getCreateDraftMutationOptions(options));
+};
+
+/**
+ * @summary Run a non-AI, pre-publish authenticity review
+ */
+export const getCheckDraftAuthenticityUrl = () => {
+  return `/api/drafts/authenticity-check`;
+};
+
+export const checkDraftAuthenticity = async (
+  checkDraftAuthenticityBody: CheckDraftAuthenticityBody,
+  options?: RequestInit,
+): Promise<CheckDraftAuthenticityResponse> => {
+  return customFetch<CheckDraftAuthenticityResponse>(
+    getCheckDraftAuthenticityUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(checkDraftAuthenticityBody),
+    },
+  );
+};
+
+export const getCheckDraftAuthenticityMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkDraftAuthenticity>>,
+    TError,
+    { data: BodyType<CheckDraftAuthenticityBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkDraftAuthenticity>>,
+  TError,
+  { data: BodyType<CheckDraftAuthenticityBody> },
+  TContext
+> => {
+  const mutationKey = ["checkDraftAuthenticity"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkDraftAuthenticity>>,
+    { data: BodyType<CheckDraftAuthenticityBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return checkDraftAuthenticity(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CheckDraftAuthenticityMutationResult = NonNullable<
+  Awaited<ReturnType<typeof checkDraftAuthenticity>>
+>;
+export type CheckDraftAuthenticityMutationBody =
+  BodyType<CheckDraftAuthenticityBody>;
+export type CheckDraftAuthenticityMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Run a non-AI, pre-publish authenticity review
+ */
+export const useCheckDraftAuthenticity = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkDraftAuthenticity>>,
+    TError,
+    { data: BodyType<CheckDraftAuthenticityBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof checkDraftAuthenticity>>,
+  TError,
+  { data: BodyType<CheckDraftAuthenticityBody> },
+  TContext
+> => {
+  return useMutation(getCheckDraftAuthenticityMutationOptions(options));
 };
 
 /**

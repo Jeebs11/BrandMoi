@@ -30,7 +30,7 @@ export function resonanceScore(s: {
  * agent's output actually changes as the user teaches it.
  */
 export async function buildFeedbackContext(userId: number): Promise<string> {
-  const [acceptedSuggestions, ideaFeedback] = await Promise.all([
+  const [acceptedSuggestions, ideaFeedback, draftFeedback] = await Promise.all([
     db.select()
       .from(voiceSuggestionsTable)
       .where(and(eq(voiceSuggestionsTable.userId, userId), eq(voiceSuggestionsTable.status, "accepted")))
@@ -41,6 +41,11 @@ export async function buildFeedbackContext(userId: number): Promise<string> {
       .where(eq(ideaFeedbackTable.userId, userId))
       .orderBy(desc(ideaFeedbackTable.createdAt))
       .limit(30),
+    db.select({ authenticityFeedback: draftsTable.authenticityFeedback })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), inArray(draftsTable.authenticityFeedback, ["sounds_like_me", "too_generic", "needs_specificity", "too_polished"])))
+      .orderBy(desc(draftsTable.updatedAt))
+      .limit(20),
   ]);
 
   const parts: string[] = [];
@@ -66,6 +71,21 @@ export async function buildFeedbackContext(userId: number): Promise<string> {
       lines.push(...disliked.map((f) => `  ✗ ${f.ideaText.slice(0, 120)}`));
     }
     parts.push(lines.join("\n"));
+  }
+
+  const feedbackCounts = draftFeedback.reduce<Record<string, number>>((counts, draft) => {
+    if (draft.authenticityFeedback) {
+      counts[draft.authenticityFeedback] = (counts[draft.authenticityFeedback] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+  const signals: string[] = [];
+  if (feedbackCounts.too_generic) signals.push(`The author marked ${feedbackCounts.too_generic} recent draft${feedbackCounts.too_generic === 1 ? "" : "s"} as too generic — avoid vague claims, stock hooks, and boilerplate.`);
+  if (feedbackCounts.needs_specificity) signals.push(`The author asked for more specificity on ${feedbackCounts.needs_specificity} recent draft${feedbackCounts.needs_specificity === 1 ? "" : "s"} — preserve concrete moments, names, numbers, and trade-offs from their raw input.`);
+  if (feedbackCounts.too_polished) signals.push(`The author marked ${feedbackCounts.too_polished} recent draft${feedbackCounts.too_polished === 1 ? "" : "s"} as too polished — keep a more natural, direct voice rather than smoothing every edge.`);
+  if (feedbackCounts.sounds_like_me) signals.push(`The author explicitly approved the voice on ${feedbackCounts.sounds_like_me} recent draft${feedbackCounts.sounds_like_me === 1 ? "" : "s"} — preserve that grounded, personal register.`);
+  if (signals.length > 0) {
+    parts.push(["## AUTHOR VOICE FEEDBACK (explicit signals from the author — honor these):", ...signals.map((signal) => `- ${signal}`)].join("\n"));
   }
 
   return parts.join("\n\n");

@@ -19,6 +19,9 @@ export const draftsTable = pgTable("drafts", {
   // at draft creation, never touched by later edits/refines. Powers the
   // publish-time authenticity check (how much has this actually changed).
   aiOriginalPost: text("ai_original_post"),
+  // An explicit, user-selected judgment about this draft's voice. This is
+  // never inferred from edits and may be cleared or changed by the author.
+  authenticityFeedback: text("authenticity_feedback"),
   shortPost: text("short_post"),
   carouselOutput: text("carousel_output"),
   visualOutput: text("visual_output"),

@@ -36,6 +36,12 @@ export type VoiceSummaryResult = {
   draftCount: number;
 };
 
+export type AuthenticityCheck = {
+  editPct: number | null;
+  flags: string[];
+  severity: "low" | "medium" | "high";
+} | null;
+
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...init,
@@ -70,6 +76,14 @@ export const angleApi = {
     apiFetch<AngleCheckResult>("/ai/check-angle", {
       method: "POST",
       body: JSON.stringify({ topic, angle }),
+    }),
+};
+
+export const authenticityApi = {
+  check: (data: { draftId?: number; aiOriginalPost?: string | null; postOutput?: string }) =>
+    apiFetch<{ check: AuthenticityCheck }>("/drafts/authenticity-check", {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 };
 

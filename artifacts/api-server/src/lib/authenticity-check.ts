@@ -1,4 +1,4 @@
-import { BANNED_WORDS, STOCK_OPENERS } from "./ai-prompts.js";
+import { STOCK_OPENERS } from "./ai-prompts.js";
 
 // Rule-based only — no AI/API call. We already know a draft's text came from
 // Claude (we generated it), so this isn't guessing at unknown provenance the
@@ -6,8 +6,25 @@ import { BANNED_WORDS, STOCK_OPENERS } from "./ai-prompts.js";
 // how much the final post has actually changed since generation, and whether
 // it still contains known generic-AI markers.
 
-const MIN_SENTENCES_FOR_VARIANCE = 4;
+const MIN_SENTENCES_FOR_VARIANCE = 5;
 const LOW_VARIANCE_THRESHOLD = 0.15; // coefficient of variation (stdev/mean)
+const CONCRETE_DETAIL_PATTERN = /(?:\b\d+(?:[,.]\d+)?(?:%|x|k|m| years?| months?| days?)?\b|\b(?:I|my|we|our)\b|["“][^"”]{3,}["”])/i;
+const HIGH_CONFIDENCE_GENERIC_PHRASES = [
+  "game-changer",
+  "thought leader",
+  "value-add",
+  "circle back",
+  "move the needle",
+  "bleeding edge",
+];
+
+export type AuthenticitySeverity = "low" | "medium" | "high";
+
+export type AuthenticityCheck = {
+  editPct: number | null;
+  flags: string[];
+  severity: AuthenticitySeverity;
+};
 
 /**
  * Word-level sequence similarity (LCS-based ratio, same idea as Python's
@@ -44,23 +61,35 @@ function splitSentences(text: string): string[] {
     .filter((s) => s.length > 0);
 }
 
+function containsWholePhrase(text: string, phrase: string): boolean {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "i").test(text);
+}
+
 /**
- * Flags known generic-AI patterns: banned/cliché words, stock opening
- * lines, and unnaturally uniform sentence-length rhythm. Each check is a
- * plain string/statistics test — no fuzzy classification, no false-positive
- * risk from guessing at unknown text origin.
+ * Flags patterns that can make a post feel templated or generic. These are
+ * coaching signals, not proof of AI authorship: a user may intentionally use
+ * a short, punchy rhythm or a familiar professional phrase.
  */
 export function checkGenericPatterns(text: string): string[] {
   const flags: string[] = [];
   const lower = text.toLowerCase();
 
-  const foundBannedWord = BANNED_WORDS.find((w) => lower.includes(w.toLowerCase()));
+  const foundBannedWord = HIGH_CONFIDENCE_GENERIC_PHRASES.find((phrase) => containsWholePhrase(lower, phrase));
   if (foundBannedWord) flags.push(`generic phrase ("${foundBannedWord}")`);
 
   const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
   const firstLineLower = firstLine.toLowerCase();
   if (STOCK_OPENERS.some((opener) => firstLineLower.startsWith(opener))) {
     flags.push("a stock opening line");
+  }
+
+  if (/^not\s+.+,\s+but\s+.+[.!?]?$/i.test(firstLine)) {
+    flags.push('a familiar "not X, but Y" hook');
+  }
+
+  if (/^(?:here are|the)\s+\d+\s+(?:lessons|things|ways|rules|tips)\b/i.test(firstLine)) {
+    flags.push("a templated list hook");
   }
 
   const sentences = splitSentences(text);
@@ -75,18 +104,31 @@ export function checkGenericPatterns(text: string): string[] {
     }
   }
 
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount >= 90 && !CONCRETE_DETAIL_PATTERN.test(text)) {
+    flags.push("few concrete personal details or evidence");
+  }
+
   return flags;
 }
 
 export function runAuthenticityCheck(
   original: string | null | undefined,
   final: string,
-): { editPct: number | null; flags: string[] } | null {
+): AuthenticityCheck | null {
   const editPct = computeEditPercent(original, final);
   const flags = checkGenericPatterns(final);
 
-  const editIsLow = editPct !== null && editPct < 0.1;
+  const editIsVeryLow = editPct !== null && editPct < 0.1;
+  const editIsLow = editPct !== null && editPct < 0.25;
   if (!editIsLow && flags.length === 0) return null;
 
-  return { editPct, flags };
+  const score =
+    (editIsVeryLow ? 3 : editIsLow ? 2 : 0) +
+    flags.reduce((total, flag) => total + (
+      flag.includes("stock opening") || flag.includes("generic phrase") ? 2 : 1
+    ), 0);
+  const severity: AuthenticitySeverity = score >= 3 ? "high" : score >= 2 ? "medium" : "low";
+
+  return { editPct, flags, severity };
 }

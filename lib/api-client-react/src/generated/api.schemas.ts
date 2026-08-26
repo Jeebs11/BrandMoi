@@ -299,6 +299,20 @@ export interface PerformanceInsightsResponse {
 /**
  * @nullable
  */
+export type DraftAuthenticityFeedback =
+  | (typeof DraftAuthenticityFeedback)[keyof typeof DraftAuthenticityFeedback]
+  | null;
+
+export const DraftAuthenticityFeedback = {
+  sounds_like_me: "sounds_like_me",
+  too_generic: "too_generic",
+  needs_specificity: "needs_specificity",
+  too_polished: "too_polished",
+} as const;
+
+/**
+ * @nullable
+ */
 export type DraftVisualType =
   | (typeof DraftVisualType)[keyof typeof DraftVisualType]
   | null;
@@ -372,6 +386,8 @@ export interface Draft {
   /** @nullable */
   visualOutput?: string | null;
   /** @nullable */
+  authenticityFeedback?: DraftAuthenticityFeedback;
+  /** @nullable */
   visualType?: DraftVisualType;
   status: DraftStatus;
   createdAt: string;
@@ -395,8 +411,6 @@ export interface Draft {
   seriesId?: number | null;
   /** @nullable */
   seriesPart?: number | null;
-  /** Rule-based, publish-time-only signal — null/omitted when nothing to report. */
-  authenticityCheck?: { editPct: number | null; flags: string[] } | null;
 }
 
 export type CreateDraftBodyStatus =
@@ -431,6 +445,20 @@ export const CreateDraftBodyVisualType = {
   art: "art",
 } as const;
 
+/**
+ * @nullable
+ */
+export type CreateDraftBodyAuthenticityFeedback =
+  | (typeof CreateDraftBodyAuthenticityFeedback)[keyof typeof CreateDraftBodyAuthenticityFeedback]
+  | null;
+
+export const CreateDraftBodyAuthenticityFeedback = {
+  sounds_like_me: "sounds_like_me",
+  too_generic: "too_generic",
+  needs_specificity: "needs_specificity",
+  too_polished: "too_polished",
+} as const;
+
 export interface CreateDraftBody {
   rawInput: string;
   objective: string;
@@ -443,6 +471,11 @@ export interface CreateDraftBody {
   carouselOutput?: string | null;
   /** @nullable */
   visualOutput?: string | null;
+  /**
+   * Immutable original AI draft snapshot — set once at creation, ignored on update.
+   * @nullable
+   */
+  aiOriginalPost?: string | null;
   status: CreateDraftBodyStatus;
   contentSource?: CreateDraftBodyContentSource;
   visualType?: CreateDraftBodyVisualType;
@@ -450,13 +483,35 @@ export interface CreateDraftBody {
   /** @nullable */
   shortPost?: string | null;
   /** @nullable */
+  authenticityFeedback?: CreateDraftBodyAuthenticityFeedback;
+  /** @nullable */
   topicId?: number | null;
   /** @nullable */
   seriesId?: number | null;
   /** @nullable */
   seriesPart?: number | null;
-  /** Immutable original AI draft snapshot — set once at creation, ignored on update. @nullable */
+}
+
+export interface CheckDraftAuthenticityBody {
+  draftId?: number;
+  /** @nullable */
   aiOriginalPost?: string | null;
+  postOutput?: string;
+}
+
+/**
+ * @nullable
+ */
+export type CheckDraftAuthenticityResponseCheck = {
+  /** @nullable */
+  editPct: number | null;
+  flags: string[];
+  severity: "low" | "medium" | "high";
+} | null;
+
+export interface CheckDraftAuthenticityResponse {
+  /** @nullable */
+  check: CheckDraftAuthenticityResponseCheck;
 }
 
 export type UpdateDraftBodyStatus =
@@ -491,6 +546,20 @@ export const UpdateDraftBodyVisualType = {
   art: "art",
 } as const;
 
+/**
+ * @nullable
+ */
+export type UpdateDraftBodyAuthenticityFeedback =
+  | (typeof UpdateDraftBodyAuthenticityFeedback)[keyof typeof UpdateDraftBodyAuthenticityFeedback]
+  | null;
+
+export const UpdateDraftBodyAuthenticityFeedback = {
+  sounds_like_me: "sounds_like_me",
+  too_generic: "too_generic",
+  needs_specificity: "needs_specificity",
+  too_polished: "too_polished",
+} as const;
+
 export interface UpdateDraftBody {
   /** @nullable */
   postOutput?: string | null;
@@ -505,6 +574,8 @@ export interface UpdateDraftBody {
   contentSource?: UpdateDraftBodyContentSource;
   visualType?: UpdateDraftBodyVisualType;
   isVoiceSample?: boolean;
+  /** @nullable */
+  authenticityFeedback?: UpdateDraftBodyAuthenticityFeedback;
   /** @nullable */
   topicId?: number | null;
   /** @nullable */

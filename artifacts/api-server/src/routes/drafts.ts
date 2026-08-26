@@ -16,6 +16,8 @@ import {
   DeleteDraftParams,
   ListDraftsResponse,
   GetAnalyticsOverviewResponse,
+  CheckDraftAuthenticityBody,
+  CheckDraftAuthenticityResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middleware/auth.js";
 import { isDemoUser } from "../lib/demo-content.js";
@@ -137,6 +139,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       selectedHook: parsed.data.selectedHook ?? null,
       postOutput: parsed.data.postOutput ?? null,
       aiOriginalPost: parsed.data.aiOriginalPost ?? null,
+      authenticityFeedback: parsed.data.authenticityFeedback ?? null,
       shortPost: parsed.data.shortPost ?? null,
       carouselOutput: parsed.data.carouselOutput ?? null,
       visualOutput: parsed.data.visualOutput ?? null,
@@ -172,6 +175,7 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
       selectedHook: parsed.data.selectedHook ?? null,
       postOutput: parsed.data.postOutput ?? null,
       aiOriginalPost: parsed.data.aiOriginalPost ?? null,
+      authenticityFeedback: parsed.data.authenticityFeedback ?? null,
       shortPost: parsed.data.shortPost ?? null,
       carouselOutput: parsed.data.carouselOutput ?? null,
       visualOutput: parsed.data.visualOutput ?? null,
@@ -188,6 +192,38 @@ router.post("/drafts", requireAuth, async (req, res): Promise<void> => {
   res.status(201).json(GetDraftResponse.parse({ ...draft, authenticityCheck }));
 
   void upsertDailyActivity(req.user!.userId);
+});
+
+router.post("/drafts/authenticity-check", requireAuth, async (req, res): Promise<void> => {
+  const parsed = CheckDraftAuthenticityBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  let original = parsed.data.aiOriginalPost ?? null;
+  let postOutput = parsed.data.postOutput;
+  if (parsed.data.draftId !== undefined) {
+    const [draft] = await db
+      .select({ aiOriginalPost: draftsTable.aiOriginalPost, postOutput: draftsTable.postOutput })
+      .from(draftsTable)
+      .where(and(eq(draftsTable.id, parsed.data.draftId), eq(draftsTable.userId, req.user!.userId)));
+    if (!draft) {
+      res.status(404).json({ error: "Draft not found" });
+      return;
+    }
+    original = draft.aiOriginalPost;
+    postOutput = postOutput ?? draft.postOutput ?? "";
+  }
+  if (!postOutput?.trim()) {
+    res.status(400).json({ error: "A post is required for review" });
+    return;
+  }
+
+  // This endpoint deliberately has no persistence side effects and no AI
+  // provider call. It gives Capture and Library a review before publishing.
+  const check = runAuthenticityCheck(original, postOutput);
+  res.json(CheckDraftAuthenticityResponse.parse({ check }));
 });
 
 router.get("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
@@ -233,6 +269,7 @@ router.patch("/drafts/:id", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.contentSource !== undefined) updateData.contentSource = parsed.data.contentSource;
   if (parsed.data.visualType !== undefined) updateData.visualType = parsed.data.visualType;
   if (parsed.data.isVoiceSample !== undefined) updateData.isVoiceSample = parsed.data.isVoiceSample;
+  if (parsed.data.authenticityFeedback !== undefined) updateData.authenticityFeedback = parsed.data.authenticityFeedback;
   if (parsed.data.topicId !== undefined) updateData.topicId = parsed.data.topicId;
   if (parsed.data.seriesId !== undefined) updateData.seriesId = parsed.data.seriesId;
   if (parsed.data.seriesPart !== undefined) updateData.seriesPart = parsed.data.seriesPart;

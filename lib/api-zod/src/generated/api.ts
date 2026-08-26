@@ -78,40 +78,34 @@ export const GetPreferencesResponse = zod.object({
     .string()
     .nullish()
     .describe("Animation speed; slow | normal | fast"),
-  bgDensity: zod
-    .string()
-    .nullish()
-    .describe("Animation particle density; low | normal | high"),
-  bgPanelOpacity: zod
-    .string()
-    .nullish()
-    .describe("Content panel opacity; solid | frosted | semi | glass"),
-  bgCustomImageUrl: zod
-    .string()
-    .nullish()
-    .describe("Base64 data URL of user-uploaded custom background image"),
-  bgPalette: zod
-    .string()
-    .nullish()
-    .describe(
-      "Named colour palette for Ripple\/Plasma\/Prismatic; ocean | sunset | forest | void | ember | rose | arctic | gold",
-    ),
   siteTheme: zod
     .string()
     .nullish()
     .describe(
       "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
     ),
-  contentPillars: zod.array(zod.string()).nullish(),
-  writingSamples: zod.array(zod.string()).nullish(),
-  proofPoints: zod.array(zod.string()).nullish(),
-  aspirationalSamples: zod.array(zod.string()).nullish(),
 });
 
 /**
  * @summary Update the current user's brand preferences
  */
 export const updatePreferencesBodyAboutMeMax = 500;
+
+export const updatePreferencesBodyContentPillarsItemMax = 60;
+
+export const updatePreferencesBodyContentPillarsMax = 6;
+
+export const updatePreferencesBodyWritingSamplesItemMax = 3000;
+
+export const updatePreferencesBodyWritingSamplesMax = 5;
+
+export const updatePreferencesBodyProofPointsItemMax = 200;
+
+export const updatePreferencesBodyProofPointsMax = 8;
+
+export const updatePreferencesBodyAspirationalSamplesItemMax = 3000;
+
+export const updatePreferencesBodyAspirationalSamplesMax = 3;
 
 export const UpdatePreferencesBody = zod.object({
   objective: zod.string().optional(),
@@ -163,10 +157,22 @@ export const UpdatePreferencesBody = zod.object({
     .describe(
       "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
     ),
-  contentPillars: zod.array(zod.string().max(60)).max(6).optional(),
-  writingSamples: zod.array(zod.string().max(3000)).max(5).optional(),
-  proofPoints: zod.array(zod.string().max(200)).max(8).optional(),
-  aspirationalSamples: zod.array(zod.string().max(3000)).max(3).optional(),
+  contentPillars: zod
+    .array(zod.string().max(updatePreferencesBodyContentPillarsItemMax))
+    .max(updatePreferencesBodyContentPillarsMax)
+    .optional(),
+  writingSamples: zod
+    .array(zod.string().max(updatePreferencesBodyWritingSamplesItemMax))
+    .max(updatePreferencesBodyWritingSamplesMax)
+    .optional(),
+  proofPoints: zod
+    .array(zod.string().max(updatePreferencesBodyProofPointsItemMax))
+    .max(updatePreferencesBodyProofPointsMax)
+    .optional(),
+  aspirationalSamples: zod
+    .array(zod.string().max(updatePreferencesBodyAspirationalSamplesItemMax))
+    .max(updatePreferencesBodyAspirationalSamplesMax)
+    .optional(),
 });
 
 export const UpdatePreferencesResponse = zod.object({
@@ -467,10 +473,6 @@ export const GetAnalyticsOverviewResponse = zod.object({
       topic: zod.string(),
       resonance: zod.number(),
       engagementRate: zod.number().nullable(),
-      impressions: zod.number(),
-      reactions: zod.number(),
-      comments: zod.number(),
-      reposts: zod.number(),
       tone: zod.string().nullable(),
       contentSource: zod.string(),
       visualType: zod.string(),
@@ -530,21 +532,8 @@ export const GetAnalyticsOverviewResponse = zod.object({
         ])
         .nullable(),
     }),
-    totalImpressions: zod.object({
-      current: zod.number().nullable(),
-      prior: zod.number().nullable(),
-      trend: zod
-        .union([
-          zod.literal("up"),
-          zod.literal("down"),
-          zod.literal("flat"),
-          zod.literal(null),
-        ])
-        .nullable(),
-    }),
   }),
   avgEngagementRate: zod.number().nullable(),
-  totalImpressions: zod.number(),
   postingConsistency: zod.object({
     avgDaysBetweenPosts: zod.number().nullable(),
     prior: zod.number().nullable(),
@@ -839,6 +828,14 @@ export const ListDraftsResponseItem = zod.object({
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  authenticityFeedback: zod
+    .enum([
+      "sounds_like_me",
+      "too_generic",
+      "needs_specificity",
+      "too_polished",
+    ])
+    .nullish(),
   visualType: zod
     .enum(["none", "card", "carousel", "infographic", "art"])
     .nullish(),
@@ -1012,6 +1009,12 @@ export const CreateDraftBody = zod.object({
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  aiOriginalPost: zod
+    .string()
+    .nullish()
+    .describe(
+      "Immutable original AI draft snapshot — set once at creation, ignored on update.",
+    ),
   status: zod.enum(["draft", "ready", "published"]),
   contentSource: zod
     .enum([
@@ -1028,10 +1031,36 @@ export const CreateDraftBody = zod.object({
     .optional(),
   selectedHook: zod.string().nullish(),
   shortPost: zod.string().nullish(),
+  authenticityFeedback: zod
+    .enum([
+      "sounds_like_me",
+      "too_generic",
+      "needs_specificity",
+      "too_polished",
+    ])
+    .nullish(),
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
+});
+
+/**
+ * @summary Run a non-AI, pre-publish authenticity review
+ */
+export const CheckDraftAuthenticityBody = zod.object({
+  draftId: zod.number().optional(),
   aiOriginalPost: zod.string().nullish(),
+  postOutput: zod.string().optional(),
+});
+
+export const CheckDraftAuthenticityResponse = zod.object({
+  check: zod
+    .object({
+      editPct: zod.number().nullable(),
+      flags: zod.array(zod.string()),
+      severity: zod.enum(["low", "medium", "high"]),
+    })
+    .nullable(),
 });
 
 /**
@@ -1124,6 +1153,14 @@ export const GetDraftResponse = zod.object({
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  authenticityFeedback: zod
+    .enum([
+      "sounds_like_me",
+      "too_generic",
+      "needs_specificity",
+      "too_polished",
+    ])
+    .nullish(),
   visualType: zod
     .enum(["none", "card", "carousel", "infographic", "art"])
     .nullish(),
@@ -1210,13 +1247,6 @@ export const GetDraftResponse = zod.object({
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
-  authenticityCheck: zod
-    .object({
-      editPct: zod.number().nullable(),
-      flags: zod.array(zod.string()),
-    })
-    .nullable()
-    .optional(),
 });
 
 /**
@@ -1321,6 +1351,14 @@ export const UpdateDraftBody = zod.object({
     .enum(["none", "card", "carousel", "infographic", "art"])
     .optional(),
   isVoiceSample: zod.boolean().optional(),
+  authenticityFeedback: zod
+    .enum([
+      "sounds_like_me",
+      "too_generic",
+      "needs_specificity",
+      "too_polished",
+    ])
+    .nullish(),
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
@@ -1409,6 +1447,14 @@ export const UpdateDraftResponse = zod.object({
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
+  authenticityFeedback: zod
+    .enum([
+      "sounds_like_me",
+      "too_generic",
+      "needs_specificity",
+      "too_polished",
+    ])
+    .nullish(),
   visualType: zod
     .enum(["none", "card", "carousel", "infographic", "art"])
     .nullish(),
@@ -1495,13 +1541,6 @@ export const UpdateDraftResponse = zod.object({
   topicId: zod.number().nullish(),
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
-  authenticityCheck: zod
-    .object({
-      editPct: zod.number().nullable(),
-      flags: zod.array(zod.string()),
-    })
-    .nullable()
-    .optional(),
 });
 
 /**

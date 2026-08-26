@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { StressTestPanel, type StressTestResult } from "@/components/StressTestPanel";
 import { PostMeter } from "@/components/PostMeter";
-import { agentApi, analyticsApi, seriesApi, type SeriesDetail } from "@/lib/api";
+import { agentApi, analyticsApi, authenticityApi, seriesApi, type SeriesDetail } from "@/lib/api";
 import {
   useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
@@ -31,6 +31,11 @@ import { downloadCarouselPDF } from "@/lib/export-carousel";
 import { downloadVisualCard } from "@/lib/export-visual-card";
 import { downloadInfographic } from "@/lib/export-infographic";
 import { downloadIllustrationCard } from "@/lib/export-illustration";
+import {
+  AuthenticityReviewDialog,
+  type AuthenticityFeedback,
+  type AuthenticityReview,
+} from "@/components/AuthenticityReviewDialog";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -204,6 +209,11 @@ export default function Capture() {
   // The exact text last stress-tested, so we know when the cached result is
   // stale (post edited since) and can reopen the result without re-spending.
   const [stressTestedText, setStressTestedText] = useState<string | null>(null);
+  const [authenticityReviewOpen, setAuthenticityReviewOpen] = useState(false);
+  const [authenticityReview, setAuthenticityReview] = useState<AuthenticityReview>(null);
+  const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
+  const [authenticityFeedback, setAuthenticityFeedback] = useState<AuthenticityFeedback>(null);
+  const [isSavingAuthenticityFeedback, setIsSavingAuthenticityFeedback] = useState(false);
 
   // ── Series context (banner + continuity for prompt) ────────────────────
   const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
@@ -262,6 +272,7 @@ export default function Capture() {
         setHashtags(persistedHashtags);
       }
       setSavedDraftId(existingDraft.id);
+      setAuthenticityFeedback((existingDraft.authenticityFeedback as AuthenticityFeedback | undefined) ?? null);
       setInitialized(true);
     }
   }, [existingDraft, initialized]);
@@ -435,6 +446,7 @@ export default function Capture() {
       status: "draft" as const,
       visualStyle,
       contentSource: "capture" as CreateDraftBodyContentSource,
+      authenticityFeedback,
       ...seriesFields,
     };
     if (savedDraftId) {
@@ -472,49 +484,59 @@ export default function Capture() {
     }).catch(() => {});
   };
 
-  // Rule-based, publish-time-only nudge from the backend (see
-  // authenticity-check.ts) — non-blocking, only fires when there's actually
-  // something worth surfacing (low edit % from the AI draft, or a generic
-  // pattern still present).
-  const showAuthenticityNudge = (check: { editPct: number | null; flags: string[] } | null | undefined) => {
-    if (!check) return;
-    if (check.editPct !== null && check.editPct < 0.1) {
-      toast({ title: "This is close to the original AI draft — a real personal pass tends to read (and perform) better." });
-      return;
-    }
-    if (check.flags.length > 0) {
-      toast({ title: `Still has ${check.flags[0]} — worth a quick look before it's out there.` });
-    }
+  const buildDraftPayload = (status: "draft" | "published") => ({
+    rawInput,
+    objective: objectiveFromAudience(audience),
+    persona: preferences?.persona ?? "Founder",
+    tone: toneFromFeeling(feeling),
+    structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
+    postOutput: editedPost,
+    aiOriginalPost: versions[0]?.post ?? null,
+    shortPost: content?.shortPost ?? "",
+    carouselOutput: JSON.stringify(content?.carousel ?? []),
+    visualOutput: content?.visual ?? "",
+    status,
+    visualStyle,
+    contentSource: "capture" as CreateDraftBodyContentSource,
+    authenticityFeedback,
+    ...seriesFields,
+  });
+
+  const handleAuthenticityFeedback = (nextFeedback: AuthenticityFeedback) => {
+    const previous = authenticityFeedback;
+    setAuthenticityFeedback(nextFeedback);
+    if (!savedDraftId) return;
+    setIsSavingAuthenticityFeedback(true);
+    updateDraft(
+      { id: savedDraftId, data: { authenticityFeedback: nextFeedback } },
+      {
+        onSuccess: () => {
+          setIsSavingAuthenticityFeedback(false);
+          toast({ title: nextFeedback ? "Voice preference saved" : "Voice preference cleared" });
+        },
+        onError: () => {
+          setAuthenticityFeedback(previous);
+          setIsSavingAuthenticityFeedback(false);
+          toast({ title: "Couldn't save voice preference", variant: "destructive" });
+        },
+      },
+    );
   };
 
-  const handleSaveAndPublish = () => {
+  const completePublish = () => {
     if (!content) {
       toast({ title: "Nothing to save yet", variant: "destructive" });
       return;
     }
 
-    // Ship it: clipboard write + LinkedIn tab must fire synchronously inside
-    // the click handler (popup blockers), then we persist the status.
+    // This action is the explicit second click from the review dialog, so the
+    // clipboard and LinkedIn tab still run synchronously for popup blockers.
     const shipText = [editedPost, content.hashtags ?? ""].filter(Boolean).join("\n\n");
     void navigator.clipboard.writeText(shipText);
     window.open("https://www.linkedin.com/feed/?shareActive=true", "_blank", "noopener");
+    setAuthenticityReviewOpen(false);
 
-    const payload = {
-      rawInput,
-      objective: objectiveFromAudience(audience),
-      persona: preferences?.persona ?? "Founder",
-      tone: toneFromFeeling(feeling),
-      structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
-      postOutput: editedPost,
-      aiOriginalPost: versions[0]?.post ?? null,
-      shortPost: content.shortPost ?? "",
-      carouselOutput: JSON.stringify(content.carousel ?? []),
-      visualOutput: content.visual ?? "",
-      status: "published" as const,
-      visualStyle,
-      contentSource: "capture" as CreateDraftBodyContentSource,
-      ...seriesFields,
-    };
+    const payload = buildDraftPayload("published");
     if (savedDraftId) {
       updateDraft(
         { id: savedDraftId, data: payload },
@@ -523,7 +545,6 @@ export default function Capture() {
             toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
             showBestTimeHint();
-            showAuthenticityNudge(updated.authenticityCheck);
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -536,11 +557,35 @@ export default function Capture() {
             setSavedDraftId(newDraft.id);
             toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
             showBestTimeHint();
-            showAuthenticityNudge(newDraft.authenticityCheck);
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
       );
+    }
+  };
+
+  const handleSaveAndPublish = async () => {
+    if (!content || isCheckingAuthenticity) {
+      if (!content) toast({ title: "Nothing to save yet", variant: "destructive" });
+      return;
+    }
+    setIsCheckingAuthenticity(true);
+    try {
+      const { check } = await authenticityApi.check(
+        savedDraftId
+          ? { draftId: savedDraftId, postOutput: editedPost }
+          : { aiOriginalPost: versions[0]?.post ?? null, postOutput: editedPost },
+      );
+      setAuthenticityReview(check);
+      setAuthenticityReviewOpen(true);
+    } catch (err) {
+      toast({
+        title: "Couldn't run the review",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingAuthenticity(false);
     }
   };
 
@@ -610,6 +655,7 @@ export default function Capture() {
       status: "draft" as const,
       visualStyle,
       contentSource: "capture" as CreateDraftBodyContentSource,
+      authenticityFeedback,
       ...seriesFields,
     };
     return new Promise((resolve) => {
@@ -766,6 +812,7 @@ export default function Capture() {
             audience={audience} feeling={feeling}
             isRefining={isRefining}
             isSaving={isSaving}
+            isCheckingAuthenticity={isCheckingAuthenticity}
             isDemo={isDemo}
             onSwapHook={swapHook}
             onRefine={runRefine}
@@ -806,6 +853,18 @@ export default function Capture() {
             onDiscard={handleDiscardRefinement}
           />
         )}
+
+        <AuthenticityReviewDialog
+          open={authenticityReviewOpen}
+          check={authenticityReview}
+          feedback={authenticityFeedback}
+          isSavingFeedback={isSavingAuthenticityFeedback}
+          continueLabel="Copy & open LinkedIn"
+          onOpenChange={setAuthenticityReviewOpen}
+          onEdit={() => setAuthenticityReviewOpen(false)}
+          onContinue={completePublish}
+          onFeedback={handleAuthenticityFeedback}
+        />
 
         {/* Loading overlay — rendered via portal so fixed positioning is always viewport-relative.
             AnimatePresence is always mounted (outside the condition) so the exit fade plays
@@ -1139,6 +1198,7 @@ interface ResultViewProps {
   audience: string; feeling: string;
   isRefining: boolean;
   isSaving: boolean;
+  isCheckingAuthenticity: boolean;
   isDemo: boolean;
   onSwapHook: (hook: string) => void;
   onRefine: (instruction: string, tab?: TabType, label?: string) => void;
@@ -1167,7 +1227,7 @@ function ResultView(props: ResultViewProps) {
     activeTab, setActiveTab, visualStyle, setVisualStyle,
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
-    fullPost, audience, feeling, isRefining, isSaving, isDemo,
+    fullPost, audience, feeling, isRefining, isSaving, isCheckingAuthenticity, isDemo,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
     onSave, onSaveAndPublish, onCopy, onStressTest, isStressTestLoading,
@@ -1352,10 +1412,10 @@ function ResultView(props: ResultViewProps) {
               variant="outline"
               className="w-full border-green-200 text-green-700 hover:bg-green-50 hover:border-green-400"
               onClick={onSaveAndPublish}
-              disabled={isSaving}
+              disabled={isSaving || isCheckingAuthenticity}
             >
               <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-              {isSaving ? "Saving…" : "Save & Publish"}
+              {isCheckingAuthenticity ? "Reviewing…" : isSaving ? "Saving…" : "Save & Publish"}
             </Button>
           )}
           <Button
