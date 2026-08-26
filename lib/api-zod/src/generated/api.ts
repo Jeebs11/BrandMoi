@@ -532,8 +532,21 @@ export const GetAnalyticsOverviewResponse = zod.object({
         ])
         .nullable(),
     }),
+    totalImpressions: zod.object({
+      current: zod.number().nullable(),
+      prior: zod.number().nullable(),
+      trend: zod
+        .union([
+          zod.literal("up"),
+          zod.literal("down"),
+          zod.literal("flat"),
+          zod.literal(null),
+        ])
+        .nullable(),
+    }),
   }),
   avgEngagementRate: zod.number().nullable(),
+  totalImpressions: zod.number(),
   postingConsistency: zod.object({
     avgDaysBetweenPosts: zod.number().nullable(),
     prior: zod.number().nullable(),
@@ -584,6 +597,31 @@ export const GetAnalyticsOverviewResponse = zod.object({
       sampledCount: zod.number(),
     }),
   ),
+  learningMetrics: zod.object({
+    authorFeedback: zod.object({
+      reviewedDrafts: zod.number(),
+      soundsLikeMe: zod.number(),
+      tooGeneric: zod.number(),
+      needsSpecificity: zod.number(),
+      tooPolished: zod.number(),
+      approvalRate: zod.number().nullable(),
+    }),
+    evidence: zod.object({
+      pinnedWritingSamples: zod.number(),
+      authenticatedPosts: zod.number(),
+      materiallyEditedBeforePublish: zod.number(),
+    }),
+    outcomes: zod.object({
+      performanceEntries: zod.number(),
+      externalFeedbackReported: zod.number(),
+      externalFeedbackNotReported: zod.number(),
+      externalFeedbackUnknown: zod.number(),
+    }),
+  }),
+  feedbackCoaching: zod.object({
+    reportedPostCount: zod.number(),
+    message: zod.string().nullable(),
+  }),
 });
 
 /**

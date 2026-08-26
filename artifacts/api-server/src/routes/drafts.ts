@@ -3,7 +3,7 @@ import { z } from "zod";
 import multer from "multer";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { draftsTable, performanceSignalsTable } from "@workspace/db";
+import { draftsTable, performanceSignalsTable, preferencesTable } from "@workspace/db";
 import { parseLinkedinAnalytics } from "../lib/linkedin-analytics-parser.js";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
@@ -586,24 +586,27 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
   const userId = req.user!.userId;
   const windowDays = req.query["window"] === "30" ? 30 : req.query["window"] === "60" ? 60 : 90;
 
-  const allDrafts = await db
-    .select()
-    .from(draftsTable)
-    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
-    .orderBy(desc(draftsTable.createdAt));
+  const [allDrafts, [preferences]] = await Promise.all([
+    db
+      .select()
+      .from(draftsTable)
+      .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+      .orderBy(desc(draftsTable.createdAt)),
+    db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
+  ]);
 
   const totalPublished = allDrafts.length;
 
   const draftIds = allDrafts.map(d => d.id);
-  const perfMap = new Map<number, { impressions: number; reactions: number; comments: number; reposts: number; saves: number; membersReached: number }>();
-  if (draftIds.length > 0) {
-    const signals = await db
+  const signals = draftIds.length > 0
+    ? await db
       .select()
       .from(performanceSignalsTable)
-      .where(inArray(performanceSignalsTable.draftId, draftIds));
-    for (const s of signals) {
-      perfMap.set(s.draftId, { impressions: s.impressions, reactions: s.reactions, comments: s.comments, reposts: s.reposts, saves: s.saves, membersReached: s.membersReached });
-    }
+      .where(inArray(performanceSignalsTable.draftId, draftIds))
+    : [];
+  const perfMap = new Map<number, { impressions: number; reactions: number; comments: number; reposts: number; saves: number; membersReached: number }>();
+  for (const s of signals) {
+    perfMap.set(s.draftId, { impressions: s.impressions, reactions: s.reactions, comments: s.comments, reposts: s.reposts, saves: s.saves, membersReached: s.membersReached });
   }
 
   const resonanceOf = (draftId: number): number | null => {
@@ -646,6 +649,59 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
   })).sort((a, b) => b.count - a.count);
 
   const loggedPerformanceCount = resonanceValues.length;
+  const feedbackCounts = allDrafts.reduce<Record<string, number>>((counts, draft) => {
+    if (draft.authenticityFeedback) {
+      counts[draft.authenticityFeedback] = (counts[draft.authenticityFeedback] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+  const reviewedDrafts = Object.values(feedbackCounts).reduce((total, count) => total + count, 0);
+  const words = (text: string) => new Set(
+    text.toLowerCase().match(/[a-z0-9']+/g) ?? [],
+  );
+  const materiallyEditedBeforePublish = allDrafts.filter((draft) => {
+    if (!draft.aiOriginalPost || !draft.postOutput) return false;
+    const originalWords = words(draft.aiOriginalPost);
+    const finalWords = words(draft.postOutput);
+    if (originalWords.size === 0 || finalWords.size === 0) return false;
+    const shared = [...originalWords].filter((word) => finalWords.has(word)).length;
+    const similarity = shared / new Set([...originalWords, ...finalWords]).size;
+    return similarity < 0.88;
+  }).length;
+  const externalFeedbackReported = signals.filter((signal) => signal.linkedinFeedbackStatus === "reported").length;
+  const externalFeedbackNotReported = signals.filter((signal) => signal.linkedinFeedbackStatus === "not_reported").length;
+  const externalFeedbackUnknown = signals.filter((signal) => signal.linkedinFeedbackStatus === "unknown").length;
+  const learningMetrics = {
+    authorFeedback: {
+      reviewedDrafts,
+      soundsLikeMe: feedbackCounts.sounds_like_me ?? 0,
+      tooGeneric: feedbackCounts.too_generic ?? 0,
+      needsSpecificity: feedbackCounts.needs_specificity ?? 0,
+      tooPolished: feedbackCounts.too_polished ?? 0,
+      approvalRate: reviewedDrafts > 0
+        ? Math.round(((feedbackCounts.sounds_like_me ?? 0) / reviewedDrafts) * 100)
+        : null,
+    },
+    evidence: {
+      pinnedWritingSamples: preferences?.writingSamples?.length ?? 0,
+      authenticatedPosts: allDrafts.filter((draft) => draft.isVoiceSample).length,
+      materiallyEditedBeforePublish,
+    },
+    outcomes: {
+      performanceEntries: signals.length,
+      externalFeedbackReported,
+      externalFeedbackNotReported,
+      externalFeedbackUnknown,
+    },
+  };
+  const feedbackCoaching = {
+    reportedPostCount: externalFeedbackReported,
+    message: externalFeedbackReported >= 2
+      ? "A member-feedback indicator appeared on more than one measured post. Treat this as a prompt to review specificity and the pre-publish check on future drafts—not as a verdict on your voice."
+      : externalFeedbackReported === 1
+        ? "One measured post included a member-feedback indicator. Keep it attached to that post and use the pre-publish check as a light coaching prompt for the next draft."
+        : null,
+  };
 
   const avgResForDrafts = (drafts: typeof allDrafts) => {
     const vals = drafts.map(d => resonanceOf(d.id)).filter((v): v is number => v !== null);
@@ -939,6 +995,8 @@ router.get("/analytics/overview", requireAuth, async (req, res): Promise<void> =
     bestTimeToPost,
     hashtagPerformance,
     byMediaFormat,
+    learningMetrics,
+    feedbackCoaching,
   });
 
   res.json(result);

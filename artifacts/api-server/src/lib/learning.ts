@@ -25,6 +25,21 @@ export function resonanceScore(s: {
   return Math.min(100, Math.round(Math.log2(1 + w) * 12));
 }
 
+export function isAcceptedSuggestionCurrent(field: string, currentValue: unknown, suggestedValue: string): boolean {
+  const normalise = (value: unknown) => {
+    const values = field === "contentPillars"
+      ? (Array.isArray(value) ? value : String(value ?? "").split(","))
+      : [value];
+    return values
+      .map((item) => String(item).trim().toLowerCase())
+      .filter(Boolean)
+      .sort()
+      .join(",");
+  };
+
+  return normalise(currentValue) === normalise(suggestedValue);
+}
+
 /**
  * Feedback the user has explicitly given — accepted voice suggestions and
  * liked/disliked idea directions. Injected into generation prompts so the
@@ -55,12 +70,9 @@ export async function buildFeedbackContext(userId: number): Promise<string> {
   const activeAcceptedSuggestions = acceptedSuggestions.filter((suggestion) => {
     if (!prefs) return true;
     const currentValue = (prefs as Record<string, unknown>)[suggestion.field];
-    const normalise = (value: unknown) => Array.isArray(value)
-      ? value.map((item) => String(item).trim().toLowerCase()).filter(Boolean).sort().join(",")
-      : String(value ?? "").trim().toLowerCase();
     // An accepted suggestion remains valid only while the profile still
     // contains the value the user accepted. A later manual edit wins.
-    return normalise(currentValue) === normalise(suggestion.suggestedValue);
+    return isAcceptedSuggestionCurrent(suggestion.field, currentValue, suggestion.suggestedValue);
   });
 
   if (activeAcceptedSuggestions.length > 0) {
@@ -190,6 +202,67 @@ export async function buildTopHashtags(userId: number): Promise<string> {
   return [
     "## PROVEN HASHTAGS (measured on this user's own posts — prefer these over generic tags when relevant; still cap at 1-3 tags total):",
     ...ranked.map((t) => `- #${t.tag} (avg resonance ${t.avg} across ${t.count} posts)`),
+  ].join("\n");
+}
+
+/**
+ * Measured performance is useful for choosing strategic patterns, not for
+ * replacing the author's current voice preferences.
+ */
+export async function buildPerformanceContext(userId: number): Promise<string> {
+  const publishedDrafts = await db
+    .select()
+    .from(draftsTable)
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
+    .orderBy(desc(draftsTable.updatedAt))
+    .limit(50);
+
+  if (publishedDrafts.length === 0) return "";
+
+  const signals = await db
+    .select()
+    .from(performanceSignalsTable)
+    .where(inArray(performanceSignalsTable.draftId, publishedDrafts.map((draft) => draft.id)));
+
+  if (signals.length < 3) return "";
+
+  const perfMap = new Map(signals.map((signal) => [signal.draftId, signal]));
+  const scored = publishedDrafts
+    .map((draft) => {
+      const signal = perfMap.get(draft.id);
+      if (!signal) return null;
+      const saveRate = signal.impressions > 0 ? ((signal.saves / signal.impressions) * 100).toFixed(1) : "0";
+      return { draft, resonance: resonanceScore(signal), saveRate };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .sort((a, b) => b.resonance - a.resonance);
+
+  if (scored.length < 3) return "";
+
+  const top = scored.slice(0, Math.min(5, scored.length));
+  const bottom = scored.slice(-Math.min(3, Math.floor(scored.length / 2)));
+  const describePost = (entry: typeof scored[0]) => {
+    const breakdown = entry.draft.structuredBreakdown as { topic?: string; feeling?: string; audience?: string } | null;
+    const topic = breakdown?.topic ?? entry.draft.rawInput.slice(0, 50) ?? "unknown";
+    const feeling = breakdown?.feeling ?? entry.draft.tone ?? "unknown";
+    const audience = breakdown?.audience ?? entry.draft.objective ?? "unknown";
+    const hook = (entry.draft.postOutput ?? "")
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 10)
+      ?.slice(0, 110) ?? "";
+    const base = `Topic: "${topic}" | ${feeling} | ${audience} | Resonance: ${entry.resonance} | Saves: ${entry.saveRate}%`;
+    return hook ? `${base}\n    Structural reference: "${hook}"` : base;
+  };
+
+  return [
+    "## PERFORMANCE HISTORY (strategy-only evidence — do not override direct author voice evidence):",
+    "HIGH RESONANCE — study the structural pattern and strategic framing; do NOT repeat the topic, claim, or exact wording:",
+    ...top.map((entry) => `  ✓ ${describePost(entry)}`),
+    ...(bottom.length > 0 ? [
+      "LOW RESONANCE — avoid these structural patterns, not merely these topics:",
+      ...bottom.map((entry) => `  ✗ ${describePost(entry)}`),
+    ] : []),
   ].join("\n");
 }
 

@@ -520,6 +520,28 @@ export type AnalyticsOverview = {
   };
   hashtagPerformance: { hashtag: string; count: number; avgResonance: number | null }[];
   byMediaFormat: { format: string; count: number; avgResonance: number | null; sampledCount: number }[];
+  learningMetrics: {
+    authorFeedback: {
+      reviewedDrafts: number;
+      soundsLikeMe: number;
+      tooGeneric: number;
+      needsSpecificity: number;
+      tooPolished: number;
+      approvalRate: number | null;
+    };
+    evidence: {
+      pinnedWritingSamples: number;
+      authenticatedPosts: number;
+      materiallyEditedBeforePublish: number;
+    };
+    outcomes: {
+      performanceEntries: number;
+      externalFeedbackReported: number;
+      externalFeedbackNotReported: number;
+      externalFeedbackUnknown: number;
+    };
+  };
+  feedbackCoaching: { reportedPostCount: number; message: string | null };
 };
 
 export type CheckinEntry = { id: number; topic: string; ageDays: number };

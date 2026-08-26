@@ -24,7 +24,7 @@ import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
 import { computeJaccard } from "../lib/voice-dna.js";
-import { buildLearnedPatterns, buildTopHashtags } from "../lib/learning.js";
+import { resonanceScore } from "../lib/learning.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
 import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 
@@ -97,13 +97,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const [brand, performanceContext, learnedPatterns, topHashtags] = await Promise.all([
-    buildCanonicalBrandContext(userId),
-    buildPerformanceContext(userId),
-    buildLearnedPatterns(userId),
-    buildTopHashtags(userId),
-  ]);
-  const feedbackContext = brand.feedbackContext;
+  const brand = await buildCanonicalBrandContext(userId);
   const voiceContext = brand.context;
   const fallbackBrand = buildBrandContext(objective ?? "", persona ?? "", tone ?? "");
   const effectiveObjective = objective || brand.objective || "";
@@ -143,10 +137,6 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "## FORMAT OVERLAY (mandatory):",
     formatOverlay,
     objectiveOverlay ? `\n## GOAL OVERLAY (mandatory — shape strategy and CTA around this):\n${objectiveOverlay}` : "",
-    performanceContext ? `\n${performanceContext}` : "",
-    feedbackContext ? `\n${feedbackContext}` : "",
-    learnedPatterns ? `\n${learnedPatterns}` : "",
-    topHashtags ? `\n${topHashtags}` : "",
     newsContext ? `\n## TODAY'S NEWS CONTEXT (weave the headline naturally — never paste a URL):\n${newsContext}` : "",
     continuityContext ? `\n## SERIES CONTINUITY (this post is one part of a planned series — build on these prior parts, don't repeat their exact beats, keep voice/thread consistent):\n${continuityContext}` : "",
     extraInstruction ? `\n## EXTRA INSTRUCTION (apply on top of everything else, this is the user's refine ask):\n${extraInstruction}` : "",
@@ -410,72 +400,6 @@ router.post("/ai/check-angle", requireAuth, async (req, res): Promise<void> => {
 
 const ALLOWED_VOICE_FIELDS = ["tone", "objective", "persona", "brandRole", "brandAudience", "brandBelief"] as const;
 type AllowedVoiceField = typeof ALLOWED_VOICE_FIELDS[number];
-
-function resonanceScore(s: { impressions: number; reactions: number; comments: number; reposts: number; saves?: number; membersReached?: number }): number {
-  const w = s.reactions * 3 + s.comments * 5 + s.reposts * 4 + (s.saves ?? 0) * 8;
-  const reach = (s.membersReached ?? 0) > 0 ? (s.membersReached ?? 0) : s.impressions;
-  if (reach > 0) return Math.min(100, Math.round((w / reach) * 1000));
-  if (w === 0) return 0;
-  return Math.min(100, Math.round(Math.log2(1 + w) * 12));
-}
-
-async function buildPerformanceContext(userId: number): Promise<string> {
-  const publishedDrafts = await db
-    .select()
-    .from(draftsTable)
-    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")))
-    .orderBy(desc(draftsTable.updatedAt))
-    .limit(50);
-
-  if (publishedDrafts.length === 0) return "";
-
-  const draftIds = publishedDrafts.map((d) => d.id);
-  const signals = await db
-    .select()
-    .from(performanceSignalsTable)
-    .where(inArray(performanceSignalsTable.draftId, draftIds));
-
-  if (signals.length < 3) return "";
-
-  const perfMap = new Map(signals.map((s) => [s.draftId, s]));
-  const scored = publishedDrafts
-    .map((d) => {
-      const s = perfMap.get(d.id);
-      if (!s) return null;
-      const score = resonanceScore(s);
-      const saveRate = s.impressions > 0 ? ((s.saves / s.impressions) * 100).toFixed(1) : "0";
-      return { draft: d, signal: s, resonance: score, saveRate };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-    .sort((a, b) => b.resonance - a.resonance);
-
-  if (scored.length < 3) return "";
-
-  const top = scored.slice(0, Math.min(5, scored.length));
-  const bottom = scored.slice(-Math.min(3, Math.floor(scored.length / 2)));
-
-  const describePost = (x: typeof scored[0]) => {
-    const bd = x.draft.structuredBreakdown as { topic?: string; feeling?: string; audience?: string } | null;
-    const topic = bd?.topic ?? x.draft.rawInput?.slice(0, 50) ?? "unknown";
-    const feeling = bd?.feeling ?? x.draft.tone ?? "unknown";
-    const audience = bd?.audience ?? x.draft.objective ?? "unknown";
-    // Include actual hook so Claude can match voice register — NOT to copy the topic
-    const postText = x.draft.postOutput ?? "";
-    const hook = postText.split("\n").map((l: string) => l.trim()).find((l: string) => l.length > 10)?.slice(0, 110) ?? "";
-    const base = `Topic: "${topic}" | ${feeling} | ${audience} | Resonance: ${x.resonance} | Saves: ${x.saveRate}%`;
-    return hook ? `${base}\n    Hook register: "${hook}"` : base;
-  };
-
-  return [
-    "## PERFORMANCE HISTORY — match the voice REGISTER and structural confidence of high-resonance posts; take fresh angles the author hasn't used before:",
-    "HIGH RESONANCE — study the hook register for rhythm cues; do NOT repeat the topic or angle:",
-    ...top.map((x) => `  ✓ ${describePost(x)}`),
-    ...(bottom.length > 0 ? [
-      "LOW RESONANCE — avoid these structural patterns (not just these topics):",
-      ...bottom.map((x) => `  ✗ ${describePost(x)}`),
-    ] : []),
-  ].join("\n");
-}
 
 // Guards against double-tap duplicate generation: one in-flight voice-insights
 // run per user. The window is only as long as the Claude call (seconds), so a

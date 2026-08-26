@@ -717,6 +717,7 @@ export type AnalyticsOverviewResponseKpiTrends = {
   avgResonance: KpiTrendItem;
   totalPublished: KpiTrendItem;
   avgEngagementRate: KpiTrendItem;
+  totalImpressions: KpiTrendItem;
 };
 
 /**
@@ -786,6 +787,41 @@ export type AnalyticsOverviewResponseByMediaFormatItem = {
   sampledCount: number;
 };
 
+export type AnalyticsOverviewResponseLearningMetricsAuthorFeedback = {
+  reviewedDrafts: number;
+  soundsLikeMe: number;
+  tooGeneric: number;
+  needsSpecificity: number;
+  tooPolished: number;
+  /** @nullable */
+  approvalRate: number | null;
+};
+
+export type AnalyticsOverviewResponseLearningMetricsEvidence = {
+  pinnedWritingSamples: number;
+  authenticatedPosts: number;
+  materiallyEditedBeforePublish: number;
+};
+
+export type AnalyticsOverviewResponseLearningMetricsOutcomes = {
+  performanceEntries: number;
+  externalFeedbackReported: number;
+  externalFeedbackNotReported: number;
+  externalFeedbackUnknown: number;
+};
+
+export type AnalyticsOverviewResponseLearningMetrics = {
+  authorFeedback: AnalyticsOverviewResponseLearningMetricsAuthorFeedback;
+  evidence: AnalyticsOverviewResponseLearningMetricsEvidence;
+  outcomes: AnalyticsOverviewResponseLearningMetricsOutcomes;
+};
+
+export type AnalyticsOverviewResponseFeedbackCoaching = {
+  reportedPostCount: number;
+  /** @nullable */
+  message: string | null;
+};
+
 /**
  * @summary Analytics overview response
  */
@@ -806,10 +842,13 @@ export interface AnalyticsOverviewResponse {
   kpiTrends: AnalyticsOverviewResponseKpiTrends;
   /** @nullable */
   avgEngagementRate: number | null;
+  totalImpressions: number;
   postingConsistency: AnalyticsOverviewResponsePostingConsistency;
   bestTimeToPost: AnalyticsOverviewResponseBestTimeToPost;
   hashtagPerformance: AnalyticsOverviewResponseHashtagPerformanceItem[];
   byMediaFormat: AnalyticsOverviewResponseByMediaFormatItem[];
+  learningMetrics: AnalyticsOverviewResponseLearningMetrics;
+  feedbackCoaching: AnalyticsOverviewResponseFeedbackCoaching;
 }
 
 export type VoiceSuggestionStatus =

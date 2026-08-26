@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  BarChart2, TrendingUp, Layers, FileText, Trophy, Zap, AlertCircle,
+  BarChart2, TrendingUp, Layers, FileText, Trophy, Zap, AlertCircle, HeartHandshake,
   ArrowUp, ArrowDown, Minus, Clock, Hash, CalendarDays, Activity,
 } from "lucide-react";
 import {
@@ -381,6 +381,47 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
           </div>
         </div>
       )}
+
+      {/* Learning signal health */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <HeartHandshake className="w-3.5 h-3.5 text-violet-500" />
+          <SectionTitle>How BrandMoi is learning</SectionTitle>
+        </div>
+        <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
+          Your direct feedback and current settings lead. Post outcomes provide supporting context only.
+        </p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <LearningMetric
+            label="Voice approvals"
+            value={data.learningMetrics.authorFeedback.approvalRate === null ? "—" : `${data.learningMetrics.authorFeedback.approvalRate}%`}
+            detail={data.learningMetrics.authorFeedback.reviewedDrafts === 0
+              ? "No reviews yet"
+              : `${data.learningMetrics.authorFeedback.soundsLikeMe} of ${data.learningMetrics.authorFeedback.reviewedDrafts} reviews`}
+          />
+          <LearningMetric
+            label="Meaningful edits"
+            value={data.learningMetrics.evidence.materiallyEditedBeforePublish}
+            detail="Before publishing"
+          />
+          <LearningMetric
+            label="Voice evidence"
+            value={data.learningMetrics.evidence.pinnedWritingSamples + data.learningMetrics.evidence.authenticatedPosts}
+            detail={`${data.learningMetrics.evidence.pinnedWritingSamples} samples · ${data.learningMetrics.evidence.authenticatedPosts} verified posts`}
+          />
+          <LearningMetric
+            label="Measured outcomes"
+            value={data.learningMetrics.outcomes.performanceEntries}
+            detail={`${data.learningMetrics.outcomes.externalFeedbackUnknown} feedback states unknown`}
+          />
+        </div>
+        {data.feedbackCoaching.message && (
+          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Post-level coaching</p>
+            <p className="text-[11px] leading-relaxed text-amber-800">{data.feedbackCoaching.message}</p>
+          </div>
+        )}
+      </div>
 
       {/* Trend chart */}
       <div className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -855,5 +896,15 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         </div>
       )}
     </>
+  );
+}
+
+function LearningMetric({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+  return (
+    <div className="rounded-xl bg-gray-50 px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
+      <p className="mt-0.5 text-lg font-extrabold tabular-nums text-gray-900">{value}</p>
+      <p className="text-[10px] leading-snug text-gray-400">{detail}</p>
+    </div>
   );
 }

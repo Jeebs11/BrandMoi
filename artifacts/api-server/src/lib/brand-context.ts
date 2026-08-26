@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, preferencesTable } from "@workspace/db";
-import { buildFeedbackContext } from "./learning.js";
+import { buildFeedbackContext, buildLearnedPatterns, buildPerformanceContext, buildTopHashtags } from "./learning.js";
 import { buildVoiceDNA } from "./voice-dna.js";
 
 export type BrandContextConfidence = "starting" | "developing" | "grounded";
@@ -35,10 +35,13 @@ function cleanList(value: unknown): string[] {
  * after this context rather than rebuilding the profile independently.
  */
 export async function buildCanonicalBrandContext(userId: number): Promise<CanonicalBrandContext> {
-  const [[prefs], voiceDNA, feedbackContext] = await Promise.all([
+  const [[prefs], voiceDNA, feedbackContext, performanceContext, learnedPatterns, topHashtags] = await Promise.all([
     db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
     buildVoiceDNA(userId),
     buildFeedbackContext(userId),
+    buildPerformanceContext(userId),
+    buildLearnedPatterns(userId),
+    buildTopHashtags(userId),
   ]);
 
   const writingSamples = cleanList(prefs?.writingSamples);
@@ -92,6 +95,14 @@ export async function buildCanonicalBrandContext(userId: number): Promise<Canoni
   }
 
   if (voiceDNA) parts.push(voiceDNA);
+  const strategySignals = [performanceContext, learnedPatterns, topHashtags].filter(Boolean);
+  if (strategySignals.length > 0) {
+    parts.push([
+      "## STRATEGY & RESONANCE SIGNALS",
+      "Use these measured patterns to guide format, structure, and strategic framing. They are supporting evidence and must not replace the author's current voice settings or direct feedback.",
+      ...strategySignals,
+    ].join("\n"));
+  }
   if (feedbackContext) {
     parts.push([
       "## SIGNAL PRECEDENCE",

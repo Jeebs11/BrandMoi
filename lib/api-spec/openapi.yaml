@@ -1454,8 +1454,11 @@ components:
               $ref: "#/components/schemas/KpiTrendItem"
             avgEngagementRate:
               $ref: "#/components/schemas/KpiTrendItem"
-          required: [avgResonance, totalPublished, avgEngagementRate]
+            totalImpressions:
+              $ref: "#/components/schemas/KpiTrendItem"
+          required: [avgResonance, totalPublished, avgEngagementRate, totalImpressions]
         avgEngagementRate: { type: ["number", "null"] }
+        totalImpressions: { type: integer }
         postingConsistency:
           type: object
           properties:
@@ -1511,6 +1514,41 @@ components:
               avgResonance: { type: ["integer", "null"] }
               sampledCount: { type: integer }
             required: [format, count, avgResonance, sampledCount]
+        learningMetrics:
+          type: object
+          properties:
+            authorFeedback:
+              type: object
+              properties:
+                reviewedDrafts: { type: integer }
+                soundsLikeMe: { type: integer }
+                tooGeneric: { type: integer }
+                needsSpecificity: { type: integer }
+                tooPolished: { type: integer }
+                approvalRate: { type: ["integer", "null"] }
+              required: [reviewedDrafts, soundsLikeMe, tooGeneric, needsSpecificity, tooPolished, approvalRate]
+            evidence:
+              type: object
+              properties:
+                pinnedWritingSamples: { type: integer }
+                authenticatedPosts: { type: integer }
+                materiallyEditedBeforePublish: { type: integer }
+              required: [pinnedWritingSamples, authenticatedPosts, materiallyEditedBeforePublish]
+            outcomes:
+              type: object
+              properties:
+                performanceEntries: { type: integer }
+                externalFeedbackReported: { type: integer }
+                externalFeedbackNotReported: { type: integer }
+                externalFeedbackUnknown: { type: integer }
+              required: [performanceEntries, externalFeedbackReported, externalFeedbackNotReported, externalFeedbackUnknown]
+          required: [authorFeedback, evidence, outcomes]
+        feedbackCoaching:
+          type: object
+          properties:
+            reportedPostCount: { type: integer }
+            message: { type: ["string", "null"] }
+          required: [reportedPostCount, message]
       required:
         - totalPublished
         - avgResonance
@@ -1527,10 +1565,13 @@ components:
         - last90
         - kpiTrends
         - avgEngagementRate
+        - totalImpressions
         - postingConsistency
         - bestTimeToPost
         - hashtagPerformance
         - byMediaFormat
+        - learningMetrics
+        - feedbackCoaching
 
     DiagnosisSection:
       type: object
