@@ -443,6 +443,24 @@ export type TopPostSuggestion = {
   angles: { label: string; angle: string }[];
 };
 
+export type BrandReviewRecommendation = {
+  id: string;
+  title: string;
+  issue: string;
+  change: string;
+  instruction: string;
+  example?: string;
+  priority: "high" | "medium";
+};
+
+export type BrandReviewResult = {
+  verdict: "specific" | "mixed" | "generalist";
+  headline: string;
+  summary: string;
+  strengths: string[];
+  recommendations: BrandReviewRecommendation[];
+};
+
 export const agentApi = {
   brief: () => apiFetch<AgentBrief>("/agent/brief"),
   dare: () => apiFetch<DareResult>("/agent/dare", { method: "POST" }),
@@ -491,6 +509,11 @@ export const agentApi = {
     apiFetch<{ ok: boolean }>(`/agent/saved-ideas/${id}`, { method: "DELETE" }),
   topPostSuggestions: () =>
     apiFetch<{ suggestions: TopPostSuggestion[]; reason?: string }>("/agent/top-post-suggestions"),
+  brandReview: (postText: string) =>
+    apiFetch<BrandReviewResult>("/agent/brand-review", {
+      method: "POST",
+      body: JSON.stringify({ postText }),
+    }),
 };
 
 export type KpiTrend = { current: number | null; prior: number | null; trend: "up" | "down" | "flat" | null };

@@ -860,6 +860,111 @@ router.get("/agent/stress-test/scores", requireAuth, async (req, res): Promise<v
   }
 });
 
+router.post("/agent/brand-review", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  const parsedBody = z.object({ postText: z.string().min(20).max(6000) }).safeParse(req.body);
+  if (!parsedBody.success) {
+    res.status(400).json({ error: "Post text required." });
+    return;
+  }
+
+  try {
+    const { dna } = await getUserAgentContext(req.user!.userId);
+    const postText = parsedBody.data.postText;
+    const completion = await anthropic.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 8192,
+      system: `You are BrandMoi's draft-level brand editor. Review the creator's draft against their positioning and writing evidence.
+
+Your job is not to make the post sound more polished. Identify whether it is too broad/generalist, too generic, or disconnected from the creator's actual expertise. Reward concrete lived experience, a clear point of view, and a recognisable audience. Preserve the creator's voice.
+
+Return JSON only:
+{
+  "verdict": "specific" | "mixed" | "generalist",
+  "headline": "short plain-language verdict",
+  "summary": "2 sentences explaining the most important finding",
+  "strengths": ["specific strength", "specific strength"],
+  "recommendations": [
+    {
+      "id": "specificity",
+      "title": "Make the audience more specific",
+      "issue": "what is currently too broad or generic",
+      "change": "the concrete change to make",
+      "instruction": "an exact instruction for rewriting this draft",
+      "example": "optional example of the direction, not a full replacement post",
+      "priority": "high" | "medium"
+    }
+  ]
+}
+
+Rules:
+- "generalist" means the draft could have been written by almost anyone in the field; do not use it merely because the creator serves more than one audience.
+- Recommend no more than 3 changes. Only recommend a change when it is grounded in the actual draft and the creator context.
+- Prefer adding a concrete decision, scenario, consequence, audience, or point of view over adding buzzwords.
+- If the draft is already specific, return verdict "specific" and an empty recommendations array.
+- Each instruction must be usable as a refinement instruction for this exact draft.
+- Do not recommend changing the creator's permanent Brand DNA. This review is for the current draft only.`,
+      messages: [{
+        role: "user",
+        content: `Creator's Brand and Voice context:
+${dna || "No detailed Brand DNA is available yet."}
+
+Draft to review:
+${postText}
+
+Return the JSON review now.`,
+      }],
+    });
+
+    const block = completion.content[0];
+    if (block.type !== "text") {
+      res.status(500).json({ error: "Unexpected AI response" });
+      return;
+    }
+
+    const data = parseJson(block.text) as {
+      verdict?: unknown;
+      headline?: unknown;
+      summary?: unknown;
+      strengths?: unknown;
+      recommendations?: unknown;
+    };
+    const verdict = data.verdict === "specific" || data.verdict === "mixed" || data.verdict === "generalist"
+      ? data.verdict
+      : null;
+    const headline = typeof data.headline === "string" ? data.headline.trim() : "";
+    const summary = typeof data.summary === "string" ? data.summary.trim() : "";
+    const strengths = Array.isArray(data.strengths)
+      ? data.strengths.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()).slice(0, 3)
+      : [];
+    const recommendations = Array.isArray(data.recommendations)
+      ? data.recommendations
+        .filter((value): value is Record<string, unknown> => !!value && typeof value === "object")
+        .map((value, index) => ({
+          id: typeof value.id === "string" && value.id.trim() ? value.id.trim() : `recommendation-${index + 1}`,
+          title: typeof value.title === "string" ? value.title.trim() : "",
+          issue: typeof value.issue === "string" ? value.issue.trim() : "",
+          change: typeof value.change === "string" ? value.change.trim() : "",
+          instruction: typeof value.instruction === "string" ? value.instruction.trim() : "",
+          example: typeof value.example === "string" && value.example.trim() ? value.example.trim() : undefined,
+          priority: value.priority === "high" ? "high" as const : "medium" as const,
+        }))
+        .filter((value) => value.title && value.issue && value.change && value.instruction)
+        .slice(0, 3)
+      : [];
+
+    if (!verdict || !headline || !summary) {
+      console.error("[brand-review] unexpected shape. raw text:", block.text.slice(0, 500));
+      res.status(500).json({ error: "Invalid AI response shape" });
+      return;
+    }
+
+    res.json({ verdict, headline, summary, strengths, recommendations });
+  } catch (err) {
+    console.error("[brand-review]", err);
+    respondAiError(res, err, "Failed to review this draft");
+  }
+});
+
 router.get("/agent/themes", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   try {
     const recentDrafts = await db
