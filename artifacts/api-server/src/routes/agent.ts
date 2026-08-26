@@ -34,12 +34,45 @@ function parseJson(text: string): unknown {
   try {
     return JSON.parse(cleaned);
   } catch {
-    // Some models prepend a sentence before the JSON — fall back to the
-    // outermost braces.
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end <= start) throw new Error("No JSON object found in AI response");
-    return JSON.parse(cleaned.slice(start, end + 1));
+    // Some models prepend/append a sentence around the JSON. Find the first
+    // complete object or array while respecting quoted braces and brackets.
+    // Using lastIndexOf("}") is unsafe when the model returns an array or
+    // includes a brace inside a quoted string.
+    const objectStart = cleaned.indexOf("{");
+    const arrayStart = cleaned.indexOf("[");
+    const startCandidates = [objectStart, arrayStart].filter((index) => index >= 0);
+    if (startCandidates.length === 0) throw new Error("No JSON object or array found in AI response");
+
+    const start = Math.min(...startCandidates);
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = start; i < cleaned.length; i += 1) {
+      const char = cleaned[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === "\\") {
+          escaped = true;
+        } else if (char === "\"") {
+          inString = false;
+        }
+        continue;
+      }
+      if (char === "\"") {
+        inString = true;
+      } else if (char === "{" || char === "[") {
+        depth += 1;
+      } else if (char === "}" || char === "]") {
+        depth -= 1;
+        if (depth === 0) {
+          return JSON.parse(cleaned.slice(start, i + 1));
+        }
+      }
+    }
+
+    throw new Error("Incomplete JSON in AI response");
   }
 }
 
@@ -1404,7 +1437,9 @@ Content preview: ${content}`;
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 800,
+      // Five posts can produce ten 20–35-word angles plus explanations.
+      // 800 tokens can truncate the JSON before the closing array/object.
+      max_tokens: 8192,
       system: `You are a LinkedIn content strategist. Given a creator's top-performing posts, analyse what made each one resonate and generate follow-up angle suggestions.
 
 For each top post, generate 2 angles:
