@@ -453,10 +453,18 @@ export type BrandReviewRecommendation = {
   priority: "high" | "medium";
 };
 
+export type BrandReviewSignal = {
+  key: "specificity" | "positioning" | "voice";
+  label: string;
+  status: "strong" | "mixed" | "needs_attention";
+  detail: string;
+};
+
 export type BrandReviewResult = {
   verdict: "specific" | "mixed" | "generalist";
   headline: string;
   summary: string;
+  signals: BrandReviewSignal[];
   strengths: string[];
   recommendations: BrandReviewRecommendation[];
 };

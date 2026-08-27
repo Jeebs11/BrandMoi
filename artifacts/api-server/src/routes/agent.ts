@@ -882,6 +882,14 @@ Return JSON only:
   "verdict": "specific" | "mixed" | "generalist",
   "headline": "short plain-language verdict",
   "summary": "2 sentences explaining the most important finding",
+  "signals": [
+    {
+      "key": "specificity" | "positioning" | "voice",
+      "label": "short non-numeric status, such as 'Grounded in real experience'",
+      "status": "strong" | "mixed" | "needs_attention",
+      "detail": "1-2 sentences explaining this signal for this draft and what to do, if anything"
+    }
+  ],
   "strengths": ["specific strength", "specific strength"],
   "recommendations": [
     {
@@ -903,6 +911,7 @@ Rules:
 - If the draft is already specific, return verdict "specific" and an empty recommendations array.
 - Each instruction must be usable as a refinement instruction for this exact draft.
 - Do not recommend changing the creator's permanent Brand DNA. This review is for the current draft only.`,
+- Return exactly three signals in this order: specificity, positioning, voice. These are editorial guidance, not scores or proof of authorship.
       messages: [{
         role: "user",
         content: `Creator's Brand and Voice context:
@@ -925,6 +934,7 @@ Return the JSON review now.`,
       verdict?: unknown;
       headline?: unknown;
       summary?: unknown;
+      signals?: unknown;
       strengths?: unknown;
       recommendations?: unknown;
     };
@@ -933,6 +943,32 @@ Return the JSON review now.`,
       : null;
     const headline = typeof data.headline === "string" ? data.headline.trim() : "";
     const summary = typeof data.summary === "string" ? data.summary.trim() : "";
+    const allowedSignalKeys = ["specificity", "positioning", "voice"] as const;
+    type SignalKey = typeof allowedSignalKeys[number];
+    const parsedSignals = Array.isArray(data.signals)
+      ? data.signals
+        .filter((value): value is Record<string, unknown> => !!value && typeof value === "object")
+        .map((value) => ({
+          key: allowedSignalKeys.includes(value.key as SignalKey) ? value.key as SignalKey : null,
+          label: typeof value.label === "string" ? value.label.trim() : "",
+          status: value.status === "strong" || value.status === "mixed" || value.status === "needs_attention"
+            ? value.status
+            : null,
+          detail: typeof value.detail === "string" ? value.detail.trim() : "",
+        }))
+        .filter((value): value is { key: SignalKey; label: string; status: "strong" | "mixed" | "needs_attention"; detail: string } =>
+          !!value.key && !!value.label && !!value.status && !!value.detail)
+      : [];
+    const fallbackStatus = verdict === "specific" ? "strong" : verdict === "mixed" ? "mixed" : "needs_attention";
+    const fallbackSignals = allowedSignalKeys.map((key) => ({
+      key,
+      label: key === "specificity" ? "Review draft detail" : key === "positioning" ? "Review audience fit" : "Review voice fit",
+      status: fallbackStatus,
+      detail: summary || "Use the recommendations below as editorial guidance for this draft.",
+    }));
+    const signals = allowedSignalKeys.every((key) => parsedSignals.some((signal) => signal.key === key))
+      ? allowedSignalKeys.map((key) => parsedSignals.find((signal) => signal.key === key)!)
+      : fallbackSignals;
     const strengths = Array.isArray(data.strengths)
       ? data.strengths.filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()).slice(0, 3)
       : [];
@@ -958,7 +994,7 @@ Return the JSON review now.`,
       return;
     }
 
-    res.json({ verdict, headline, summary, strengths, recommendations });
+    res.json({ verdict, headline, summary, signals, strengths, recommendations });
   } catch (err) {
     console.error("[brand-review]", err);
     respondAiError(res, err, "Failed to review this draft");
