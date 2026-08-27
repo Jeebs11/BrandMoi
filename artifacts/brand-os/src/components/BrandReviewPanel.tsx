@@ -1,9 +1,11 @@
 import { createPortal } from "react-dom";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronRight, Edit3, Loader2, RotateCcw, Target, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ChevronUp, Edit3, ExternalLink, Loader2, RotateCcw, ShieldCheck, Target, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { BrandReviewRecommendation, BrandReviewResult } from "@/lib/api";
+import type { AuthenticityFeedback, AuthenticityReview } from "@/components/AuthenticityReviewDialog";
 
 type PendingBrandChange = {
   recommendation: BrandReviewRecommendation;
@@ -20,6 +22,12 @@ interface BrandReviewPanelProps {
   onApprove: () => void;
   onDiscard: () => void;
   onEditManually: () => void;
+  authenticityCheck?: AuthenticityReview;
+  feedback?: AuthenticityFeedback;
+  isSavingFeedback?: boolean;
+  onFeedback?: (value: AuthenticityFeedback) => void;
+  onSaveAndPublish?: () => void;
+  isPublishing?: boolean;
 }
 
 const VERDICT_COPY = {
@@ -50,9 +58,19 @@ export function BrandReviewPanel({
   onApprove,
   onDiscard,
   onEditManually,
+  authenticityCheck = null,
+  feedback = null,
+  isSavingFeedback = false,
+  onFeedback,
+  onSaveAndPublish,
+  isPublishing = false,
 }: BrandReviewPanelProps) {
   const verdict = result ? VERDICT_COPY[result.verdict] : null;
   const isReviewingChange = !!pendingChange;
+  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
+  const changedPercent = authenticityCheck?.editPct !== null && authenticityCheck?.editPct !== undefined
+    ? Math.round(authenticityCheck.editPct * 100)
+    : null;
 
   return createPortal(
     <AnimatePresence>
@@ -131,6 +149,37 @@ export function BrandReviewPanel({
                       <p className="text-[11px] text-gray-400 mt-1">These recommendations apply to this draft only. Your permanent Brand DNA will not change.</p>
                     </div>
 
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Quick glance</p>
+                      <div className="space-y-2">
+                        {result.signals.map((signal) => {
+                          const isExpanded = expandedSignal === signal.key;
+                          const tone = signal.status === "strong"
+                            ? "border-emerald-100 bg-emerald-50/70 text-emerald-800"
+                            : signal.status === "mixed"
+                            ? "border-amber-100 bg-amber-50/70 text-amber-800"
+                            : "border-orange-100 bg-orange-50/70 text-orange-800";
+                          const Icon = signal.status === "strong" ? Check : signal.status === "mixed" ? AlertTriangle : Target;
+                          return (
+                            <button
+                              key={signal.key}
+                              type="button"
+                              onClick={() => setExpandedSignal(isExpanded ? null : signal.key)}
+                              className={cn("w-full rounded-2xl border px-3.5 py-3 text-left transition-colors", tone)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-4 w-4 flex-none" />
+                                <span className="flex-1 text-xs font-extrabold capitalize">{signal.key}</span>
+                                <span className="text-xs font-semibold">{signal.label}</span>
+                                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                              </div>
+                              {isExpanded && <p className="mt-2 border-t border-current/10 pt-2 text-xs leading-relaxed">{signal.detail}</p>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {result.strengths.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
                         {result.strengths.map((strength) => (
@@ -183,14 +232,66 @@ export function BrandReviewPanel({
                         <p className="text-xs text-emerald-700 mt-1 leading-relaxed">{verdict.description}</p>
                       </div>
                     )}
+
+                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-start gap-2">
+                        <ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-violet-600" />
+                        <div>
+                          <p className="text-xs font-extrabold text-gray-900">Transparent draft check</p>
+                          <p className="mt-1 text-[11px] leading-relaxed text-gray-500">This compares the original draft with your final edits and looks for common generic patterns. It does not claim to detect AI authorship.</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2 text-xs text-gray-700">
+                        {changedPercent !== null && (
+                          <p>You changed about <strong>{changedPercent}%</strong> of the original draft.</p>
+                        )}
+                        {authenticityCheck?.flags.length ? (
+                          <ul className="space-y-1.5">
+                            {authenticityCheck.flags.map((flag) => (
+                              <li key={flag} className="flex items-start gap-2">
+                                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                <span>May read as <strong>{flag}</strong>.</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-emerald-700">No common generic patterns were found.</p>
+                        )}
+                      </div>
+                      {onFeedback && (
+                        <div className="mt-3 border-t border-gray-200 pt-3">
+                          <p className="text-[11px] text-gray-500">Optional: this helps guide future drafts you request.</p>
+                          <button
+                            type="button"
+                            disabled={isSavingFeedback}
+                            onClick={() => onFeedback(feedback === "sounds_like_me" ? null : "sounds_like_me")}
+                            className={cn(
+                              "mt-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50",
+                              feedback === "sounds_like_me"
+                                ? "border-violet-500 bg-violet-600 text-white"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:text-violet-700",
+                            )}
+                          >
+                            {feedback === "sounds_like_me" && <Check className="mr-1 inline h-3 w-3" />}
+                            Sounds like me
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
               {!isLoading && result && (
-                <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex-shrink-0">
-                  <Button variant="outline" className="w-full h-11 rounded-2xl text-sm font-bold" onClick={onEditManually}>
-                    <Edit3 className="w-4 h-4 mr-2" />Edit the draft manually
+                <div className="px-5 pb-6 pt-3 border-t border-gray-100 flex-shrink-0 flex gap-3">
+                  <Button variant="outline" className="flex-1 h-11 rounded-2xl text-sm font-bold" onClick={onEditManually}>
+                    <Edit3 className="w-4 h-4 mr-2" />Edit
                   </Button>
+                  {onSaveAndPublish && (
+                    <Button className="flex-[1.45] h-11 rounded-2xl text-sm font-bold bg-violet-600 hover:bg-violet-700" onClick={onSaveAndPublish} disabled={isPublishing}>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      {isPublishing ? "Saving…" : "Save, copy & open LinkedIn"}
+                    </Button>
+                  )}
                 </div>
               )}
             </>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useSearch } from "wouter";
-import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Zap, ChevronDown, ChevronUp, AlertTriangle, XCircle, Star, ThumbsUp, MessageCircle, Repeat2, Users } from "lucide-react";
+import { Pencil, Trash2, MoreVertical, CheckCircle2, Clock, FileText, BookOpen, BarChart2, X, CalendarDays, Sparkles, Loader2, Upload, Eye, Copy, Check, Star, ThumbsUp, MessageCircle, Repeat2, Users } from "lucide-react";
 import { useListDrafts, useDeleteDraft, useUpdateDraft, useCreateDraft } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
-import { performanceApi, resonanceMapApi, diagnosisApi, agentApi, studioApi, topicsApi, authenticityApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type StressTestScoreEntry, type StressTestFactor, type Topic, type ResonanceMapEntry } from "@/lib/api";
+import { performanceApi, resonanceMapApi, diagnosisApi, studioApi, topicsApi, authenticityApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type Topic, type ResonanceMapEntry } from "@/lib/api";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { CalendarHeatmap } from "@/components/CalendarHeatmap";
 import {
@@ -110,7 +110,6 @@ export default function Library() {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [resonanceMap, setResonanceMap] = useState<Record<string, ResonanceMapEntry>>({});
-  const [stressScoreMap, setStressScoreMap] = useState<Record<string, StressTestScoreEntry>>({});
   const [diagnosisPanel, setDiagnosisPanel] = useState<{ draftId: number; topic: string; diagnosis: PostDiagnosis | null; loading: boolean } | null>(null);
   const [publishReview, setPublishReview] = useState<{ draftId: number; feedback: AuthenticityFeedback } | null>(null);
   const [publishReviewCheck, setPublishReviewCheck] = useState<AuthenticityReview>(null);
@@ -129,11 +128,7 @@ export default function Library() {
     resonanceMapApi.get().then(setResonanceMap).catch(() => {});
   };
 
-  const loadStressScoreMap = () => {
-    agentApi.stressTestScores().then(setStressScoreMap).catch(() => {});
-  };
-
-  useEffect(() => { loadResonanceMap(); loadStressScoreMap(); }, []);
+  useEffect(() => { loadResonanceMap(); }, []);
   useEffect(() => { topicsApi.list().then(setTopics).catch(() => {}); }, []);
 
   const openDiagnosis = async (draftId: number, topic: string, cachedDiagnosis?: PostDiagnosis | null) => {
@@ -398,18 +393,6 @@ export default function Library() {
                             )}
                           </>
                         )}
-                        {stressScoreMap[String(draft.id)] !== undefined && (
-                          <span className={cn(
-                            "text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5",
-                            stressScoreMap[String(draft.id)].publishReady
-                              ? "bg-emerald-50 text-emerald-700"
-                              : stressScoreMap[String(draft.id)].score >= 65
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-red-50 text-red-600"
-                          )}>
-                            {stressScoreMap[String(draft.id)].score}/100
-                          </span>
-                        )}
                       </div>
                       {(resonanceMap[String(draft.id)]?.resonance ?? 0) >= 60 && (
                         <button
@@ -524,7 +507,6 @@ export default function Library() {
             draft={viewDraft}
             onClose={() => setViewDraft(null)}
             onEdit={() => { setViewDraft(null); navigate(`/capture?draftId=${viewDraft.id}`); }}
-            stressScore={stressScoreMap[String(viewDraft.id)]}
           />
         )}
 
@@ -641,64 +623,17 @@ export default function Library() {
   );
 }
 
-function FactorBreakdown({ factors }: { factors: StressTestFactor[] }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
-  return (
-    <div className="px-4 pb-4 space-y-1.5 border-t border-gray-100">
-      {factors.map((f, i) => {
-        const pct = f.score / f.maxScore;
-        const FactorIcon = pct >= 1 ? CheckCircle2 : pct >= 0.6 ? AlertTriangle : XCircle;
-        const iconColor = pct >= 1 ? "text-emerald-500" : pct >= 0.6 ? "text-amber-500" : "text-red-500";
-        const isOpen = expanded === i;
-        return (
-          <div key={i} className="bg-white rounded-xl overflow-hidden">
-            <button
-              onClick={() => setExpanded(isOpen ? null : i)}
-              className="w-full flex items-center gap-2.5 p-3 text-left"
-            >
-              <FactorIcon className={cn("w-4 h-4 flex-shrink-0", iconColor)} />
-              <span className="flex-1 text-xs font-semibold text-gray-800">{f.name}</span>
-              <span className={cn("text-xs font-bold tabular-nums mr-1", pct >= 1 ? "text-emerald-600" : pct >= 0.6 ? "text-amber-600" : "text-red-500")}>
-                {f.score}/{f.maxScore}
-              </span>
-              {isOpen ? <ChevronUp className="w-3 h-3 text-gray-400" /> : <ChevronDown className="w-3 h-3 text-gray-400" />}
-            </button>
-            {isOpen && (
-              <div className="px-3 pb-3 space-y-1.5 border-t border-gray-100">
-                {f.why && (
-                  <p className="text-[11px] text-gray-600 leading-relaxed">
-                    <span className="font-semibold text-gray-700">Why: </span>{f.why}
-                  </p>
-                )}
-                {f.howToFix && (
-                  <p className="text-[11px] text-gray-600 leading-relaxed">
-                    <span className="font-semibold text-gray-700">How to fix: </span>{f.howToFix}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-      <p className="text-[10px] text-gray-400 text-center pt-1">Open in editor to apply fixes and re-test</p>
-    </div>
-  );
-}
-
 function ViewPostModal({
   draft,
   onClose,
   onEdit,
-  stressScore,
 }: {
   draft: { id: number; topic: string; postOutput: string | null; shortPost: string | null; status: string; audience: string; feeling: string };
   onClose: () => void;
   onEdit: () => void;
-  stressScore?: StressTestScoreEntry;
 }) {
   const [activeTab, setActiveTab] = useState<"post" | "short">("post");
   const [copied, setCopied] = useState(false);
-  const [stressExpanded, setStressExpanded] = useState(false);
 
   const text = activeTab === "short" ? draft.shortPost : draft.postOutput;
 
@@ -775,42 +710,6 @@ function ViewPostModal({
             </div>
           )}
 
-          {/* Stress test score section */}
-          {stressScore && (
-            <div className={cn(
-              "border rounded-2xl overflow-hidden",
-              stressScore.publishReady ? "border-emerald-200 bg-emerald-50/50" : stressScore.score >= 65 ? "border-amber-200 bg-amber-50/50" : "border-red-200 bg-red-50/50"
-            )}>
-              <button
-                className="w-full flex items-center justify-between px-4 py-3"
-                onClick={() => setStressExpanded((v) => !v)}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Zap className={cn("w-4 h-4", stressScore.publishReady ? "text-emerald-600" : stressScore.score >= 65 ? "text-amber-600" : "text-red-500")} />
-                  <div className="text-left">
-                    <p className="text-xs font-extrabold text-gray-800">Stress Test Score</p>
-                    <p className={cn("text-[10px] font-semibold", stressScore.publishReady ? "text-emerald-700" : stressScore.score >= 65 ? "text-amber-700" : "text-red-600")}>
-                      {stressScore.publishReady ? "Publish ready" : stressScore.score >= 65 ? "Needs minor fixes" : "Needs improvement"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={cn("text-xl font-black tabular-nums", stressScore.publishReady ? "text-emerald-700" : stressScore.score >= 65 ? "text-amber-700" : "text-red-600")}>
-                    {stressScore.score}
-                  </span>
-                  {stressExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                </div>
-              </button>
-
-              {stressExpanded && stressScore.factors && stressScore.factors.length > 0 && (
-                <FactorBreakdown factors={stressScore.factors} />
-              )}
-
-              {stressExpanded && (!stressScore.factors || stressScore.factors.length === 0) && (
-                <p className="px-4 pb-4 text-xs text-gray-400">Factor breakdown not available for this result.</p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Footer actions */}

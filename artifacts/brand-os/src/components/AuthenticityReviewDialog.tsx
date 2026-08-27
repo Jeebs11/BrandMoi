@@ -28,9 +28,6 @@ const FEEDBACK_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "sounds_like_me", label: "Sounds like me" },
-  { value: "too_generic", label: "Too generic" },
-  { value: "needs_specificity", label: "Needs a real detail" },
-  { value: "too_polished", label: "Too polished" },
 ];
 
 type Props = {

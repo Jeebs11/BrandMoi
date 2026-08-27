@@ -637,6 +637,14 @@ const StressTestBody = z.object({
 });
 
 router.post("/agent/stress-test", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
+  // The scorecard has been retired in favour of the draft-level Brand Review.
+  // Preserve historical records and the read route below, but never create
+  // another subjective score.
+  if (req.method === "POST") {
+    res.status(410).json({ error: "Stress Test has been retired. Use Brand Review instead." });
+    return;
+  }
+
   const parsed = StressTestBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "postContent is required." }); return; }
 
@@ -910,8 +918,8 @@ Rules:
 - Prefer adding a concrete decision, scenario, consequence, audience, or point of view over adding buzzwords.
 - If the draft is already specific, return verdict "specific" and an empty recommendations array.
 - Each instruction must be usable as a refinement instruction for this exact draft.
-- Do not recommend changing the creator's permanent Brand DNA. This review is for the current draft only.`,
-- Return exactly three signals in this order: specificity, positioning, voice. These are editorial guidance, not scores or proof of authorship.
+- Do not recommend changing the creator's permanent Brand DNA. This review is for the current draft only.
+- Return exactly three signals in this order: specificity, positioning, voice. These are editorial guidance, not scores or proof of authorship.`,
       messages: [{
         role: "user",
         content: `Creator's Brand and Voice context:

@@ -6,9 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, ChevronLeft, RefreshCw, Copy, Save, Newspaper,
   Image as ImageIcon, Layout, BarChart3, PenTool, Wand2,
-  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, Zap, CheckCircle2,
+  ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, CheckCircle2,
 } from "lucide-react";
-import { StressTestPanel, type StressTestResult } from "@/components/StressTestPanel";
 import { BrandReviewPanel } from "@/components/BrandReviewPanel";
 import { PostMeter } from "@/components/PostMeter";
 import { agentApi, analyticsApi, authenticityApi, seriesApi, type BrandReviewRecommendation, type BrandReviewResult, type SeriesDetail } from "@/lib/api";
@@ -33,7 +32,6 @@ import { downloadVisualCard } from "@/lib/export-visual-card";
 import { downloadInfographic } from "@/lib/export-infographic";
 import { downloadIllustrationCard } from "@/lib/export-illustration";
 import {
-  AuthenticityReviewDialog,
   type AuthenticityFeedback,
   type AuthenticityReview,
 } from "@/components/AuthenticityReviewDialog";
@@ -135,6 +133,41 @@ function toneFromFeeling(feeling: string): string {
   }
 }
 
+const LINKEDIN_COMPOSER_URL = "https://www.linkedin.com/feed/?shareActive=true";
+
+type PublishStatus = {
+  text: string;
+  copy: "checking" | "copied" | "failed";
+  linkedIn: "opened" | "blocked";
+};
+
+async function copyTextWithFallback(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Some browsers deny Clipboard API access in embedded previews. Try the
+    // older user-gesture-based route before reporting a failure.
+  }
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied;
+  } catch {
+    return false;
+  }
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function Capture() {
@@ -201,25 +234,17 @@ export default function Capture() {
   const [isLoadingVisual, setIsLoadingVisual] = useState(false);
   const [isLoadingIllustration, setIsLoadingIllustration] = useState(false);
   const downloadedVisualRef = useRef<string | null>(null);
-  const [stressTestOpen, setStressTestOpen] = useState(false);
-  const [stressTestResult, setStressTestResult] = useState<StressTestResult | null>(null);
-  const [isStressTestLoading, setIsStressTestLoading] = useState(false);
-  const [isApplyingFixes, setIsApplyingFixes] = useState(false);
-  const [stressTestSourceTab, setStressTestSourceTab] = useState<"post" | "short">("post");
-  const [pendingRefinedContent, setPendingRefinedContent] = useState<string | null>(null);
-  // The exact text last stress-tested, so we know when the cached result is
-  // stale (post edited since) and can reopen the result without re-spending.
-  const [stressTestedText, setStressTestedText] = useState<string | null>(null);
   const [brandReviewOpen, setBrandReviewOpen] = useState(false);
   const [brandReviewResult, setBrandReviewResult] = useState<BrandReviewResult | null>(null);
+  const [brandReviewEvidence, setBrandReviewEvidence] = useState<AuthenticityReview>(null);
+  const [brandReviewIsForPublish, setBrandReviewIsForPublish] = useState(false);
   const [isBrandReviewLoading, setIsBrandReviewLoading] = useState(false);
   const [isApplyingBrandReviewId, setIsApplyingBrandReviewId] = useState<string | null>(null);
   const [pendingBrandChange, setPendingBrandChange] = useState<{ recommendation: BrandReviewRecommendation; content: string } | null>(null);
-  const [authenticityReviewOpen, setAuthenticityReviewOpen] = useState(false);
-  const [authenticityReview, setAuthenticityReview] = useState<AuthenticityReview>(null);
   const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
   const [authenticityFeedback, setAuthenticityFeedback] = useState<AuthenticityFeedback>(null);
   const [isSavingAuthenticityFeedback, setIsSavingAuthenticityFeedback] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<PublishStatus | null>(null);
 
   // ── Series context (banner + continuity for prompt) ────────────────────
   const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
@@ -425,8 +450,7 @@ export default function Capture() {
     } as StructuredBreakdown & Record<string, unknown>;
   };
 
-  // Shared across all three save payloads below (draft save, ship, and the
-  // silent stress-test auto-save) so a part always carries its series/topic tags.
+  // Shared across save payloads so a part always carries its series/topic tags.
   const seriesFields = {
     ...(topicId ? { topicId } : {}),
     ...(seriesId ? { seriesId } : {}),
@@ -535,20 +559,38 @@ export default function Capture() {
       return;
     }
 
-    // This action is the explicit second click from the review dialog, so the
-    // clipboard and LinkedIn tab still run synchronously for popup blockers.
-    const shipText = [editedPost, content.hashtags ?? ""].filter(Boolean).join("\n\n");
-    void navigator.clipboard.writeText(shipText);
-    window.open("https://www.linkedin.com/feed/?shareActive=true", "_blank", "noopener");
-    setAuthenticityReviewOpen(false);
+    // This is the explicit action from the review panel, so opening a tab still
+    // occurs synchronously and is less likely to be blocked by the browser.
+    const shipText = [editedPost.trimEnd(), hashtags.trim()].filter(Boolean).join("\n\n");
+    let linkedIn: PublishStatus["linkedIn"] = "blocked";
+    try {
+      const linkedInWindow = window.open("", "_blank");
+      if (linkedInWindow) {
+        linkedInWindow.opener = null;
+        linkedInWindow.location.href = LINKEDIN_COMPOSER_URL;
+        linkedIn = "opened";
+      }
+    } catch {
+      linkedIn = "blocked";
+    }
+    setBrandReviewOpen(false);
+    setBrandReviewIsForPublish(false);
+    setPublishStatus({ text: shipText, copy: "checking", linkedIn });
+    void copyTextWithFallback(shipText).then((copied) => {
+      setPublishStatus((current) => current ? { ...current, copy: copied ? "copied" : "failed" } : current);
+      toast(copied
+        ? { title: "Post copied", description: "Your latest post and hashtags are ready to paste into LinkedIn." }
+        : { title: "Couldn't copy automatically", description: "Use the Copy post button below, then paste into LinkedIn.", variant: "destructive" },
+      );
+    });
 
     const payload = buildDraftPayload("published");
     if (savedDraftId) {
       updateDraft(
         { id: savedDraftId, data: payload },
         {
-          onSuccess: (updated) => {
-            toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
+          onSuccess: () => {
+            toast({ title: "Saved for publishing", description: "The current post and hashtags have been saved." });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
             showBestTimeHint();
           },
@@ -561,7 +603,7 @@ export default function Capture() {
         {
           onSuccess: (newDraft) => {
             setSavedDraftId(newDraft.id);
-            toast({ title: "🚀 Shipped", description: "Post copied to clipboard — paste it into the LinkedIn composer that just opened." });
+            toast({ title: "Saved for publishing", description: "The current post and hashtags have been saved." });
             showBestTimeHint();
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
@@ -571,27 +613,56 @@ export default function Capture() {
   };
 
   const handleSaveAndPublish = async () => {
-    if (!content || isCheckingAuthenticity) {
+    if (!content || isCheckingAuthenticity || isBrandReviewLoading) {
       if (!content) toast({ title: "Nothing to save yet", variant: "destructive" });
       return;
     }
+    void handleBrandReview(fullPost, true);
+  };
+
+  const retryPublishCopy = () => {
+    if (!publishStatus) return;
+    setPublishStatus((current) => current ? { ...current, copy: "checking" } : current);
+    void copyTextWithFallback(publishStatus.text).then((copied) => {
+      setPublishStatus((current) => current ? { ...current, copy: copied ? "copied" : "failed" } : current);
+      toast(copied
+        ? { title: "Post copied", description: "Your latest post and hashtags are ready to paste." }
+        : { title: "Couldn't copy automatically", description: "Select the post in the editor and copy it manually.", variant: "destructive" },
+      );
+    });
+  };
+
+  // ── Draft Brand Review ─────────────────────────────────────────────────
+  const handleBrandReview = async (postText: string, forPublish = false) => {
+    if (!postText.trim() || isBrandReviewLoading) return;
+    setBrandReviewOpen(true);
+    setBrandReviewResult(null);
+    setBrandReviewEvidence(null);
+    setBrandReviewIsForPublish(forPublish);
+    setPendingBrandChange(null);
+    setIsBrandReviewLoading(true);
     setIsCheckingAuthenticity(true);
     try {
-      const { check } = await authenticityApi.check(
-        savedDraftId
-          ? { draftId: savedDraftId, postOutput: editedPost }
-          : { aiOriginalPost: versions[0]?.post ?? null, postOutput: editedPost },
-      );
-      setAuthenticityReview(check);
-      setAuthenticityReviewOpen(true);
+      const authenticityRequest = savedDraftId
+        ? { draftId: savedDraftId, postOutput: editedPost }
+        : { aiOriginalPost: versions[0]?.post ?? null, postOutput: editedPost };
+      const [brandReview, authenticityReview] = await Promise.all([
+        agentApi.brandReview(postText),
+        authenticityApi.check(authenticityRequest),
+      ]);
+      setBrandReviewResult(brandReview);
+      setBrandReviewEvidence(authenticityReview.check);
     } catch (err) {
+      setBrandReviewOpen(false);
+      setBrandReviewIsForPublish(false);
       toast({
-        title: "Couldn't run the review",
+        title: "Couldn't run Brand Review",
         description: err instanceof Error ? err.message : "Try again.",
         variant: "destructive",
       });
     } finally {
       setIsCheckingAuthenticity(false);
+      setIsBrandReviewLoading(false);
     }
   };
 
@@ -638,135 +709,6 @@ export default function Capture() {
   const copy = (text: string, label = "Copied") => {
     void navigator.clipboard.writeText(text);
     toast({ title: label });
-  };
-
-  // ── Stress Test ──────────────────────────────────────────────────────
-
-  // Silently creates a draft if one doesn't exist yet, so every stress test
-  // result can be persisted with a draftId. Returns the draftId on success.
-  const ensureDraftSaved = (): Promise<number | null> => {
-    if (savedDraftId) return Promise.resolve(savedDraftId);
-    if (!content) return Promise.resolve(null);
-    const payload = {
-      rawInput,
-      objective: objectiveFromAudience(audience),
-      persona: preferences?.persona ?? "Founder",
-      tone: toneFromFeeling(feeling),
-      structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
-      postOutput: editedPost,
-      aiOriginalPost: versions[0]?.post ?? null,
-      shortPost: content.shortPost ?? "",
-      carouselOutput: JSON.stringify(content.carousel ?? []),
-      visualOutput: content.visual ?? "",
-      status: "draft" as const,
-      visualStyle,
-      contentSource: "capture" as CreateDraftBodyContentSource,
-      authenticityFeedback,
-      ...seriesFields,
-    };
-    return new Promise((resolve) => {
-      createDraft(
-        { data: payload },
-        {
-          onSuccess: (newDraft) => { setSavedDraftId(newDraft.id); resolve(newDraft.id); },
-          onError: () => resolve(null),
-        }
-      );
-    });
-  };
-
-  const handleStressTest = async (postText: string, sourceTab: "post" | "short" = "post") => {
-    setStressTestSourceTab(sourceTab);
-    setStressTestOpen(true);
-    setStressTestResult(null);
-    setIsStressTestLoading(true);
-    try {
-      // Auto-save draft so every successful test gets persisted with a draftId
-      const draftIdForTest = await ensureDraftSaved();
-      const result = await agentApi.stressTest(postText, draftIdForTest);
-      setStressTestResult(result);
-      setStressTestedText(postText);
-    } catch (err) {
-      toast({ title: "Stress test failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-      setStressTestOpen(false);
-    } finally {
-      setIsStressTestLoading(false);
-    }
-  };
-
-  const handleApplyFixes = () => {
-    if (!stressTestResult?.fixes?.length || !content) return;
-    setIsApplyingFixes(true);
-    const isShort = stressTestSourceTab === "short";
-    const sourceContent = isShort ? (content.shortPost ?? "") : editedPost;
-    const fixInstruction = `Apply these specific improvements: ${stressTestResult.fixes.join("; ")}. Keep the same topic, voice, and structure — only make the targeted changes listed.`;
-    refineContent(
-      { data: { content: sourceContent, instruction: fixInstruction, tab: stressTestSourceTab } },
-      {
-        onSuccess: (data) => {
-          const refined = data.content ?? sourceContent;
-          // Show for review — don't apply until user approves
-          setPendingRefinedContent(refined);
-          setIsApplyingFixes(false);
-        },
-        onError: (err) => {
-          toast({ title: "Fix failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-          setIsApplyingFixes(false);
-        },
-      }
-    );
-  };
-
-  const handleApproveRefinement = async () => {
-    if (!pendingRefinedContent || !content) return;
-    const isShort = stressTestSourceTab === "short";
-    const refined = pendingRefinedContent;
-    setPendingRefinedContent(null);
-    if (isShort) {
-      setContent((c) => c ? { ...c, shortPost: refined } : c);
-    } else {
-      setEditedPost(refined);
-      setContent((c) => c ? { ...c, post: refined } : c);
-      // Snapshot the post-tab rewrite so the user can flip back to the
-      // pre-fix version from the Versions strip.
-      addVersion("Fixes applied", refined, hashtags);
-    }
-    // Re-score after applying
-    setIsStressTestLoading(true);
-    try {
-      const retestContent = isShort ? refined : `${refined}${hashtags ? `\n\n${hashtags}` : ""}`;
-      const result = await agentApi.stressTest(retestContent, savedDraftId, true);
-      setStressTestResult(result);
-      // Keep the cached-result tracker in sync so the new score isn't
-      // immediately flagged "edited since".
-      setStressTestedText(retestContent);
-    } catch {
-      // keep existing result if re-test fails
-    } finally {
-      setIsStressTestLoading(false);
-    }
-  };
-
-  const handleDiscardRefinement = () => {
-    setPendingRefinedContent(null);
-  };
-
-  // ── Draft Brand Review ─────────────────────────────────────────────────
-  const handleBrandReview = async (postText: string) => {
-    if (!postText.trim() || isBrandReviewLoading) return;
-    setBrandReviewOpen(true);
-    setBrandReviewResult(null);
-    setPendingBrandChange(null);
-    setIsBrandReviewLoading(true);
-    try {
-      const result = await agentApi.brandReview(postText);
-      setBrandReviewResult(result);
-    } catch (err) {
-      toast({ title: "Brand review failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-      setBrandReviewOpen(false);
-    } finally {
-      setIsBrandReviewLoading(false);
-    }
   };
 
   const handleApplyBrandRecommendation = (recommendation: BrandReviewRecommendation) => {
@@ -900,27 +842,49 @@ export default function Capture() {
             onSave={handleSave}
             onSaveAndPublish={handleSaveAndPublish}
             onCopy={copy}
-            onStressTest={handleStressTest}
-            isStressTestLoading={isStressTestLoading}
-            cachedStressScore={stressTestResult?.score ?? null}
-            stressStale={!!stressTestResult && stressTestedText !== null && stressTestedText !== fullPost}
-            onViewStressTest={() => setStressTestOpen(true)}
             onBrandReview={handleBrandReview}
             isBrandReviewLoading={isBrandReviewLoading}
           />
         )}
 
-        {stressTestOpen && (
-          <StressTestPanel
-            result={stressTestResult}
-            isLoading={isStressTestLoading}
-            onClose={() => { setStressTestOpen(false); setPendingRefinedContent(null); }}
-            onApplyFixes={handleApplyFixes}
-            isApplying={isApplyingFixes}
-            pendingContent={pendingRefinedContent}
-            onApprove={handleApproveRefinement}
-            onDiscard={handleDiscardRefinement}
-          />
+        {publishStatus && (
+          <div className={cn(
+            "mt-4 rounded-2xl border p-4 text-sm",
+            publishStatus.copy === "failed" || publishStatus.linkedIn === "blocked"
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-emerald-200 bg-emerald-50 text-emerald-950",
+          )}>
+            <p className="font-bold">
+              {publishStatus.copy === "checking"
+                ? "Preparing your post for LinkedIn…"
+                : publishStatus.copy === "copied"
+                ? "Your post and hashtags are copied."
+                : "Your post could not be copied automatically."}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed">
+              {publishStatus.linkedIn === "opened"
+                ? "LinkedIn opened in a new tab. Paste the copied text there, then publish manually."
+                : "Your browser blocked the LinkedIn tab. Open LinkedIn below, then paste and publish manually."}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {publishStatus.copy !== "copied" && (
+                <Button size="sm" variant="outline" onClick={retryPublishCopy}>
+                  <Copy className="mr-1.5 h-3.5 w-3.5" />Try copying again
+                </Button>
+              )}
+              {publishStatus.linkedIn === "blocked" && (
+                <a
+                  href={LINKEDIN_COMPOSER_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90"
+                >
+                  Open LinkedIn
+                </a>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setPublishStatus(null)}>Dismiss</Button>
+            </div>
+          </div>
         )}
 
         {brandReviewOpen && (
@@ -934,20 +898,14 @@ export default function Capture() {
             onApprove={handleApproveBrandChange}
             onDiscard={() => setPendingBrandChange(null)}
             onEditManually={handleEditDraftManually}
+            authenticityCheck={brandReviewEvidence}
+            feedback={authenticityFeedback}
+            isSavingFeedback={isSavingAuthenticityFeedback}
+            onFeedback={handleAuthenticityFeedback}
+            onSaveAndPublish={brandReviewIsForPublish ? completePublish : undefined}
+            isPublishing={isSaving}
           />
         )}
-
-        <AuthenticityReviewDialog
-          open={authenticityReviewOpen}
-          check={authenticityReview}
-          feedback={authenticityFeedback}
-          isSavingFeedback={isSavingAuthenticityFeedback}
-          continueLabel="Copy & open LinkedIn"
-          onOpenChange={setAuthenticityReviewOpen}
-          onEdit={() => setAuthenticityReviewOpen(false)}
-          onContinue={completePublish}
-          onFeedback={handleAuthenticityFeedback}
-        />
 
         {/* Loading overlay — rendered via portal so fixed positioning is always viewport-relative.
             AnimatePresence is always mounted (outside the condition) so the exit fade plays
@@ -1296,11 +1254,6 @@ interface ResultViewProps {
   onSave: () => void;
   onSaveAndPublish?: () => void;
   onCopy: (text: string, label?: string) => void;
-  onStressTest: (postText: string, sourceTab: "post" | "short") => void;
-  cachedStressScore: number | null;
-  stressStale: boolean;
-  onViewStressTest: () => void;
-  isStressTestLoading: boolean;
   onBrandReview: (postText: string) => void;
   isBrandReviewLoading: boolean;
 }
@@ -1315,8 +1268,7 @@ function ResultView(props: ResultViewProps) {
     fullPost, audience, feeling, isRefining, isSaving, isCheckingAuthenticity, isDemo,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
-    onSave, onSaveAndPublish, onCopy, onStressTest, isStressTestLoading,
-    cachedStressScore, stressStale, onViewStressTest, onBrandReview, isBrandReviewLoading,
+    onSave, onSaveAndPublish, onCopy, onBrandReview, isBrandReviewLoading,
   } = props;
 
   return (
@@ -1506,32 +1458,6 @@ function ResultView(props: ResultViewProps) {
           )}
           <Button
             variant="outline"
-            className="w-full border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"
-            onClick={() => onStressTest(fullPost, "post")}
-            disabled={isStressTestLoading || isRefining}
-          >
-            <Zap className="w-3.5 h-3.5 mr-1.5" />
-            {isStressTestLoading ? "Analysing…" : cachedStressScore !== null ? "Re-run Stress Test" : "Stress Test"}
-          </Button>
-          {cachedStressScore !== null && !isStressTestLoading && (
-            <button
-              onClick={onViewStressTest}
-              className={cn(
-                "col-span-2 flex items-center justify-center gap-2 text-xs font-bold py-2 rounded-xl border transition-colors",
-                stressStale
-                  ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                  : "border-violet-100 bg-violet-50 text-violet-700 hover:bg-violet-100"
-              )}
-            >
-              <span className={cn(
-                "text-[10px] font-black px-1.5 py-0.5 rounded-full",
-                cachedStressScore >= 80 ? "bg-emerald-100 text-emerald-700" : cachedStressScore >= 60 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"
-              )}>{cachedStressScore}</span>
-              {stressStale ? "Post edited since — review or re-run" : "View last stress test"}
-            </button>
-          )}
-          <Button
-            variant="outline"
             className="w-full border-sky-200 text-sky-700 hover:bg-sky-50 hover:border-sky-400"
             onClick={() => onBrandReview(fullPost)}
             disabled={isBrandReviewLoading || isRefining}
@@ -1545,18 +1471,9 @@ function ResultView(props: ResultViewProps) {
       {activeTab === "short" && (
         <div className="space-y-3">
           <pre className="whitespace-pre-wrap text-sm p-4 bg-gray-50 rounded-xl">{content.shortPost ?? "No short version yet."}</pre>
-          <div className="grid grid-cols-2 gap-2">
+          <div>
             <Button variant="outline" onClick={() => onCopy(content.shortPost ?? "", "Short post copied")}>
               <Copy className="w-3.5 h-3.5 mr-1" />Copy
-            </Button>
-            <Button
-              variant="outline"
-              className="border-violet-200 text-violet-700 hover:bg-violet-50 hover:border-violet-400"
-              onClick={() => onStressTest(content.shortPost ?? "", "short")}
-              disabled={isStressTestLoading}
-            >
-              <Zap className="w-3.5 h-3.5 mr-1.5" />
-              {isStressTestLoading ? "Analysing…" : "Stress Test"}
             </Button>
           </div>
         </div>
