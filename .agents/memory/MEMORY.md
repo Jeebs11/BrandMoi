@@ -1,1 +1,2 @@
 - [Voice signal precedence](voice-signal-precedence.md) — direct author evidence outranks inferred, performance, and external feedback; missing LinkedIn fields remain unknown.
+- [GitHub write-path blocking](github-write-path-blocking.md) — healthy GitHub reads can coexist with blocked writes; preserve the local commit and never force-update a remote branch.
