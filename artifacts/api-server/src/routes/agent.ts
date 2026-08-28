@@ -12,7 +12,7 @@ import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
-import { runAuthenticityCheck, type AuthenticityCheck } from "../lib/authenticity-check.js";
+import { computeEditPercent, runAuthenticityCheck, type AuthenticityCheck } from "../lib/authenticity-check.js";
 
 // Legacy-objective → modern-audience fallback for drafts saved before the
 // audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
@@ -1071,7 +1071,12 @@ Return the JSON review now.`,
       return;
     }
 
-    const authenticityCheck = runAuthenticityCheck(draft?.aiOriginalPost, postText);
+    const authenticityCheck = runAuthenticityCheck(draft?.aiOriginalPost, postText)
+      ?? {
+        editPct: computeEditPercent(draft?.aiOriginalPost, postText),
+        flags: [],
+        severity: "low" as const,
+      };
     const cache: BrandReviewCache = {
       result: { verdict, headline, summary, signals, strengths, recommendations },
       authenticityCheck,

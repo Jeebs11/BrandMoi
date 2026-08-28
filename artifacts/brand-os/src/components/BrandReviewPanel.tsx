@@ -279,9 +279,38 @@ export function BrandReviewPanel({
                         </div>
                       </div>
                       <div className="mt-3 space-y-2 text-xs text-gray-700">
-                        {changedPercent !== null && (
-                          <p>You changed about <strong>{changedPercent}%</strong> of the original draft.</p>
-                        )}
+                        <div className="rounded-xl border border-violet-100 bg-white px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-semibold text-gray-700">Edit range from original</span>
+                            <strong className="text-violet-700">
+                              {changedPercent !== null ? `${changedPercent}% changed` : "Unavailable"}
+                            </strong>
+                          </div>
+                          {changedPercent !== null ? (
+                            <>
+                              <div
+                                className="mt-2 h-2 overflow-hidden rounded-full bg-violet-100"
+                                role="progressbar"
+                                aria-label="Percentage of the original draft changed"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={changedPercent}
+                              >
+                                <div
+                                  className="h-full rounded-full bg-violet-500 transition-all"
+                                  style={{ width: `${Math.min(100, Math.max(0, changedPercent))}%` }}
+                                />
+                              </div>
+                              <p className="mt-1.5 text-[11px] text-gray-500">
+                                About <strong>{changedPercent}%</strong> of the original wording changed.
+                              </p>
+                            </>
+                          ) : (
+                            <p className="mt-1.5 text-[11px] text-gray-500">
+                              The original generated draft was not available for comparison.
+                            </p>
+                          )}
+                        </div>
                         {authenticityCheck?.flags.length ? (
                           <ul className="space-y-1.5">
                             {authenticityCheck.flags.map((flag) => (

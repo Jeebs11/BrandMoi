@@ -168,6 +168,12 @@ async function copyTextWithFallback(text: string): Promise<boolean> {
   }
 }
 
+function composeLinkedInText(post: string, hashtags: string): string {
+  const postText = post.trimEnd();
+  const hashtagText = hashtags.trim();
+  return [postText, hashtagText].filter(Boolean).join("\n\n");
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function Capture() {
@@ -569,7 +575,11 @@ export default function Capture() {
 
     // This is the explicit action from the review panel, so opening a tab still
     // occurs synchronously and is less likely to be blocked by the browser.
-    const shipText = [editedPost.trimEnd(), hashtags.trim()].filter(Boolean).join("\n\n");
+    const shipText = composeLinkedInText(editedPost, hashtags);
+    // Start the clipboard operation while the original click still owns the
+    // browser user gesture. Opening/navigating LinkedIn first can cause some
+    // browsers to reject the clipboard write, especially in an embedded app.
+    const copyPromise = copyTextWithFallback(shipText);
     let linkedIn: PublishStatus["linkedIn"] = "blocked";
     try {
       const linkedInWindow = window.open("", "_blank");
@@ -584,7 +594,7 @@ export default function Capture() {
     setBrandReviewOpen(false);
     setBrandReviewIsForPublish(false);
     setPublishStatus({ text: shipText, copy: "checking", linkedIn });
-    void copyTextWithFallback(shipText).then((copied) => {
+    void copyPromise.then((copied) => {
       setPublishStatus((current) => current ? { ...current, copy: copied ? "copied" : "failed" } : current);
       toast(copied
         ? { title: "Post copied", description: "Your latest post and hashtags are ready to paste into LinkedIn." }
