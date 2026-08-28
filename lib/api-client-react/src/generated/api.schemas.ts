@@ -296,6 +296,85 @@ export interface PerformanceInsightsResponse {
   message?: string | null;
 }
 
+export type BrandReviewSignalKey =
+  (typeof BrandReviewSignalKey)[keyof typeof BrandReviewSignalKey];
+
+export const BrandReviewSignalKey = {
+  specificity: "specificity",
+  positioning: "positioning",
+  voice: "voice",
+} as const;
+
+export type BrandReviewSignalStatus =
+  (typeof BrandReviewSignalStatus)[keyof typeof BrandReviewSignalStatus];
+
+export const BrandReviewSignalStatus = {
+  strong: "strong",
+  mixed: "mixed",
+  needs_attention: "needs_attention",
+} as const;
+
+export interface BrandReviewSignal {
+  key: BrandReviewSignalKey;
+  label: string;
+  status: BrandReviewSignalStatus;
+  detail: string;
+}
+
+export type BrandReviewRecommendationPriority =
+  (typeof BrandReviewRecommendationPriority)[keyof typeof BrandReviewRecommendationPriority];
+
+export const BrandReviewRecommendationPriority = {
+  high: "high",
+  medium: "medium",
+} as const;
+
+export interface BrandReviewRecommendation {
+  id: string;
+  title: string;
+  issue: string;
+  change: string;
+  instruction: string;
+  example?: string;
+  priority: BrandReviewRecommendationPriority;
+}
+
+export type BrandReviewResultVerdict =
+  (typeof BrandReviewResultVerdict)[keyof typeof BrandReviewResultVerdict];
+
+export const BrandReviewResultVerdict = {
+  specific: "specific",
+  mixed: "mixed",
+  generalist: "generalist",
+} as const;
+
+export interface BrandReviewResult {
+  verdict: BrandReviewResultVerdict;
+  headline: string;
+  summary: string;
+  signals: BrandReviewSignal[];
+  strengths: string[];
+  recommendations: BrandReviewRecommendation[];
+}
+
+/**
+ * @nullable
+ */
+export type BrandReviewCacheAuthenticityCheck = {
+  /** @nullable */
+  editPct: number | null;
+  flags: string[];
+  severity: "low" | "medium" | "high";
+} | null;
+
+export interface BrandReviewCache {
+  result: BrandReviewResult;
+  /** @nullable */
+  authenticityCheck: BrandReviewCacheAuthenticityCheck;
+  reviewedPost: string;
+  cachedAt: string;
+}
+
 /**
  * @nullable
  */
@@ -377,6 +456,8 @@ export interface Draft {
   persona: string;
   tone: string;
   structuredBreakdown: StructuredBreakdown;
+  /** Latest cached Brand Review for this draft, if one has been run */
+  brandReview?: BrandReviewCache | null;
   /** @nullable */
   postOutput?: string | null;
   /** @nullable */

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { BrandReviewPanel } from "@/components/BrandReviewPanel";
 import { PostMeter } from "@/components/PostMeter";
-import { agentApi, analyticsApi, authenticityApi, seriesApi, type BrandReviewRecommendation, type BrandReviewResult, type SeriesDetail } from "@/lib/api";
+import { agentApi, analyticsApi, seriesApi, type BrandReviewRecommendation, type BrandReviewResult, type SeriesDetail } from "@/lib/api";
 import {
   useGenerateContent, useRefineContent,
   useCreateDraft, useUpdateDraft, useGetDraft, getGetDraftQueryKey,
@@ -237,6 +237,8 @@ export default function Capture() {
   const [brandReviewOpen, setBrandReviewOpen] = useState(false);
   const [brandReviewResult, setBrandReviewResult] = useState<BrandReviewResult | null>(null);
   const [brandReviewEvidence, setBrandReviewEvidence] = useState<AuthenticityReview>(null);
+  const [brandReviewReviewedPost, setBrandReviewReviewedPost] = useState<string | null>(null);
+  const [brandReviewCachedAt, setBrandReviewCachedAt] = useState<string | null>(null);
   const [brandReviewIsForPublish, setBrandReviewIsForPublish] = useState(false);
   const [isBrandReviewLoading, setIsBrandReviewLoading] = useState(false);
   const [isApplyingBrandReviewId, setIsApplyingBrandReviewId] = useState<string | null>(null);
@@ -269,7 +271,7 @@ export default function Capture() {
 
   const { mutate: generateContent, isPending: isGenerating, error: generateError } = useGenerateContent();
   const { mutate: refineContent, isPending: isRefining } = useRefineContent();
-  const { mutate: createDraft, isPending: isCreating } = useCreateDraft();
+  const { mutate: createDraft, mutateAsync: createDraftAsync, isPending: isCreating } = useCreateDraft();
   const { mutate: updateDraft, isPending: isUpdating } = useUpdateDraft();
   const isSaving = isCreating || isUpdating;
 
@@ -304,6 +306,12 @@ export default function Capture() {
       }
       setSavedDraftId(existingDraft.id);
       setAuthenticityFeedback((existingDraft.authenticityFeedback as AuthenticityFeedback | undefined) ?? null);
+      if (existingDraft.brandReview) {
+        setBrandReviewResult(existingDraft.brandReview.result);
+        setBrandReviewEvidence(existingDraft.brandReview.authenticityCheck);
+        setBrandReviewReviewedPost(existingDraft.brandReview.reviewedPost);
+        setBrandReviewCachedAt(existingDraft.brandReview.cachedAt);
+      }
       setInitialized(true);
     }
   }, [existingDraft, initialized]);
@@ -617,7 +625,7 @@ export default function Capture() {
       if (!content) toast({ title: "Nothing to save yet", variant: "destructive" });
       return;
     }
-    void handleBrandReview(fullPost, true);
+    void handleViewBrandReview(true);
   };
 
   const retryPublishCopy = () => {
@@ -633,30 +641,45 @@ export default function Capture() {
   };
 
   // ── Draft Brand Review ─────────────────────────────────────────────────
-  const handleBrandReview = async (postText: string, forPublish = false) => {
+  const handleBrandReview = async (postText: string, forPublish = false, force = false) => {
     if (!postText.trim() || isBrandReviewLoading) return;
     setBrandReviewOpen(true);
-    setBrandReviewResult(null);
-    setBrandReviewEvidence(null);
+    // Keep the previous result visible while an explicit refresh is running.
+    // If the refresh fails, the user can still inspect the last good review.
+    if (!brandReviewResult) {
+      setBrandReviewResult(null);
+      setBrandReviewEvidence(null);
+      setBrandReviewReviewedPost(null);
+      setBrandReviewCachedAt(null);
+    }
     setBrandReviewIsForPublish(forPublish);
     setPendingBrandChange(null);
     setIsBrandReviewLoading(true);
-    setIsCheckingAuthenticity(true);
+    setIsCheckingAuthenticity(forPublish);
     try {
-      const authenticityRequest = savedDraftId
-        ? { draftId: savedDraftId, postOutput: editedPost }
-        : { aiOriginalPost: versions[0]?.post ?? null, postOutput: editedPost };
-      const [brandReview, authenticityReview] = await Promise.all([
-        agentApi.brandReview(postText),
-        authenticityApi.check(authenticityRequest),
-      ]);
-      setBrandReviewResult(brandReview);
-      setBrandReviewEvidence(authenticityReview.check);
+      // A review needs a stable draft owner so it can be reopened later. Save
+      // generated content as a draft the first time review is requested.
+      let reviewDraftId = savedDraftId;
+      if (!reviewDraftId) {
+        const newDraft = await createDraftAsync({ data: buildDraftPayload("draft") });
+        reviewDraftId = newDraft.id;
+        setSavedDraftId(reviewDraftId);
+      }
+
+      const brandReview = await agentApi.brandReview(postText, reviewDraftId, force);
+      setBrandReviewResult(brandReview.result);
+      setBrandReviewEvidence(brandReview.authenticityCheck);
+      setBrandReviewReviewedPost(brandReview.reviewedPost);
+      setBrandReviewCachedAt(brandReview.cachedAt);
     } catch (err) {
-      setBrandReviewOpen(false);
-      setBrandReviewIsForPublish(false);
+      // Keep an existing review open on refresh failure; closing it would hide
+      // the cached result the user explicitly asked to preserve.
+      if (!brandReviewResult) {
+        setBrandReviewOpen(false);
+        setBrandReviewIsForPublish(false);
+      }
       toast({
-        title: "Couldn't run Brand Review",
+        title: force ? "Couldn't refresh Brand Review" : "Couldn't run Brand Review",
         description: err instanceof Error ? err.message : "Try again.",
         variant: "destructive",
       });
@@ -664,6 +687,20 @@ export default function Capture() {
       setIsCheckingAuthenticity(false);
       setIsBrandReviewLoading(false);
     }
+  };
+
+  const handleViewBrandReview = (forPublish = false) => {
+    if (brandReviewResult) {
+      setBrandReviewIsForPublish(forPublish);
+      setBrandReviewOpen(true);
+      setPendingBrandChange(null);
+      return;
+    }
+    void handleBrandReview(fullPost, forPublish);
+  };
+
+  const handleReRunBrandReview = () => {
+    void handleBrandReview(fullPost, brandReviewIsForPublish, true);
   };
 
   // ── Generate visual image on demand (triggered by user, not auto-fired) ─
@@ -757,6 +794,9 @@ export default function Capture() {
   // ── Render ──────────────────────────────────────────────────────────
   const showResult = !!content;
   const fullPost = useMemo(() => `${editedPost}${hashtags ? `\n\n${hashtags}` : ""}`, [editedPost, hashtags]);
+  const brandReviewIsStale = !!brandReviewResult
+    && brandReviewReviewedPost !== null
+    && brandReviewReviewedPost !== fullPost;
 
   return (
     <AppShell>
@@ -842,8 +882,10 @@ export default function Capture() {
             onSave={handleSave}
             onSaveAndPublish={handleSaveAndPublish}
             onCopy={copy}
-            onBrandReview={handleBrandReview}
+            onBrandReview={() => handleViewBrandReview(false)}
             isBrandReviewLoading={isBrandReviewLoading}
+            hasCachedBrandReview={!!brandReviewResult && !!brandReviewCachedAt}
+            brandReviewIsStale={brandReviewIsStale}
           />
         )}
 
@@ -899,6 +941,9 @@ export default function Capture() {
             onDiscard={() => setPendingBrandChange(null)}
             onEditManually={handleEditDraftManually}
             authenticityCheck={brandReviewEvidence}
+            cachedAt={brandReviewCachedAt}
+            isStale={brandReviewIsStale}
+            onReRun={handleReRunBrandReview}
             feedback={authenticityFeedback}
             isSavingFeedback={isSavingAuthenticityFeedback}
             onFeedback={handleAuthenticityFeedback}
@@ -1256,6 +1301,8 @@ interface ResultViewProps {
   onCopy: (text: string, label?: string) => void;
   onBrandReview: (postText: string) => void;
   isBrandReviewLoading: boolean;
+  hasCachedBrandReview: boolean;
+  brandReviewIsStale: boolean;
 }
 
 function ResultView(props: ResultViewProps) {
@@ -1269,6 +1316,7 @@ function ResultView(props: ResultViewProps) {
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
     onSave, onSaveAndPublish, onCopy, onBrandReview, isBrandReviewLoading,
+    hasCachedBrandReview, brandReviewIsStale,
   } = props;
 
   return (
@@ -1463,7 +1511,11 @@ function ResultView(props: ResultViewProps) {
             disabled={isBrandReviewLoading || isRefining}
           >
             <Target className="w-3.5 h-3.5 mr-1.5" />
-            {isBrandReviewLoading ? "Reviewing brand fit…" : "Brand Review"}
+            {isBrandReviewLoading
+              ? "Reviewing brand fit…"
+              : hasCachedBrandReview
+              ? brandReviewIsStale ? "View saved review · draft changed" : "View saved Brand Review"
+              : "Brand Review"}
           </Button>
         </div>
       )}

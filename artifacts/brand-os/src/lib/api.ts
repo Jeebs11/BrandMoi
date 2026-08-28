@@ -1,4 +1,4 @@
-import type { DiagnosisSection, PostDiagnosis } from "@workspace/api-client-react";
+import type { DiagnosisSection, PostDiagnosis, BrandReviewCache as ApiBrandReviewCache } from "@workspace/api-client-react";
 export type { DiagnosisSection, PostDiagnosis };
 
 export type Thought = {
@@ -469,6 +469,11 @@ export type BrandReviewResult = {
   recommendations: BrandReviewRecommendation[];
 };
 
+export type CachedBrandReview = ApiBrandReviewCache & {
+  fromCache?: boolean;
+  isStale?: boolean;
+};
+
 export const agentApi = {
   brief: () => apiFetch<AgentBrief>("/agent/brief"),
   dare: () => apiFetch<DareResult>("/agent/dare", { method: "POST" }),
@@ -517,10 +522,10 @@ export const agentApi = {
     apiFetch<{ ok: boolean }>(`/agent/saved-ideas/${id}`, { method: "DELETE" }),
   topPostSuggestions: () =>
     apiFetch<{ suggestions: TopPostSuggestion[]; reason?: string }>("/agent/top-post-suggestions"),
-  brandReview: (postText: string) =>
-    apiFetch<BrandReviewResult>("/agent/brand-review", {
+  brandReview: (postText: string, draftId?: number | null, force = false) =>
+    apiFetch<CachedBrandReview>("/agent/brand-review", {
       method: "POST",
-      body: JSON.stringify({ postText }),
+      body: JSON.stringify({ postText, ...(draftId ? { draftId } : {}), force }),
     }),
 };
 

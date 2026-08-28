@@ -1120,6 +1120,90 @@ components:
         - confidence
         - sampleSize
 
+    BrandReviewSignal:
+      type: object
+      properties:
+        key:
+          type: string
+          enum: [specificity, positioning, voice]
+        label:
+          type: string
+        status:
+          type: string
+          enum: [strong, mixed, needs_attention]
+        detail:
+          type: string
+      required: [key, label, status, detail]
+
+    BrandReviewRecommendation:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        issue:
+          type: string
+        change:
+          type: string
+        instruction:
+          type: string
+        example:
+          type: string
+        priority:
+          type: string
+          enum: [high, medium]
+      required: [id, title, issue, change, instruction, priority]
+
+    BrandReviewResult:
+      type: object
+      properties:
+        verdict:
+          type: string
+          enum: [specific, mixed, generalist]
+        headline:
+          type: string
+        summary:
+          type: string
+        signals:
+          type: array
+          items:
+            $ref: "#/components/schemas/BrandReviewSignal"
+        strengths:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/BrandReviewRecommendation"
+      required: [verdict, headline, summary, signals, strengths, recommendations]
+
+    BrandReviewCache:
+      type: object
+      properties:
+        result:
+          $ref: "#/components/schemas/BrandReviewResult"
+        authenticityCheck:
+          type: ["object", "null"]
+          properties:
+            editPct:
+              type: ["number", "null"]
+            flags:
+              type: array
+              items:
+                type: string
+            severity:
+              type: string
+              enum: [low, medium, high]
+          required: [editPct, flags, severity]
+        reviewedPost:
+          type: string
+        cachedAt:
+          type: string
+          format: date-time
+      required: [result, authenticityCheck, reviewedPost, cachedAt]
+
     Draft:
       type: object
       properties:
@@ -1135,6 +1219,11 @@ components:
           type: string
         structuredBreakdown:
           $ref: "#/components/schemas/StructuredBreakdown"
+        brandReview:
+          description: Latest cached Brand Review for this draft, if one has been run
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/BrandReviewCache"
         postOutput:
           type: ["string", "null"]
         shortPost:

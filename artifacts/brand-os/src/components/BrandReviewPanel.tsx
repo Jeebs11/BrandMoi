@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ChevronUp, Edit3, ExternalLink, Loader2, RotateCcw, ShieldCheck, Target, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ChevronUp, Edit3, ExternalLink, Loader2, RefreshCw, RotateCcw, ShieldCheck, Target, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { BrandReviewRecommendation, BrandReviewResult } from "@/lib/api";
@@ -23,6 +23,9 @@ interface BrandReviewPanelProps {
   onDiscard: () => void;
   onEditManually: () => void;
   authenticityCheck?: AuthenticityReview;
+  cachedAt?: string | null;
+  isStale?: boolean;
+  onReRun: () => void;
   feedback?: AuthenticityFeedback;
   isSavingFeedback?: boolean;
   onFeedback?: (value: AuthenticityFeedback) => void;
@@ -59,6 +62,9 @@ export function BrandReviewPanel({
   onDiscard,
   onEditManually,
   authenticityCheck = null,
+  cachedAt = null,
+  isStale = false,
+  onReRun,
   feedback = null,
   isSavingFeedback = false,
   onFeedback,
@@ -127,7 +133,7 @@ export function BrandReviewPanel({
           ) : (
             <>
               <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-                {isLoading && (
+                 {isLoading && !result && (
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
                     <Target className="w-8 h-8 text-sky-500 animate-pulse" />
                     <p className="text-sm text-gray-700 font-bold">Reading this draft against your brand…</p>
@@ -136,8 +142,39 @@ export function BrandReviewPanel({
                   </div>
                 )}
 
-                {!isLoading && result && verdict && (
+                 {result && verdict && (
                   <>
+                     <div className={cn(
+                       "flex items-center gap-3 rounded-2xl border px-3.5 py-3",
+                       isStale
+                         ? "border-amber-200 bg-amber-50 text-amber-900"
+                         : "border-sky-100 bg-sky-50/70 text-sky-900",
+                     )}>
+                       <div className="min-w-0 flex-1">
+                         <p className="text-xs font-bold">
+                           {isStale ? "This review is from an earlier draft" : "Saved Brand Review"}
+                         </p>
+                         <p className="mt-0.5 text-[11px] leading-relaxed opacity-75">
+                           {isStale
+                             ? "Your draft changed. Re-run when you want guidance for the current version."
+                             : cachedAt
+                             ? `Reviewed ${new Date(cachedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+                             : "This review is available without another AI call."}
+                         </p>
+                       </div>
+                       <Button
+                         type="button"
+                         size="sm"
+                         variant="outline"
+                         className="flex-none rounded-xl border-current/20 bg-white/70 text-xs"
+                         onClick={onReRun}
+                         disabled={isLoading}
+                       >
+                         <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isLoading && "animate-spin")} />
+                         {isLoading ? "Refreshing…" : "Re-run review"}
+                       </Button>
+                     </div>
+
                     <div className={cn("rounded-2xl border p-4", verdict.className)}>
                       <p className="text-[10px] font-black uppercase tracking-wider mb-1">Draft diagnosis</p>
                       <p className="text-base font-extrabold">{verdict.label}</p>

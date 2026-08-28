@@ -862,6 +862,45 @@ export const ListDraftsResponseItem = zod.object({
         "When tieToNews=true, the news headline anchor used in the post",
       ),
   }),
+  brandReview: zod
+    .object({
+      result: zod.object({
+        verdict: zod.enum(["specific", "mixed", "generalist"]),
+        headline: zod.string(),
+        summary: zod.string(),
+        signals: zod.array(
+          zod.object({
+            key: zod.enum(["specificity", "positioning", "voice"]),
+            label: zod.string(),
+            status: zod.enum(["strong", "mixed", "needs_attention"]),
+            detail: zod.string(),
+          }),
+        ),
+        strengths: zod.array(zod.string()),
+        recommendations: zod.array(
+          zod.object({
+            id: zod.string(),
+            title: zod.string(),
+            issue: zod.string(),
+            change: zod.string(),
+            instruction: zod.string(),
+            example: zod.string().optional(),
+            priority: zod.enum(["high", "medium"]),
+          }),
+        ),
+      }),
+      authenticityCheck: zod
+        .object({
+          editPct: zod.number().nullable(),
+          flags: zod.array(zod.string()),
+          severity: zod.enum(["low", "medium", "high"]),
+        })
+        .nullable(),
+      reviewedPost: zod.string(),
+      cachedAt: zod.date(),
+    })
+    .nullish()
+    .describe("Latest cached Brand Review for this draft, if one has been run"),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
@@ -1187,6 +1226,45 @@ export const GetDraftResponse = zod.object({
         "When tieToNews=true, the news headline anchor used in the post",
       ),
   }),
+  brandReview: zod
+    .object({
+      result: zod.object({
+        verdict: zod.enum(["specific", "mixed", "generalist"]),
+        headline: zod.string(),
+        summary: zod.string(),
+        signals: zod.array(
+          zod.object({
+            key: zod.enum(["specificity", "positioning", "voice"]),
+            label: zod.string(),
+            status: zod.enum(["strong", "mixed", "needs_attention"]),
+            detail: zod.string(),
+          }),
+        ),
+        strengths: zod.array(zod.string()),
+        recommendations: zod.array(
+          zod.object({
+            id: zod.string(),
+            title: zod.string(),
+            issue: zod.string(),
+            change: zod.string(),
+            instruction: zod.string(),
+            example: zod.string().optional(),
+            priority: zod.enum(["high", "medium"]),
+          }),
+        ),
+      }),
+      authenticityCheck: zod
+        .object({
+          editPct: zod.number().nullable(),
+          flags: zod.array(zod.string()),
+          severity: zod.enum(["low", "medium", "high"]),
+        })
+        .nullable(),
+      reviewedPost: zod.string(),
+      cachedAt: zod.date(),
+    })
+    .nullish()
+    .describe("Latest cached Brand Review for this draft, if one has been run"),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
@@ -1481,6 +1559,45 @@ export const UpdateDraftResponse = zod.object({
         "When tieToNews=true, the news headline anchor used in the post",
       ),
   }),
+  brandReview: zod
+    .object({
+      result: zod.object({
+        verdict: zod.enum(["specific", "mixed", "generalist"]),
+        headline: zod.string(),
+        summary: zod.string(),
+        signals: zod.array(
+          zod.object({
+            key: zod.enum(["specificity", "positioning", "voice"]),
+            label: zod.string(),
+            status: zod.enum(["strong", "mixed", "needs_attention"]),
+            detail: zod.string(),
+          }),
+        ),
+        strengths: zod.array(zod.string()),
+        recommendations: zod.array(
+          zod.object({
+            id: zod.string(),
+            title: zod.string(),
+            issue: zod.string(),
+            change: zod.string(),
+            instruction: zod.string(),
+            example: zod.string().optional(),
+            priority: zod.enum(["high", "medium"]),
+          }),
+        ),
+      }),
+      authenticityCheck: zod
+        .object({
+          editPct: zod.number().nullable(),
+          flags: zod.array(zod.string()),
+          severity: zod.enum(["low", "medium", "high"]),
+        })
+        .nullable(),
+      reviewedPost: zod.string(),
+      cachedAt: zod.date(),
+    })
+    .nullish()
+    .describe("Latest cached Brand Review for this draft, if one has been run"),
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),

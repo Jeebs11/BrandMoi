@@ -12,6 +12,7 @@ import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
+import { runAuthenticityCheck, type AuthenticityCheck } from "../lib/authenticity-check.js";
 
 // Legacy-objective → modern-audience fallback for drafts saved before the
 // audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
@@ -868,16 +869,83 @@ router.get("/agent/stress-test/scores", requireAuth, async (req, res): Promise<v
   }
 });
 
+const BrandReviewBody = z.object({
+  postText: z.string().min(20).max(6000),
+  draftId: z.number().int().positive().optional(),
+  force: z.boolean().optional().default(false),
+});
+
+type BrandReviewResultData = {
+  verdict: "specific" | "mixed" | "generalist";
+  headline: string;
+  summary: string;
+  signals: Array<{
+    key: "specificity" | "positioning" | "voice";
+    label: string;
+    status: "strong" | "mixed" | "needs_attention";
+    detail: string;
+  }>;
+  strengths: string[];
+  recommendations: Array<{
+    id: string;
+    title: string;
+    issue: string;
+    change: string;
+    instruction: string;
+    example?: string;
+    priority: "high" | "medium";
+  }>;
+};
+
+type BrandReviewCache = {
+  result: BrandReviewResultData;
+  authenticityCheck: AuthenticityCheck | null;
+  reviewedPost: string;
+  cachedAt: string;
+};
+
+function isBrandReviewCache(value: unknown): value is BrandReviewCache {
+  if (!value || typeof value !== "object") return false;
+  const cache = value as Partial<BrandReviewCache>;
+  return !!cache.result
+    && typeof cache.reviewedPost === "string"
+    && typeof cache.cachedAt === "string"
+    && (cache.authenticityCheck === null || typeof cache.authenticityCheck === "object");
+}
+
 router.post("/agent/brand-review", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
-  const parsedBody = z.object({ postText: z.string().min(20).max(6000) }).safeParse(req.body);
+  const parsedBody = BrandReviewBody.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(400).json({ error: "Post text required." });
     return;
   }
 
   try {
+    const { postText, draftId, force } = parsedBody.data;
+    let draft: typeof draftsTable.$inferSelect | undefined;
+    if (draftId !== undefined) {
+      [draft] = await db
+        .select()
+        .from(draftsTable)
+        .where(and(eq(draftsTable.id, draftId), eq(draftsTable.userId, req.user!.userId)))
+        .limit(1);
+      if (!draft) {
+        res.status(404).json({ error: "Draft not found" });
+        return;
+      }
+
+      const cached = isBrandReviewCache(draft.brandReview) ? draft.brandReview : null;
+      if (cached && !force) {
+        res.json({
+          ...cached,
+          fromCache: true,
+          isStale: cached.reviewedPost !== postText,
+        });
+        return;
+      }
+    }
+
     const { dna } = await getUserAgentContext(req.user!.userId);
-    const postText = parsedBody.data.postText;
     const completion = await anthropic.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 8192,
@@ -967,7 +1035,8 @@ Return the JSON review now.`,
         .filter((value): value is { key: SignalKey; label: string; status: "strong" | "mixed" | "needs_attention"; detail: string } =>
           !!value.key && !!value.label && !!value.status && !!value.detail)
       : [];
-    const fallbackStatus = verdict === "specific" ? "strong" : verdict === "mixed" ? "mixed" : "needs_attention";
+    const fallbackStatus: BrandReviewResultData["signals"][number]["status"] =
+      verdict === "specific" ? "strong" : verdict === "mixed" ? "mixed" : "needs_attention";
     const fallbackSignals = allowedSignalKeys.map((key) => ({
       key,
       label: key === "specificity" ? "Review draft detail" : key === "positioning" ? "Review audience fit" : "Review voice fit",
@@ -1002,7 +1071,29 @@ Return the JSON review now.`,
       return;
     }
 
-    res.json({ verdict, headline, summary, signals, strengths, recommendations });
+    const authenticityCheck = runAuthenticityCheck(draft?.aiOriginalPost, postText);
+    const cache: BrandReviewCache = {
+      result: { verdict, headline, summary, signals, strengths, recommendations },
+      authenticityCheck,
+      reviewedPost: postText,
+      cachedAt: new Date().toISOString(),
+    };
+
+    // Demo drafts are intentionally ephemeral. They can still display a
+    // review during the session, but must not write to shared demo data.
+    if (draft && !isDemoUser(req.user!.email)) {
+      const [updated] = await db
+        .update(draftsTable)
+        .set({ brandReview: cache })
+        .where(and(eq(draftsTable.id, draft.id), eq(draftsTable.userId, req.user!.userId)))
+        .returning({ id: draftsTable.id });
+      if (!updated) {
+        res.status(404).json({ error: "Draft not found" });
+        return;
+      }
+    }
+
+    res.json({ ...cache, fromCache: false, isStale: false });
   } catch (err) {
     console.error("[brand-review]", err);
     respondAiError(res, err, "Failed to review this draft");

@@ -13,6 +13,9 @@ export const draftsTable = pgTable("drafts", {
   persona: text("persona").notNull(),
   tone: text("tone").notNull(),
   structuredBreakdown: jsonb("structured_breakdown").notNull(),
+  // Latest draft-level Brand Review, including the post text it reviewed and
+  // the rule-based authenticity evidence shown alongside the AI guidance.
+  brandReview: jsonb("brand_review"),
   selectedHook: text("selected_hook"),
   postOutput: text("post_output"),
   // Immutable snapshot of the post exactly as first AI-generated — set once

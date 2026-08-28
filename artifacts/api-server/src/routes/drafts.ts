@@ -89,6 +89,16 @@ function normalizeDraft<T extends { structuredBreakdown: unknown; objective?: un
   if (typeof draft.visualStyle === "string" && LEGACY_STYLE_REMAP[draft.visualStyle]) {
     (draft as { visualStyle?: string }).visualStyle = LEGACY_STYLE_REMAP[draft.visualStyle];
   }
+
+  // JSONB stores the cached Brand Review timestamp as an ISO string, while
+  // the server-side response schema uses a Date for date-time fields.
+  const brandReview = (draft as { brandReview?: unknown }).brandReview;
+  if (brandReview && typeof brandReview === "object" && !Array.isArray(brandReview)) {
+    const cachedAt = (brandReview as { cachedAt?: unknown }).cachedAt;
+    if (typeof cachedAt === "string") {
+      (brandReview as { cachedAt: Date }).cachedAt = new Date(cachedAt);
+    }
+  }
   return draft;
 }
 
