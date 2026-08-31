@@ -936,6 +936,20 @@ export default function Capture() {
               )}
               <Button size="sm" variant="ghost" onClick={() => setPublishStatus(null)}>Dismiss</Button>
             </div>
+            {publishStatus.copy === "failed" && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                  Complete text to copy manually
+                </p>
+                <textarea
+                  readOnly
+                  value={publishStatus.text}
+                  aria-label="Complete post text including hashtags"
+                  onClick={(event) => event.currentTarget.select()}
+                  className="min-h-28 w-full resize-y rounded-xl border border-amber-200 bg-white p-3 text-xs leading-relaxed text-gray-700 outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+            )}
           </div>
         )}
 

@@ -910,7 +910,16 @@ function isBrandReviewCache(value: unknown): value is BrandReviewCache {
   return !!cache.result
     && typeof cache.reviewedPost === "string"
     && typeof cache.cachedAt === "string"
-    && (cache.authenticityCheck === null || typeof cache.authenticityCheck === "object");
+    && (cache.authenticityCheck === undefined || cache.authenticityCheck === null || typeof cache.authenticityCheck === "object");
+}
+
+function buildAuthenticityEvidence(original: string | null | undefined, final: string): AuthenticityCheck {
+  return runAuthenticityCheck(original, final)
+    ?? {
+      editPct: computeEditPercent(original, final),
+      flags: [],
+      severity: "low" as const,
+    };
 }
 
 router.post("/agent/brand-review", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -936,8 +945,16 @@ router.post("/agent/brand-review", requireAuth, aiRateLimit, async (req, res): P
 
       const cached = isBrandReviewCache(draft.brandReview) ? draft.brandReview : null;
       if (cached && !force) {
+        const authenticityCheck = cached.authenticityCheck ?? buildAuthenticityEvidence(draft.aiOriginalPost, cached.reviewedPost);
+        if (!cached.authenticityCheck && !isDemoUser(req.user!.email)) {
+          await db
+            .update(draftsTable)
+            .set({ brandReview: { ...cached, authenticityCheck } })
+            .where(and(eq(draftsTable.id, draft.id), eq(draftsTable.userId, req.user!.userId)));
+        }
         res.json({
           ...cached,
+          authenticityCheck,
           fromCache: true,
           isStale: cached.reviewedPost !== postText,
         });
@@ -1071,12 +1088,7 @@ Return the JSON review now.`,
       return;
     }
 
-    const authenticityCheck = runAuthenticityCheck(draft?.aiOriginalPost, postText)
-      ?? {
-        editPct: computeEditPercent(draft?.aiOriginalPost, postText),
-        flags: [],
-        severity: "low" as const,
-      };
+    const authenticityCheck = buildAuthenticityEvidence(draft?.aiOriginalPost, postText);
     const cache: BrandReviewCache = {
       result: { verdict, headline, summary, signals, strengths, recommendations },
       authenticityCheck,
