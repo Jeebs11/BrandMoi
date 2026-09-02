@@ -74,7 +74,10 @@ export function BrandReviewPanel({
   const verdict = result ? VERDICT_COPY[result.verdict] : null;
   const isReviewingChange = !!pendingChange;
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
-  const changedPercent = authenticityCheck?.editPct !== null && authenticityCheck?.editPct !== undefined
+  const wordChangeSummary = authenticityCheck?.wordChangeSummary ?? null;
+  const changedPercent = wordChangeSummary
+    ? wordChangeSummary.aiChangedPct
+    : authenticityCheck?.editPct !== null && authenticityCheck?.editPct !== undefined
     ? Math.round(authenticityCheck.editPct * 100)
     : null;
 
@@ -311,6 +314,58 @@ export function BrandReviewPanel({
                             </p>
                           )}
                         </div>
+                        {wordChangeSummary && (
+                          <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">AI kept</p>
+                                <p className="mt-1 text-sm font-extrabold text-gray-800">{wordChangeSummary.unchangedPct}%</p>
+                                <p className="text-[10px] text-gray-400">{wordChangeSummary.unchangedWordCount} words</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-rose-500">AI changed</p>
+                                <p className="mt-1 text-sm font-extrabold text-rose-700">{wordChangeSummary.aiChangedPct}%</p>
+                                <p className="text-[10px] text-gray-400">{wordChangeSummary.removedWordCount} removed/replaced</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">User added</p>
+                                <p className="mt-1 text-sm font-extrabold text-emerald-700">{wordChangeSummary.userAddedPct}%</p>
+                                <p className="text-[10px] text-gray-400">{wordChangeSummary.addedWordCount} words</p>
+                              </div>
+                            </div>
+                            {(wordChangeSummary.removedWords.length > 0 || wordChangeSummary.addedWords.length > 0) && (
+                              <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                                {wordChangeSummary.removedWords.length > 0 && (
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-rose-600">AI wording removed/replaced</p>
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {wordChangeSummary.removedWords.map((word, index) => (
+                                        <span key={`removed-${word}-${index}`} className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-700">
+                                          {word}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {wordChangeSummary.addedWords.length > 0 && (
+                                  <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">User wording added</p>
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                      {wordChangeSummary.addedWords.map((word, index) => (
+                                        <span key={`added-${word}-${index}`} className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700">
+                                          {word}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+                              Replacements count as one AI word removed and one user word added. Punctuation and line breaks are ignored.
+                            </p>
+                          </div>
+                        )}
                         {authenticityCheck?.flags.length ? (
                           <ul className="space-y-1.5">
                             {authenticityCheck.flags.map((flag) => (

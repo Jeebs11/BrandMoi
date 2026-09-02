@@ -358,6 +358,22 @@ export interface BrandReviewResult {
 }
 
 /**
+ * Explainable word-level comparison between the original AI draft and the final draft
+ */
+export interface WordChangeSummary {
+  originalWordCount: number;
+  finalWordCount: number;
+  unchangedWordCount: number;
+  removedWordCount: number;
+  addedWordCount: number;
+  unchangedPct: number;
+  aiChangedPct: number;
+  userAddedPct: number;
+  removedWords: string[];
+  addedWords: string[];
+}
+
+/**
  * @nullable
  */
 export type BrandReviewCacheAuthenticityCheck = {
@@ -365,6 +381,7 @@ export type BrandReviewCacheAuthenticityCheck = {
   editPct: number | null;
   flags: string[];
   severity: "low" | "medium" | "high";
+  wordChangeSummary?: WordChangeSummary | null;
 } | null;
 
 export interface BrandReviewCache {

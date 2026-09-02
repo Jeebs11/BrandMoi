@@ -22,7 +22,7 @@ import {
 import { requireAuth } from "../middleware/auth.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { upsertDailyActivity } from "../lib/momentum.js";
-import { runAuthenticityCheck } from "../lib/authenticity-check.js";
+import { computeEditPercent, computeWordChangeSummary, runAuthenticityCheck } from "../lib/authenticity-check.js";
 
 const router: IRouter = Router();
 
@@ -97,6 +97,31 @@ function normalizeDraft<T extends { structuredBreakdown: unknown; objective?: un
     const cachedAt = (brandReview as { cachedAt?: unknown }).cachedAt;
     if (typeof cachedAt === "string") {
       (brandReview as { cachedAt: Date }).cachedAt = new Date(cachedAt);
+    }
+
+    const reviewedPost = (brandReview as { reviewedPost?: unknown }).reviewedPost;
+    const originalPost = (draft as { aiOriginalPost?: unknown }).aiOriginalPost;
+    const existingCheck = (brandReview as { authenticityCheck?: unknown }).authenticityCheck;
+    if (typeof reviewedPost === "string" && typeof originalPost === "string") {
+      const wordChangeSummary = computeWordChangeSummary(originalPost, reviewedPost);
+      if (wordChangeSummary) {
+        const check = existingCheck && typeof existingCheck === "object" && !Array.isArray(existingCheck)
+          ? existingCheck as { editPct?: number | null; flags?: string[]; severity?: "low" | "medium" | "high"; wordChangeSummary?: unknown }
+          : null;
+        (brandReview as {
+          authenticityCheck: {
+            editPct: number | null;
+            flags: string[];
+            severity: "low" | "medium" | "high";
+            wordChangeSummary: typeof wordChangeSummary;
+          };
+        }).authenticityCheck = {
+          editPct: check?.editPct ?? computeEditPercent(originalPost, reviewedPost),
+          flags: check?.flags ?? [],
+          severity: check?.severity ?? "low",
+          wordChangeSummary,
+        };
+      }
     }
   }
   return draft;

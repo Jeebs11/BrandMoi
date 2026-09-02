@@ -52,6 +52,18 @@ export type AuthenticityCheck = {
   editPct: number | null;
   flags: string[];
   severity: "low" | "medium" | "high";
+  wordChangeSummary?: {
+    originalWordCount: number;
+    finalWordCount: number;
+    unchangedWordCount: number;
+    removedWordCount: number;
+    addedWordCount: number;
+    unchangedPct: number;
+    aiChangedPct: number;
+    userAddedPct: number;
+    removedWords: string[];
+    addedWords: string[];
+  } | null;
 } | null;
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {

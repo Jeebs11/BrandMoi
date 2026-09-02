@@ -20,10 +20,24 @@ const HIGH_CONFIDENCE_GENERIC_PHRASES = [
 
 export type AuthenticitySeverity = "low" | "medium" | "high";
 
+export type WordChangeSummary = {
+  originalWordCount: number;
+  finalWordCount: number;
+  unchangedWordCount: number;
+  removedWordCount: number;
+  addedWordCount: number;
+  unchangedPct: number;
+  aiChangedPct: number;
+  userAddedPct: number;
+  removedWords: string[];
+  addedWords: string[];
+};
+
 export type AuthenticityCheck = {
   editPct: number | null;
   flags: string[];
   severity: AuthenticitySeverity;
+  wordChangeSummary?: WordChangeSummary;
 };
 
 /**
@@ -36,22 +50,89 @@ export type AuthenticityCheck = {
  * 1 = completely different), or null if there's nothing to compare against.
  */
 export function computeEditPercent(original: string | null | undefined, final: string): number | null {
+  const summary = computeWordChangeSummary(original, final);
+  if (!summary) return null;
+  const similarity = (2 * summary.unchangedWordCount)
+    / (summary.originalWordCount + summary.finalWordCount);
+  return Math.round((1 - similarity) * 100) / 100;
+}
+
+type WordToken = {
+  display: string;
+  key: string;
+};
+
+const WORD_TOKEN_PATTERN = /#?[A-Za-z0-9]+(?:['’\-][A-Za-z0-9]+)*/g;
+const WORD_PREVIEW_LIMIT = 24;
+
+function tokenizeWords(text: string): WordToken[] {
+  return (text.match(WORD_TOKEN_PATTERN) ?? []).map((display) => ({
+    display,
+    key: display.toLocaleLowerCase(),
+  }));
+}
+
+function percent(part: number, whole: number): number {
+  return whole > 0 ? Math.round((part / whole) * 100) : 0;
+}
+
+/**
+ * Creates an explainable word-level diff. It deliberately reports additions
+ * and removals separately: replacing one AI word with one user word is one
+ * removed word plus one added word, rather than pretending we know authorship.
+ * Punctuation and line breaks do not count as word changes.
+ */
+export function computeWordChangeSummary(
+  original: string | null | undefined,
+  final: string,
+): WordChangeSummary | null {
   if (!original || !original.trim() || !final.trim()) return null;
-  const a = original.trim().split(/\s+/);
-  const b = final.trim().split(/\s+/);
+
+  const a = tokenizeWords(original);
+  const b = tokenizeWords(final);
   if (a.length === 0 || b.length === 0) return null;
 
-  // Longest common subsequence length via DP — O(n*m), trivially fast at
-  // post length (~150-300 words).
   const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
-      dp[i]![j] = a[i - 1] === b[j - 1] ? dp[i - 1]![j - 1]! + 1 : Math.max(dp[i - 1]![j]!, dp[i]![j - 1]!);
+      dp[i]![j] = a[i - 1]!.key === b[j - 1]!.key
+        ? dp[i - 1]![j - 1]! + 1
+        : Math.max(dp[i - 1]![j]!, dp[i]![j - 1]!);
     }
   }
-  const lcs = dp[a.length]![b.length]!;
-  const similarity = (2 * lcs) / (a.length + b.length);
-  return Math.round((1 - similarity) * 100) / 100;
+
+  const removedWords: string[] = [];
+  const addedWords: string[] = [];
+  let i = a.length;
+  let j = b.length;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1]!.key === b[j - 1]!.key) {
+      i--;
+      j--;
+    } else if (i > 0 && (j === 0 || dp[i - 1]![j]! >= dp[i]![j - 1]!)) {
+      removedWords.push(a[i - 1]!.display);
+      i--;
+    } else {
+      addedWords.push(b[j - 1]!.display);
+      j--;
+    }
+  }
+  removedWords.reverse();
+  addedWords.reverse();
+
+  const unchangedWordCount = dp[a.length]![b.length]!;
+  return {
+    originalWordCount: a.length,
+    finalWordCount: b.length,
+    unchangedWordCount,
+    removedWordCount: removedWords.length,
+    addedWordCount: addedWords.length,
+    unchangedPct: percent(unchangedWordCount, a.length),
+    aiChangedPct: percent(removedWords.length, a.length),
+    userAddedPct: percent(addedWords.length, b.length),
+    removedWords: removedWords.slice(0, WORD_PREVIEW_LIMIT),
+    addedWords: addedWords.slice(0, WORD_PREVIEW_LIMIT),
+  };
 }
 
 function splitSentences(text: string): string[] {

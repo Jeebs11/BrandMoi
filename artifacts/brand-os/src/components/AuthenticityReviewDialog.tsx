@@ -14,7 +14,21 @@ export type AuthenticityReview = {
   editPct: number | null;
   flags: string[];
   severity: "low" | "medium" | "high";
+  wordChangeSummary?: WordChangeSummary | null;
 } | null;
+
+export type WordChangeSummary = {
+  originalWordCount: number;
+  finalWordCount: number;
+  unchangedWordCount: number;
+  removedWordCount: number;
+  addedWordCount: number;
+  unchangedPct: number;
+  aiChangedPct: number;
+  userAddedPct: number;
+  removedWords: string[];
+  addedWords: string[];
+};
 
 export type AuthenticityFeedback =
   | "sounds_like_me"

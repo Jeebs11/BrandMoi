@@ -1196,6 +1196,10 @@ components:
             severity:
               type: string
               enum: [low, medium, high]
+            wordChangeSummary:
+              nullable: true
+              allOf:
+                - $ref: "#/components/schemas/WordChangeSummary"
           required: [editPct, flags, severity]
         reviewedPost:
           type: string
@@ -1203,6 +1207,46 @@ components:
           type: string
           format: date-time
       required: [result, authenticityCheck, reviewedPost, cachedAt]
+
+    WordChangeSummary:
+      type: object
+      description: Explainable word-level comparison between the original AI draft and the final draft
+      properties:
+        originalWordCount:
+          type: integer
+        finalWordCount:
+          type: integer
+        unchangedWordCount:
+          type: integer
+        removedWordCount:
+          type: integer
+        addedWordCount:
+          type: integer
+        unchangedPct:
+          type: integer
+        aiChangedPct:
+          type: integer
+        userAddedPct:
+          type: integer
+        removedWords:
+          type: array
+          items:
+            type: string
+        addedWords:
+          type: array
+          items:
+            type: string
+      required:
+        - originalWordCount
+        - finalWordCount
+        - unchangedWordCount
+        - removedWordCount
+        - addedWordCount
+        - unchangedPct
+        - aiChangedPct
+        - userAddedPct
+        - removedWords
+        - addedWords
 
     Draft:
       type: object

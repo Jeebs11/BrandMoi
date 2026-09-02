@@ -12,7 +12,12 @@ import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
-import { computeEditPercent, runAuthenticityCheck, type AuthenticityCheck } from "../lib/authenticity-check.js";
+import {
+  computeEditPercent,
+  computeWordChangeSummary,
+  runAuthenticityCheck,
+  type AuthenticityCheck,
+} from "../lib/authenticity-check.js";
 
 // Legacy-objective → modern-audience fallback for drafts saved before the
 // audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
@@ -914,12 +919,13 @@ function isBrandReviewCache(value: unknown): value is BrandReviewCache {
 }
 
 function buildAuthenticityEvidence(original: string | null | undefined, final: string): AuthenticityCheck {
-  return runAuthenticityCheck(original, final)
-    ?? {
-      editPct: computeEditPercent(original, final),
-      flags: [],
-      severity: "low" as const,
-    };
+  const wordChangeSummary = computeWordChangeSummary(original, final);
+  const base = runAuthenticityCheck(original, final) ?? {
+    editPct: computeEditPercent(original, final),
+    flags: [],
+    severity: "low" as const,
+  };
+  return wordChangeSummary ? { ...base, wordChangeSummary } : base;
 }
 
 router.post("/agent/brand-review", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
@@ -945,8 +951,10 @@ router.post("/agent/brand-review", requireAuth, aiRateLimit, async (req, res): P
 
       const cached = isBrandReviewCache(draft.brandReview) ? draft.brandReview : null;
       if (cached && !force) {
-        const authenticityCheck = cached.authenticityCheck ?? buildAuthenticityEvidence(draft.aiOriginalPost, cached.reviewedPost);
-        if (!cached.authenticityCheck && !isDemoUser(req.user!.email)) {
+        const authenticityCheck = cached.authenticityCheck?.wordChangeSummary
+          ? cached.authenticityCheck
+          : buildAuthenticityEvidence(draft.aiOriginalPost, cached.reviewedPost);
+        if (!cached.authenticityCheck?.wordChangeSummary && !isDemoUser(req.user!.email)) {
           await db
             .update(draftsTable)
             .set({ brandReview: { ...cached, authenticityCheck } })

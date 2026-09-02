@@ -894,6 +894,23 @@ export const ListDraftsResponseItem = zod.object({
           editPct: zod.number().nullable(),
           flags: zod.array(zod.string()),
           severity: zod.enum(["low", "medium", "high"]),
+          wordChangeSummary: zod
+            .object({
+              originalWordCount: zod.number(),
+              finalWordCount: zod.number(),
+              unchangedWordCount: zod.number(),
+              removedWordCount: zod.number(),
+              addedWordCount: zod.number(),
+              unchangedPct: zod.number(),
+              aiChangedPct: zod.number(),
+              userAddedPct: zod.number(),
+              removedWords: zod.array(zod.string()),
+              addedWords: zod.array(zod.string()),
+            })
+            .describe(
+              "Explainable word-level comparison between the original AI draft and the final draft",
+            )
+            .nullish(),
         })
         .nullable(),
       reviewedPost: zod.string(),
@@ -1258,6 +1275,23 @@ export const GetDraftResponse = zod.object({
           editPct: zod.number().nullable(),
           flags: zod.array(zod.string()),
           severity: zod.enum(["low", "medium", "high"]),
+          wordChangeSummary: zod
+            .object({
+              originalWordCount: zod.number(),
+              finalWordCount: zod.number(),
+              unchangedWordCount: zod.number(),
+              removedWordCount: zod.number(),
+              addedWordCount: zod.number(),
+              unchangedPct: zod.number(),
+              aiChangedPct: zod.number(),
+              userAddedPct: zod.number(),
+              removedWords: zod.array(zod.string()),
+              addedWords: zod.array(zod.string()),
+            })
+            .describe(
+              "Explainable word-level comparison between the original AI draft and the final draft",
+            )
+            .nullish(),
         })
         .nullable(),
       reviewedPost: zod.string(),
@@ -1591,6 +1625,23 @@ export const UpdateDraftResponse = zod.object({
           editPct: zod.number().nullable(),
           flags: zod.array(zod.string()),
           severity: zod.enum(["low", "medium", "high"]),
+          wordChangeSummary: zod
+            .object({
+              originalWordCount: zod.number(),
+              finalWordCount: zod.number(),
+              unchangedWordCount: zod.number(),
+              removedWordCount: zod.number(),
+              addedWordCount: zod.number(),
+              unchangedPct: zod.number(),
+              aiChangedPct: zod.number(),
+              userAddedPct: zod.number(),
+              removedWords: zod.array(zod.string()),
+              addedWords: zod.array(zod.string()),
+            })
+            .describe(
+              "Explainable word-level comparison between the original AI draft and the final draft",
+            )
+            .nullish(),
         })
         .nullable(),
       reviewedPost: zod.string(),
