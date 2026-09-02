@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { imageGenApi, illustrationConceptApi } from "@/lib/api";
+import { applyBrandClosing, removeBrandClosing, type BrandClosingMode, type BrandClosingStyle } from "@/lib/brand-closing";
 import { downloadCarouselPDF } from "@/lib/export-carousel";
 import { downloadVisualCard } from "@/lib/export-visual-card";
 import { downloadInfographic } from "@/lib/export-infographic";
@@ -217,6 +218,11 @@ export default function Capture() {
   const [activeTab, setActiveTab] = useState<TabType>("post");
   const [editedPost, setEditedPost] = useState<string>("");
   const [hashtags, setHashtags] = useState<string>("");
+  const [aiOriginalPost, setAiOriginalPost] = useState<string>("");
+  const [brandClosingMode, setBrandClosingMode] = useState<BrandClosingMode>("never");
+  const [brandClosingStyle, setBrandClosingStyle] = useState<BrandClosingStyle>("expert");
+  const [brandClosingText, setBrandClosingText] = useState<string>("");
+  const [brandClosingApplied, setBrandClosingApplied] = useState(false);
   // Version history — every AI-produced version of the Post is snapshotted so
   // the user can flip back to a different tone / opener / length. In-memory
   // for the editing session; manual typing isn't snapshotted (too noisy).
@@ -309,6 +315,16 @@ export default function Capture() {
         setContent(restored);
         setEditedPost(restored.post);
         setHashtags(persistedHashtags);
+        setAiOriginalPost(existingDraft.aiOriginalPost ?? "");
+        const savedClosing = (sb as {
+          brandClosing?: { enabled?: boolean; mode?: BrandClosingMode; style?: BrandClosingStyle; text?: string };
+        }).brandClosing;
+        if (savedClosing) {
+          if (savedClosing.mode === "always" || savedClosing.mode === "smart" || savedClosing.mode === "never") setBrandClosingMode(savedClosing.mode);
+          if (savedClosing.style === "signature" || savedClosing.style === "follow" || savedClosing.style === "expert" || savedClosing.style === "custom") setBrandClosingStyle(savedClosing.style);
+          if (typeof savedClosing.text === "string") setBrandClosingText(savedClosing.text);
+          setBrandClosingApplied(savedClosing.enabled === true);
+        }
       }
       setSavedDraftId(existingDraft.id);
       setAuthenticityFeedback((existingDraft.authenticityFeedback as AuthenticityFeedback | undefined) ?? null);
@@ -321,6 +337,18 @@ export default function Capture() {
       setInitialized(true);
     }
   }, [existingDraft, initialized]);
+
+  useEffect(() => {
+    if (existingDraft || content || !preferences) return;
+    const next = preferences as typeof preferences & {
+      brandClosingMode?: string;
+      brandClosingStyle?: string;
+      brandClosingText?: string;
+    };
+    if (next.brandClosingMode === "always" || next.brandClosingMode === "smart" || next.brandClosingMode === "never") setBrandClosingMode(next.brandClosingMode);
+    if (next.brandClosingStyle === "signature" || next.brandClosingStyle === "follow" || next.brandClosingStyle === "expert" || next.brandClosingStyle === "custom") setBrandClosingStyle(next.brandClosingStyle);
+    if (typeof next.brandClosingText === "string") setBrandClosingText(next.brandClosingText);
+  }, [preferences, existingDraft, content]);
 
   // ── Generate (initial Make-it / Try a different angle) ─────────────────
   const runGenerate = (overrides?: { extraInstruction?: string; feeling?: string; audience?: string; rawInput?: string }) => {
@@ -353,10 +381,13 @@ export default function Capture() {
           const { post: hookedPost, hashtags: hookedHashtags } = seriesPart && seriesHookParam
             ? applySeriesHook(data.post, data.hashtags ?? "", seriesHookParam)
             : { post: data.post, hashtags: data.hashtags ?? "" };
-          setContent({ ...data, post: hookedPost, hashtags: hookedHashtags });
-          setEditedPost(hookedPost);
+          const withClosing = applyBrandClosing(hookedPost, brandClosingMode, brandClosingText);
+          setAiOriginalPost(hookedPost);
+          setBrandClosingApplied(withClosing.applied);
+          setContent({ ...data, post: withClosing.post, hashtags: hookedHashtags });
+          setEditedPost(withClosing.post);
           setHashtags(hookedHashtags);
-          addVersion(versions.length === 0 ? `${effectiveFeeling} · original` : effectiveFeeling, hookedPost, hookedHashtags);
+          addVersion(versions.length === 0 ? `${effectiveFeeling} · original` : effectiveFeeling, withClosing.post, hookedHashtags);
           setActiveTab("post");
           setVisualImage(null);
           setIllustrationImage(null);
@@ -379,16 +410,19 @@ export default function Capture() {
       tab === "carousel" ? JSON.stringify(content.carousel ?? []) :
       tab === "visual" ? (content.visual ?? "") :
       tab === "infographic" ? JSON.stringify(content.infographic ?? {}) :
-      editedPost;
+      (brandClosingApplied ? removeBrandClosing(editedPost, brandClosingText) : editedPost);
     refineContent(
       { data: { content: source, instruction, tab } },
       {
         onSuccess: (data) => {
           const refined = data.content ?? "";
           if (tab === "post") {
-            setEditedPost(refined);
-            setContent((c) => c ? { ...c, post: refined } : c);
-            addVersion(label ?? "Refined", refined, hashtags);
+            const refinedPost = brandClosingApplied
+              ? applyBrandClosing(refined, "always", brandClosingText).post
+              : refined;
+            setEditedPost(refinedPost);
+            setContent((c) => c ? { ...c, post: refinedPost } : c);
+            addVersion(label ?? "Refined", refinedPost, hashtags);
           } else if (tab === "short") {
             setContent((c) => c ? { ...c, shortPost: refined } : c);
           } else if (tab === "visual") {
@@ -461,6 +495,12 @@ export default function Capture() {
       alternativeHooks: content?.alternativeHooks ?? [],
       newsAnchor: cleanAnchor,
       infographic: content?.infographic ?? null,
+      brandClosing: {
+        enabled: brandClosingApplied && !!brandClosingText.trim() && editedPost.toLocaleLowerCase().endsWith(brandClosingText.trim().toLocaleLowerCase()),
+        mode: brandClosingMode,
+        style: brandClosingStyle,
+        text: brandClosingText.trim(),
+      },
     } as StructuredBreakdown & Record<string, unknown>;
   };
 
@@ -535,7 +575,7 @@ export default function Capture() {
     tone: toneFromFeeling(feeling),
     structuredBreakdown: buildStructuredBreakdown() as StructuredBreakdown,
     postOutput: editedPost,
-    aiOriginalPost: versions[0]?.post ?? null,
+    aiOriginalPost: aiOriginalPost || versions[0]?.post || null,
     shortPost: content?.shortPost ?? "",
     carouselOutput: JSON.stringify(content?.carousel ?? []),
     visualOutput: content?.visual ?? "",
@@ -565,6 +605,19 @@ export default function Capture() {
         },
       },
     );
+  };
+
+  const handleBrandClosingToggle = (enabled: boolean) => {
+    if (!brandClosingText.trim()) {
+      toast({ title: "Add a Brand Closing in Settings first.", variant: "destructive" });
+      return;
+    }
+    const next = enabled
+      ? applyBrandClosing(editedPost, "always", brandClosingText).post
+      : removeBrandClosing(editedPost, brandClosingText);
+    setBrandClosingApplied(enabled);
+    setEditedPost(next);
+    setContent((current) => current ? { ...current, post: next } : current);
   };
 
   const completePublish = () => {
@@ -868,6 +921,10 @@ export default function Capture() {
             illustrationImage={illustrationImage} illustrationCaption={illustrationCaption}
             illustrationScene={illustrationScene} isLoadingIllustration={isLoadingIllustration}
             fullPost={fullPost}
+            brandClosingMode={brandClosingMode}
+            brandClosingText={brandClosingText}
+            brandClosingApplied={brandClosingApplied}
+            onToggleBrandClosing={handleBrandClosingToggle}
             audience={audience} feeling={feeling}
             isRefining={isRefining}
             isSaving={isSaving}
@@ -1305,6 +1362,10 @@ interface ResultViewProps {
   illustrationImage: string | null; illustrationCaption: string;
   illustrationScene: string; isLoadingIllustration: boolean;
   fullPost: string;
+  brandClosingMode: BrandClosingMode;
+  brandClosingText: string;
+  brandClosingApplied: boolean;
+  onToggleBrandClosing: (enabled: boolean) => void;
   audience: string; feeling: string;
   isRefining: boolean;
   isSaving: boolean;
@@ -1337,6 +1398,7 @@ function ResultView(props: ResultViewProps) {
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
     fullPost, audience, feeling, isRefining, isSaving, isCheckingAuthenticity, isDemo,
+    brandClosingMode, brandClosingText, brandClosingApplied, onToggleBrandClosing,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
     onSave, onSaveAndPublish, onCopy, onBrandReview, isBrandReviewLoading,
@@ -1455,6 +1517,36 @@ function ResultView(props: ResultViewProps) {
             spellCheck
             className="w-full min-h-[280px] p-4 rounded-2xl border border-gray-200 focus:border-primary focus:outline-none text-sm leading-relaxed font-mono"
           />
+
+          <div className={cn(
+            "rounded-2xl border p-3.5",
+            brandClosingApplied ? "border-indigo-100 bg-indigo-50/60" : "border-gray-100 bg-gray-50",
+          )}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={brandClosingApplied}
+                onChange={(e) => onToggleBrandClosing(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-indigo-600"
+              />
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-xs font-bold text-gray-700">
+                  Brand closing
+                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-indigo-500 capitalize">{brandClosingMode}</span>
+                </span>
+                <span className="block text-[11px] text-gray-500 leading-relaxed mt-1">
+                  {brandClosingApplied
+                    ? "Included before hashtags. You can turn it off for this post."
+                    : brandClosingMode === "smart"
+                    ? "Smart mode left it off because this post already has a natural close."
+                    : "Turn it on for this post; manage the wording in Settings."}
+                </span>
+                {brandClosingApplied && brandClosingText.trim() && (
+                  <span className="block text-xs text-indigo-900 leading-relaxed mt-2 whitespace-pre-line">{brandClosingText.trim()}</span>
+                )}
+              </span>
+            </label>
+          </div>
 
           <input
             value={hashtags}

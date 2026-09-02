@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X, PenLine } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,17 @@ const AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", 
 const FEELINGS = ["Direct", "Witty", "Vulnerable", "Story", "Contrarian"];
 // Persona kept hidden — defaults to "Founder" backend-side; existing values preserved.
 const PERSONAS = ["Operator", "Founder", "Career", "Technical", "Sales"];
+const CLOSING_MODES = [
+  { key: "always", label: "Always", description: "Append it to every generated post." },
+  { key: "smart", label: "Smart", description: "Add it when the post does not already have a natural close." },
+  { key: "never", label: "Never", description: "Keep it off by default. You can still add it to an individual post." },
+] as const;
+const CLOSING_STYLES = [
+  { key: "signature", label: "Signature", template: "— Your Name · Brand strategist" },
+  { key: "follow", label: "Soft follow", template: "Follow for practical ideas on building a clearer, more credible personal brand." },
+  { key: "expert", label: "Expert positioning", template: "I help founders turn complex ideas into clear, credible brands." },
+  { key: "custom", label: "Custom", template: "" },
+] as const;
 
 function ThumbBtn({
   bgKey, label, isActive, onSelect, children,
@@ -84,10 +95,20 @@ export default function Settings() {
     bgDensity?: string;
     siteTheme?: string;
     bgCustomImageUrl?: string | null;
+    brandClosingMode?: string;
+    brandClosingStyle?: string;
+    brandClosingText?: string;
   });
   const [brandBgColor, setBrandBgColor] = useState(prefs?.brandBgColor ?? "#0f172a");
   const [brandAccentColor, setBrandAccentColor] = useState(prefs?.brandAccentColor ?? "#6366f1");
   const [brandTextColor, setBrandTextColor] = useState(prefs?.brandTextColor ?? "#ffffff");
+  const [brandClosingMode, setBrandClosingMode] = useState<"always" | "smart" | "never">(
+    (prefs?.brandClosingMode as "always" | "smart" | "never") ?? "never",
+  );
+  const [brandClosingStyle, setBrandClosingStyle] = useState<"signature" | "follow" | "expert" | "custom">(
+    (prefs?.brandClosingStyle as "signature" | "follow" | "expert" | "custom") ?? "expert",
+  );
+  const [brandClosingText, setBrandClosingText] = useState(prefs?.brandClosingText ?? "");
 
   const [openPanelId, setOpenPanelId] = useState<string | null>(null);
   const togglePanel = (id: string) => setOpenPanelId(prev => prev === id ? null : id);
@@ -149,6 +170,14 @@ export default function Settings() {
       if (preferences.brandBgColor) setBrandBgColor(preferences.brandBgColor);
       if (preferences.brandAccentColor) setBrandAccentColor(preferences.brandAccentColor);
       if (preferences.brandTextColor) setBrandTextColor(preferences.brandTextColor);
+      const nextPrefs = preferences as typeof preferences & { brandClosingMode?: string; brandClosingStyle?: string; brandClosingText?: string };
+      if (nextPrefs.brandClosingMode === "always" || nextPrefs.brandClosingMode === "smart" || nextPrefs.brandClosingMode === "never") {
+        setBrandClosingMode(nextPrefs.brandClosingMode);
+      }
+      if (nextPrefs.brandClosingStyle === "signature" || nextPrefs.brandClosingStyle === "follow" || nextPrefs.brandClosingStyle === "expert" || nextPrefs.brandClosingStyle === "custom") {
+        setBrandClosingStyle(nextPrefs.brandClosingStyle);
+      }
+      if (typeof nextPrefs.brandClosingText === "string") setBrandClosingText(nextPrefs.brandClosingText);
     }
   }, [preferences]);
 
@@ -316,6 +345,10 @@ export default function Settings() {
         return;
       }
     }
+    if (brandClosingMode !== "never" && !brandClosingText.trim()) {
+      toast({ title: "Add a closing sentence or choose Never.", variant: "destructive" });
+      return;
+    }
 
     const accountPayload: { displayName?: string; currentPassword?: string; newPassword?: string } = {};
     if (displayName.trim() && displayName.trim() !== user?.displayName) {
@@ -329,7 +362,7 @@ export default function Settings() {
 
     setIsSavingAccount(true);
     updatePreferences(
-      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples, proofPoints, contentPillars } },
+      { data: { objective, persona, tone, brandRole, brandAudience, brandBelief, aboutMe, brandBgColor, brandAccentColor, brandTextColor, writingSamples, proofPoints, contentPillars, brandClosingMode, brandClosingStyle, brandClosingText: brandClosingText.trim() } },
       {
         onSuccess: async () => {
           try {
@@ -487,6 +520,81 @@ export default function Settings() {
                 panelId="belief" openPanelId={openPanelId} onTogglePanel={togglePanel}
                 info="Your philosophical anchor — the contrarian or foundational idea that makes your POV unique. Example: 'Most digital transformations fail because of governance gaps, not technology gaps'."
               />
+            </div>
+          </section>
+
+          {/* Brand Closing */}
+          <section>
+            <div className="flex items-center gap-2 mb-1">
+              <PenLine className="w-4 h-4 text-primary" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Brand Closing</h2>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">
+              Add a consistent signature, soft follow invitation, or expert-positioning line to the main LinkedIn post. It is placed before hashtags and stays editable per post.
+            </p>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-5">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2.5">Default behavior</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {CLOSING_MODES.map((mode) => (
+                    <button
+                      key={mode.key}
+                      type="button"
+                      onClick={() => setBrandClosingMode(mode.key)}
+                      className={cn(
+                        "rounded-xl border-2 px-2 py-2.5 text-left transition-all",
+                        brandClosingMode === mode.key ? "border-primary bg-primary/5" : "border-gray-100 hover:border-primary/30",
+                      )}
+                    >
+                      <span className={cn("block text-xs font-bold", brandClosingMode === mode.key ? "text-primary" : "text-gray-600")}>{mode.label}</span>
+                      <span className="block text-[10px] leading-relaxed text-gray-400 mt-1">{mode.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2.5">Closing style</p>
+                <div className="flex flex-wrap gap-2">
+                  {CLOSING_STYLES.map((style) => (
+                    <button
+                      key={style.key}
+                      type="button"
+                      onClick={() => {
+                        setBrandClosingStyle(style.key);
+                        if (style.template) setBrandClosingText(style.template);
+                      }}
+                      className={cn(
+                        "px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all",
+                        brandClosingStyle === style.key ? "bg-primary text-white border-primary" : "bg-white text-gray-600 border-gray-200 hover:border-primary/40",
+                      )}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Your closing</p>
+                  <span className="text-[10px] text-gray-300">{brandClosingText.length}/240</span>
+                </div>
+                <textarea
+                  value={brandClosingText}
+                  onChange={(e) => setBrandClosingText(e.target.value)}
+                  maxLength={240}
+                  rows={2}
+                  placeholder="e.g. I help operators make complex work easier to understand."
+                  className="w-full text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 transition-shadow resize-none leading-relaxed placeholder:text-gray-300"
+                />
+                <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed">Keep it specific, useful, and human. Avoid asking for a follow, like, comment, and share all at once.</p>
+              </div>
+              {brandClosingText.trim() && (
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3.5 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400 mb-1.5">Preview</p>
+                  <p className="text-sm text-indigo-900 leading-relaxed">{brandClosingText.trim()}</p>
+                  <p className="text-[10px] text-indigo-500 mt-2">This appears before your hashtags.</p>
+                </div>
+              )}
             </div>
           </section>
 

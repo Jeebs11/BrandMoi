@@ -31,6 +31,31 @@ export interface UserResponse {
   displayName: string;
 }
 
+/**
+ * Whether to append the saved brand closing to generated LinkedIn posts
+ */
+export type PreferencesResponseBrandClosingMode =
+  (typeof PreferencesResponseBrandClosingMode)[keyof typeof PreferencesResponseBrandClosingMode];
+
+export const PreferencesResponseBrandClosingMode = {
+  always: "always",
+  smart: "smart",
+  never: "never",
+} as const;
+
+/**
+ * Preset style for the saved brand closing
+ */
+export type PreferencesResponseBrandClosingStyle =
+  (typeof PreferencesResponseBrandClosingStyle)[keyof typeof PreferencesResponseBrandClosingStyle];
+
+export const PreferencesResponseBrandClosingStyle = {
+  signature: "signature",
+  follow: "follow",
+  expert: "expert",
+  custom: "custom",
+} as const;
+
 export interface PreferencesResponse {
   id: number;
   userId: number;
@@ -52,7 +77,35 @@ export interface PreferencesResponse {
   bgSpeed?: string | null;
   /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
   siteTheme?: string | null;
+  /** Whether to append the saved brand closing to generated LinkedIn posts */
+  brandClosingMode?: PreferencesResponseBrandClosingMode;
+  /** Preset style for the saved brand closing */
+  brandClosingStyle?: PreferencesResponseBrandClosingStyle;
+  /**
+   * User-controlled closing appended before hashtags
+   * @maxLength 240
+   */
+  brandClosingText?: string;
 }
+
+export type UpdatePreferencesBodyBrandClosingMode =
+  (typeof UpdatePreferencesBodyBrandClosingMode)[keyof typeof UpdatePreferencesBodyBrandClosingMode];
+
+export const UpdatePreferencesBodyBrandClosingMode = {
+  always: "always",
+  smart: "smart",
+  never: "never",
+} as const;
+
+export type UpdatePreferencesBodyBrandClosingStyle =
+  (typeof UpdatePreferencesBodyBrandClosingStyle)[keyof typeof UpdatePreferencesBodyBrandClosingStyle];
+
+export const UpdatePreferencesBodyBrandClosingStyle = {
+  signature: "signature",
+  follow: "follow",
+  expert: "expert",
+  custom: "custom",
+} as const;
 
 export interface UpdatePreferencesBody {
   objective?: string;
@@ -92,6 +145,10 @@ export interface UpdatePreferencesBody {
   proofPoints?: string[];
   /** @maxItems 3 */
   aspirationalSamples?: string[];
+  brandClosingMode?: UpdatePreferencesBodyBrandClosingMode;
+  brandClosingStyle?: UpdatePreferencesBodyBrandClosingStyle;
+  /** @maxLength 240 */
+  brandClosingText?: string;
 }
 
 export interface SuggestionItem {
@@ -152,6 +209,36 @@ export type StructuredBreakdownNewsAnchor = {
   sourceLine?: string;
 } | null;
 
+export type StructuredBreakdownBrandClosingMode =
+  (typeof StructuredBreakdownBrandClosingMode)[keyof typeof StructuredBreakdownBrandClosingMode];
+
+export const StructuredBreakdownBrandClosingMode = {
+  always: "always",
+  smart: "smart",
+  never: "never",
+} as const;
+
+export type StructuredBreakdownBrandClosingStyle =
+  (typeof StructuredBreakdownBrandClosingStyle)[keyof typeof StructuredBreakdownBrandClosingStyle];
+
+export const StructuredBreakdownBrandClosingStyle = {
+  signature: "signature",
+  follow: "follow",
+  expert: "expert",
+  custom: "custom",
+} as const;
+
+/**
+ * User-controlled closing snapshot applied to this draft
+ */
+export type StructuredBreakdownBrandClosing = {
+  enabled?: boolean;
+  mode?: StructuredBreakdownBrandClosingMode;
+  style?: StructuredBreakdownBrandClosingStyle;
+  /** @maxLength 240 */
+  text?: string;
+} | null;
+
 export interface StructuredBreakdown {
   topic: string;
   angle: string;
@@ -173,6 +260,8 @@ export interface StructuredBreakdown {
   alternativeHooks?: string[];
   /** When tieToNews=true, the news headline anchor used in the post */
   newsAnchor?: StructuredBreakdownNewsAnchor;
+  /** User-controlled closing snapshot applied to this draft */
+  brandClosing?: StructuredBreakdownBrandClosing;
 }
 
 export type StructureIdeaResponseHookUsage = { [key: string]: number };
@@ -477,6 +566,11 @@ export interface Draft {
   brandReview?: BrandReviewCache | null;
   /** @nullable */
   postOutput?: string | null;
+  /**
+   * Immutable original AI draft snapshot, before user edits or the configured brand closing
+   * @nullable
+   */
+  aiOriginalPost?: string | null;
   /** @nullable */
   shortPost?: string | null;
   /** @nullable */

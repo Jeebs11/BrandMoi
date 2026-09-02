@@ -60,6 +60,9 @@ const UpdatePreferencesBody = z.object({
   writingSamples: z.array(z.string().max(3000)).max(5).optional(),
   proofPoints: z.array(z.string().max(200)).max(8).optional(),
   aspirationalSamples: z.array(z.string().max(3000)).max(3).optional(),
+  brandClosingMode: z.enum(["always", "smart", "never"]).optional(),
+  brandClosingStyle: z.enum(["signature", "follow", "expert", "custom"]).optional(),
+  brandClosingText: z.string().max(240).optional(),
 });
 
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
@@ -115,6 +118,9 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.writingSamples !== undefined) updateData.writingSamples = parsed.data.writingSamples;
   if (parsed.data.proofPoints !== undefined) updateData.proofPoints = parsed.data.proofPoints;
   if (parsed.data.aspirationalSamples !== undefined) updateData.aspirationalSamples = parsed.data.aspirationalSamples;
+  if (parsed.data.brandClosingMode !== undefined) updateData.brandClosingMode = parsed.data.brandClosingMode;
+  if (parsed.data.brandClosingStyle !== undefined) updateData.brandClosingStyle = parsed.data.brandClosingStyle;
+  if (parsed.data.brandClosingText !== undefined) updateData.brandClosingText = parsed.data.brandClosingText.trim();
 
   const [prefs] = await db
     .update(preferencesTable)

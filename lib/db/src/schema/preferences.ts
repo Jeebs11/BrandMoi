@@ -34,6 +34,11 @@ export const preferencesTable = pgTable("preferences", {
   // Posts (anyone's) whose STYLE the user wants to lean toward — rhythm and
   // language patterns only, never topics or claims.
   aspirationalSamples: jsonb("aspirational_samples").$type<string[]>(),
+  // A deterministic, user-controlled closing appended to the main LinkedIn
+  // post before hashtags. Existing users default to never until they opt in.
+  brandClosingMode: text("brand_closing_mode").notNull().default("never"),
+  brandClosingStyle: text("brand_closing_style").notNull().default("expert"),
+  brandClosingText: text("brand_closing_text").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

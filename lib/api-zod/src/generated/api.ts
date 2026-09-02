@@ -51,6 +51,8 @@ export const GetMeResponse = zod.object({
 /**
  * @summary Get the current user's brand preferences
  */
+export const getPreferencesResponseBrandClosingTextMax = 240;
+
 export const GetPreferencesResponse = zod.object({
   id: zod.number(),
   userId: zod.number(),
@@ -84,6 +86,21 @@ export const GetPreferencesResponse = zod.object({
     .describe(
       "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
     ),
+  brandClosingMode: zod
+    .enum(["always", "smart", "never"])
+    .optional()
+    .describe(
+      "Whether to append the saved brand closing to generated LinkedIn posts",
+    ),
+  brandClosingStyle: zod
+    .enum(["signature", "follow", "expert", "custom"])
+    .optional()
+    .describe("Preset style for the saved brand closing"),
+  brandClosingText: zod
+    .string()
+    .max(getPreferencesResponseBrandClosingTextMax)
+    .optional()
+    .describe("User-controlled closing appended before hashtags"),
 });
 
 /**
@@ -106,6 +123,8 @@ export const updatePreferencesBodyProofPointsMax = 8;
 export const updatePreferencesBodyAspirationalSamplesItemMax = 3000;
 
 export const updatePreferencesBodyAspirationalSamplesMax = 3;
+
+export const updatePreferencesBodyBrandClosingTextMax = 240;
 
 export const UpdatePreferencesBody = zod.object({
   objective: zod.string().optional(),
@@ -173,7 +192,17 @@ export const UpdatePreferencesBody = zod.object({
     .array(zod.string().max(updatePreferencesBodyAspirationalSamplesItemMax))
     .max(updatePreferencesBodyAspirationalSamplesMax)
     .optional(),
+  brandClosingMode: zod.enum(["always", "smart", "never"]).optional(),
+  brandClosingStyle: zod
+    .enum(["signature", "follow", "expert", "custom"])
+    .optional(),
+  brandClosingText: zod
+    .string()
+    .max(updatePreferencesBodyBrandClosingTextMax)
+    .optional(),
 });
+
+export const updatePreferencesResponseBrandClosingTextMax = 240;
 
 export const UpdatePreferencesResponse = zod.object({
   id: zod.number(),
@@ -208,6 +237,21 @@ export const UpdatePreferencesResponse = zod.object({
     .describe(
       "App colour theme preset; indigo | violet | sky | emerald | rose | amber",
     ),
+  brandClosingMode: zod
+    .enum(["always", "smart", "never"])
+    .optional()
+    .describe(
+      "Whether to append the saved brand closing to generated LinkedIn posts",
+    ),
+  brandClosingStyle: zod
+    .enum(["signature", "follow", "expert", "custom"])
+    .optional()
+    .describe("Preset style for the saved brand closing"),
+  brandClosingText: zod
+    .string()
+    .max(updatePreferencesResponseBrandClosingTextMax)
+    .optional()
+    .describe("User-controlled closing appended before hashtags"),
 });
 
 /**
@@ -783,6 +827,8 @@ export const GeneratePostDiagnosisResponse = zod.object({
 /**
  * @summary List all drafts for the current user
  */
+export const listDraftsResponseStructuredBreakdownBrandClosingTextMax = 240;
+
 export const ListDraftsResponseItem = zod.object({
   id: zod.number(),
   rawInput: zod.string(),
@@ -861,6 +907,18 @@ export const ListDraftsResponseItem = zod.object({
       .describe(
         "When tieToNews=true, the news headline anchor used in the post",
       ),
+    brandClosing: zod
+      .object({
+        enabled: zod.boolean().optional(),
+        mode: zod.enum(["always", "smart", "never"]).optional(),
+        style: zod.enum(["signature", "follow", "expert", "custom"]).optional(),
+        text: zod
+          .string()
+          .max(listDraftsResponseStructuredBreakdownBrandClosingTextMax)
+          .optional(),
+      })
+      .nullish()
+      .describe("User-controlled closing snapshot applied to this draft"),
   }),
   brandReview: zod
     .object({
@@ -919,6 +977,12 @@ export const ListDraftsResponseItem = zod.object({
     .nullish()
     .describe("Latest cached Brand Review for this draft, if one has been run"),
   postOutput: zod.string().nullish(),
+  aiOriginalPost: zod
+    .string()
+    .nullish()
+    .describe(
+      "Immutable original AI draft snapshot, before user edits or the configured brand closing",
+    ),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
@@ -1022,6 +1086,8 @@ export const ListDraftsResponse = zod.array(ListDraftsResponseItem);
 /**
  * @summary Create a new draft
  */
+export const createDraftBodyStructuredBreakdownBrandClosingTextMax = 240;
+
 export const CreateDraftBody = zod.object({
   rawInput: zod.string(),
   objective: zod.string(),
@@ -1099,6 +1165,18 @@ export const CreateDraftBody = zod.object({
       .describe(
         "When tieToNews=true, the news headline anchor used in the post",
       ),
+    brandClosing: zod
+      .object({
+        enabled: zod.boolean().optional(),
+        mode: zod.enum(["always", "smart", "never"]).optional(),
+        style: zod.enum(["signature", "follow", "expert", "custom"]).optional(),
+        text: zod
+          .string()
+          .max(createDraftBodyStructuredBreakdownBrandClosingTextMax)
+          .optional(),
+      })
+      .nullish()
+      .describe("User-controlled closing snapshot applied to this draft"),
   }),
   postOutput: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
@@ -1163,6 +1241,8 @@ export const CheckDraftAuthenticityResponse = zod.object({
 export const GetDraftParams = zod.object({
   id: zod.coerce.number(),
 });
+
+export const getDraftResponseStructuredBreakdownBrandClosingTextMax = 240;
 
 export const GetDraftResponse = zod.object({
   id: zod.number(),
@@ -1242,6 +1322,18 @@ export const GetDraftResponse = zod.object({
       .describe(
         "When tieToNews=true, the news headline anchor used in the post",
       ),
+    brandClosing: zod
+      .object({
+        enabled: zod.boolean().optional(),
+        mode: zod.enum(["always", "smart", "never"]).optional(),
+        style: zod.enum(["signature", "follow", "expert", "custom"]).optional(),
+        text: zod
+          .string()
+          .max(getDraftResponseStructuredBreakdownBrandClosingTextMax)
+          .optional(),
+      })
+      .nullish()
+      .describe("User-controlled closing snapshot applied to this draft"),
   }),
   brandReview: zod
     .object({
@@ -1300,6 +1392,12 @@ export const GetDraftResponse = zod.object({
     .nullish()
     .describe("Latest cached Brand Review for this draft, if one has been run"),
   postOutput: zod.string().nullish(),
+  aiOriginalPost: zod
+    .string()
+    .nullish()
+    .describe(
+      "Immutable original AI draft snapshot, before user edits or the configured brand closing",
+    ),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),
@@ -1406,6 +1504,8 @@ export const UpdateDraftParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateDraftBodyStructuredBreakdownBrandClosingTextMax = 240;
+
 export const UpdateDraftBody = zod.object({
   postOutput: zod.string().nullish(),
   shortPost: zod.string().nullish(),
@@ -1484,6 +1584,20 @@ export const UpdateDraftBody = zod.object({
         .describe(
           "When tieToNews=true, the news headline anchor used in the post",
         ),
+      brandClosing: zod
+        .object({
+          enabled: zod.boolean().optional(),
+          mode: zod.enum(["always", "smart", "never"]).optional(),
+          style: zod
+            .enum(["signature", "follow", "expert", "custom"])
+            .optional(),
+          text: zod
+            .string()
+            .max(updateDraftBodyStructuredBreakdownBrandClosingTextMax)
+            .optional(),
+        })
+        .nullish()
+        .describe("User-controlled closing snapshot applied to this draft"),
     })
     .optional(),
   status: zod.enum(["draft", "ready", "published"]).optional(),
@@ -1513,6 +1627,8 @@ export const UpdateDraftBody = zod.object({
   seriesId: zod.number().nullish(),
   seriesPart: zod.number().nullish(),
 });
+
+export const updateDraftResponseStructuredBreakdownBrandClosingTextMax = 240;
 
 export const UpdateDraftResponse = zod.object({
   id: zod.number(),
@@ -1592,6 +1708,18 @@ export const UpdateDraftResponse = zod.object({
       .describe(
         "When tieToNews=true, the news headline anchor used in the post",
       ),
+    brandClosing: zod
+      .object({
+        enabled: zod.boolean().optional(),
+        mode: zod.enum(["always", "smart", "never"]).optional(),
+        style: zod.enum(["signature", "follow", "expert", "custom"]).optional(),
+        text: zod
+          .string()
+          .max(updateDraftResponseStructuredBreakdownBrandClosingTextMax)
+          .optional(),
+      })
+      .nullish()
+      .describe("User-controlled closing snapshot applied to this draft"),
   }),
   brandReview: zod
     .object({
@@ -1650,6 +1778,12 @@ export const UpdateDraftResponse = zod.object({
     .nullish()
     .describe("Latest cached Brand Review for this draft, if one has been run"),
   postOutput: zod.string().nullish(),
+  aiOriginalPost: zod
+    .string()
+    .nullish()
+    .describe(
+      "Immutable original AI draft snapshot, before user edits or the configured brand closing",
+    ),
   shortPost: zod.string().nullish(),
   carouselOutput: zod.string().nullish(),
   visualOutput: zod.string().nullish(),

@@ -692,6 +692,18 @@ components:
           type: string
           nullable: true
           description: App colour theme preset; indigo | violet | sky | emerald | rose | amber
+        brandClosingMode:
+          type: string
+          enum: [always, smart, never]
+          description: Whether to append the saved brand closing to generated LinkedIn posts
+        brandClosingStyle:
+          type: string
+          enum: [signature, follow, expert, custom]
+          description: Preset style for the saved brand closing
+        brandClosingText:
+          type: string
+          maxLength: 240
+          description: User-controlled closing appended before hashtags
       required:
         - id
         - userId
@@ -785,6 +797,15 @@ components:
             type: string
             maxLength: 3000
           maxItems: 3
+        brandClosingMode:
+          type: string
+          enum: [always, smart, never]
+        brandClosingStyle:
+          type: string
+          enum: [signature, follow, expert, custom]
+        brandClosingText:
+          type: string
+          maxLength: 240
 
     SuggestionItem:
       type: object
@@ -891,6 +912,22 @@ components:
               type: string
             sourceLine:
               type: string
+        brandClosing:
+          type: object
+          nullable: true
+          description: User-controlled closing snapshot applied to this draft
+          properties:
+            enabled:
+              type: boolean
+            mode:
+              type: string
+              enum: [always, smart, never]
+            style:
+              type: string
+              enum: [signature, follow, expert, custom]
+            text:
+              type: string
+              maxLength: 240
       required:
         - topic
         - angle
@@ -1270,6 +1307,9 @@ components:
             - $ref: "#/components/schemas/BrandReviewCache"
         postOutput:
           type: ["string", "null"]
+        aiOriginalPost:
+          type: ["string", "null"]
+          description: Immutable original AI draft snapshot, before user edits or the configured brand closing
         shortPost:
           type: ["string", "null"]
         carouselOutput:
