@@ -70,6 +70,14 @@ const AUDIENCE_TAG_COLORS: Record<string, string> = {
   "My audience": "bg-gray-100 text-gray-500",
 };
 
+function scenarioIdeaRaw(item: BrandAngle): string {
+  return [
+    item.scenario ? `Real-life scenario: ${item.scenario}` : "",
+    item.tension ? `Tension: ${item.tension}` : "",
+    `Content angle: ${item.angle}`,
+  ].filter(Boolean).join("\n\n");
+}
+
 
 const WEEK_STREAK_LINES = (weekStreak: number): string => {
   if (weekStreak === 0) return "Post once this week to start the wall.";
@@ -727,7 +735,33 @@ export default function Dashboard() {
                         </button>
                         {isOpen && (
                           <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100 space-y-2">
-                            <button onClick={() => openLengthPicker(item.angle, `audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
+                            {(item.scenario || item.tension || item.whyItResonates) && (
+                              <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2.5 space-y-2">
+                                {item.scenarioType && (
+                                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                                    {item.scenarioType}
+                                  </span>
+                                )}
+                                {item.scenario && (
+                                  <div>
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">The moment</p>
+                                    <p className="text-xs font-semibold leading-snug text-gray-800">{item.scenario}</p>
+                                  </div>
+                                )}
+                                {item.tension && (
+                                  <div>
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">The tension</p>
+                                    <p className="text-[11px] leading-snug text-gray-600">{item.tension}</p>
+                                  </div>
+                                )}
+                                {item.whyItResonates && (
+                                  <p className="text-[10px] leading-snug text-gray-500 border-t border-amber-100 pt-1.5">
+                                    <span className="font-bold text-gray-700">Why it resonates: </span>{item.whyItResonates}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            <button onClick={() => openLengthPicker(scenarioIdeaRaw(item), `audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
                             <div className="flex gap-2">
                               <button onClick={() => void handleIdeaFeedback(item.angle, "brand", "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
                               <button onClick={() => void handleIdeaFeedback(item.angle, "brand", "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>

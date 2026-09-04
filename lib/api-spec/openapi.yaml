@@ -1507,7 +1507,7 @@ components:
         angles:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/BrandAngle"
         teachAngles:
           type: array
           items:
@@ -1529,6 +1529,27 @@ components:
         - insight
         - angles
         - teachAngles
+
+    BrandAngle:
+      type: object
+      properties:
+        angle:
+          type: string
+        audience:
+          type: string
+          enum: [Clients, Peers, Recruiters & Headhunters, Investors, My audience]
+        scenarioType:
+          type: string
+        scenario:
+          type: string
+          description: A recognisable real-life writing prompt, not an asserted personal fact
+        tension:
+          type: string
+        whyItResonates:
+          type: string
+      required:
+        - angle
+        - audience
 
     AnalyticsOverviewResponse:
       type: object

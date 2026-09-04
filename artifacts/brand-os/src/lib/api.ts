@@ -375,7 +375,14 @@ export type SkillAngle = {
   hook: string;
 };
 
-export type BrandAngle = { angle: string; audience: string };
+export type BrandAngle = {
+  angle: string;
+  audience: string;
+  scenarioType?: string;
+  scenario?: string;
+  tension?: string;
+  whyItResonates?: string;
+};
 
 export type AgentBrief = {
   headline: string;

@@ -791,10 +791,31 @@ export interface LinkedinSyncResponse {
   total: number;
 }
 
+export type BrandAngleAudience =
+  (typeof BrandAngleAudience)[keyof typeof BrandAngleAudience];
+
+export const BrandAngleAudience = {
+  Clients: "Clients",
+  Peers: "Peers",
+  "Recruiters_&_Headhunters": "Recruiters & Headhunters",
+  Investors: "Investors",
+  My_audience: "My audience",
+} as const;
+
+export interface BrandAngle {
+  angle: string;
+  audience: BrandAngleAudience;
+  scenarioType?: string;
+  /** A recognisable real-life writing prompt, not an asserted personal fact */
+  scenario?: string;
+  tension?: string;
+  whyItResonates?: string;
+}
+
 export interface AgentBriefResponse {
   headline: string;
   insight: string;
-  angles: string[];
+  angles: BrandAngle[];
   teachAngles: string[];
   newsHeadline?: string;
   newsSourceLine?: string;

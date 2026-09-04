@@ -1349,13 +1349,15 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
     const isTeach = parsed.data.type === "teach";
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 450,
+      max_tokens: isTeach ? 450 : 700,
       system: isTeach
         ? `You generate "teach your audience" LinkedIn post seeds — analogy or FAQ ideas grounded in the creator's exact field. Each max 12 words, like "Why [misconception] — an analogy for [audience]". Return JSON only: {"angles": ["...", "...", "..."]}`
         : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
 Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one.
 Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
-Return JSON only: {"angles": [{"angle": "...", "audience": "Clients"}, {"angle": "...", "audience": "Peers"}, {"angle": "...", "audience": "Recruiters & Headhunters"}, {"angle": "...", "audience": "Investors"}, {"angle": "...", "audience": "My audience"}]}`,
+Every angle must be grounded in a recognisable real-life work scenario, not an abstract topic. The scenario is a writing prompt, not a claim that the creator personally experienced it — never invent names, metrics, clients, or outcomes.
+For each angle include: scenarioType (2–3 words), scenario (a specific moment, max 18 words), tension (the conflict, max 12 words), and whyItResonates (why that audience cares, max 16 words).
+Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "Peers", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "Recruiters & Headhunters", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "Investors", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "My audience", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}]}`,
       messages: [{
         role: "user",
         content: [
@@ -1382,17 +1384,31 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients"}, {"angle":
     }
 
     const VALID_AUDIENCES = new Set(ALL_AUDIENCES);
-    const rawAngles = data.angles
+    const rawAngles: ScenarioAngle[] = data.angles
       .map((a) => {
         if (typeof a === "string") return { angle: a, audience: "My audience" };
         if (a && typeof a === "object" && typeof (a as { angle?: unknown }).angle === "string") {
-          const obj = a as { angle: string; audience?: unknown };
+          const obj = a as {
+            angle: string;
+            audience?: unknown;
+            scenarioType?: unknown;
+            scenario?: unknown;
+            tension?: unknown;
+            whyItResonates?: unknown;
+          };
           const audience = typeof obj.audience === "string" && VALID_AUDIENCES.has(obj.audience) ? obj.audience : "My audience";
-          return { angle: obj.angle, audience };
+          return {
+            angle: obj.angle,
+            audience,
+            ...(typeof obj.scenarioType === "string" ? { scenarioType: obj.scenarioType } : {}),
+            ...(typeof obj.scenario === "string" ? { scenario: obj.scenario } : {}),
+            ...(typeof obj.tension === "string" ? { tension: obj.tension } : {}),
+            ...(typeof obj.whyItResonates === "string" ? { whyItResonates: obj.whyItResonates } : {}),
+          };
         }
         return null;
       })
-      .filter((a): a is { angle: string; audience: string } => a !== null);
+      .filter((a): a is ScenarioAngle => a !== null);
 
     // Guarantee exactly one angle per audience — fill any the model missed
     // or duplicated from a per-audience fallback.
@@ -1404,7 +1420,7 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients"}, {"angle":
       "My audience": `Teach one thing you wish you knew earlier in your career`,
     };
     const angles = ALL_AUDIENCES.map(
-      (aud) => rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud }
+      (aud) => completeScenarioAngle(rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud })
     );
     res.json({ angles });
   } catch (err) {

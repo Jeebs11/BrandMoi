@@ -154,9 +154,47 @@ const DEMO_BRIEFS = [
   },
 ];
 
+const DEMO_SCENARIOS: Record<string, { scenarioType: string; scenario: string; tension: string; whyItResonates: string }> = {
+  "Clients": {
+    scenarioType: "Client tension",
+    scenario: "A new client hands you a messy backlog and expects priorities by Friday",
+    tension: "Moving quickly without pretending every request is equally urgent",
+    whyItResonates: "Clients recognise the relief of clear priorities in a messy situation",
+  },
+  "Peers": {
+    scenarioType: "Team tradeoff",
+    scenario: "A meeting ends with agreement, but nobody can name the actual decision",
+    tension: "Visible alignment versus real commitment",
+    whyItResonates: "Peers have lived through meetings that create motion without clarity",
+  },
+  "Recruiters & Headhunters": {
+    scenarioType: "Hard decision",
+    scenario: "A deadline is fixed, quality is slipping, and the team needs a defensible call",
+    tension: "Protecting standards while still delivering under pressure",
+    whyItResonates: "Hiring managers want evidence of judgment when no option is perfect",
+  },
+  "Investors": {
+    scenarioType: "Market signal",
+    scenario: "Customer behaviour contradicts the growth story everyone expected to be true",
+    tension: "Defending the plan versus following the evidence",
+    whyItResonates: "Investors value leaders who recognise signals before consensus catches up",
+  },
+  "My audience": {
+    scenarioType: "Behind the scenes",
+    scenario: "A small mistake at work exposes a lesson no framework ever taught you",
+    tension: "The polished advice versus what actually happened",
+    whyItResonates: "Specific moments make familiar lessons feel human and credible",
+  },
+};
+
+function addDemoScenarios<T extends { angle: string; audience: string }>(angles: T[]) {
+  return angles.map((item) => ({ ...item, ...DEMO_SCENARIOS[item.audience] }));
+}
+
 export function getDemoBrief() {
   const idx = Math.floor(Date.now() / 86400000) % DEMO_BRIEFS.length;
-  return DEMO_BRIEFS[idx];
+  const brief = DEMO_BRIEFS[idx]!;
+  return { ...brief, angles: addDemoScenarios(brief.angles) };
 }
 
 const DEMO_IDEAS_BRAND: Array<{ angle: string; audience: string }>[] = [
@@ -192,7 +230,7 @@ const DEMO_IDEAS_TEACH: string[][] = [
 export function getDemoIdeas(type: "brand" | "teach") {
   const idx = Math.floor(Date.now() / 3600000) % 2;
   if (type === "teach") return { angles: DEMO_IDEAS_TEACH[idx] };
-  return { angles: DEMO_IDEAS_BRAND[idx] };
+  return { angles: addDemoScenarios(DEMO_IDEAS_BRAND[idx]!) };
 }
 
 const DEMO_DARES = [

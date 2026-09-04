@@ -271,7 +271,27 @@ export const GetSuggestionsResponse = zod.array(GetSuggestionsResponseItem);
 export const GetAgentBriefResponse = zod.object({
   headline: zod.string(),
   insight: zod.string(),
-  angles: zod.array(zod.string()),
+  angles: zod.array(
+    zod.object({
+      angle: zod.string(),
+      audience: zod.enum([
+        "Clients",
+        "Peers",
+        "Recruiters & Headhunters",
+        "Investors",
+        "My audience",
+      ]),
+      scenarioType: zod.string().optional(),
+      scenario: zod
+        .string()
+        .optional()
+        .describe(
+          "A recognisable real-life writing prompt, not an asserted personal fact",
+        ),
+      tension: zod.string().optional(),
+      whyItResonates: zod.string().optional(),
+    }),
+  ),
   teachAngles: zod.array(zod.string()),
   newsHeadline: zod.string().optional(),
   newsSourceLine: zod.string().optional(),
