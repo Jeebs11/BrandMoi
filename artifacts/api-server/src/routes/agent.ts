@@ -32,6 +32,55 @@ function deriveAudienceFallback(objective: unknown): string {
   return "My audience";
 }
 
+type ScenarioAngle = {
+  angle: string;
+  audience: string;
+  scenarioType?: string;
+  scenario?: string;
+  tension?: string;
+  whyItResonates?: string;
+};
+
+const SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience">> = {
+  "Clients": {
+    scenarioType: "Client tension",
+    scenario: "A client asks for one more change just before launch",
+    tension: "Protecting the relationship versus protecting delivery quality",
+    whyItResonates: "Clients recognise the pressure behind difficult scope decisions",
+  },
+  "Peers": {
+    scenarioType: "Tradeoff",
+    scenario: "Two experienced people disagree about the right way to solve a problem",
+    tension: "Being right versus making a decision the team can execute",
+    whyItResonates: "Peers care about the judgment behind the decision",
+  },
+  "Recruiters & Headhunters": {
+    scenarioType: "Hard decision",
+    scenario: "You have to choose between shipping on time and protecting quality",
+    tension: "Speed versus standards when the pressure is visible",
+    whyItResonates: "Hiring managers look for evidence of judgment under pressure",
+  },
+  "Investors": {
+    scenarioType: "Market signal",
+    scenario: "A customer or market signal contradicts the plan everyone agreed on",
+    tension: "Following the plan versus responding to what the evidence says",
+    whyItResonates: "Investors value pattern recognition and clear-headed adaptation",
+  },
+  "My audience": {
+    scenarioType: "Behind the scenes",
+    scenario: "A small moment at work exposes a lesson you wish you knew earlier",
+    tension: "The ordinary detail versus the bigger lesson it reveals",
+    whyItResonates: "People connect with specific moments more than abstract advice",
+  },
+};
+
+function completeScenarioAngle(angle: ScenarioAngle): ScenarioAngle {
+  return {
+    ...SCENARIO_FALLBACKS[angle.audience],
+    ...angle,
+  };
+}
+
 function parseJson(text: string): unknown {
   const cleaned = text
     .replace(/^```(?:json)?\s*/i, "")
@@ -218,9 +267,9 @@ router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<v
       .filter(Boolean)
       .join("\n");
 
-    const msg = await anthropic.messages.create({
+      const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 750,
+        max_tokens: 1100,
       system: `You are an AI creative director for a LinkedIn creator. Generate a personalized daily brief — like a smart chief-of-staff, not a motivational poster.
 
 Return JSON only (no markdown):
@@ -228,11 +277,11 @@ Return JSON only (no markdown):
   "headline": "One sharp directive about what to focus on today (max 12 words)",
   "insight": "One specific observation about their content gap or momentum (max 25 words)",
   "angles": [
-    {"angle": "specific post angle for Clients (max 10 words)", "audience": "Clients"},
-    {"angle": "specific post angle for Peers (max 10 words)", "audience": "Peers"},
-    {"angle": "specific post angle for Recruiters & Headhunters (max 10 words)", "audience": "Recruiters & Headhunters"},
-    {"angle": "specific post angle for Investors (max 10 words)", "audience": "Investors"},
-    {"angle": "specific post angle for My audience (max 10 words)", "audience": "My audience"}
+    {"angle": "specific post angle (max 10 words)", "audience": "Clients", "scenarioType": "Client tension", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "Peers", "scenarioType": "Tradeoff", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "Recruiters & Headhunters", "scenarioType": "Hard decision", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "Investors", "scenarioType": "Market signal", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "My audience", "scenarioType": "Behind the scenes", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"}
   ],
   "teachAngles": ["FAQ or analogy seed 1 (max 12 words)", "FAQ or analogy seed 2 (max 12 words)", "FAQ or analogy seed 3 (max 12 words)"],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
@@ -249,6 +298,9 @@ Rules:
 - angles are real post ideas they could write today
 - return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
 - each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one
+- every angle must be grounded in a recognisable real-life work scenario, not an abstract topic
+- scenario is a writing prompt, not a claim that the creator personally experienced it; never invent names, metrics, clients, or outcomes
+- scenarioType should be 2–3 words, scenario should describe a specific moment, tension should name the conflict, and whyItResonates should explain the audience connection
 - if news context is available, let it inspire whichever of the 5 angles it fits best — don't force it
 - teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Each should be a short prompt like "Why [common misconception] — an analogy for [audience]" or "The real reason [industry thing] fails (explained simply)". Never generic — always tied to their specific brand context.
 - tone: direct, peer-level, no fluff, no "great job"
@@ -302,18 +354,32 @@ Rules:
       // {angle, audience} shape; if the model (or an old cached shape)
       // returns a bare string, default it to "My audience" rather than drop it.
       const VALID_AUDIENCES = new Set(ALL_AUDIENCES);
-      const rawAngles: Array<{ angle: string; audience: string }> = Array.isArray(parsed.angles)
+      const rawAngles: ScenarioAngle[] = Array.isArray(parsed.angles)
         ? (parsed.angles as unknown[])
             .map((a) => {
               if (typeof a === "string") return { angle: a, audience: "My audience" };
               if (a && typeof a === "object" && typeof (a as { angle?: unknown }).angle === "string") {
-                const obj = a as { angle: string; audience?: unknown };
+                const obj = a as {
+                  angle: string;
+                  audience?: unknown;
+                  scenarioType?: unknown;
+                  scenario?: unknown;
+                  tension?: unknown;
+                  whyItResonates?: unknown;
+                };
                 const audience = typeof obj.audience === "string" && VALID_AUDIENCES.has(obj.audience) ? obj.audience : "My audience";
-                return { angle: obj.angle, audience };
+                return {
+                  angle: obj.angle,
+                  audience,
+                  ...(typeof obj.scenarioType === "string" ? { scenarioType: obj.scenarioType } : {}),
+                  ...(typeof obj.scenario === "string" ? { scenario: obj.scenario } : {}),
+                  ...(typeof obj.tension === "string" ? { tension: obj.tension } : {}),
+                  ...(typeof obj.whyItResonates === "string" ? { whyItResonates: obj.whyItResonates } : {}),
+                };
               }
               return null;
             })
-            .filter((a): a is { angle: string; audience: string } => a !== null)
+            .filter((a): a is ScenarioAngle => a !== null)
         : [];
       // Guarantee exactly one angle per audience, in ALL_AUDIENCES order —
       // fill any the model missed or duplicated from a per-audience fallback.
@@ -324,8 +390,8 @@ Rules:
         "Investors": `Share a non-consensus read on where your market is heading`,
         "My audience": `Teach one thing you wish you knew earlier in your career`,
       };
-      const angles: Array<{ angle: string; audience: string }> = ALL_AUDIENCES.map(
-        (aud) => rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud }
+      const angles: ScenarioAngle[] = ALL_AUDIENCES.map(
+        (aud) => completeScenarioAngle(rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud })
       );
       res.json({
         headline,
