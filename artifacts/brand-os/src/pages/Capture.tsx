@@ -32,6 +32,7 @@ import { downloadCarouselPDF } from "@/lib/export-carousel";
 import { downloadVisualCard } from "@/lib/export-visual-card";
 import { downloadInfographic } from "@/lib/export-infographic";
 import { downloadIllustrationCard } from "@/lib/export-illustration";
+import { trackEvent } from "@/lib/analytics";
 import {
   type AuthenticityFeedback,
   type AuthenticityReview,
@@ -359,6 +360,12 @@ export default function Capture() {
     }
     const effectiveAudience = overrides?.audience ?? audience;
     const effectiveFeeling = overrides?.feeling ?? feeling;
+    trackEvent("content_generation_started", {
+      audience: effectiveAudience,
+      feeling: effectiveFeeling,
+      tie_to_news: tieToNews,
+      has_series: Boolean(seriesDetail),
+    });
     generateContent(
       {
         data: {
@@ -394,8 +401,19 @@ export default function Capture() {
           setIllustrationCaption("");
           setIllustrationScene("");
           downloadedVisualRef.current = null;
+           trackEvent("content_generated", {
+             audience: effectiveAudience,
+             feeling: effectiveFeeling,
+             tie_to_news: tieToNews,
+             has_series: Boolean(seriesDetail),
+           });
         },
         onError: (err) => {
+           trackEvent("content_generation_failed", {
+             audience: effectiveAudience,
+             feeling: effectiveFeeling,
+             tie_to_news: tieToNews,
+           });
           toast({ title: "Couldn't generate", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
         },
       }
@@ -539,6 +557,7 @@ export default function Capture() {
         {
           onSuccess: () => {
             toast({ title: "Saved", description: "Draft updated." });
+            trackEvent("draft_saved", { status: "draft", updated: true });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
@@ -551,6 +570,7 @@ export default function Capture() {
           onSuccess: (newDraft) => {
             setSavedDraftId(newDraft.id);
             toast({ title: "Saved", description: "Draft created." });
+            trackEvent("draft_saved", { status: "draft", updated: false });
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
         }
@@ -629,6 +649,10 @@ export default function Capture() {
     // This is the explicit action from the review panel, so opening a tab still
     // occurs synchronously and is less likely to be blocked by the browser.
     const shipText = composeLinkedInText(editedPost, hashtags);
+    trackEvent("linkedin_publish_started", {
+      has_brand_review: Boolean(brandReviewResult),
+      has_hashtags: Boolean(hashtags.trim()),
+    });
     // Start the clipboard operation while the original click still owns the
     // browser user gesture. Opening/navigating LinkedIn first can cause some
     // browsers to reject the clipboard write, especially in an embedded app.
@@ -662,6 +686,7 @@ export default function Capture() {
         {
           onSuccess: () => {
             toast({ title: "Saved for publishing", description: "The current post and hashtags have been saved." });
+            trackEvent("draft_published", { updated: true });
             void queryClient.invalidateQueries({ queryKey: getGetDraftQueryKey(savedDraftId) });
             showBestTimeHint();
           },
@@ -675,6 +700,7 @@ export default function Capture() {
           onSuccess: (newDraft) => {
             setSavedDraftId(newDraft.id);
             toast({ title: "Saved for publishing", description: "The current post and hashtags have been saved." });
+            trackEvent("draft_published", { updated: false });
             showBestTimeHint();
           },
           onError: (err) => toast({ title: "Save failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }),
@@ -734,6 +760,10 @@ export default function Capture() {
       setBrandReviewEvidence(brandReview.authenticityCheck);
       setBrandReviewReviewedPost(brandReview.reviewedPost);
       setBrandReviewCachedAt(brandReview.cachedAt);
+       trackEvent("brand_review_completed", {
+         purpose: forPublish ? "publish" : "preview",
+         refreshed: force,
+       });
     } catch (err) {
       // Keep an existing review open on refresh failure; closing it would hide
       // the cached result the user explicitly asked to preserve.
@@ -771,7 +801,10 @@ export default function Capture() {
     if (!content?.visual || isLoadingVisual) return;
     setIsLoadingVisual(true);
     imageGenApi.generate(content.visual, "photo")
-      .then(({ imageBase64 }) => setVisualImage(imageBase64))
+      .then(({ imageBase64 }) => {
+        setVisualImage(imageBase64);
+        trackEvent("visual_generated", { kind: "photo" });
+      })
       .catch((err) => toast({ title: "Visual failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }))
       .finally(() => setIsLoadingVisual(false));
   };
@@ -787,6 +820,7 @@ export default function Capture() {
         setIllustrationScene(concept.scenePrompt);
         const { imageBase64 } = await imageGenApi.generate(concept.scenePrompt, "illustration", visualStyle);
         setIllustrationImage(imageBase64);
+        trackEvent("visual_generated", { kind: "illustration", style: visualStyle });
       } catch (err) {
         toast({ title: "Illustration failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
       } finally {
@@ -800,7 +834,10 @@ export default function Capture() {
     if (!scene.trim() || isLoadingIllustration) return;
     setIsLoadingIllustration(true);
     imageGenApi.generate(scene, "illustration", visualStyle)
-      .then(({ imageBase64 }) => setIllustrationImage(imageBase64))
+      .then(({ imageBase64 }) => {
+        setIllustrationImage(imageBase64);
+        trackEvent("visual_generated", { kind: "illustration", style: visualStyle });
+      })
       .catch((err) => toast({ title: "Illustration failed", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" }))
       .finally(() => setIsLoadingIllustration(false));
   };

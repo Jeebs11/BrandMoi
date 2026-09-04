@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, type Thought } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { trackEvent } from "@/lib/analytics";
 
 export default function Vault() {
   const [, navigate] = useLocation();
@@ -34,6 +35,7 @@ export default function Vault() {
       setThoughts((prev) => [thought, ...prev]);
       setInput("");
       textareaRef.current?.focus();
+      trackEvent("vault_idea_captured");
     } finally {
       setSaving(false);
     }
@@ -41,6 +43,7 @@ export default function Vault() {
 
   const handleDevelop = (thought: Thought) => {
     const encoded = encodeURIComponent(thought.content);
+    trackEvent("vault_idea_developed");
     navigate(`/capture?thought=${encoded}&thoughtId=${thought.id}`);
   };
 
@@ -49,6 +52,7 @@ export default function Vault() {
     try {
       await thoughtsApi.markDeveloped(id);
       setThoughts((prev) => prev.map((t) => (t.id === id ? { ...t, developed: true } : t)));
+      trackEvent("vault_idea_marked_developed");
     } finally {
       setDevelopingId(null);
     }
