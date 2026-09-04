@@ -68,6 +68,17 @@ export const GetPreferencesResponse = zod.object({
     .describe(
       "Free-text creator bio used as primary AI context; replaces Objective\/Persona labels when non-empty.",
     ),
+  contentPillars: zod
+    .array(zod.string())
+    .optional()
+    .describe("Professional territories the creator wants to become known for"),
+  proofPoints: zod
+    .array(zod.string())
+    .optional()
+    .describe(
+      "Verified experience or outcomes available as evidence for generation",
+    ),
+  writingSamples: zod.array(zod.string()).optional(),
   onboarded: zod.boolean(),
   brandBgColor: zod.string().nullish(),
   brandAccentColor: zod.string().nullish(),
@@ -179,7 +190,10 @@ export const UpdatePreferencesBody = zod.object({
   contentPillars: zod
     .array(zod.string().max(updatePreferencesBodyContentPillarsItemMax))
     .max(updatePreferencesBodyContentPillarsMax)
-    .optional(),
+    .optional()
+    .describe(
+      "Professional territories the creator wants to become known for; at least one is required when completing onboarding.",
+    ),
   writingSamples: zod
     .array(zod.string().max(updatePreferencesBodyWritingSamplesItemMax))
     .max(updatePreferencesBodyWritingSamplesMax)
@@ -187,7 +201,10 @@ export const UpdatePreferencesBody = zod.object({
   proofPoints: zod
     .array(zod.string().max(updatePreferencesBodyProofPointsItemMax))
     .max(updatePreferencesBodyProofPointsMax)
-    .optional(),
+    .optional()
+    .describe(
+      "Verified experience or outcomes the AI may use as evidence; at least one is required when completing onboarding.",
+    ),
   aspirationalSamples: zod
     .array(zod.string().max(updatePreferencesBodyAspirationalSamplesItemMax))
     .max(updatePreferencesBodyAspirationalSamplesMax)
@@ -219,6 +236,17 @@ export const UpdatePreferencesResponse = zod.object({
     .describe(
       "Free-text creator bio used as primary AI context; replaces Objective\/Persona labels when non-empty.",
     ),
+  contentPillars: zod
+    .array(zod.string())
+    .optional()
+    .describe("Professional territories the creator wants to become known for"),
+  proofPoints: zod
+    .array(zod.string())
+    .optional()
+    .describe(
+      "Verified experience or outcomes available as evidence for generation",
+    ),
+  writingSamples: zod.array(zod.string()).optional(),
   onboarded: zod.boolean(),
   brandBgColor: zod.string().nullish(),
   brandAccentColor: zod.string().nullish(),
@@ -290,6 +318,16 @@ export const GetAgentBriefResponse = zod.object({
         ),
       tension: zod.string().optional(),
       whyItResonates: zod.string().optional(),
+      professionalTerritory: zod
+        .string()
+        .optional()
+        .describe("The saved professional territory this idea reinforces"),
+      professionalSignal: zod
+        .string()
+        .optional()
+        .describe(
+          "A plain-language explanation of the capability readers can credibly infer",
+        ),
     }),
   ),
   teachAngles: zod.array(zod.string()),

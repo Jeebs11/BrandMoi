@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X, PenLine } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X, PenLine, AlertCircle } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,12 @@ export default function Settings() {
   const [newProofPoint, setNewProofPoint] = useState("");
   const [contentPillars, setContentPillars] = useState<string[]>((preferences as typeof preferences & { contentPillars?: string[] })?.contentPillars ?? []);
   const [newPillar, setNewPillar] = useState("");
+  const requiredPositioningFields = [
+    { done: !!brandRole.trim(), label: "your role" },
+    { done: !!brandAudience.trim(), label: "your audience" },
+    { done: contentPillars.length > 0, label: "one professional territory" },
+    { done: proofPoints.length > 0, label: "one proof point" },
+  ];
 
   const prefs = preferences as (typeof preferences & {
     brandBgColor?: string;
@@ -418,12 +424,7 @@ export default function Settings() {
               generation prompt (About You, role, audience, belief below).
               Updates live as you type, before you've even hit Save. */}
           {(() => {
-            const fields = [
-              { done: !!brandRole.trim(), label: "your role" },
-              { done: !!brandAudience.trim(), label: "your audience" },
-              { done: !!brandBelief.trim(), label: "your core belief" },
-              { done: !!aboutMe.trim(), label: "a short bio" },
-            ];
+             const fields = requiredPositioningFields;
             const missing = fields.filter((f) => !f.done);
             if (missing.length === 0) return null;
             const pct = Math.round(((fields.length - missing.length) / fields.length) * 100);
@@ -436,9 +437,12 @@ export default function Settings() {
                 <div className="h-1.5 bg-violet-100 rounded-full overflow-hidden mb-1.5">
                   <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
                 </div>
-                <p className="text-xs text-gray-600">
-                  Add <span className="font-bold text-gray-800">{missing[0]!.label}</span> below — every post is written using this, so filling it in sharpens what you get.
-                </p>
+                 <div className="flex items-start gap-2">
+                   <AlertCircle className="w-3.5 h-3.5 text-violet-500 mt-0.5 flex-shrink-0" />
+                   <p className="text-xs text-gray-600">
+                     Add <span className="font-bold text-gray-800">{missing[0]!.label}</span> below. These are required for new accounts and directly shape your generated ideas.
+                   </p>
+                 </div>
               </section>
             );
           })()}
@@ -450,7 +454,7 @@ export default function Settings() {
 
           {/* About me — primary context for AI */}
           <section>
-            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">About You</h2>
+            <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">About You <span className="normal-case tracking-normal text-gray-300">Optional</span></h2>
             <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
               Write 1–3 sentences describing who you are and what you write about. When filled, this replaces the generic Objective + Persona labels and gives the AI real context to write in your voice.
             </p>
@@ -508,11 +512,11 @@ export default function Settings() {
           <section>
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-4">Brand Voice</h2>
             <div className="space-y-4">
-              <VoiceInput label="Your role" value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..."
+              <VoiceInput label="Your role" required value={brandRole} onChange={setBrandRole} placeholder="I help founders build systems that scale..."
                 panelId="role" openPanelId={openPanelId} onTogglePanel={togglePanel}
                 info="Tells the AI who you are in one sentence. The more specific, the more precise the content. Example: 'PMO consultant helping enterprise teams implement AI-driven project delivery'."
               />
-              <VoiceInput label="Your audience" value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..."
+              <VoiceInput label="Your audience" required value={brandAudience} onChange={setBrandAudience} placeholder="B2B founders with 5–50 person teams..."
                 panelId="audience" openPanelId={openPanelId} onTogglePanel={togglePanel}
                 info="Tells the AI who you're speaking to. Example: 'CIOs and VPs of Engineering at companies with 500+ employees planning digital transformation'."
               />
@@ -732,11 +736,53 @@ export default function Settings() {
             )}
           </section>
 
+          {/* Professional positioning territories */}
+          <section>
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-sky-500" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">What you want to be known for <span className="normal-case tracking-normal text-rose-500">Required</span></h2>
+            </div>
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">Add 1–3 professional territories. Every brand idea will show which territory it strengthens and what capability it demonstrates.</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {contentPillars.map((pillar, idx) => (
+                <span key={`${pillar}-${idx}`} className="inline-flex items-center gap-1.5 bg-sky-50 border border-sky-100 text-sky-700 text-xs font-medium rounded-full pl-3 pr-1.5 py-1.5">
+                  {pillar}
+                  <button type="button" onClick={() => setContentPillars(contentPillars.filter((_, i) => i !== idx))} className="p-0.5 rounded-full text-sky-300 hover:text-red-400 hover:bg-red-50 transition-colors" aria-label={`Remove ${pillar}`}>
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            {contentPillars.length < 3 && (
+              <div className="flex gap-2">
+                <input
+                  value={newPillar}
+                  onChange={(e) => setNewPillar(e.target.value.slice(0, 60))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newPillar.trim()) {
+                      e.preventDefault();
+                      setContentPillars([...contentPillars, newPillar.trim()]);
+                      setNewPillar("");
+                    }
+                  }}
+                  placeholder="e.g. Product positioning"
+                  maxLength={60}
+                  className="flex-1 text-sm rounded-2xl border border-gray-200 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white placeholder-gray-300"
+                />
+                <Button size="sm" variant="outline" disabled={!newPillar.trim()} onClick={() => {
+                  if (!newPillar.trim()) return;
+                  setContentPillars([...contentPillars, newPillar.trim()]);
+                  setNewPillar("");
+                }} className="text-xs rounded-xl self-center">Add</Button>
+              </div>
+            )}
+          </section>
+
           {/* Proof Points */}
           <section>
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-emerald-500" />
-              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Proof Points</h2>
+              <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Proof Points <span className="normal-case tracking-normal text-rose-500">Required</span></h2>
             </div>
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">Quantified career achievements — real numbers, programmes, and outcomes. The AI reaches for one of these when a post needs a concrete anchor, so it never invents vague claims. Up to 8.</p>
             <div className="space-y-2 mb-3">
@@ -1305,7 +1351,7 @@ function SelRow({
 
 function VoiceInput({
   label, value, onChange, placeholder,
-  info, panelId, openPanelId, onTogglePanel,
+  info, panelId, openPanelId, onTogglePanel, required = false,
 }: {
   label: string;
   value: string;
@@ -1315,12 +1361,13 @@ function VoiceInput({
   panelId?: string;
   openPanelId?: string | null;
   onTogglePanel?: (id: string) => void;
+  required?: boolean;
 }) {
   const isOpen = panelId !== undefined && openPanelId === panelId;
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label} <span className={cn("normal-case tracking-normal", required ? "text-rose-500" : "text-gray-300")}>{required ? "Required" : "Optional"}</span></p>
         {panelId && onTogglePanel && (
           <button
             type="button"

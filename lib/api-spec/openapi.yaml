@@ -669,6 +669,20 @@ components:
         aboutMe:
           type: string
           description: Free-text creator bio used as primary AI context; replaces Objective/Persona labels when non-empty.
+        contentPillars:
+          type: array
+          items:
+            type: string
+          description: Professional territories the creator wants to become known for
+        proofPoints:
+          type: array
+          items:
+            type: string
+          description: Verified experience or outcomes available as evidence for generation
+        writingSamples:
+          type: array
+          items:
+            type: string
         onboarded:
           type: boolean
         brandBgColor:
@@ -779,6 +793,7 @@ components:
             type: string
             maxLength: 60
           maxItems: 6
+          description: Professional territories the creator wants to become known for; at least one is required when completing onboarding.
         writingSamples:
           type: array
           items:
@@ -791,6 +806,7 @@ components:
             type: string
             maxLength: 200
           maxItems: 8
+          description: Verified experience or outcomes the AI may use as evidence; at least one is required when completing onboarding.
         aspirationalSamples:
           type: array
           items:
@@ -1547,6 +1563,12 @@ components:
           type: string
         whyItResonates:
           type: string
+        professionalTerritory:
+          type: string
+          description: The saved professional territory this idea reinforces
+        professionalSignal:
+          type: string
+          description: A plain-language explanation of the capability readers can credibly infer
       required:
         - angle
         - audience

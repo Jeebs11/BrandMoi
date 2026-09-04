@@ -67,6 +67,11 @@ export interface PreferencesResponse {
   brandBelief: string;
   /** Free-text creator bio used as primary AI context; replaces Objective/Persona labels when non-empty. */
   aboutMe?: string;
+  /** Professional territories the creator wants to become known for */
+  contentPillars?: string[];
+  /** Verified experience or outcomes available as evidence for generation */
+  proofPoints?: string[];
+  writingSamples?: string[];
   onboarded: boolean;
   brandBgColor?: string | null;
   brandAccentColor?: string | null;
@@ -137,11 +142,17 @@ export interface UpdatePreferencesBody {
   bgPalette?: string | null;
   /** App colour theme preset; indigo | violet | sky | emerald | rose | amber */
   siteTheme?: string | null;
-  /** @maxItems 6 */
+  /**
+   * Professional territories the creator wants to become known for; at least one is required when completing onboarding.
+   * @maxItems 6
+   */
   contentPillars?: string[];
   /** @maxItems 5 */
   writingSamples?: string[];
-  /** @maxItems 8 */
+  /**
+   * Verified experience or outcomes the AI may use as evidence; at least one is required when completing onboarding.
+   * @maxItems 8
+   */
   proofPoints?: string[];
   /** @maxItems 3 */
   aspirationalSamples?: string[];
@@ -810,6 +821,10 @@ export interface BrandAngle {
   scenario?: string;
   tension?: string;
   whyItResonates?: string;
+  /** The saved professional territory this idea reinforces */
+  professionalTerritory?: string;
+  /** A plain-language explanation of the capability readers can credibly infer */
+  professionalSignal?: string;
 }
 
 export interface AgentBriefResponse {

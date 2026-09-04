@@ -39,6 +39,8 @@ type ScenarioAngle = {
   scenario?: string;
   tension?: string;
   whyItResonates?: string;
+  professionalTerritory?: string;
+  professionalSignal?: string;
 };
 
 const SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience">> = {
@@ -74,9 +76,13 @@ const SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience
   },
 };
 
-function completeScenarioAngle(angle: ScenarioAngle): ScenarioAngle {
+function completeScenarioAngle(
+  angle: ScenarioAngle,
+  positioning?: Pick<ScenarioAngle, "professionalTerritory" | "professionalSignal">,
+): ScenarioAngle {
   return {
     ...SCENARIO_FALLBACKS[angle.audience],
+    ...positioning,
     ...angle,
   };
 }
@@ -247,12 +253,15 @@ router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<v
     const likedIdeas = ideaFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText);
     const dislikedIdeas = ideaFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText);
     const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
+    const proofPoints = Array.isArray(prefs?.proofPoints) ? (prefs.proofPoints as string[]) : [];
+    const defaultTerritory = pillars[0] || prefs?.brandRole || "Professional expertise";
 
     const userMessage = [
       prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
       prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
       prefs?.brandBelief ? `Core belief: ${prefs.brandBelief}` : "",
       pillars.length > 0 ? `Content pillars: ${pillars.join(", ")}` : "",
+      proofPoints.length > 0 ? `Verified proof points — use these as evidence when relevant; never invent replacements:\n${proofPoints.map((point) => `- ${point}`).join("\n")}` : "",
       dna ? `\nWriting DNA:\n${dna}` : "",
       recentTopics ? `\nRecent topics: ${recentTopics}` : "",
       daysSinceLast !== null ? `Days since last draft: ${daysSinceLast}` : "No drafts yet",
@@ -277,11 +286,11 @@ Return JSON only (no markdown):
   "headline": "One sharp directive about what to focus on today (max 12 words)",
   "insight": "One specific observation about their content gap or momentum (max 25 words)",
   "angles": [
-    {"angle": "specific post angle (max 10 words)", "audience": "Clients", "scenarioType": "Client tension", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
-    {"angle": "specific post angle (max 10 words)", "audience": "Peers", "scenarioType": "Tradeoff", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
-    {"angle": "specific post angle (max 10 words)", "audience": "Recruiters & Headhunters", "scenarioType": "Hard decision", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
-    {"angle": "specific post angle (max 10 words)", "audience": "Investors", "scenarioType": "Market signal", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"},
-    {"angle": "specific post angle (max 10 words)", "audience": "My audience", "scenarioType": "Behind the scenes", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)"}
+    {"angle": "specific post angle (max 10 words)", "audience": "Clients", "scenarioType": "Client tension", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "Peers", "scenarioType": "Tradeoff", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "Recruiters & Headhunters", "scenarioType": "Hard decision", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what a hiring manager can credibly infer (max 18 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "Investors", "scenarioType": "Market signal", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"},
+    {"angle": "specific post angle (max 10 words)", "audience": "My audience", "scenarioType": "Behind the scenes", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"}
   ],
   "teachAngles": ["FAQ or analogy seed 1 (max 12 words)", "FAQ or analogy seed 2 (max 12 words)", "FAQ or analogy seed 3 (max 12 words)"],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
@@ -301,6 +310,9 @@ Rules:
 - every angle must be grounded in a recognisable real-life work scenario, not an abstract topic
 - scenario is a writing prompt, not a claim that the creator personally experienced it; never invent names, metrics, clients, or outcomes
 - scenarioType should be 2–3 words, scenario should describe a specific moment, tension should name the conflict, and whyItResonates should explain the audience connection
+- professionalTerritory must use the closest supplied content pillar, not invent a new career direction
+- professionalSignal explains the capability a reader can infer from the evidence; do not describe the creator as job-seeking or address recruiters directly
+- use verified proof points when they fit, but never fabricate personal experience, numbers, clients, or outcomes
 - if news context is available, let it inspire whichever of the 5 angles it fits best — don't force it
 - teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Each should be a short prompt like "Why [common misconception] — an analogy for [audience]" or "The real reason [industry thing] fails (explained simply)". Never generic — always tied to their specific brand context.
 - tone: direct, peer-level, no fluff, no "great job"
@@ -366,6 +378,8 @@ Rules:
                   scenario?: unknown;
                   tension?: unknown;
                   whyItResonates?: unknown;
+                  professionalTerritory?: unknown;
+                  professionalSignal?: unknown;
                 };
                 const audience = typeof obj.audience === "string" && VALID_AUDIENCES.has(obj.audience) ? obj.audience : "My audience";
                 return {
@@ -375,6 +389,8 @@ Rules:
                   ...(typeof obj.scenario === "string" ? { scenario: obj.scenario } : {}),
                   ...(typeof obj.tension === "string" ? { tension: obj.tension } : {}),
                   ...(typeof obj.whyItResonates === "string" ? { whyItResonates: obj.whyItResonates } : {}),
+                  ...(typeof obj.professionalTerritory === "string" ? { professionalTerritory: obj.professionalTerritory } : {}),
+                  ...(typeof obj.professionalSignal === "string" ? { professionalSignal: obj.professionalSignal } : {}),
                 };
               }
               return null;
@@ -391,7 +407,15 @@ Rules:
         "My audience": `Teach one thing you wish you knew earlier in your career`,
       };
       const angles: ScenarioAngle[] = ALL_AUDIENCES.map(
-        (aud) => completeScenarioAngle(rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud })
+        (aud) => completeScenarioAngle(
+          rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud },
+          {
+            professionalTerritory: defaultTerritory,
+            professionalSignal: aud === "Recruiters & Headhunters"
+              ? `Shows credible judgment and capability in ${defaultTerritory}`
+              : `Reinforces practical expertise in ${defaultTerritory}`,
+          },
+        )
       );
       res.json({
         headline,
@@ -1333,6 +1357,8 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
     const liked = ideaFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText).slice(0, 8);
     const disliked = ideaFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText).slice(0, 8);
     const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
+    const proofPoints = Array.isArray(prefs?.proofPoints) ? (prefs.proofPoints as string[]) : [];
+    const defaultTerritory = pillars[0] || prefs?.brandRole || "Professional expertise";
     const recentTopics = recentDrafts.slice(0, 8)
       .map((d) => (d.structuredBreakdown as { topic?: string } | null)?.topic)
       .filter(Boolean).join(", ");
@@ -1356,14 +1382,16 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
 Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one.
 Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
 Every angle must be grounded in a recognisable real-life work scenario, not an abstract topic. The scenario is a writing prompt, not a claim that the creator personally experienced it — never invent names, metrics, clients, or outcomes.
-For each angle include: scenarioType (2–3 words), scenario (a specific moment, max 18 words), tension (the conflict, max 12 words), and whyItResonates (why that audience cares, max 16 words).
-Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "Peers", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "Recruiters & Headhunters", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "Investors", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}, {"angle": "...", "audience": "My audience", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "..."}]}`,
+For each angle include: scenarioType (2–3 words), scenario (a specific moment, max 18 words), tension (the conflict, max 12 words), whyItResonates (why that audience cares, max 16 words), professionalTerritory (the closest supplied content pillar), and professionalSignal (what credible capability the evidence demonstrates, max 18 words).
+Use verified proof points when relevant, but never invent personal experience, names, metrics, clients, or outcomes. Professional positioning should be inferred from useful proof, never sound like a job application or address recruiters directly.
+Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Peers", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Recruiters & Headhunters", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Investors", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "My audience", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}]}`,
       messages: [{
         role: "user",
         content: [
           prefs?.brandRole ? `Role: ${prefs.brandRole}` : "",
           prefs?.brandAudience ? `Audience: ${prefs.brandAudience}` : "",
           pillars.length > 0 ? `Content pillars: ${pillars.join(", ")}` : "",
+          proofPoints.length > 0 ? `Verified proof points:\n${proofPoints.map((point) => `- ${point}`).join("\n")}` : "",
           topicName ? `Generate ideas specifically for this topic (all angles must fit it): ${topicName}` : "",
           recentTopics ? `Recent topics (avoid repeating): ${recentTopics}` : "",
           liked.length > 0 ? `Liked idea directions:\n${liked.map((t) => `- ${t}`).join("\n")}` : "",
@@ -1395,6 +1423,8 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
             scenario?: unknown;
             tension?: unknown;
             whyItResonates?: unknown;
+            professionalTerritory?: unknown;
+            professionalSignal?: unknown;
           };
           const audience = typeof obj.audience === "string" && VALID_AUDIENCES.has(obj.audience) ? obj.audience : "My audience";
           return {
@@ -1404,6 +1434,8 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
             ...(typeof obj.scenario === "string" ? { scenario: obj.scenario } : {}),
             ...(typeof obj.tension === "string" ? { tension: obj.tension } : {}),
             ...(typeof obj.whyItResonates === "string" ? { whyItResonates: obj.whyItResonates } : {}),
+            ...(typeof obj.professionalTerritory === "string" ? { professionalTerritory: obj.professionalTerritory } : {}),
+            ...(typeof obj.professionalSignal === "string" ? { professionalSignal: obj.professionalSignal } : {}),
           };
         }
         return null;
@@ -1420,7 +1452,15 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
       "My audience": `Teach one thing you wish you knew earlier in your career`,
     };
     const angles = ALL_AUDIENCES.map(
-      (aud) => completeScenarioAngle(rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud })
+      (aud) => completeScenarioAngle(
+        rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud },
+        {
+          professionalTerritory: defaultTerritory,
+          professionalSignal: aud === "Recruiters & Headhunters"
+            ? `Shows credible judgment and capability in ${defaultTerritory}`
+            : `Reinforces practical expertise in ${defaultTerritory}`,
+        },
+      )
     );
     res.json({ angles });
   } catch (err) {

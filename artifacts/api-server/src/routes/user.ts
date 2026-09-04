@@ -65,6 +65,13 @@ const UpdatePreferencesBody = z.object({
   brandClosingText: z.string().max(240).optional(),
 });
 
+const REQUIRED_POSITIONING_FIELDS = [
+  { key: "brandRole", label: "your role" },
+  { key: "brandAudience", label: "your audience" },
+  { key: "contentPillars", label: "at least one professional territory" },
+  { key: "proofPoints", label: "at least one proof point" },
+] as const;
+
 router.get("/user/preferences", requireAuth, async (req, res): Promise<void> => {
   const [prefs] = await db
     .select()
@@ -95,13 +102,37 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
+  // New accounts cannot complete onboarding without the minimum evidence
+  // required for useful positioning-led generation. Existing onboarded users
+  // remain usable and are prompted in Settings instead of being locked out.
+  if (parsed.data.onboarded === true) {
+    const [current] = await db
+      .select()
+      .from(preferencesTable)
+      .where(eq(preferencesTable.userId, req.user!.userId))
+      .limit(1);
+    if (!current?.onboarded) {
+      const merged = { ...current, ...parsed.data };
+      const missing = REQUIRED_POSITIONING_FIELDS
+        .filter(({ key }) => {
+          const value = merged[key];
+          return Array.isArray(value) ? value.length === 0 : typeof value !== "string" || value.trim().length === 0;
+        })
+        .map(({ label }) => label);
+      if (missing.length > 0) {
+        res.status(400).json({ error: `Complete the required positioning fields: ${missing.join(", ")}.` });
+        return;
+      }
+    }
+  }
+
   const updateData: Record<string, unknown> = {};
   if (parsed.data.objective !== undefined) updateData.objective = parsed.data.objective;
   if (parsed.data.persona !== undefined) updateData.persona = parsed.data.persona;
   if (parsed.data.tone !== undefined) updateData.tone = parsed.data.tone;
-  if (parsed.data.brandRole !== undefined) updateData.brandRole = parsed.data.brandRole;
-  if (parsed.data.brandAudience !== undefined) updateData.brandAudience = parsed.data.brandAudience;
-  if (parsed.data.brandBelief !== undefined) updateData.brandBelief = parsed.data.brandBelief;
+  if (parsed.data.brandRole !== undefined) updateData.brandRole = parsed.data.brandRole.trim();
+  if (parsed.data.brandAudience !== undefined) updateData.brandAudience = parsed.data.brandAudience.trim();
+  if (parsed.data.brandBelief !== undefined) updateData.brandBelief = parsed.data.brandBelief.trim();
   if (parsed.data.aboutMe !== undefined) updateData.aboutMe = parsed.data.aboutMe;
   if (parsed.data.onboarded !== undefined) updateData.onboarded = parsed.data.onboarded;
   if (parsed.data.brandBgColor !== undefined) updateData.brandBgColor = parsed.data.brandBgColor;
@@ -114,9 +145,9 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.bgPanelOpacity !== undefined) updateData.bgPanelOpacity = parsed.data.bgPanelOpacity;
   if (parsed.data.siteTheme !== undefined) updateData.siteTheme = parsed.data.siteTheme;
   if (parsed.data.bgPalette !== undefined) updateData.bgPalette = parsed.data.bgPalette;
-  if (parsed.data.contentPillars !== undefined) updateData.contentPillars = parsed.data.contentPillars;
+  if (parsed.data.contentPillars !== undefined) updateData.contentPillars = parsed.data.contentPillars.map((value) => value.trim()).filter(Boolean);
   if (parsed.data.writingSamples !== undefined) updateData.writingSamples = parsed.data.writingSamples;
-  if (parsed.data.proofPoints !== undefined) updateData.proofPoints = parsed.data.proofPoints;
+  if (parsed.data.proofPoints !== undefined) updateData.proofPoints = parsed.data.proofPoints.map((value) => value.trim()).filter(Boolean);
   if (parsed.data.aspirationalSamples !== undefined) updateData.aspirationalSamples = parsed.data.aspirationalSamples;
   if (parsed.data.brandClosingMode !== undefined) updateData.brandClosingMode = parsed.data.brandClosingMode;
   if (parsed.data.brandClosingStyle !== undefined) updateData.brandClosingStyle = parsed.data.brandClosingStyle;

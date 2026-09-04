@@ -65,6 +65,12 @@ export default function Onboarding() {
   const [newProofPoint, setNewProofPoint] = useState("");
 
   const { mutate: updatePreferences, isPending } = useUpdatePreferences();
+  const missingRequired = [
+    !data.brandRole.trim() ? "your role" : "",
+    !data.brandAudience.trim() ? "your audience" : "",
+    data.contentPillars.length === 0 ? "one professional territory" : "",
+    data.proofPoints.length === 0 ? "one proof point" : "",
+  ].filter(Boolean);
 
   const set = <K extends keyof OnboardingState>(key: K, value: string) =>
     setData((d) => ({ ...d, [key]: value }));
@@ -85,6 +91,10 @@ export default function Onboarding() {
   };
 
   const handleFinish = () => {
+    if (missingRequired.length > 0) {
+      setStep(3);
+      return;
+    }
     updatePreferences(
       {
         data: {
@@ -189,7 +199,8 @@ export default function Onboarding() {
             <BackButton onClick={() => setStep(2)} />
             <div className="flex-1 pt-4 pb-32 overflow-y-auto no-scrollbar">
               <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Define your voice</h2>
-              <p className="text-gray-500 text-sm mb-5">This gives the AI the depth to write content that sounds like you — not anyone else.</p>
+              <p className="text-gray-500 text-sm mb-2">Required details give BrandMoi enough evidence to build your professional positioning. Optional details make the voice more personal.</p>
+              <p className="text-[11px] text-gray-400 mb-5"><span className="font-bold text-rose-500">Required</span> fields must be completed before you can start creating.</p>
 
               <div className="mb-5">
                 <SmartImportButton onApply={handleSmartImport} />
@@ -207,12 +218,14 @@ export default function Onboarding() {
                   placeholder="I help founders build systems that scale without chaos"
                   value={data.brandRole}
                   onChange={(v) => set("brandRole", v)}
+                  required
                 />
                 <VoiceField
                   label="Who specifically is your audience?"
                   placeholder="B2B founders with 5–50 person teams looking to systematise ops"
                   value={data.brandAudience}
                   onChange={(v) => set("brandAudience", v)}
+                  required
                 />
                 <VoiceField
                   label="Your core belief about your field"
@@ -223,17 +236,18 @@ export default function Onboarding() {
 
                 <div className="pt-1">
                   <VoiceField
-                    label="A little more about you (optional)"
+                    label="A little more about you"
                     placeholder="What have you learned, built, or experienced that shapes the way you see your work?"
                     value={data.aboutMe}
                     onChange={(v) => set("aboutMe", v.slice(0, 500))}
+                    optional
                   />
                   <p className="text-[10px] text-gray-300 text-right mt-1">{data.aboutMe.length}/500</p>
                 </div>
 
                 <div className="pt-1">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                    Show us how you write <span className="font-medium normal-case tracking-normal text-gray-300">(optional)</span>
+                     Show us how you write <FieldStatus optional />
                   </label>
                   <p className="text-xs text-gray-400 mb-2 leading-relaxed">
                     Add up to 3 posts or paragraphs you wrote yourself. These are the strongest early anchors for Voice DNA.
@@ -284,8 +298,8 @@ export default function Onboarding() {
                 </div>
 
                 <TagInput
-                  label="Your content pillars (optional)"
-                  hint="The 2–4 themes you want to be known for."
+                   label="What do you want to be known for?"
+                   hint="Add at least one professional territory. BrandMoi uses these to keep your ideas building a consistent reputation."
                   placeholder="e.g. leadership, operating systems, founder lessons"
                   values={data.contentPillars}
                   value={newPillar}
@@ -299,11 +313,12 @@ export default function Onboarding() {
                     setNewPillar("");
                   }}
                   onRemove={(index) => setData((current) => ({ ...current, contentPillars: current.contentPillars.filter((_, i) => i !== index) }))}
+                   required
                 />
 
                 <TagInput
-                  label="Real proof points (optional)"
-                  hint="Specific results, numbers, teams, clients, or moments you can credibly write about."
+                   label="Real proof points"
+                   hint="Add at least one result, decision, project, or work moment you can credibly discuss. BrandMoi will not invent evidence."
                   placeholder="e.g. Grew the team from 5 to 40 in 18 months"
                   values={data.proofPoints}
                   value={newProofPoint}
@@ -317,10 +332,11 @@ export default function Onboarding() {
                     setNewProofPoint("");
                   }}
                   onRemove={(index) => setData((current) => ({ ...current, proofPoints: current.proofPoints.filter((_, i) => i !== index) }))}
+                   required
                 />
               </div>
             </div>
-            <NextButton onClick={() => setStep(4)} label="Continue" />
+             <NextButton onClick={() => setStep(4)} label={missingRequired.length ? `Add ${missingRequired[0]} to continue` : "Continue"} disabled={missingRequired.length > 0} />
           </motion.div>
         );
 
@@ -387,10 +403,10 @@ export default function Onboarding() {
   );
 }
 
-function NextButton({ onClick, label = "Next" }: { onClick: () => void; label?: string }) {
+function NextButton({ onClick, label = "Next", disabled = false }: { onClick: () => void; label?: string; disabled?: boolean }) {
   return (
     <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-4 bg-gradient-to-t from-gray-50 via-gray-50/90 to-transparent z-10">
-      <Button className="w-full h-14 text-base font-semibold group" onClick={onClick}>
+      <Button className="w-full h-14 text-base font-semibold group" onClick={onClick} disabled={disabled}>
         {label}
         <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
       </Button>
@@ -420,6 +436,7 @@ function TagInput({
   onChange,
   onAdd,
   onRemove,
+  required = false,
 }: {
   label: string;
   hint: string;
@@ -431,11 +448,12 @@ function TagInput({
   onChange: (value: string) => void;
   onAdd: () => void;
   onRemove: (index: number) => void;
+  required?: boolean;
 }) {
   return (
     <div className="pt-1">
       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">
-        {label}
+        {label} <FieldStatus required={required} />
       </label>
       <p className="text-xs text-gray-400 mb-2 leading-relaxed">{hint}</p>
       {values.length > 0 && (
@@ -487,10 +505,21 @@ function TagInput({
   );
 }
 
-function VoiceField({ label, placeholder, value, onChange }: { label: string; placeholder: string; value: string; onChange: (v: string) => void }) {
+function FieldStatus({ required = false, optional = false }: { required?: boolean; optional?: boolean }) {
+  return (
+    <span className={cn(
+      "ml-1 font-bold normal-case tracking-normal",
+      required ? "text-rose-500" : "text-gray-300",
+    )}>
+      {required ? "Required" : optional ? "Optional" : "Optional"}
+    </span>
+  );
+}
+
+function VoiceField({ label, placeholder, value, onChange, required = false, optional = false }: { label: string; placeholder: string; value: string; onChange: (v: string) => void; required?: boolean; optional?: boolean }) {
   return (
     <div>
-      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">{label}</label>
+      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">{label}<FieldStatus required={required} optional={optional} /></label>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

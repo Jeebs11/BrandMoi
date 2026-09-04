@@ -382,6 +382,8 @@ export type BrandAngle = {
   scenario?: string;
   tension?: string;
   whyItResonates?: string;
+  professionalTerritory?: string;
+  professionalSignal?: string;
 };
 
 export type AgentBrief = {

@@ -12,7 +12,9 @@ import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 import { useToast } from "@/hooks/use-toast";
 
 function dayUserKey(name: string, userId: number | string) {
-  return `bos_${name}_v3_${userId}_${new Date().toISOString().slice(0, 10)}`;
+  // v4 invalidates pre-positioning brief caches so existing users immediately
+  // receive ideas with professional territory and capability context.
+  return `bos_${name}_v4_${userId}_${new Date().toISOString().slice(0, 10)}`;
 }
 
 function loadDayCache<T>(name: string, userId: number | string): T | null {
@@ -75,6 +77,8 @@ function scenarioIdeaRaw(item: BrandAngle): string {
     item.scenario ? `Real-life scenario: ${item.scenario}` : "",
     item.tension ? `Tension: ${item.tension}` : "",
     `Content angle: ${item.angle}`,
+    item.professionalTerritory ? `Professional territory: ${item.professionalTerritory}` : "",
+    item.professionalSignal ? `What this should demonstrate: ${item.professionalSignal}` : "",
   ].filter(Boolean).join("\n\n");
 }
 
@@ -287,17 +291,20 @@ function MomentumCard({ data }: { data: MomentumData }) {
 // injected into every generation prompt (voice context, audience overlay,
 // belief framing) — an incomplete profile means generically-voiced output,
 // not a cosmetic gap. Disappears entirely once all four are filled in.
-type ProfileFields = { brandRole?: string; brandAudience?: string; brandBelief?: string; aboutMe?: string };
+type ProfileFields = { brandRole?: string; brandAudience?: string; contentPillars?: string[]; proofPoints?: string[] };
 
 function ProfileStrengthCard({ preferences, onComplete }: { preferences: ProfileFields | undefined; onComplete: () => void }) {
   if (!preferences) return null;
   const fields: Array<{ key: keyof ProfileFields; label: string }> = [
     { key: "brandRole", label: "your role" },
     { key: "brandAudience", label: "your audience" },
-    { key: "brandBelief", label: "your core belief" },
-    { key: "aboutMe", label: "a short bio" },
+    { key: "contentPillars", label: "a professional territory" },
+    { key: "proofPoints", label: "a proof point" },
   ];
-  const missing = fields.filter((f) => !preferences[f.key]?.trim());
+  const missing = fields.filter((f) => {
+    const value = preferences[f.key];
+    return Array.isArray(value) ? value.length === 0 : !value?.trim();
+  });
   if (missing.length === 0) return null;
   const pct = Math.round(((fields.length - missing.length) / fields.length) * 100);
 
@@ -758,6 +765,13 @@ export default function Dashboard() {
                                   <p className="text-[10px] leading-snug text-gray-500 border-t border-amber-100 pt-1.5">
                                     <span className="font-bold text-gray-700">Why it resonates: </span>{item.whyItResonates}
                                   </p>
+                                )}
+                                {(item.professionalTerritory || item.professionalSignal) && (
+                                  <div className="rounded-lg border border-sky-100 bg-sky-50/70 px-3 py-2">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-sky-600 mb-1">Professional positioning</p>
+                                    {item.professionalTerritory && <p className="text-xs font-bold text-gray-800">{item.professionalTerritory}</p>}
+                                    {item.professionalSignal && <p className="text-[10px] leading-snug text-gray-600 mt-0.5">{item.professionalSignal}</p>}
+                                  </div>
                                 )}
                               </div>
                             )}
