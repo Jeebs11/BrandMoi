@@ -13,6 +13,7 @@ import linkedinRouter from "./linkedin.js";
 import adminRouter from "./admin.js";
 import topicsRouter from "./topics.js";
 import seriesRouter from "./series.js";
+import profileAlignmentRouter from "./profile-alignment.js";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,7 @@ router.use(agentRouter);
 router.use(linkedinRouter);
 router.use(topicsRouter);
 router.use(seriesRouter);
+router.use(profileAlignmentRouter);
 router.use(adminRouter);
 
 export default router;

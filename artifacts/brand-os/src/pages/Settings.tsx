@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X, PenLine, AlertCircle } from "lucide-react";
+import { ChevronLeft, LogOut, Save, Loader2, Brain, RefreshCw, Eye, EyeOff, KeyRound, Info, Sparkles, ImagePlus, X, PenLine, AlertCircle, Target } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { useUpdatePreferences, useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -679,6 +679,23 @@ export default function Settings() {
                 <VoiceConstellation />
               </div>
             )}
+          </section>
+
+          {/* Profile Alignment now lives on its own page — see the side nav / mobile "More" menu */}
+          <section>
+            <button
+              onClick={() => navigate("/profile-alignment")}
+              className="w-full flex items-center gap-3 bg-white rounded-2xl border border-gray-100 p-4 hover:border-gray-200 transition-colors text-left"
+            >
+              <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
+                <Target className="w-4 h-4 text-violet-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900">Profile Alignment</p>
+                <p className="text-[11px] text-gray-400">Check your CV, BrandMoi, and LinkedIn all say the same thing</p>
+              </div>
+              <ChevronLeft className="w-4 h-4 text-gray-300 rotate-180 flex-shrink-0" />
+            </button>
           </section>
 
           {/* Writing Samples */}

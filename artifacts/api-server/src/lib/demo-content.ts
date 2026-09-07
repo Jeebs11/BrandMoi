@@ -114,7 +114,7 @@ const DEMO_BRIEFS = [
       { angle: "Challenge the '10x engineer' myth with a hiring story", audience: "Peers" },
       { angle: "Share the interview question that revealed real judgment, not rehearsed answers", audience: "Recruiters & Headhunters" },
       { angle: "Explain why you're betting on boring infrastructure over hype this year", audience: "Investors" },
-      { angle: "Teach the one thing you wish someone told you before your first exec hire", audience: "My audience" },
+      { angle: "The exec hire I doubted for weeks — and why I almost said no", audience: "My audience" },
     ],
     teachAngles: [
       "Why 'move fast' quietly breaks onboarding — an analogy for new managers",
@@ -137,7 +137,7 @@ const DEMO_BRIEFS = [
       { angle: "Call out the 'growth at all costs' era as officially over", audience: "Peers" },
       { angle: "Describe the hardest call you made under pressure last quarter", audience: "Recruiters & Headhunters" },
       { angle: "Explain the market shift you're quietly positioning the business around", audience: "Investors" },
-      { angle: "Share the career mistake that taught you the most", audience: "My audience" },
+      { angle: "The career mistake I still think about — and what it actually cost", audience: "My audience" },
     ],
     teachAngles: [
       "Why 'data-driven' often means 'afraid to decide' — explained simply",
@@ -188,10 +188,10 @@ const DEMO_SCENARIOS: Record<string, { scenarioType: string; scenario: string; t
     professionalSignal: "Shows evidence-led thinking when the expected story changes",
   },
   "My audience": {
-    scenarioType: "Behind the scenes",
-    scenario: "A small mistake at work exposes a lesson no framework ever taught you",
-    tension: "The polished advice versus what actually happened",
-    whyItResonates: "Specific moments make familiar lessons feel human and credible",
+    scenarioType: "Vulnerable moment",
+    scenario: "A real moment of doubt before a decision that turned out fine",
+    tension: "The urge to hide the doubt versus admitting it happened",
+    whyItResonates: "People connect with your specific doubts and mistakes, not your polish",
     professionalTerritory: "Leadership lessons",
     professionalSignal: "Shows reflective judgment grounded in a concrete work moment",
   },
@@ -213,14 +213,14 @@ const DEMO_IDEAS_BRAND: Array<{ angle: string; audience: string }>[] = [
     { angle: "Challenge the assumption that more meetings mean more alignment", audience: "Peers" },
     { angle: "Share a hiring decision you'd defend even under pushback", audience: "Recruiters & Headhunters" },
     { angle: "Explain the contrarian bet you're making on the market this year", audience: "Investors" },
-    { angle: "Teach the lesson from your first failed hire", audience: "My audience" },
+    { angle: "The first hire I got wrong, and the moment I knew it", audience: "My audience" },
   ],
   [
     { angle: "Walk through the exact framework you use to scope a new client", audience: "Clients" },
     { angle: "Call out the 'thought leadership' posts that are just good formatting", audience: "Peers" },
     { angle: "Describe a hard call you made under pressure that paid off", audience: "Recruiters & Headhunters" },
     { angle: "Share why you're avoiding the obvious growth lever everyone else is chasing", audience: "Investors" },
-    { angle: "Teach the one system that saved your sanity as you scaled", audience: "My audience" },
+    { angle: "The week I nearly burned out scaling this — what actually helped", audience: "My audience" },
   ],
 ];
 
@@ -258,6 +258,109 @@ export function getDemoDare() {
     risk: d.risk,
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     remaining: 2,
+  };
+}
+
+const DEMO_CV_FACTS = {
+  headline: null,
+  about: null,
+  currentTitle: "Senior Product Manager",
+  currentEmployer: "Northwind Analytics",
+  currentRoleDates: "2022 - Present",
+  achievements: [
+    "Led discovery research that cut onboarding drop-off by 23% in 6 months",
+    "Grew activation from 41% to 58% across a 12-person cross-functional team",
+    "Ran 40+ customer interviews that reshaped the 2024 product roadmap",
+  ],
+  skills: ["Product discovery", "Customer research", "Roadmapping", "Stakeholder alignment"],
+};
+
+const DEMO_LINKEDIN_FACTS = {
+  headline: "Business professional | Product & Strategy",
+  about: "Experienced professional with a background in product management. Passionate about building great products and leading teams.",
+  currentTitle: "Product Lead",
+  currentEmployer: "Northwind Analytics",
+  currentRoleDates: "2021 - Present",
+  achievements: [],
+  skills: ["Leadership", "Product Management", "Strategy"],
+};
+
+export function getDemoProfileFacts(kind: "cv" | "linkedin") {
+  return kind === "cv" ? DEMO_CV_FACTS : DEMO_LINKEDIN_FACTS;
+}
+
+export function getDemoProfileAlignment() {
+  const comparisonTable = {
+    generatedAt: new Date().toISOString(),
+    rows: [
+      {
+        rowKey: "role_title", label: "Role / Title", applicableSources: ["cv", "brandmoi", "linkedin"],
+        cv: { value: "Senior Product Manager", source: "cv" },
+        brandmoi: { value: "Product professional focused on discovery and research", source: "brandmoi" },
+        linkedin: { value: "Product Lead", source: "linkedin" },
+        status: "all_differ",
+        statusDetail: "All three sources say something different here — this needs your call.",
+      },
+      {
+        rowKey: "territories", label: "Territories", applicableSources: ["brandmoi", "linkedin"],
+        cv: null,
+        brandmoi: { value: ["Product discovery", "Customer research"], source: "brandmoi" },
+        linkedin: { value: ["Leadership", "Product Management", "Strategy"], source: "linkedin" },
+        status: "cv_brandmoi_agree_linkedin_differs",
+        statusDetail: "Your BrandMoi positioning and your LinkedIn profile say different things here.",
+      },
+      {
+        rowKey: "proof_points", label: "Proof Points (approximate match)", applicableSources: ["cv", "brandmoi", "linkedin"],
+        points: [
+          { point: "Cut onboarding drop-off by 23% in 6 months", presentInCv: true, reflectedInLinkedin: false },
+          { point: "Grew activation from 41% to 58%", presentInCv: true, reflectedInLinkedin: false },
+        ],
+        status: "cv_brandmoi_agree_linkedin_differs",
+        statusDetail: "Some of your proof points aren't showing up on your LinkedIn profile yet.",
+      },
+    ],
+  };
+
+  return {
+    id: 0,
+    targetAudience: "Recruiters",
+    comparisonTable,
+    narrativeSummary: "Your LinkedIn headline reads as generic (\"Business professional\") while your CV and BrandMoi positioning both point to product discovery and customer research — that gap is the main thing costing you recognisability.",
+    fieldRewrites: [
+      {
+        id: "field:headline", field: "headline",
+        currentBrandmoi: "Product professional focused on discovery and research",
+        currentLinkedin: "Business professional | Product & Strategy",
+        rewrite: "Product Discovery Leader — turning ambiguous customer problems into validated direction",
+        rationale: "Your current headline is generic enough to fit almost any profile; your CV's actual achievements point specifically to discovery and research.",
+        status: "pending",
+      },
+      {
+        id: "field:about", field: "about",
+        currentBrandmoi: null,
+        currentLinkedin: "Experienced professional with a background in product management. Passionate about building great products and leading teams.",
+        rewrite: "I turn ambiguous customer problems into validated product direction.\n\nOver the last few years I've run 40+ customer interviews, cut onboarding drop-off by 23%, and grown activation from 41% to 58% — not by guessing, but by building a repeatable discovery process.\n\nIf you're trying to figure out what to build next, that's the conversation I want to have.",
+        rationale: "The current About section is a template — no numbers, no specifics. Your CV has three concrete, quantified wins that belong here instead.",
+        status: "pending",
+      },
+      {
+        id: "field:current_role", field: "current_role",
+        currentBrandmoi: "Product professional focused on discovery and research",
+        currentLinkedin: "Product Lead",
+        rewrite: "Senior Product Manager driving discovery-led roadmaps at Northwind Analytics",
+        rationale: "Your CV states \"Senior Product Manager\" — LinkedIn currently says \"Product Lead\". The CV is the more current, authoritative title.",
+        status: "pending",
+      },
+    ],
+    pairedFactSuggestions: [
+      {
+        id: "fact:0", rowKey: "role_title",
+        claim: "Senior Product Manager, 2022 - Present (per CV)",
+        updateBrandmoi: { targetField: "brandRole", suggestedValue: "Senior Product Manager focused on discovery-led roadmaps", status: "pending" },
+        updateLinkedin: { suggestedValue: "Senior Product Manager", status: "pending" },
+      },
+    ],
+    createdAt: new Date().toISOString(),
   };
 }
 

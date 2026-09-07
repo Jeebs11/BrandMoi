@@ -69,10 +69,10 @@ const SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience
     whyItResonates: "Investors value pattern recognition and clear-headed adaptation",
   },
   "My audience": {
-    scenarioType: "Behind the scenes",
-    scenario: "A small moment at work exposes a lesson you wish you knew earlier",
-    tension: "The ordinary detail versus the bigger lesson it reveals",
-    whyItResonates: "People connect with specific moments more than abstract advice",
+    scenarioType: "Vulnerable moment",
+    scenario: "A moment of real doubt, a mistake, or a near-miss at work that turned out fine",
+    tension: "The urge to hide the doubt versus admitting it happened",
+    whyItResonates: "People connect with your specific doubts and mistakes, not your polish",
   },
 };
 
@@ -290,7 +290,7 @@ Return JSON only (no markdown):
     {"angle": "specific post angle (max 10 words)", "audience": "Peers", "scenarioType": "Tradeoff", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"},
     {"angle": "specific post angle (max 10 words)", "audience": "Recruiters & Headhunters", "scenarioType": "Hard decision", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what a hiring manager can credibly infer (max 18 words)"},
     {"angle": "specific post angle (max 10 words)", "audience": "Investors", "scenarioType": "Market signal", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"},
-    {"angle": "specific post angle (max 10 words)", "audience": "My audience", "scenarioType": "Behind the scenes", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"}
+    {"angle": "specific post angle (max 10 words)", "audience": "My audience", "scenarioType": "Vulnerable moment", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"}
   ],
   "teachAngles": ["FAQ or analogy seed 1 (max 12 words)", "FAQ or analogy seed 2 (max 12 words)", "FAQ or analogy seed 3 (max 12 words)"],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
@@ -306,7 +306,7 @@ Rules:
 - insight must reference something concrete from their history or underused objectives
 - angles are real post ideas they could write today
 - return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
-- each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one
+- each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle should build a parasocial connection — surface a specific, relatable, slightly vulnerable moment from their real work (a doubt, a mistake, a moment of relief or frustration), grounded in an actual proof point or piece of their history already on file. Never a generic "we've all felt this" statement with no real anchor — the specificity is what makes it relatable, not the feeling alone
 - every angle must be grounded in a recognisable real-life work scenario, not an abstract topic
 - scenario is a writing prompt, not a claim that the creator personally experienced it; never invent names, metrics, clients, or outcomes
 - scenarioType should be 2–3 words, scenario should describe a specific moment, tension should name the conflict, and whyItResonates should explain the audience connection
@@ -404,7 +404,7 @@ Rules:
         "Peers": `Challenge the most common assumption in your field`,
         "Recruiters & Headhunters": `Share a hard call you made under pressure at work`,
         "Investors": `Share a non-consensus read on where your market is heading`,
-        "My audience": `Teach one thing you wish you knew earlier in your career`,
+        "My audience": `Share a moment you doubted yourself before it worked out`,
       };
       const angles: ScenarioAngle[] = ALL_AUDIENCES.map(
         (aud) => completeScenarioAngle(
@@ -1379,7 +1379,7 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
       system: isTeach
         ? `You generate "teach your audience" LinkedIn post seeds — analogy or FAQ ideas grounded in the creator's exact field. Each max 12 words, like "Why [misconception] — an analogy for [audience]". Return JSON only: {"angles": ["...", "...", "..."]}`
         : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
-Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle can be the most personal/direct one.
+Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle should build a parasocial connection — surface a specific, relatable, slightly vulnerable moment from their real work (a doubt, a mistake, a moment of relief or frustration), grounded in an actual proof point or piece of their history already on file. Never a generic "we've all felt this" statement with no real anchor — the specificity is what makes it relatable, not the feeling alone.
 Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
 Every angle must be grounded in a recognisable real-life work scenario, not an abstract topic. The scenario is a writing prompt, not a claim that the creator personally experienced it — never invent names, metrics, clients, or outcomes.
 For each angle include: scenarioType (2–3 words), scenario (a specific moment, max 18 words), tension (the conflict, max 12 words), whyItResonates (why that audience cares, max 16 words), professionalTerritory (the closest supplied content pillar), and professionalSignal (what credible capability the evidence demonstrates, max 18 words).
@@ -1449,7 +1449,7 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
       "Peers": `Challenge the most common assumption in your field`,
       "Recruiters & Headhunters": `Share a hard call you made under pressure at work`,
       "Investors": `Share a non-consensus read on where your market is heading`,
-      "My audience": `Teach one thing you wish you knew earlier in your career`,
+      "My audience": `Share a moment you doubted yourself before it worked out`,
     };
     const angles = ALL_AUDIENCES.map(
       (aud) => completeScenarioAngle(

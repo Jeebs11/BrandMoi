@@ -591,7 +591,7 @@ export default function Dashboard() {
                   <span className="text-xs font-bold text-violet-600">{momentum.weekStreak}-week streak</span>
                 </div>
               )}
-              <Link href="/settings" className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+              <Link href="/settings" data-tour="settings-mobile" className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
                 <Settings className="w-4 h-4" />
               </Link>
             </div>
@@ -674,6 +674,7 @@ export default function Dashboard() {
           {/* Write your own — primary CTA always visible */}
           <button
             onClick={() => openLengthPicker("", "")}
+            data-tour="write-post"
             className="w-full bg-primary rounded-3xl p-5 flex items-center justify-between shadow-lg shadow-primary/20 cursor-pointer hover:bg-primary/90 transition-colors group"
           >
             <div className="flex items-center gap-4">
@@ -691,7 +692,7 @@ export default function Dashboard() {
           </button>
 
           {/* ── Idea Engine — one card, four lenses ── */}
-          <div className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden">
+          <div data-tour="idea-engine" className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-gray-900" />

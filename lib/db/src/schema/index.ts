@@ -13,3 +13,5 @@ export * from "./login_events";
 export * from "./stress_test_scores";
 export * from "./idea_feedback";
 export * from "./ai_usage";
+export * from "./profile_snapshots";
+export * from "./profile_analyses";

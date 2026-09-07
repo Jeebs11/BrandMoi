@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { ChevronLeft, Layers, Plus, Trash2, Sparkles, X, Pencil, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
+import { usePageTour } from "@/components/tour/usePageTour";
+import { SERIES_TOUR_STEPS } from "@/components/tour/page-tours";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +49,8 @@ export default function SeriesPage() {
     }
   };
 
+  const pageTour = usePageTour("series-tour", SERIES_TOUR_STEPS);
+
   if (detailId) {
     return <SeriesDetailView id={detailId} onBack={() => { setDetailId(null); refresh(); }} />;
   }
@@ -65,7 +69,7 @@ export default function SeriesPage() {
       </header>
 
       <main className="flex-1 px-5 py-5 overflow-y-auto space-y-4">
-        <Button onClick={() => setCreating(true)} className="w-full rounded-2xl font-bold gap-2">
+        <Button onClick={() => setCreating(true)} data-tour="series-new" className="w-full rounded-2xl font-bold gap-2">
           <Plus className="w-4 h-4" /> New series
         </Button>
 
@@ -94,6 +98,7 @@ export default function SeriesPage() {
           onCreated={(s) => { setCreating(false); setSeries((prev) => [...prev, s]); setDetailId(s.id); }}
         />
       )}
+      {pageTour}
     </AppShell>
   );
 }

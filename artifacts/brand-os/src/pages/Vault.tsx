@@ -3,6 +3,8 @@ import { useLocation } from "wouter";
 import { Lightbulb, Plus, Trash2, ArrowRight, CheckCircle2, ChevronLeft, Lock, Pencil, X, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
+import { usePageTour } from "@/components/tour/usePageTour";
+import { VAULT_TOUR_STEPS } from "@/components/tour/page-tours";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, type Thought } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -75,6 +77,7 @@ export default function Vault() {
 
   const undeveloped = thoughts.filter((t) => !t.developed);
   const developed = thoughts.filter((t) => t.developed);
+  const pageTour = usePageTour("vault-tour", VAULT_TOUR_STEPS);
 
   return (
     <AppShell>
@@ -97,7 +100,7 @@ export default function Vault() {
               <span>Vault capture is view-only in demo mode. <a href="/signup" className="font-semibold underline underline-offset-2">Sign up free</a> to capture your own ideas.</span>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border-2 border-gray-100 focus-within:border-primary/40 transition-colors shadow-sm">
+            <div data-tour="vault-capture" className="bg-white rounded-2xl border-2 border-gray-100 focus-within:border-primary/40 transition-colors shadow-sm">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -198,6 +201,7 @@ export default function Vault() {
           )}
         </main>
 
+      {pageTour}
     </AppShell>
   );
 }

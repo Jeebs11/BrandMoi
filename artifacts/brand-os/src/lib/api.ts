@@ -315,6 +315,139 @@ export const smartImportApi = {
   },
 };
 
+export type ProfileFacts = {
+  headline: string | null;
+  about: string | null;
+  currentTitle: string | null;
+  currentEmployer: string | null;
+  currentRoleDates: string | null;
+  achievements: string[];
+  skills: string[];
+};
+
+export type ApplicableSource = "cv" | "brandmoi" | "linkedin";
+
+export type ComparisonStatus =
+  | "all_agree"
+  | "cv_brandmoi_agree_linkedin_differs"
+  | "cv_linkedin_agree_brandmoi_stale"
+  | "brandmoi_linkedin_agree_cv_differs"
+  | "all_differ"
+  | "only_one_source"
+  | "insufficient_data";
+
+type SourceValue = { value: string | string[]; source: ApplicableSource } | null;
+
+export type ComparisonRow = {
+  rowKey: "role_title" | "territories" | "audience" | "recent_content_themes";
+  label: string;
+  applicableSources: ApplicableSource[];
+  cv: SourceValue;
+  brandmoi: SourceValue;
+  linkedin: SourceValue;
+  status: ComparisonStatus;
+  statusDetail: string;
+};
+
+export type ProofPointComparisonRow = {
+  rowKey: "proof_points";
+  label: string;
+  applicableSources: ApplicableSource[];
+  points: Array<{ point: string; presentInCv: boolean; reflectedInLinkedin: boolean }>;
+  status: ComparisonStatus;
+  statusDetail: string;
+};
+
+export type ComparisonTable = {
+  generatedAt: string;
+  rows: Array<ComparisonRow | ProofPointComparisonRow>;
+};
+
+export type TargetAudience = "Recruiters" | "Hiring managers" | "Clients" | "Peers" | "Investors" | "General";
+
+export type RecommendationStatus = "pending" | "accepted" | "edited" | "rejected";
+
+export type FieldRewrite = {
+  id: string;
+  field: "headline" | "about" | "current_role";
+  currentBrandmoi: string | null;
+  currentLinkedin: string | null;
+  rewrite: string;
+  rationale: string;
+  status: RecommendationStatus;
+  editedValue?: string;
+};
+
+export type PairedFactSuggestion = {
+  id: string;
+  rowKey: ComparisonRow["rowKey"];
+  claim: string;
+  updateBrandmoi: {
+    targetField: "brandRole" | "aboutMe" | "contentPillars" | "proofPoints";
+    suggestedValue: string | string[];
+    status: RecommendationStatus;
+    editedValue?: string | string[];
+  };
+  updateLinkedin: {
+    suggestedValue: string;
+    status: RecommendationStatus;
+    editedValue?: string;
+  };
+};
+
+export type ProfileAlignmentAnalysis = {
+  id: number;
+  targetAudience: TargetAudience;
+  comparisonTable: ComparisonTable;
+  narrativeSummary: string;
+  fieldRewrites: FieldRewrite[];
+  pairedFactSuggestions: PairedFactSuggestion[];
+  createdAt: string;
+};
+
+async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`/api${path}`, { method: "POST", credentials: "include", body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const profileAlignmentApi = {
+  uploadCv: (file: File) => {
+    const form = new FormData();
+    form.append("document", file);
+    return postForm<ProfileFacts>("/profile-alignment/cv", form);
+  },
+  uploadLinkedin: (file: File) => {
+    const form = new FormData();
+    form.append("document", file);
+    return postForm<ProfileFacts>("/profile-alignment/linkedin", form);
+  },
+  // The backend endpoint always expects multipart (it runs multer
+  // unconditionally) — pasted text goes as a form field, not JSON, so it
+  // lands in req.body.pastedText the same way multer parses any non-file field.
+  pasteLinkedin: (pastedText: string) => {
+    const form = new FormData();
+    form.append("pastedText", pastedText);
+    return postForm<ProfileFacts>("/profile-alignment/linkedin", form);
+  },
+  comparison: () => apiFetch<ComparisonTable>("/profile-alignment/comparison"),
+  analyze: (targetAudience: TargetAudience) =>
+    apiFetch<ProfileAlignmentAnalysis>("/profile-alignment/analyze", { method: "POST", body: JSON.stringify({ targetAudience }) }),
+  reviewRecommendation: (
+    analysisId: number,
+    recId: string,
+    status: RecommendationStatus,
+    opts?: { target?: "brandmoi" | "linkedin"; editedValue?: string | string[] },
+  ) =>
+    apiFetch<{ ok: true }>(`/profile-alignment/analyses/${analysisId}/recommendations/${recId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, target: opts?.target, editedValue: opts?.editedValue }),
+    }),
+};
+
 export const imageGenApi = {
   generate: async (
     prompt: string,
@@ -362,6 +495,8 @@ export const preferencesApi = {
       method: "PUT",
       body: JSON.stringify({ brandBgColor, brandAccentColor, brandTextColor }),
     }),
+  updateFields: (fields: Partial<{ brandRole: string; aboutMe: string; contentPillars: string[]; proofPoints: string[]; lastSeenUpdateId: string | null; seenPageTours: string[] }>) =>
+    apiFetch<unknown>("/user/preferences", { method: "PUT", body: JSON.stringify(fields) }),
 };
 
 export type PainPoint = {

@@ -17,6 +17,7 @@ import Vault from "@/pages/Vault";
 import Analytics from "@/pages/Analytics";
 import BrandStudio from "@/pages/BrandStudio";
 import SeriesPage from "@/pages/Series";
+import ProfileAlignment from "@/pages/ProfileAlignment";
 import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -155,6 +156,11 @@ function Router() {
       <Route path="/series">
         <AuthGuard>
           <SeriesPage />
+        </AuthGuard>
+      </Route>
+      <Route path="/profile-alignment">
+        <AuthGuard>
+          <ProfileAlignment />
         </AuthGuard>
       </Route>
       <Route path="/admin">

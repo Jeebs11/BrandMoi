@@ -32,6 +32,8 @@ const UpdatePreferencesBody = z.object({
   brandBelief: z.string().optional(),
   aboutMe: z.string().max(500).optional(),
   onboarded: z.boolean().optional(),
+  lastSeenUpdateId: z.string().max(64).optional().nullable(),
+  seenPageTours: z.array(z.string().max(64)).max(20).optional(),
   brandBgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandAccentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   brandTextColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
@@ -135,6 +137,8 @@ router.put("/user/preferences", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.brandBelief !== undefined) updateData.brandBelief = parsed.data.brandBelief.trim();
   if (parsed.data.aboutMe !== undefined) updateData.aboutMe = parsed.data.aboutMe;
   if (parsed.data.onboarded !== undefined) updateData.onboarded = parsed.data.onboarded;
+  if (parsed.data.lastSeenUpdateId !== undefined) updateData.lastSeenUpdateId = parsed.data.lastSeenUpdateId;
+  if (parsed.data.seenPageTours !== undefined) updateData.seenPageTours = parsed.data.seenPageTours;
   if (parsed.data.brandBgColor !== undefined) updateData.brandBgColor = parsed.data.brandBgColor;
   if (parsed.data.brandAccentColor !== undefined) updateData.brandAccentColor = parsed.data.brandAccentColor;
   if (parsed.data.brandTextColor !== undefined) updateData.brandTextColor = parsed.data.brandTextColor;

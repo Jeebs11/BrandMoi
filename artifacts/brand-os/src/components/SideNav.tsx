@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight, Shield, FlaskConical, Layers } from "lucide-react";
+import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight, Shield, FlaskConical, Layers, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useListDrafts } from "@workspace/api-client-react";
@@ -26,6 +26,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
     ...BASE_NAV_ITEMS,
     ...(hasPublished ? [{ href: "/analytics", label: "Analytics", icon: BarChart2 }] : []),
     { href: "/studio", label: "Brand Studio", icon: FlaskConical },
+    { href: "/profile-alignment", label: "Profile Alignment", icon: Target },
   ];
 
   return (
@@ -55,6 +56,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
               key={href}
               href={href}
               title={collapsed ? label : undefined}
+              data-tour={href === "/profile-alignment" ? "profile-alignment" : undefined}
               className={cn(
                 "flex items-center rounded-xl transition-all text-sm font-semibold",
                 collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
@@ -102,6 +104,7 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
         <Link
           href="/settings"
           title={collapsed ? "Settings" : undefined}
+          data-tour="settings"
           className={cn(
             "flex items-center rounded-xl transition-all text-sm font-semibold",
             collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
