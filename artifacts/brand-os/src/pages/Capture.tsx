@@ -40,6 +40,16 @@ import {
   type AuthenticityFeedback,
   type AuthenticityReview,
 } from "@/components/AuthenticityReviewDialog";
+import {
+  EMPTY_MOMENT_DETAILS,
+  HUMANISE_ACTIONS,
+  composeGenerationInput,
+  composeHumanDetailBlock,
+  getDetailsUsed,
+  getSpecificityQuestion,
+  shouldShowSpecificityPrompt,
+  type MomentDetails,
+} from "@/lib/humanisation";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -67,20 +77,6 @@ const VISUAL_STYLES = [
 ] as const;
 
 type TabType = "post" | "short" | "carousel" | "visual" | "infographic" | "illustration";
-
-type MomentDetails = {
-  scene: string;
-  stakes: string;
-  action: string;
-  changed: string;
-};
-
-const EMPTY_MOMENT_DETAILS: MomentDetails = {
-  scene: "",
-  stakes: "",
-  action: "",
-  changed: "",
-};
 
 const TABS: Array<{ key: TabType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { key: "post", label: "Post", icon: PenTool },
@@ -1138,7 +1134,7 @@ interface CaptureFormProps {
   error: string | null;
 }
 
-function CaptureForm(props: CaptureFormProps) {
+export function CaptureForm(props: CaptureFormProps) {
   const {
     rawInput, setRawInput, audience, setAudience,
     feeling, setFeeling, tieToNews, setTieToNews,
@@ -1154,32 +1150,14 @@ function CaptureForm(props: CaptureFormProps) {
   const [ppWentWrong, setPpWentWrong] = useState("");
   const [ppAnalogy, setPpAnalogy] = useState("");
 
-  const hasMomentDetails = Object.values(momentDetails).some((value) => value.trim());
-  const hasConcreteSignal = /\b(last|yesterday|today|this morning|this afternoon|this week|during|when|after|before|on monday|on tuesday|on wednesday|on thursday|on friday)\b|\d/i.test(rawInput);
-  const specificityQuestion = /team|client|customer|conversation|meeting/i.test(rawInput)
-    ? "What did the other person say or do in that moment?"
-    : /fail|wrong|mistake|hard|stuck|problem/i.test(rawInput)
-    ? "What specifically went wrong, and what did you do next?"
-    : "What was happening right before you had to act?";
-  const needsSpecificityCheck = rawInput.trim().length >= 24
-    && rawInput.trim().length < 280
-    && !hasMomentDetails
-    && !hasConcreteSignal;
+  const needsSpecificityCheck = shouldShowSpecificityPrompt(rawInput, momentDetails);
 
   const updateMomentDetail = (key: keyof MomentDetails, value: string) => {
     setMomentDetails({ ...momentDetails, [key]: value });
   };
 
   const handleMakeIt = () => {
-    const detailLines = [
-      momentDetails.scene.trim() ? `Specific moment or scene: ${momentDetails.scene.trim()}` : "",
-      momentDetails.stakes.trim() ? `What was at stake or went wrong: ${momentDetails.stakes.trim()}` : "",
-      momentDetails.action.trim() ? `What I did: ${momentDetails.action.trim()}` : "",
-      momentDetails.changed.trim() ? `What changed or what I learned: ${momentDetails.changed.trim()}` : "",
-    ].filter(Boolean);
-    const humanDetailBlock = detailLines.length > 0
-      ? `Human detail provided by the author:\n${detailLines.join("\n")}`
-      : "";
+    const humanDetailBlock = composeHumanDetailBlock(momentDetails);
 
     if (painPointMode) {
       if (!ppConcept.trim()) return;
@@ -1196,9 +1174,7 @@ function CaptureForm(props: CaptureFormProps) {
         moment: momentDetails,
       });
     } else {
-      const composedRawInput = detailLines.length > 0
-        ? `${rawInput.trim()}\n\n${humanDetailBlock}`
-        : rawInput;
+      const composedRawInput = composeGenerationInput(rawInput, momentDetails);
       onMakeIt({ rawInput: composedRawInput, moment: momentDetails });
     }
   };
@@ -1255,7 +1231,7 @@ function CaptureForm(props: CaptureFormProps) {
           <div>
             <p className="font-semibold">A little more detail could make this feel like you.</p>
             <p className="mt-1 leading-relaxed text-amber-800">
-              If you remember it, consider: <span className="font-medium">{specificityQuestion}</span>
+              If you remember it, consider: <span className="font-medium">{getSpecificityQuestion(rawInput)}</span>
             </p>
           </div>
         </div>
@@ -1278,7 +1254,7 @@ function CaptureForm(props: CaptureFormProps) {
               Optional. Give the post one real moment to hold on to.
             </span>
           </span>
-          {hasMomentDetails && (
+          {Object.values(momentDetails).some((value) => value.trim()) && (
             <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-600" data-testid="status-human-detail-added">
               Added
             </span>
@@ -1600,7 +1576,7 @@ interface ResultViewProps {
   brandReviewIsStale: boolean;
 }
 
-function ResultView(props: ResultViewProps) {
+export function ResultView(props: ResultViewProps) {
   const {
     content, editedPost, setEditedPost, hashtags, setHashtags,
     versions, onRestoreVersion,
@@ -1615,13 +1591,16 @@ function ResultView(props: ResultViewProps) {
     hasCachedBrandReview, brandReviewIsStale,
   } = props;
 
-  const detailsUsed = [
-    { key: "idea", label: "Your idea", value: rawIdea.trim() },
-    { key: "scene", label: "Moment or scene", value: momentDetails.scene.trim() },
-    { key: "stakes", label: "What was at stake", value: momentDetails.stakes.trim() },
-    { key: "action", label: "What you did", value: momentDetails.action.trim() },
-    { key: "changed", label: "What changed or you learned", value: momentDetails.changed.trim() },
-  ].filter((detail) => detail.value);
+  const detailsUsed = getDetailsUsed(rawIdea, momentDetails).map((detail) => ({
+    ...detail,
+    label: detail.key === "scene"
+      ? "Moment or scene"
+      : detail.key === "stakes"
+      ? "What was at stake"
+      : detail.key === "changed"
+      ? "What changed or you learned"
+      : detail.label,
+  }));
 
   return (
     <div className="space-y-4">
@@ -1839,54 +1818,21 @@ function ResultView(props: ResultViewProps) {
                </p>
              </div>
              <div className="grid grid-cols-2 gap-2">
-               <Button
-                 variant="outline"
-                 onClick={() => onRefine(
-                   "Preserve the story, sequence, and every existing fact. Improve clarity and flow without adding or removing factual details. Return the complete revised post only.",
-                   "post",
-                   "Preserve the story",
-                 )}
-                 disabled={isRefining}
-                 data-testid="button-humanise-preserve-story"
-               >
-                 <BookOpen className="mr-1.5 h-3.5 w-3.5" />Preserve the story
-               </Button>
-               <Button
-                 variant="outline"
-                 onClick={() => onRefine(
-                   "Make this sound more spoken and natural, as if the author is saying it to a thoughtful colleague. Preserve the story and all facts. Do not add fabricated specifics. Return the complete revised post only.",
-                   "post",
-                   "Make it more spoken",
-                 )}
-                 disabled={isRefining}
-                 data-testid="button-humanise-more-spoken"
-               >
-                 <MessageCircle className="mr-1.5 h-3.5 w-3.5" />Make it more spoken
-               </Button>
-               <Button
-                 variant="outline"
-                 onClick={() => onRefine(
-                   "Add texture through the existing details, sensory language, or pacing already present. Do not invent scenes, dialogue, names, numbers, or other specifics; use only details already in the post. Preserve the story. Return the complete revised post only.",
-                   "post",
-                   "Add texture",
-                 )}
-                 disabled={isRefining}
-                 data-testid="button-humanise-add-texture"
-               >
-                 <Sparkles className="mr-1.5 h-3.5 w-3.5" />Add texture
-               </Button>
-               <Button
-                 variant="outline"
-                 onClick={() => onRefine(
-                   "Make this more relatable by clarifying the human tension and takeaway using only what is already in the post. Do not invent experiences, facts, or specifics. Preserve the story. Return the complete revised post only.",
-                   "post",
-                   "Make it more relatable",
-                 )}
-                 disabled={isRefining}
-                 data-testid="button-humanise-more-relatable"
-               >
-                 <Target className="mr-1.5 h-3.5 w-3.5" />Make it more relatable
-               </Button>
+               {HUMANISE_ACTIONS.map((action) => (
+                 <Button
+                   key={action.key}
+                   variant="outline"
+                   onClick={() => onRefine(action.instruction, "post", action.label)}
+                   disabled={isRefining}
+                   data-testid={`button-humanise-${action.key}`}
+                 >
+                   {action.key === "preserve-story" && <BookOpen className="mr-1.5 h-3.5 w-3.5" />}
+                   {action.key === "more-spoken" && <MessageCircle className="mr-1.5 h-3.5 w-3.5" />}
+                   {action.key === "add-texture" && <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                   {action.key === "more-relatable" && <Target className="mr-1.5 h-3.5 w-3.5" />}
+                   {action.label}
+                 </Button>
+               ))}
              </div>
            </div>
 
