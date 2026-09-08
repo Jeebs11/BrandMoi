@@ -18,6 +18,7 @@ import {
   FORMAT_INSTRUCTIONS,
   OBJECTIVE_OVERLAYS,
   REFINE_SYSTEM_PROMPT,
+  CONTENT_GENERATION_MODEL,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
@@ -146,7 +147,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
 
   try {
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: CONTENT_GENERATION_MODEL,
       max_tokens: 8192,
       system: GENERATE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
@@ -312,7 +313,7 @@ Instruction: ${instruction}
 Return ONLY the refined text. No JSON. No markdown fences. No preamble. No explanation. Just the rewritten content.`;
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: CONTENT_GENERATION_MODEL,
     max_tokens: 8192,
     system: REFINE_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
