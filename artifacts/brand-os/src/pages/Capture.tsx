@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearch, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Sparkles, ChevronLeft, RefreshCw, Copy, Save, Newspaper,
+  Sparkles, ChevronLeft, ChevronDown, RefreshCw, Copy, Save, Newspaper,
   Image as ImageIcon, Layout, BarChart3, PenTool, Wand2,
   ArrowDown, ArrowUp, BookOpen, Check, Layers, Target, CheckCircle2,
+  MapPin, AlertTriangle, MessageCircle,
 } from "lucide-react";
 import { BrandReviewPanel } from "@/components/BrandReviewPanel";
 import { PostMeter } from "@/components/PostMeter";
@@ -66,6 +67,20 @@ const VISUAL_STYLES = [
 ] as const;
 
 type TabType = "post" | "short" | "carousel" | "visual" | "infographic" | "illustration";
+
+type MomentDetails = {
+  scene: string;
+  stakes: string;
+  action: string;
+  changed: string;
+};
+
+const EMPTY_MOMENT_DETAILS: MomentDetails = {
+  scene: "",
+  stakes: "",
+  action: "",
+  changed: "",
+};
 
 const TABS: Array<{ key: TabType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { key: "post", label: "Post", icon: PenTool },
@@ -217,6 +232,7 @@ export default function Capture() {
   );
   const [feeling, setFeeling] = useState<string>(feelingFromTone(preferences?.tone));
   const [tieToNews, setTieToNews] = useState<boolean>(!!newsUrlParam);
+  const [momentDetails, setMomentDetails] = useState<MomentDetails>(EMPTY_MOMENT_DETAILS);
   const [content, setContent] = useState<GeneratedContent | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("post");
   const [editedPost, setEditedPost] = useState<string>("");
@@ -354,7 +370,13 @@ export default function Capture() {
   }, [preferences, existingDraft, content]);
 
   // ── Generate (initial Make-it / Try a different angle) ─────────────────
-  const runGenerate = (overrides?: { extraInstruction?: string; feeling?: string; audience?: string; rawInput?: string }) => {
+  const runGenerate = (overrides?: {
+    extraInstruction?: string;
+    feeling?: string;
+    audience?: string;
+    rawInput?: string;
+    moment?: MomentDetails;
+  }) => {
     const effectiveRawInput = overrides?.rawInput ?? rawInput;
     if (!effectiveRawInput.trim()) {
       toast({ title: "Add an idea first", description: "Tell us what you want to say.", variant: "destructive" });
@@ -362,6 +384,7 @@ export default function Capture() {
     }
     const effectiveAudience = overrides?.audience ?? audience;
     const effectiveFeeling = overrides?.feeling ?? feeling;
+    if (overrides?.moment) setMomentDetails(overrides.moment);
     trackEvent("content_generation_started", {
       audience: effectiveAudience,
       feeling: effectiveFeeling,
@@ -932,6 +955,7 @@ export default function Capture() {
         {!showResult && (
           <CaptureForm
             rawInput={rawInput} setRawInput={setRawInput}
+            momentDetails={momentDetails} setMomentDetails={setMomentDetails}
             audience={audience} setAudience={setAudience}
             feeling={feeling} setFeeling={setFeeling}
             tieToNews={tieToNews} setTieToNews={setTieToNews}
@@ -961,6 +985,8 @@ export default function Capture() {
             illustrationImage={illustrationImage} illustrationCaption={illustrationCaption}
             illustrationScene={illustrationScene} isLoadingIllustration={isLoadingIllustration}
             fullPost={fullPost}
+            rawIdea={rawInput}
+            momentDetails={momentDetails}
             brandClosingMode={brandClosingMode}
             brandClosingText={brandClosingText}
             brandClosingApplied={brandClosingApplied}
@@ -1102,11 +1128,12 @@ export default function Capture() {
 
 interface CaptureFormProps {
   rawInput: string; setRawInput: (v: string) => void;
+  momentDetails: MomentDetails; setMomentDetails: (v: MomentDetails) => void;
   audience: string; setAudience: (v: string) => void;
   feeling: string; setFeeling: (v: string) => void;
   tieToNews: boolean; setTieToNews: (v: boolean) => void;
   isGenerating: boolean;
-  onMakeIt: (overrides?: { rawInput?: string; extraInstruction?: string }) => void;
+  onMakeIt: (overrides?: { rawInput?: string; extraInstruction?: string; moment?: MomentDetails }) => void;
   onSelectDirection: (d: { feeling: string; hook: string }) => void;
   error: string | null;
 }
@@ -1115,31 +1142,64 @@ function CaptureForm(props: CaptureFormProps) {
   const {
     rawInput, setRawInput, audience, setAudience,
     feeling, setFeeling, tieToNews, setTieToNews,
+    momentDetails, setMomentDetails,
     isGenerating, onMakeIt, onSelectDirection, error,
   } = props;
 
   const [showDirections, setShowDirections] = useState(false);
+  const [showMomentDetails, setShowMomentDetails] = useState(false);
   const [directions, setDirections] = useState<DirectionConcept[]>([]);
   const [painPointMode, setPainPointMode] = useState(false);
   const [ppConcept, setPpConcept] = useState("");
   const [ppWentWrong, setPpWentWrong] = useState("");
   const [ppAnalogy, setPpAnalogy] = useState("");
 
+  const hasMomentDetails = Object.values(momentDetails).some((value) => value.trim());
+  const hasConcreteSignal = /\b(last|yesterday|today|this morning|this afternoon|this week|during|when|after|before|on monday|on tuesday|on wednesday|on thursday|on friday)\b|\d/i.test(rawInput);
+  const specificityQuestion = /team|client|customer|conversation|meeting/i.test(rawInput)
+    ? "What did the other person say or do in that moment?"
+    : /fail|wrong|mistake|hard|stuck|problem/i.test(rawInput)
+    ? "What specifically went wrong, and what did you do next?"
+    : "What was happening right before you had to act?";
+  const needsSpecificityCheck = rawInput.trim().length >= 24
+    && rawInput.trim().length < 280
+    && !hasMomentDetails
+    && !hasConcreteSignal;
+
+  const updateMomentDetail = (key: keyof MomentDetails, value: string) => {
+    setMomentDetails({ ...momentDetails, [key]: value });
+  };
+
   const handleMakeIt = () => {
+    const detailLines = [
+      momentDetails.scene.trim() ? `Specific moment or scene: ${momentDetails.scene.trim()}` : "",
+      momentDetails.stakes.trim() ? `What was at stake or went wrong: ${momentDetails.stakes.trim()}` : "",
+      momentDetails.action.trim() ? `What I did: ${momentDetails.action.trim()}` : "",
+      momentDetails.changed.trim() ? `What changed or what I learned: ${momentDetails.changed.trim()}` : "",
+    ].filter(Boolean);
+    const humanDetailBlock = detailLines.length > 0
+      ? `Human detail provided by the author:\n${detailLines.join("\n")}`
+      : "";
+
     if (painPointMode) {
       if (!ppConcept.trim()) return;
       const composed = [
         `Topic: ${ppConcept}`,
         ppWentWrong ? `What goes wrong: ${ppWentWrong}` : "",
         ppAnalogy ? `Analogy or hook: ${ppAnalogy}` : "",
+        humanDetailBlock,
       ].filter(Boolean).join("\n");
       onMakeIt({
         rawInput: composed,
         extraInstruction:
           "Structure this as a Pain Point Post: open with an uncomfortable question or bold observation that surfaces the pain, use the analogy/hook to make it vivid and concrete, describe the real-world consequences people feel, then close with the key insight or reframe. Direct and conversational.",
+        moment: momentDetails,
       });
     } else {
-      onMakeIt();
+      const composedRawInput = detailLines.length > 0
+        ? `${rawInput.trim()}\n\n${humanDetailBlock}`
+        : rawInput;
+      onMakeIt({ rawInput: composedRawInput, moment: momentDetails });
     }
   };
 
@@ -1182,8 +1242,114 @@ function CaptureForm(props: CaptureFormProps) {
           placeholder="A rough thought, a story, an opinion. Just type — we'll shape it."
           className="w-full min-h-[140px] p-4 rounded-2xl border border-gray-200 focus:border-primary focus:outline-none text-base leading-relaxed resize-none"
           autoFocus
+          data-testid="input-raw-idea"
         />
       )}
+
+      {needsSpecificityCheck && (
+        <div
+          className="flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/70 px-3.5 py-3 text-xs text-amber-900"
+          data-testid="prompt-specificity-check"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <p className="font-semibold">A little more detail could make this feel like you.</p>
+            <p className="mt-1 leading-relaxed text-amber-800">
+              If you remember it, consider: <span className="font-medium">{specificityQuestion}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 overflow-hidden" data-testid="section-human-detail">
+        <button
+          type="button"
+          onClick={() => setShowMomentDetails((visible) => !visible)}
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-100/80"
+          aria-expanded={showMomentDetails}
+          data-testid="button-toggle-human-detail"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
+            <MapPin className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-800">Add the human detail</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+              Optional. Give the post one real moment to hold on to.
+            </span>
+          </span>
+          {hasMomentDetails && (
+            <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-600" data-testid="status-human-detail-added">
+              Added
+            </span>
+          )}
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", showMomentDetails && "rotate-180")} />
+        </button>
+
+        {showMomentDetails && (
+          <div className="space-y-3 border-t border-slate-200 px-4 pb-4 pt-3" data-testid="panel-human-detail-fields">
+            <p className="text-xs leading-relaxed text-slate-500">
+              Use what you actually remember. Leave anything blank that does not fit.
+            </p>
+            <div>
+              <label htmlFor="moment-scene" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                A specific moment or scene
+              </label>
+              <textarea
+                id="moment-scene"
+                value={momentDetails.scene}
+                onChange={(e) => updateMomentDetail("scene", e.target.value)}
+                placeholder="Where were you, and what was happening?"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed focus:border-slate-400 focus:outline-none"
+                data-testid="input-moment-scene"
+              />
+            </div>
+            <div>
+              <label htmlFor="moment-stakes" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                What was at stake or went wrong
+              </label>
+              <textarea
+                id="moment-stakes"
+                value={momentDetails.stakes}
+                onChange={(e) => updateMomentDetail("stakes", e.target.value)}
+                placeholder="What felt difficult, risky, or off-track?"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed focus:border-slate-400 focus:outline-none"
+                data-testid="input-moment-stakes"
+              />
+            </div>
+            <div>
+              <label htmlFor="moment-action" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                What you did
+              </label>
+              <textarea
+                id="moment-action"
+                value={momentDetails.action}
+                onChange={(e) => updateMomentDetail("action", e.target.value)}
+                placeholder="What choice, conversation, or small move did you make?"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed focus:border-slate-400 focus:outline-none"
+                data-testid="input-moment-action"
+              />
+            </div>
+            <div>
+              <label htmlFor="moment-changed" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                What changed or what you learned
+              </label>
+              <textarea
+                id="moment-changed"
+                value={momentDetails.changed}
+                onChange={(e) => updateMomentDetail("changed", e.target.value)}
+                placeholder="What was different afterward, or what stayed with you?"
+                rows={2}
+                className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm leading-relaxed focus:border-slate-400 focus:outline-none"
+                data-testid="input-moment-changed"
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Who's it for?</p>
@@ -1404,6 +1570,8 @@ interface ResultViewProps {
   illustrationImage: string | null; illustrationCaption: string;
   illustrationScene: string; isLoadingIllustration: boolean;
   fullPost: string;
+  rawIdea: string;
+  momentDetails: MomentDetails;
   brandClosingMode: BrandClosingMode;
   brandClosingText: string;
   brandClosingApplied: boolean;
@@ -1439,13 +1607,21 @@ function ResultView(props: ResultViewProps) {
     activeTab, setActiveTab, visualStyle, setVisualStyle,
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
-    fullPost, audience, feeling, isRefining, isSaving, isCheckingAuthenticity, isDemo,
+    fullPost, rawIdea, momentDetails, audience, feeling, isRefining, isSaving, isCheckingAuthenticity, isDemo,
     brandClosingMode, brandClosingText, brandClosingApplied, onToggleBrandClosing,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
     onSave, onSaveAndPublish, onCopy, onBrandReview, isBrandReviewLoading,
     hasCachedBrandReview, brandReviewIsStale,
   } = props;
+
+  const detailsUsed = [
+    { key: "idea", label: "Your idea", value: rawIdea.trim() },
+    { key: "scene", label: "Moment or scene", value: momentDetails.scene.trim() },
+    { key: "stakes", label: "What was at stake", value: momentDetails.stakes.trim() },
+    { key: "action", label: "What you did", value: momentDetails.action.trim() },
+    { key: "changed", label: "What changed or you learned", value: momentDetails.changed.trim() },
+  ].filter((detail) => detail.value);
 
   return (
     <div className="space-y-4">
@@ -1558,7 +1734,36 @@ function ResultView(props: ResultViewProps) {
             onChange={(e) => setEditedPost(e.target.value)}
             spellCheck
             className="w-full min-h-[280px] p-4 rounded-2xl border border-gray-200 focus:border-primary focus:outline-none text-sm leading-relaxed font-mono"
+             data-testid="textarea-generated-post"
           />
+
+           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4" data-testid="panel-details-used">
+             <div className="flex items-start gap-2.5">
+               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
+                 <CheckCircle2 className="h-4 w-4" />
+               </span>
+               <div className="min-w-0">
+                 <p className="text-sm font-semibold text-slate-800">Details used</p>
+                 <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                   A quick view of the details you gave BrandMoi for this draft.
+                 </p>
+               </div>
+             </div>
+             {detailsUsed.length > 0 ? (
+               <div className="mt-3 space-y-2.5">
+                 {detailsUsed.map((detail) => (
+                   <div key={detail.key} className="border-t border-slate-200/80 pt-2.5" data-testid={`text-detail-used-${detail.key}`}>
+                     <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{detail.label}</p>
+                     <p className="mt-0.5 whitespace-pre-wrap text-xs leading-relaxed text-slate-700">{detail.value}</p>
+                   </div>
+                 ))}
+               </div>
+             ) : (
+               <p className="mt-3 border-t border-slate-200/80 pt-3 text-xs leading-relaxed text-slate-500" data-testid="text-details-used-empty">
+                 No extra details were captured. This draft started with your idea alone.
+               </p>
+             )}
+           </div>
 
           <div className={cn(
             "rounded-2xl border p-3.5",
@@ -1625,6 +1830,65 @@ function ResultView(props: ResultViewProps) {
 
           {/* Live algorithm tracker — fold line, counts, structure, hashtags, links */}
           <PostMeter post={editedPost} hashtags={hashtags} />
+
+           <div className="space-y-2.5" data-testid="section-humanise-actions">
+             <div>
+               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Humanise this draft</p>
+               <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                 Choose a direction. The story stays yours; no new facts are added.
+               </p>
+             </div>
+             <div className="grid grid-cols-2 gap-2">
+               <Button
+                 variant="outline"
+                 onClick={() => onRefine(
+                   "Preserve the story, sequence, and every existing fact. Improve clarity and flow without adding or removing factual details. Return the complete revised post only.",
+                   "post",
+                   "Preserve the story",
+                 )}
+                 disabled={isRefining}
+                 data-testid="button-humanise-preserve-story"
+               >
+                 <BookOpen className="mr-1.5 h-3.5 w-3.5" />Preserve the story
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() => onRefine(
+                   "Make this sound more spoken and natural, as if the author is saying it to a thoughtful colleague. Preserve the story and all facts. Do not add fabricated specifics. Return the complete revised post only.",
+                   "post",
+                   "Make it more spoken",
+                 )}
+                 disabled={isRefining}
+                 data-testid="button-humanise-more-spoken"
+               >
+                 <MessageCircle className="mr-1.5 h-3.5 w-3.5" />Make it more spoken
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() => onRefine(
+                   "Add texture through the existing details, sensory language, or pacing already present. Do not invent scenes, dialogue, names, numbers, or other specifics; use only details already in the post. Preserve the story. Return the complete revised post only.",
+                   "post",
+                   "Add texture",
+                 )}
+                 disabled={isRefining}
+                 data-testid="button-humanise-add-texture"
+               >
+                 <Sparkles className="mr-1.5 h-3.5 w-3.5" />Add texture
+               </Button>
+               <Button
+                 variant="outline"
+                 onClick={() => onRefine(
+                   "Make this more relatable by clarifying the human tension and takeaway using only what is already in the post. Do not invent experiences, facts, or specifics. Preserve the story. Return the complete revised post only.",
+                   "post",
+                   "Make it more relatable",
+                 )}
+                 disabled={isRefining}
+                 data-testid="button-humanise-more-relatable"
+               >
+                 <Target className="mr-1.5 h-3.5 w-3.5" />Make it more relatable
+               </Button>
+             </div>
+           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={() => onRefine("Make this shorter and punchier.", "post", "Shorter")} disabled={isRefining}>
