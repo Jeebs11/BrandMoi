@@ -3,13 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   BarChart2, TrendingUp, Layers, FileText, Trophy, Zap, AlertCircle, HeartHandshake,
-  ArrowUp, ArrowDown, Minus, Clock, Hash, CalendarDays, Activity,
+  ArrowUp, ArrowDown, Minus, Clock, Hash, CalendarDays, Activity, ChevronDown,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Cell, AreaChart, Area,
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
+import { usePageTour } from "@/components/tour/usePageTour";
+import { ANALYTICS_TOUR_STEPS } from "@/components/tour/page-tours";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { cn } from "@/lib/utils";
@@ -72,6 +74,13 @@ const MEDIA_FORMAT_EMOJI: Record<string, string> = {
 
 const BAR_COLOR = "#7c3aed";
 const BAR_MUTED = "#ede9fe";
+
+// Recharts category-axis ticks don't wrap — long labels get clipped at the
+// axis width, especially on mobile. Truncate defensively for any horizontal
+// bar chart's YAxis category label.
+function truncateLabel(v: string, max = 12): string {
+  return v.length > max ? `${v.slice(0, max - 1)}…` : v;
+}
 
 function TrendArrow({ trend }: { trend: "up" | "down" | "flat" | null }) {
   if (!trend) return null;
@@ -150,6 +159,8 @@ export default function Analytics() {
     staleTime: 60_000,
   });
 
+  const pageTour = usePageTour("analytics-tour", ANALYTICS_TOUR_STEPS, !isLoading && !!data && data.totalPublished > 0);
+
   return (
     <AppShell>
       <header className="px-6 pt-10 pb-4 bg-white/80 backdrop-blur border-b border-gray-100 sticky top-0 z-10">
@@ -176,6 +187,7 @@ export default function Analytics() {
           {isLoading ? <LoadingState /> : !data || data.totalPublished === 0 ? <EmptyState /> : <Content data={data} trendWindow={trendWindow} seriesList={seriesList} topicsList={topicsList} />}
         </div>
       </main>
+      {pageTour}
     </AppShell>
   );
 }
@@ -217,6 +229,7 @@ type BreakdownKey = (typeof BREAKDOWN_TABS)[number]["key"];
 function Content({ data, trendWindow, seriesList, topicsList }: { data: AnalyticsOverview; trendWindow: 30 | 60 | 90; seriesList?: Series[]; topicsList?: Topic[] }) {
   const [, navigate] = useLocation();
   const [activeBreakdown, setActiveBreakdown] = useState<BreakdownKey>("tone");
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const hasResonanceData = data.loggedPerformanceCount > 0;
 
@@ -258,7 +271,7 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
   return (
     <>
       {/* ── Hero band ── */}
-      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-900 to-violet-950 px-6 pt-6 pb-4">
+      <section data-tour="analytics-hero" className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-gray-900 via-gray-900 to-violet-950 px-6 pt-6 pb-4">
         <div className="absolute -top-20 -right-10 w-56 h-56 rounded-full bg-violet-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex items-end justify-between gap-4 mb-1">
           <div>
@@ -330,45 +343,6 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         </div>
       </section>
 
-      {/* ── Milestone progress ── */}
-      {nextMilestone && (
-        <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Next milestone</p>
-            <p className="text-[11px] font-black text-violet-600 tabular-nums">{data.totalPublished} / {nextMilestone} posts</p>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.min(100, Math.round((data.totalPublished / nextMilestone) * 100))}%` }} />
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1.5">{nextMilestone - data.totalPublished} more post{nextMilestone - data.totalPublished !== 1 ? "s" : ""} to hit {nextMilestone} 🏅</p>
-        </div>
-      )}
-
-      {/* ── Personal best ── */}
-      {champion && champion.resonance >= 40 && (
-        <button
-          onClick={() => navigate(`/library?highlight=${champion.id}`)}
-          className="w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 p-[1.5px] text-left group"
-        >
-          <div className="rounded-[14.5px] bg-white px-4 py-3 flex items-center gap-3 group-hover:bg-amber-50/50 transition-colors">
-            <span className="text-xl flex-shrink-0">🏆</span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Personal best</p>
-              <p className="text-xs font-bold text-gray-800 truncate">{champion.topic}</p>
-              {champion.impressions > 0 && (
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {champion.impressions.toLocaleString()} impressions · {champion.reactions + champion.comments} reactions & comments
-                </p>
-              )}
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span className="text-xl font-black text-amber-500 tabular-nums">{champion.engagementRate !== null ? `${champion.engagementRate}%` : "—"}</span>
-              <p className="text-[9px] font-bold text-amber-500/70 uppercase tracking-wider">Engagement</p>
-            </div>
-          </div>
-        </button>
-      )}
-
       {/* Performance CTA */}
       {data.loggedPerformanceCount < 5 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
@@ -382,49 +356,8 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
         </div>
       )}
 
-      {/* Learning signal health */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
-        <div className="flex items-center gap-2 mb-1">
-          <HeartHandshake className="w-3.5 h-3.5 text-violet-500" />
-          <SectionTitle>How BrandMoi is learning</SectionTitle>
-        </div>
-        <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
-          Your direct feedback and current settings lead. Post outcomes provide supporting context only.
-        </p>
-        <div className="grid grid-cols-2 gap-2.5">
-          <LearningMetric
-            label="Voice approvals"
-            value={data.learningMetrics.authorFeedback.approvalRate === null ? "—" : `${data.learningMetrics.authorFeedback.approvalRate}%`}
-            detail={data.learningMetrics.authorFeedback.reviewedDrafts === 0
-              ? "No reviews yet"
-              : `${data.learningMetrics.authorFeedback.soundsLikeMe} of ${data.learningMetrics.authorFeedback.reviewedDrafts} reviews`}
-          />
-          <LearningMetric
-            label="Meaningful edits"
-            value={data.learningMetrics.evidence.materiallyEditedBeforePublish}
-            detail="Before publishing"
-          />
-          <LearningMetric
-            label="Voice evidence"
-            value={data.learningMetrics.evidence.pinnedWritingSamples + data.learningMetrics.evidence.authenticatedPosts}
-            detail={`${data.learningMetrics.evidence.pinnedWritingSamples} samples · ${data.learningMetrics.evidence.authenticatedPosts} verified posts`}
-          />
-          <LearningMetric
-            label="Measured outcomes"
-            value={data.learningMetrics.outcomes.performanceEntries}
-            detail={`${data.learningMetrics.outcomes.externalFeedbackUnknown} feedback states unknown`}
-          />
-        </div>
-        {data.feedbackCoaching.message && (
-          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Post-level coaching</p>
-            <p className="text-[11px] leading-relaxed text-amber-800">{data.feedbackCoaching.message}</p>
-          </div>
-        )}
-      </div>
-
       {/* Trend chart */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+      <div data-tour="analytics-trend" className="bg-white rounded-2xl border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
           <SectionTitle>
             {useResonanceTrend ? "Impact trend" : "Publishing trend"}
@@ -514,52 +447,66 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
               </p>
             </div>
           )}
-          {data.bestTimeToPost.byDayOfWeek.length > 0 && (
-            <>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">By day of week</p>
-              <div className="space-y-1.5 mb-3">
-                {data.bestTimeToPost.byDayOfWeek.map(d => (
-                  <div key={d.day} className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-500 font-medium w-20 flex-shrink-0">{d.day.slice(0, 3)}</span>
-                    <span className="text-gray-400 tabular-nums text-[10px] w-6">{d.count}p</span>
-                    {d.avgResonance === null ? (
-                      <SparseLabel />
-                    ) : (
-                      <div className="flex items-center gap-1.5 flex-1">
-                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${d.avgResonance}%` }} />
-                        </div>
-                        <span className="font-bold text-gray-700 tabular-nums w-5 text-right text-[10px]">{d.avgResonance}</span>
-                      </div>
-                    )}
+          {data.bestTimeToPost.byDayOfWeek.length > 0 && (() => {
+            const chartable = data.bestTimeToPost.byDayOfWeek
+              .filter(d => d.avgResonance !== null)
+              .map(d => ({ label: d.day.slice(0, 3), value: d.avgResonance as number, count: d.count }));
+            const sparseCount = data.bestTimeToPost.byDayOfWeek.length - chartable.length;
+            return (
+              <div className="mb-3">
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">By day of week</p>
+                {chartable.length > 0 ? (
+                  <div style={{ height: chartable.length * 24 + 8 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartable} layout="vertical" margin={{ top: 2, right: 24, left: 0, bottom: 0 }}>
+                        <XAxis type="number" hide domain={[0, 100]} />
+                        <YAxis type="category" dataKey="label" width={32} tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Avg Impact"]} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 10, fill: "#6b7280" }}>
+                          {chartable.map((entry, i) => <Cell key={i} fill={i === 0 ? BAR_COLOR : BAR_MUTED} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
+                ) : (
+                  <SparseLabel />
+                )}
+                {sparseCount > 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">{sparseCount} day{sparseCount !== 1 ? "s" : ""} with limited data not shown</p>
+                )}
               </div>
-            </>
-          )}
-          {data.bestTimeToPost.byTimeBlock.length > 0 && (
-            <>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">By time of day</p>
-              <div className="space-y-1.5">
-                {data.bestTimeToPost.byTimeBlock.map(b => (
-                  <div key={b.block} className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-500 font-medium w-20 flex-shrink-0">{b.block}</span>
-                    <span className="text-gray-400 tabular-nums text-[10px] w-6">{b.count}p</span>
-                    {b.avgResonance === null ? (
-                      <SparseLabel />
-                    ) : (
-                      <div className="flex items-center gap-1.5 flex-1">
-                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${b.avgResonance}%` }} />
-                        </div>
-                        <span className="font-bold text-gray-700 tabular-nums w-5 text-right text-[10px]">{b.avgResonance}</span>
-                      </div>
-                    )}
+            );
+          })()}
+          {data.bestTimeToPost.byTimeBlock.length > 0 && (() => {
+            const chartable = data.bestTimeToPost.byTimeBlock
+              .filter(b => b.avgResonance !== null)
+              .map(b => ({ label: b.block, value: b.avgResonance as number, count: b.count }));
+            const sparseCount = data.bestTimeToPost.byTimeBlock.length - chartable.length;
+            return (
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">By time of day</p>
+                {chartable.length > 0 ? (
+                  <div style={{ height: chartable.length * 24 + 8 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartable} layout="vertical" margin={{ top: 2, right: 24, left: 0, bottom: 0 }}>
+                        <XAxis type="number" hide domain={[0, 100]} />
+                        <YAxis type="category" dataKey="label" width={68} tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Avg Impact"]} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 10, fill: "#6b7280" }}>
+                          {chartable.map((entry, i) => <Cell key={i} fill={i === 0 ? BAR_COLOR : BAR_MUTED} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
+                ) : (
+                  <SparseLabel />
+                )}
+                {sparseCount > 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">{sparseCount} time block{sparseCount !== 1 ? "s" : ""} with limited data not shown</p>
+                )}
               </div>
-            </>
-          )}
+            );
+          })()}
           {data.bestTimeToPost.byDayOfWeek.length === 0 && data.bestTimeToPost.byTimeBlock.length === 0 && (
             <p className="text-xs text-gray-400 text-center py-3">Publish more posts in this window to see timing data</p>
           )}
@@ -573,25 +520,51 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
             <Hash className="w-3.5 h-3.5 text-violet-500" />
             <SectionTitle>Hashtag performance</SectionTitle>
           </div>
-          <div className="space-y-1.5">
-            {data.hashtagPerformance.map((h, i) => (
-              <div key={h.hashtag} className="flex items-center gap-2 text-xs">
-                <span className={cn("font-medium flex-shrink-0 w-4 text-[10px] tabular-nums text-center", i < 3 ? "text-violet-600" : "text-gray-400")}>{i + 1}</span>
-                <span className="text-gray-700 font-medium flex-1 truncate">#{h.hashtag}</span>
-                <span className="text-gray-400 tabular-nums text-[10px] flex-shrink-0">{h.count}×</span>
-                {h.avgResonance === null ? (
-                  <SparseLabel />
+          {(() => {
+            const chartable = data.hashtagPerformance
+              .filter(h => h.avgResonance !== null)
+              .map(h => ({ label: `#${h.hashtag}`, value: h.avgResonance as number, count: h.count }));
+            const sparse = data.hashtagPerformance.filter(h => h.avgResonance === null);
+            return (
+              <>
+                {chartable.length > 0 ? (
+                  <div style={{ height: chartable.length * 24 + 8 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartable} layout="vertical" margin={{ top: 2, right: 24, left: 0, bottom: 0 }}>
+                        <XAxis type="number" hide domain={[0, 100]} />
+                        <YAxis
+                          type="category"
+                          dataKey="label"
+                          width={80}
+                          tick={{ fontSize: 10, fill: "#6b7280" }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={truncateLabel}
+                        />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Avg Impact"]} labelFormatter={(l: string) => l} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 10, fill: "#6b7280" }}>
+                          {chartable.map((entry, i) => <Cell key={i} fill={i === 0 ? BAR_COLOR : BAR_MUTED} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${h.avgResonance}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
-                    </div>
-                    <span className="font-bold text-gray-700 tabular-nums w-5 text-right text-[10px]">{h.avgResonance}</span>
+                  <SparseLabel />
+                )}
+                {sparse.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {sparse.map(h => (
+                      <div key={h.hashtag} className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-700 font-medium flex-1 truncate">#{h.hashtag}</span>
+                        <span className="text-gray-400 tabular-nums text-[10px] flex-shrink-0">{h.count}×</span>
+                        <SparseLabel />
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -679,164 +652,103 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
           )}
 
           {activeBreakdown === "source" && data.byContentSource.length > 0 && (
-          <div className="space-y-2.5">
-            {data.byContentSource.map((s, i) => {
-              const pct = Math.round((s.count / data.totalPublished) * 100);
-              return (
-                <div key={s.source}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs text-gray-600 flex-1 font-medium">{SOURCE_EMOJI[s.source] ?? ""} {SOURCE_LABELS[s.source] ?? s.source}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">{s.count} post{s.count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
+          <>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.byContentSource.map(s => ({ ...s, label: `${SOURCE_EMOJI[s.source] ?? ""} ${SOURCE_LABELS[s.source] ?? s.source}` }))} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#9ca3af" }} />
+                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Posts"]} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {data.byContentSource.map((_, i) => <Cell key={i} fill={i === 0 ? BAR_COLOR : BAR_MUTED} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
+              {data.byContentSource.map((s) => (
+                <div key={s.source} className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500 font-medium flex-1 truncate">{SOURCE_EMOJI[s.source] ?? ""} {SOURCE_LABELS[s.source] ?? s.source}</span>
+                  <span className="text-gray-400 tabular-nums">{s.count}p</span>
+                  {s.sampledCount < 2 ? <SparseLabel /> : (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${s.avgResonance}%` }} />
+                      </div>
+                      <span className="font-bold text-gray-700 tabular-nums w-5 text-right">{s.avgResonance}</span>
                     </div>
-                    {s.sampledCount < 2 ? <SparseLabel /> : (
-                      <span className="text-[10px] font-bold text-violet-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {s.avgResonance}</span>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </>
           )}
 
           {activeBreakdown === "visual" && data.byVisualType.length > 0 && (
-          <div className="space-y-2.5">
-            {data.byVisualType.map((v, i) => {
-              const pct = Math.round((v.count / data.totalPublished) * 100);
-              return (
-                <div key={v.type}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs text-gray-600 flex-1 font-medium">{VISUAL_EMOJI[v.type] ?? ""} {VISUAL_LABELS[v.type] ?? v.type}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">{v.count} post{v.count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#10b981" : "#d1fae5" }} />
+          <>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.byVisualType.map(v => ({ ...v, label: `${VISUAL_EMOJI[v.type] ?? ""} ${VISUAL_LABELS[v.type] ?? v.type}` }))} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#9ca3af" }} />
+                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Posts"]} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {data.byVisualType.map((_, i) => <Cell key={i} fill={i === 0 ? "#10b981" : "#d1fae5"} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
+              {data.byVisualType.map((v) => (
+                <div key={v.type} className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500 font-medium flex-1 truncate">{VISUAL_EMOJI[v.type] ?? ""} {VISUAL_LABELS[v.type] ?? v.type}</span>
+                  <span className="text-gray-400 tabular-nums">{v.count}p</span>
+                  {v.sampledCount < 2 ? <SparseLabel /> : (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${v.avgResonance}%` }} />
+                      </div>
+                      <span className="font-bold text-gray-700 tabular-nums w-5 text-right">{v.avgResonance}</span>
                     </div>
-                    {v.sampledCount < 2 ? <SparseLabel /> : (
-                      <span className="text-[10px] font-bold text-emerald-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {v.avgResonance}</span>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </>
           )}
 
           {activeBreakdown === "objective" && data.byObjective.length > 0 && (
-          <div className="space-y-2.5">
-            {data.byObjective.map((o, i) => {
-              const pct = Math.round((o.count / data.totalPublished) * 100);
-              return (
-                <div key={o.objective}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs text-gray-600 flex-1 font-medium">{o.objective}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">{o.count} post{o.count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#f59e0b" : "#fef3c7" }} />
-                    </div>
-                    {o.sampledCount < 2 ? <SparseLabel /> : (
-                      <span className="text-[10px] font-bold text-amber-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {o.avgResonance}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          )}
-        </div>
-      )}
-
-      {/* Series performance rollup — reuses each series' already-computed
-          aggregate (GET /series), no extra AI or query here. */}
-      {seriesList && seriesList.filter((s) => s.performance.impressions > 0).length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>By series</SectionTitle>
-          <div className="space-y-2.5">
-            {[...seriesList]
-              .filter((s) => s.performance.impressions > 0)
-              .sort((a, b) => b.performance.impressions - a.performance.impressions)
-              .map((s, i) => {
-                const max = Math.max(...seriesList.map((x) => x.performance.impressions), 1);
-                const pct = Math.round((s.performance.impressions / max) * 100);
-                return (
-                  <div key={s.id}>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-xs text-gray-600 flex-1 font-medium truncate">{s.title}</span>
-                      <span className="text-[10px] text-gray-400 tabular-nums">{s.partsPublished}/{s.plannedParts} published</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
+          <>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.byObjective} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <XAxis dataKey="objective" tick={{ fontSize: 9, fill: "#9ca3af" }} />
+                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Posts"]} />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {data.byObjective.map((_, i) => <Cell key={i} fill={i === 0 ? "#f59e0b" : "#fef3c7"} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
+              {data.byObjective.map((o) => (
+                <div key={o.objective} className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500 font-medium flex-1 truncate">{o.objective}</span>
+                  <span className="text-gray-400 tabular-nums">{o.count}p</span>
+                  {o.sampledCount < 2 ? <SparseLabel /> : (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${o.avgResonance}%` }} />
                       </div>
-                      <span className="text-[10px] font-bold text-violet-600 tabular-nums w-20 text-right flex-shrink-0">{s.performance.impressions.toLocaleString()} impr.</span>
+                      <span className="font-bold text-gray-700 tabular-nums w-5 text-right">{o.avgResonance}</span>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* Topic breakdown — post count per topic (performance rollup by topic
-          would need a new aggregation endpoint; this is the count-only view). */}
-      {topicsList && topicsList.filter((t) => t.draftCount > 0).length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>By topic</SectionTitle>
-          <div className="space-y-2.5">
-            {[...topicsList]
-              .filter((t) => t.draftCount > 0)
-              .sort((a, b) => b.draftCount - a.draftCount)
-              .map((t, i) => {
-                const max = Math.max(...topicsList.map((x) => x.draftCount), 1);
-                const pct = Math.round((t.draftCount / max) * 100);
-                return (
-                  <div key={t.id}>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-xs text-gray-600 flex-1 font-medium truncate">{t.name}</span>
-                      <span className="text-[10px] text-gray-400 tabular-nums">{t.draftCount} post{t.draftCount !== 1 ? "s" : ""}</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? BAR_COLOR : BAR_MUTED }} />
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* LinkedIn media format breakdown */}
-      {hasMediaFormatData && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
-          <SectionTitle>LinkedIn content format</SectionTitle>
-          <div className="space-y-2.5">
-            {data.byMediaFormat.map((f, i) => {
-              const total = data.byMediaFormat.reduce((s, x) => s + x.count, 0);
-              const pct = total > 0 ? Math.round((f.count / total) * 100) : 0;
-              return (
-                <div key={f.format}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-xs text-gray-600 flex-1 font-medium">{MEDIA_FORMAT_EMOJI[f.format] ?? "📄"} {MEDIA_FORMAT_LABELS[f.format] ?? f.format}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">{f.count} post{f.count !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: i === 0 ? "#0ea5e9" : "#e0f2fe" }} />
-                    </div>
-                    {f.sampledCount < 2 ? <SparseLabel /> : (
-                      <span className="text-[10px] font-bold text-sky-600 tabular-nums w-14 text-right flex-shrink-0">⚡ {f.avgResonance}</span>
-                    )}
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </>
+          )}
         </div>
       )}
 
@@ -895,6 +807,180 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
           </button>
         </div>
       )}
+
+      {/* ── More insights (collapsed by default) ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div
+          className="px-4 py-3 flex items-center justify-between cursor-pointer"
+          onClick={() => setMoreOpen((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">More insights</span>
+          </div>
+          <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 transition-transform duration-200", moreOpen && "rotate-180")} />
+        </div>
+        {moreOpen && (
+          <div className="px-4 pb-4 space-y-4 border-t border-gray-50 pt-4">
+            {/* Milestone progress */}
+            {nextMilestone && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Next milestone</p>
+                  <p className="text-[11px] font-black text-violet-600 tabular-nums">{data.totalPublished} / {nextMilestone} posts</p>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-700" style={{ width: `${Math.min(100, Math.round((data.totalPublished / nextMilestone) * 100))}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1.5">{nextMilestone - data.totalPublished} more post{nextMilestone - data.totalPublished !== 1 ? "s" : ""} to hit {nextMilestone} 🏅</p>
+              </div>
+            )}
+
+            {/* Personal best */}
+            {champion && champion.resonance >= 40 && (
+              <button
+                onClick={() => navigate(`/library?highlight=${champion.id}`)}
+                className="w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 p-[1.5px] text-left group"
+              >
+                <div className="rounded-[14.5px] bg-white px-4 py-3 flex items-center gap-3 group-hover:bg-amber-50/50 transition-colors">
+                  <span className="text-xl flex-shrink-0">🏆</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Personal best</p>
+                    <p className="text-xs font-bold text-gray-800 truncate">{champion.topic}</p>
+                    {champion.impressions > 0 && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {champion.impressions.toLocaleString()} impressions · {champion.reactions + champion.comments} reactions & comments
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-xl font-black text-amber-500 tabular-nums">{champion.engagementRate !== null ? `${champion.engagementRate}%` : "—"}</span>
+                    <p className="text-[9px] font-bold text-amber-500/70 uppercase tracking-wider">Engagement</p>
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* Learning signal health */}
+            <div data-tour="analytics-learning">
+              <div className="flex items-center gap-2 mb-1">
+                <HeartHandshake className="w-3.5 h-3.5 text-violet-500" />
+                <SectionTitle>How BrandMoi is learning</SectionTitle>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-relaxed mb-3">
+                Your direct feedback and current settings lead. Post outcomes provide supporting context only.
+              </p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <LearningMetric
+                  label="Voice approvals"
+                  value={data.learningMetrics.authorFeedback.approvalRate === null ? "—" : `${data.learningMetrics.authorFeedback.approvalRate}%`}
+                  detail={data.learningMetrics.authorFeedback.reviewedDrafts === 0
+                    ? "No reviews yet"
+                    : `${data.learningMetrics.authorFeedback.soundsLikeMe} of ${data.learningMetrics.authorFeedback.reviewedDrafts} reviews`}
+                />
+                <LearningMetric
+                  label="Meaningful edits"
+                  value={data.learningMetrics.evidence.materiallyEditedBeforePublish}
+                  detail="Before publishing"
+                />
+                <LearningMetric
+                  label="Voice evidence"
+                  value={data.learningMetrics.evidence.pinnedWritingSamples + data.learningMetrics.evidence.authenticatedPosts}
+                  detail={`${data.learningMetrics.evidence.pinnedWritingSamples} samples · ${data.learningMetrics.evidence.authenticatedPosts} verified posts`}
+                />
+                <LearningMetric
+                  label="Measured outcomes"
+                  value={data.learningMetrics.outcomes.performanceEntries}
+                  detail={`${data.learningMetrics.outcomes.externalFeedbackUnknown} feedback states unknown`}
+                />
+              </div>
+              {data.feedbackCoaching.message && (
+                <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Post-level coaching</p>
+                  <p className="text-[11px] leading-relaxed text-amber-800">{data.feedbackCoaching.message}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Series performance rollup — reuses each series' already-computed
+                aggregate (GET /series), no extra AI or query here. */}
+            {seriesList && seriesList.filter((s) => s.performance.impressions > 0).length > 0 && (() => {
+              const chartable = [...seriesList]
+                .filter((s) => s.performance.impressions > 0)
+                .sort((a, b) => b.performance.impressions - a.performance.impressions)
+                .map((s) => ({ label: s.title, value: s.performance.impressions, parts: `${s.partsPublished}/${s.plannedParts}` }));
+              return (
+                <div>
+                  <SectionTitle>By series</SectionTitle>
+                  <div style={{ height: chartable.length * 26 + 8 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartable} layout="vertical" margin={{ top: 2, right: 32, left: 0, bottom: 0 }}>
+                        <XAxis type="number" hide />
+                        <YAxis type="category" dataKey="label" width={92} tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => truncateLabel(v, 14)} />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val.toLocaleString(), "Impressions"]} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 9, fill: "#6b7280", formatter: (v: number) => v.toLocaleString() }}>
+                          {chartable.map((entry, i) => <Cell key={i} fill={i === 0 ? BAR_COLOR : BAR_MUTED} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Topic breakdown — post count per topic (performance rollup by topic
+                would need a new aggregation endpoint; this is the count-only view). */}
+            {topicsList && topicsList.filter((t) => t.draftCount > 0).length > 0 && (() => {
+              const chartable = [...topicsList]
+                .filter((t) => t.draftCount > 0)
+                .sort((a, b) => b.draftCount - a.draftCount)
+                .map((t) => ({ label: t.name, value: t.draftCount }));
+              return (
+                <div>
+                  <SectionTitle>By topic</SectionTitle>
+                  <div style={{ height: chartable.length * 26 + 8 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartable} layout="vertical" margin={{ top: 2, right: 24, left: 0, bottom: 0 }}>
+                        <XAxis type="number" hide allowDecimals={false} />
+                        <YAxis type="category" dataKey="label" width={92} tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => truncateLabel(v, 14)} />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Posts"]} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 9, fill: "#6b7280" }}>
+                          {chartable.map((entry, i) => <Cell key={i} fill={i === 0 ? BAR_COLOR : BAR_MUTED} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* LinkedIn media format breakdown */}
+            {hasMediaFormatData && (() => {
+              const chartable = data.byMediaFormat.map((f) => ({
+                label: `${MEDIA_FORMAT_EMOJI[f.format] ?? "📄"} ${MEDIA_FORMAT_LABELS[f.format] ?? f.format}`,
+                value: f.count,
+              }));
+              return (
+                <div>
+                  <SectionTitle>LinkedIn content format</SectionTitle>
+                  <div style={{ height: chartable.length * 26 + 8 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartable} layout="vertical" margin={{ top: 2, right: 24, left: 0, bottom: 0 }}>
+                        <XAxis type="number" hide allowDecimals={false} />
+                        <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 10, fill: "#6b7280" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => truncateLabel(v, 16)} />
+                        <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb" }} formatter={(val: number) => [val, "Posts"]} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 9, fill: "#6b7280" }}>
+                          {chartable.map((entry, i) => <Cell key={i} fill={i === 0 ? "#0ea5e9" : "#e0f2fe"} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
     </>
   );
 }

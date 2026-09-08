@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, Sparkles, Loader2, Check, X, FlaskConical, TrendingUp, Quote } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { usePageTour } from "@/components/tour/usePageTour";
+import { STUDIO_TOUR_STEPS } from "@/components/tour/page-tours";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -141,6 +143,8 @@ export default function BrandStudio() {
     );
   };
 
+  const pageTour = usePageTour("studio-tour", STUDIO_TOUR_STEPS);
+
   return (
     <AppShell>
       <div className="px-5 pt-4 pb-28 space-y-7 max-w-[430px] mx-auto min-w-0 w-full">
@@ -159,7 +163,7 @@ export default function BrandStudio() {
         </div>
 
         {/* ── Zone 1: Brand health ── */}
-        <section className="rounded-3xl bg-gray-900 px-5 py-4">
+        <section data-tour="studio-health" className="rounded-3xl bg-gray-900 px-5 py-4">
           {health ? (
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -183,7 +187,7 @@ export default function BrandStudio() {
         </section>
 
         {/* ── Zone 2: Top-post analysis ── */}
-        <section>
+        <section data-tour="studio-analyze">
           <h2 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">What's working</h2>
           <p className="text-xs text-gray-400 mb-4 leading-relaxed">Pick the posts that represent your best work (top performers pre-selected). The analysis compares them against your brand profile and recommends updates.</p>
 
@@ -341,7 +345,7 @@ export default function BrandStudio() {
         )}
 
         {/* ── Zone 3: Aspirational voice ── */}
-        <section>
+        <section data-tour="studio-aspirational">
           <div className="flex items-center gap-2 mb-1">
             <Quote className="w-4 h-4 text-sky-500" />
             <h2 className="text-xs font-black uppercase tracking-wider text-gray-400">Aspirational voice</h2>
@@ -394,6 +398,7 @@ export default function BrandStudio() {
           )}
         </section>
       </div>
+      {pageTour}
     </AppShell>
   );
 }

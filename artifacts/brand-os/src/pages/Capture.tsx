@@ -23,6 +23,8 @@ import type {
 import { Button } from "@/components/ui/button";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
+import { usePageTour } from "@/components/tour/usePageTour";
+import { CAPTURE_TOUR_STEPS } from "@/components/tour/page-tours";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -897,6 +899,7 @@ export default function Capture() {
   const brandReviewIsStale = !!brandReviewResult
     && brandReviewReviewedPost !== null
     && brandReviewReviewedPost !== fullPost;
+  const pageTour = usePageTour("capture-tour", CAPTURE_TOUR_STEPS);
 
   return (
     <AppShell>
@@ -1089,6 +1092,7 @@ export default function Capture() {
           document.body
         )}
       </div>
+      {pageTour}
     </AppShell>
   );
 
@@ -1376,6 +1380,7 @@ function CaptureForm(props: CaptureFormProps) {
       <Button
         onClick={handleMakeIt}
         disabled={isGenerating || (painPointMode ? !ppConcept.trim() : !rawInput.trim())}
+        data-tour="make-it"
         className={cn("w-full h-14 text-base rounded-2xl", painPointMode && "bg-rose-600 hover:bg-rose-500 border-rose-600")}
       >
         <Sparkles className="w-4 h-4 mr-2" />

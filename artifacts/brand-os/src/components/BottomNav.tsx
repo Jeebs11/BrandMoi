@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, BarChart2, Menu, X, Lightbulb, Layers, FlaskConical, ChevronRight } from "lucide-react";
+import { Home, PenSquare, BookOpen, BarChart2, Menu, X, Lightbulb, Layers, FlaskConical, Target, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListDrafts } from "@workspace/api-client-react";
 
@@ -12,6 +12,7 @@ const MORE_ITEMS = [
   { href: "/vault", label: "Thought Vault", sub: "Capture raw ideas", icon: Lightbulb },
   { href: "/series", label: "Series", sub: "Multi-part content threads", icon: Layers },
   { href: "/studio", label: "Brand Studio", sub: "Tune your brand with what's working", icon: FlaskConical },
+  { href: "/profile-alignment", label: "Profile Alignment", sub: "CV, BrandMoi, and LinkedIn — keep them in sync", icon: Target },
 ];
 
 export function BottomNav() {
@@ -54,6 +55,7 @@ export function BottomNav() {
             })}
             <button
               onClick={() => setMoreOpen(true)}
+              data-tour="more-menu"
               className={cn(
                 "flex-1 flex flex-col items-center gap-1 py-3 transition-colors",
                 moreActive ? "text-primary" : "text-gray-400 hover:text-gray-600"

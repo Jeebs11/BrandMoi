@@ -14,6 +14,13 @@ export const preferencesTable = pgTable("preferences", {
   brandBelief: text("brand_belief").notNull().default(""),
   aboutMe: text("about_me").default(""),
   onboarded: boolean("onboarded").notNull().default(false),
+  // Id of the last tour/product-update entry (see lib/product-updates.ts on
+  // the frontend) this user has seen — null means brand-new, never toured.
+  lastSeenUpdateId: text("last_seen_update_id"),
+  // Ids of per-page tours (see components/tour/page-tours.ts) this user has
+  // already been shown — independent booleans, unlike lastSeenUpdateId's
+  // single linear pointer, since pages can be visited in any order.
+  seenPageTours: jsonb("seen_page_tours").$type<string[]>(),
   brandVoiceSummary: text("brand_voice_summary"),
   voiceSummaryDraftCount: integer("voice_summary_draft_count").notNull().default(0),
   brandBgColor: text("brand_bg_color").notNull().default("#0f172a"),

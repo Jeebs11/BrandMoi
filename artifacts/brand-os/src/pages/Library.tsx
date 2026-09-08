@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AppShell } from "@/components/AppShell";
+import { usePageTour } from "@/components/tour/usePageTour";
+import { LIBRARY_TOUR_STEPS } from "@/components/tour/page-tours";
 import { cn } from "@/lib/utils";
 import { performanceApi, resonanceMapApi, diagnosisApi, studioApi, topicsApi, authenticityApi, type PerformanceSignal, type PostDiagnosis, type DiagnosisSection, type Topic, type ResonanceMapEntry } from "@/lib/api";
 import { InfoTooltip } from "@/components/InfoTooltip";
@@ -252,6 +254,8 @@ export default function Library() {
     loadResonanceMap();
   };
 
+  const pageTour = usePageTour("library-tour", LIBRARY_TOUR_STEPS);
+
   return (
     <AppShell>
         <header className="px-6 pt-12 pb-4 bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -264,6 +268,7 @@ export default function Library() {
               {!isDemo && (
                 <button
                   onClick={() => setImportOpen(true)}
+                  data-tour="add-past-post"
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 transition-all"
                 >
                   <Upload className="w-3.5 h-3.5" />
@@ -297,7 +302,7 @@ export default function Library() {
                 >{f}</button>
               ))}
             </div>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            <div data-tour="status-filter" className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {STATUSES.map((s) => (
                 <button key={s} onClick={() => setStatusFilter(s)}
                   className={cn("px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border capitalize",
@@ -619,6 +624,7 @@ export default function Library() {
           </div>,
           document.body
         )}
+      {pageTour}
     </AppShell>
   );
 }

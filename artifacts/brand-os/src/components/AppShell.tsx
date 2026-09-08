@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { SideNav } from "@/components/SideNav";
+import { HelpTourButton } from "@/components/HelpTourButton";
 import { useBackgroundTheme, PANEL_OPACITY_ALPHA } from "@/lib/background-context";
 import { getBackground } from "@/lib/backgrounds";
 
@@ -128,6 +129,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
       </div>
 
       {!noNav && <BottomNav />}
+      {!noNav && <HelpTourButton />}
     </div>
   );
 }
