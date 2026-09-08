@@ -1,2 +1,3 @@
 - [Voice signal precedence](voice-signal-precedence.md) — direct author evidence outranks inferred, performance, and external feedback; missing LinkedIn fields remain unknown.
 - [GitHub write-path blocking](github-write-path-blocking.md) — healthy GitHub reads can coexist with blocked writes; preserve the local commit and never force-update a remote branch.
+- [AI response handling](ai-response-handling.md) — Anthropic responses may put reasoning blocks before text; news search may return stale fallback prose that must not become a fresh anchor.

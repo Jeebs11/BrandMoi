@@ -8,6 +8,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { AUDIENCE_OVERLAYS, FORMATS, FORMAT_INSTRUCTIONS } from "../lib/ai-prompts.js";
 import { respondAiError } from "../lib/ai-errors.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 
 const router: IRouter = Router();
 
@@ -235,8 +236,8 @@ Return JSON only: {"format": "one of the 5 options above", "rationale": "under 1
       }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     const data = parseJson(block.text) as { format?: unknown; rationale?: unknown };
     const format = typeof data.format === "string" && FORMAT_SET.has(data.format) ? data.format : "standard";
     const rationale = typeof data.rationale === "string" ? data.rationale : "";
@@ -398,8 +399,8 @@ Return JSON only: {"parts": [{"part": ${targetParts[0]}, "angle": "..."}, ...]} 
       }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     const data = parseJson(block.text) as { parts?: unknown };
     if (!Array.isArray(data.parts)) throw new Error("bad shape");
 

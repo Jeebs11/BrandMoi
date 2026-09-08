@@ -8,6 +8,7 @@ import { preferencesTable, draftsTable, brandVoiceSignalsTable, usersTable, voic
 import { requireAuth } from "../middleware/auth.js";
 import { signToken } from "../lib/jwt.js";
 import { isDemoUser } from "../lib/demo-content.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 import { extractVoiceDNA } from "./ai.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { buildCanonicalBrandContext } from "../lib/brand-context.js";
@@ -240,8 +241,8 @@ async function runVoiceAnalysis(userId: number): Promise<{ summary: string | nul
     messages: [{ role: "user", content: `Writing signals from ${signals.length} posts:\n${signalsText}\n\nReturn 3-5 bullet points about this person's writing voice.` }],
   });
 
-  const t = message.content[0];
-  if (t.type !== "text") return { summary: null, draftCount: publishedPosts.length };
+  const t = getAiTextBlock(message);
+  if (!t) return { summary: null, draftCount: publishedPosts.length };
 
   const summary = t.text.trim();
   await db.update(preferencesTable)

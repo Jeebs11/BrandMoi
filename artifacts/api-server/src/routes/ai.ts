@@ -24,6 +24,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 import { computeJaccard } from "../lib/voice-dna.js";
 import { resonanceScore } from "../lib/learning.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
@@ -153,8 +154,8 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const text = message.content[0];
-    if (text.type !== "text") {
+    const text = getAiTextBlock(message);
+    if (!text) {
       res.status(500).json({ error: "Unexpected AI response type" });
       return;
     }
@@ -229,8 +230,8 @@ Return ONLY the updated slides as a JSON array — no markdown fences, no extra 
       messages: [{ role: "user", content: carouselMessage }],
     });
 
-    const carouselText = carouselResp.content[0];
-    if (carouselText.type !== "text") {
+    const carouselText = getAiTextBlock(carouselResp);
+    if (!carouselText) {
       res.status(500).json({ error: "Unexpected AI response type" });
       return;
     }
@@ -275,8 +276,8 @@ Return ONLY the updated infographic as JSON — no markdown fences, no extra tex
       messages: [{ role: "user", content: infoMessage }],
     });
 
-    const infoText = infoResp.content[0];
-    if (infoText.type !== "text") {
+    const infoText = getAiTextBlock(infoResp);
+    if (!infoText) {
       res.status(500).json({ error: "Unexpected AI response type" });
       return;
     }
@@ -319,8 +320,8 @@ Return ONLY the refined text. No JSON. No markdown fences. No preamble. No expla
     messages: [{ role: "user", content: userMessage }],
   });
 
-  const text = message.content[0];
-  if (text.type !== "text") {
+  const text = getAiTextBlock(message);
+  if (!text) {
     res.status(500).json({ error: "Unexpected AI response type" });
     return;
   }
@@ -382,8 +383,8 @@ router.post("/ai/check-angle", requireAuth, async (req, res): Promise<void> => {
       system: "You are a content strategist. Suggest 2 fresh alternative angles on the same topic that approach it from a different perspective, audience, or entry point. Return JSON only: { \"freshAngles\": [\"angle 1\", \"angle 2\"] }",
       messages: [{ role: "user", content: `Topic: ${topic}\nCurrent angle: ${angle}\nProvide 2 fresh angles. Return JSON only.` }],
     });
-    const t = angleMsg.content[0];
-    if (t.type === "text") {
+    const t = getAiTextBlock(angleMsg);
+    if (t) {
       const p = JSON.parse(t.text) as { freshAngles?: string[] };
       freshAngles = p.freshAngles ?? [];
     }
@@ -520,8 +521,8 @@ Identify 1-3 brand voice improvements based on what's working. Return JSON only.
     }],
   });
 
-  const t = message.content[0];
-  if (t.type !== "text") {
+  const t = getAiTextBlock(message);
+  if (!t) {
     res.status(500).json({ error: "Unexpected AI response" });
     return;
   }
@@ -695,8 +696,8 @@ Diagnose this post. Return JSON only.`,
     }],
   });
 
-  const t = message.content[0];
-  if (t.type !== "text") { res.status(500).json({ error: "Unexpected AI response" }); return; }
+  const t = getAiTextBlock(message);
+  if (!t) { res.status(500).json({ error: "Unexpected AI response" }); return; }
 
   type DiagnosisSection = { rating: number | null; analysis: string };
   let diagnosis: {
@@ -792,8 +793,8 @@ RULES:
       system: systemPrompt,
       messages: [{ role: "user", content: userMsg }],
     });
-    const t = message.content[0];
-    if (t.type !== "text") { res.status(500).json({ error: "Unexpected AI response" }); return; }
+    const t = getAiTextBlock(message);
+    if (!t) { res.status(500).json({ error: "Unexpected AI response" }); return; }
     let parsed: unknown;
     try {
       parsed = JSON.parse(t.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
@@ -913,8 +914,8 @@ export async function extractVoiceDNA(userId: number, draftId: number, postOutpu
       messages: [{ role: "user", content: postOutput.slice(0, 2000) }],
     });
 
-    const t = message.content[0];
-    if (t.type !== "text") return;
+    const t = getAiTextBlock(message);
+    if (!t) return;
 
     const cleaned = t.text.replace(/```json/g, "").replace(/```/g, "").trim();
     const signals = JSON.parse(cleaned) as object;

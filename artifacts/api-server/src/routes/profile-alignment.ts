@@ -12,6 +12,7 @@ import { isDemoUser } from "../lib/demo-content.js";
 import { getDemoProfileAlignment, getDemoProfileFacts } from "../lib/demo-content.js";
 import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { extractText } from "../lib/extract-text.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 
 const router: IRouter = Router();
 
@@ -200,8 +201,8 @@ Rules:
     ],
   });
 
-  const block = message.content[0];
-  if (block.type !== "text") throw new Error("Unexpected AI response");
+  const block = getAiTextBlock(message);
+  if (!block) throw new Error("Unexpected AI response");
   const parsed = parseJson(block.text) as Record<string, unknown>;
 
   const asStringArray = (v: unknown, cap: number): string[] =>
@@ -538,8 +539,8 @@ Rules:
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = message.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "Unexpected AI response." }); return; }
+    const block = getAiTextBlock(message);
+    if (!block) { res.status(500).json({ error: "Unexpected AI response." }); return; }
     const raw = parseJson(block.text) as {
       narrativeSummary?: unknown;
       fieldRewrites?: unknown;

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import multer from "multer";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { requireAuth } from "../middleware/auth.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 import { extractText } from "../lib/extract-text.js";
 
 const router: IRouter = Router();
@@ -105,8 +106,8 @@ Rules:
       ],
     });
 
-    const text = message.content[0];
-    if (text.type !== "text") {
+    const text = getAiTextBlock(message);
+    if (!text) {
       res.status(500).json({ error: "Unexpected AI response." });
       return;
     }

@@ -23,6 +23,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { upsertDailyActivity } from "../lib/momentum.js";
 import { computeEditPercent, computeWordChangeSummary, runAuthenticityCheck } from "../lib/authenticity-check.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 
 const router: IRouter = Router();
 
@@ -561,8 +562,8 @@ Return JSON only — no markdown, no explanation:
         }],
       });
 
-      const block = msg.content[0];
-      if (block.type === "text") {
+      const block = getAiTextBlock(msg);
+      if (block) {
         const cleaned = block.text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/m, "").trim();
         analysis = JSON.parse(cleaned) as { strengths: string[]; takeaways: string[]; futureImprovement: string };
       }

@@ -4,6 +4,7 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser } from "../lib/demo-content.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 
 const router: IRouter = Router();
 
@@ -105,8 +106,8 @@ router.post("/ai/generate-illustration-concept", requireAuth, aiRateLimit, async
       messages: [{ role: "user", content: `LinkedIn post:\n\n${postContent}` }],
     });
 
-    const text = message.content[0];
-    if (text.type !== "text") {
+    const text = getAiTextBlock(message);
+    if (!text) {
       res.status(500).json({ error: "Unexpected AI response." });
       return;
     }
@@ -140,8 +141,8 @@ router.post("/ai/generate-image-prompt", requireAuth, aiRateLimit, async (req, r
       messages: [{ role: "user", content: parsed.data.visualDescription }],
     });
 
-    const text = message.content[0];
-    if (text.type !== "text") {
+    const text = getAiTextBlock(message);
+    if (!text) {
       res.status(500).json({ error: "Unexpected AI response." });
       return;
     }
@@ -263,8 +264,8 @@ Return ONLY the revised scene description — no explanation, no surrounding quo
       messages: [{ role: "user", content: `Current scene: ${parsed.data.currentScene}\n\nChange to apply: ${parsed.data.editRequest}` }],
     });
 
-    const text = message.content[0];
-    if (text.type !== "text") {
+    const text = getAiTextBlock(message);
+    if (!text) {
       res.status(500).json({ error: "Unexpected AI response." });
       return;
     }

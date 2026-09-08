@@ -5,6 +5,17 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 
+// Web search can return an older article while explaining that no result met
+// the requested freshness window. Treat that response as no usable news
+// rather than presenting the older article as a current anchor.
+const NO_FRESH_NEWS_MARKERS = [
+  /\bno (?:fresh|recent|new) (?:news|articles?|results?)\b/i,
+  /\bnone of (?:the )?(?:search )?(?:results?|articles?)\b/i,
+  /\bnot within the last 48 hours\b/i,
+  /\bolder than (?:the )?last 48 hours\b/i,
+  /\bno results? (?:were|was)?\s*returned\b/i,
+];
+
 /**
  * Shared Momentum news-anchor signal. Used by both /agent/brief (the daily
  * Momentum feed) and /ai/generate (when the user toggles "Tie to news" while
@@ -73,7 +84,12 @@ export async function fetchMomentumNewsAnchor(
         }
       }
     }
-    return { context: context.trim(), url };
+    const trimmed = context.trim();
+    if (!trimmed || NO_FRESH_NEWS_MARKERS.some((marker) => marker.test(trimmed))) {
+      return { context: "", url: null };
+    }
+
+    return { context: trimmed, url };
   } catch (err) {
     console.warn("News anchor fetch failed:", err);
     return { context: "", url: null };

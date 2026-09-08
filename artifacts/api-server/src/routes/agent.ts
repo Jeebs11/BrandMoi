@@ -12,6 +12,7 @@ import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
+import { getAiTextBlock } from "../lib/ai-response.js";
 import {
   computeEditPercent,
   computeWordChangeSummary,
@@ -320,8 +321,8 @@ Rules:
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const parsed = parseJson(block.text) as Record<string, unknown>;
       newsHeadline = typeof parsed.newsHeadline === "string" ? parsed.newsHeadline.trim() : "";
@@ -480,8 +481,8 @@ Rules:
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       res.json(parseJson(block.text));
     } catch {
@@ -540,8 +541,8 @@ Return JSON only (no markdown):
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { angles?: unknown };
       if (!Array.isArray(data.angles)) throw new Error("bad shape");
@@ -615,8 +616,8 @@ Return JSON only (no markdown):
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { hooks?: unknown };
       if (!Array.isArray(data.hooks)) throw new Error("bad shape");
@@ -664,8 +665,8 @@ Return JSON only (no markdown):
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { painPoints?: unknown };
       if (!Array.isArray(data.painPoints)) throw new Error("bad shape");
@@ -711,8 +712,8 @@ Return JSON only (no markdown):
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { angles?: unknown };
       if (!Array.isArray(data.angles)) throw new Error("bad shape");
@@ -855,8 +856,8 @@ Return this exact JSON shape:
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = completion.content[0];
-    const raw = block?.type === "text"
+    const block = getAiTextBlock(completion);
+    const raw = block
       ? block.text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
       : "{}";
     const data = JSON.parse(raw) as {
@@ -1115,8 +1116,8 @@ Return the JSON review now.`,
       }],
     });
 
-    const block = completion.content[0];
-    if (block.type !== "text") {
+    const block = getAiTextBlock(completion);
+    if (!block) {
       res.status(500).json({ error: "Unexpected AI response" });
       return;
     }
@@ -1260,8 +1261,8 @@ Rules:
       messages: [{ role: "user", content: `Recent drafts:\n${topicsWithAngles}` }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       res.json(parseJson(block.text));
     } catch {
@@ -1316,8 +1317,8 @@ Return JSON only (no markdown):
       messages: [{ role: "user", content: userMessage }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { dare?: string; why?: string; risk?: string };
       if (!data.dare) throw new Error("bad shape");
@@ -1375,7 +1376,9 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
     const isTeach = parsed.data.type === "teach";
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: isTeach ? 450 : 700,
+       // Brand angles include five audience-specific objects with several
+       // evidence fields each; 700 tokens can truncate the JSON mid-object.
+       max_tokens: isTeach ? 450 : 1400,
       system: isTeach
         ? `You generate "teach your audience" LinkedIn post seeds — analogy or FAQ ideas grounded in the creator's exact field. Each max 12 words, like "Why [misconception] — an analogy for [audience]". Return JSON only: {"angles": ["...", "...", "..."]}`
         : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
@@ -1401,8 +1404,8 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
       }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     const data = parseJson(block.text) as { angles?: unknown };
     if (!Array.isArray(data.angles)) throw new Error("bad shape");
 
@@ -1493,8 +1496,8 @@ Infer from the post's content, framing, and call-to-action. Pick the closest mat
       messages: [{ role: "user", content: parsed.data.text }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     const data = parseJson(block.text) as { topic?: string; audience?: string; feeling?: string; objective?: string; tone?: string };
 
     const AUD = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
@@ -1670,8 +1673,8 @@ Rules:
       }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
 
     const data = parseJson(block.text) as { suggestions?: Array<{ field: string; suggestedValue: string; rationale: string; evidenceDraftIds?: number[] }> };
     const currentMap: Record<string, string> = {
@@ -1855,8 +1858,8 @@ Return JSON only (no markdown):
       }],
     });
 
-    const block = msg.content[0];
-    if (block.type !== "text") { res.status(500).json({ error: "AI error" }); return; }
+    const block = getAiTextBlock(msg);
+    if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const data = parseJson(block.text) as { suggestions?: unknown };
       // Tolerate the AI returning the array at the top level or nested
