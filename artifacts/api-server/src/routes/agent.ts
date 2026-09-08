@@ -6,7 +6,7 @@ import { db } from "@workspace/db";
 import { preferencesTable, draftsTable, stressTestScoresTable, performanceSignalsTable, ideaFeedbackTable, voiceSuggestionsTable, aiUsageTable, seriesTable, topicsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
-import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
+import { fetchMomentumNewsAnchor, type MomentumNewsArticle } from "../lib/momentum.js";
 import { buildLearnedPatterns, resonanceScore } from "../lib/learning.js";
 import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
@@ -242,10 +242,24 @@ router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<v
     let newsSourceDomain = "";
     let newsDescription = "";
     let trendingTopics: Array<{ headline: string; sourceLine: string }> = [];
+    let newsArticles: MomentumNewsArticle[] = [];
     try {
       const news = await fetchMomentumNewsAnchor(req.user!.userId);
       newsContext = news.context;
       newsUrl = news.url ?? "";
+      newsArticles = news.articles;
+      const primary = newsArticles[0];
+      if (primary) {
+        newsHeadline = primary.headline;
+        newsSourceLine = `${primary.source} · Published ${primary.publishedAt}`;
+        newsPublishedAt = primary.publishedAt;
+        newsSourceDomain = primary.source;
+        newsDescription = primary.summary;
+        trendingTopics = newsArticles.map((article) => ({
+          headline: article.headline,
+          sourceLine: article.source,
+        }));
+      }
     } catch {
       newsContext = "";
     }
@@ -279,7 +293,9 @@ router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<v
 
       const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-        max_tokens: 1100,
+        // The five audience angles are deliberately evidence-rich. Keep
+        // enough room for those fields plus the optional seven-day news data.
+        max_tokens: 2400,
       system: `You are an AI creative director for a LinkedIn creator. Generate a personalized daily brief — like a smart chief-of-staff, not a motivational poster.
 
 Return JSON only (no markdown):
@@ -325,23 +341,6 @@ Rules:
     if (!block) { res.status(500).json({ error: "AI error" }); return; }
     try {
       const parsed = parseJson(block.text) as Record<string, unknown>;
-      newsHeadline = typeof parsed.newsHeadline === "string" ? parsed.newsHeadline.trim() : "";
-      newsSourceLine = typeof parsed.newsSourceLine === "string" ? parsed.newsSourceLine.trim() : "";
-      newsPublishedAt = typeof parsed.newsPublishedAt === "string" ? parsed.newsPublishedAt.trim() : "";
-      newsSourceDomain = typeof parsed.newsSourceDomain === "string" ? parsed.newsSourceDomain.trim() : "";
-      newsDescription = typeof parsed.newsDescription === "string" ? parsed.newsDescription.trim() : "";
-      trendingTopics = Array.isArray(parsed.trendingTopics)
-        ? (parsed.trendingTopics as unknown[])
-            .map((t) => {
-              if (t && typeof t === "object" && typeof (t as { headline?: unknown }).headline === "string") {
-                const obj = t as { headline: string; sourceLine?: unknown };
-                return { headline: obj.headline.trim(), sourceLine: typeof obj.sourceLine === "string" ? obj.sourceLine.trim() : "" };
-              }
-              return null;
-            })
-            .filter((t): t is { headline: string; sourceLine: string } => t !== null && t.headline.length > 0)
-            .slice(0, 3)
-        : [];
       const role = prefs?.brandRole ?? "professional";
       const audience = prefs?.brandAudience ?? "your audience";
       const FALLBACK_TEACH_ANGLES = [

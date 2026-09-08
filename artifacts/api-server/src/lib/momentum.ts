@@ -1,7 +1,7 @@
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { draftsTable, performanceSignalsTable, dailyActivityTable, preferencesTable } from "@workspace/db";
-import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { ai as gemini } from "@workspace/integrations-gemini-ai";
 
 const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hiring"];
 
@@ -11,10 +11,18 @@ const OBJECTIVES = ["Clients", "Job", "Authority", "Documenting", "Expert", "Hir
 const NO_FRESH_NEWS_MARKERS = [
   /\bno (?:fresh|recent|new) (?:news|articles?|results?)\b/i,
   /\bnone of (?:the )?(?:search )?(?:results?|articles?)\b/i,
-  /\bnot within the last 48 hours\b/i,
-  /\bolder than (?:the )?last 48 hours\b/i,
+  /\bnot within the last 7 days\b/i,
+  /\bolder than (?:the )?last 7 days\b/i,
   /\bno results? (?:were|was)?\s*returned\b/i,
 ];
+
+export type MomentumNewsArticle = {
+  headline: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+  summary: string;
+};
 
 /**
  * Shared Momentum news-anchor signal. Used by both /agent/brief (the daily
@@ -32,6 +40,7 @@ export async function fetchMomentumNewsAnchor(
 ): Promise<{
   context: string;
   url: string | null;
+  articles: MomentumNewsArticle[];
 }> {
   const [prefs] = await db
     .select({
@@ -47,52 +56,95 @@ export async function fetchMomentumNewsAnchor(
     .join(" working with ");
   const persona = roleContext || "LinkedIn professional";
 
-  // Tie-to-news (topicHint present) only needs one strong anchor for a
-  // single post; the daily brief needs enough raw material to also surface
-  // a short trending-topics list, so it asks for three distinct articles in
-  // the same search instead of firing a second call.
-  const searchQuery = opts?.topicHint
-    ? `Find the single most relevant news article published in the last 48 hours for a ${persona} that connects to this idea: "${opts.topicHint.trim().slice(0, 240)}".${
-        opts.audience ? ` The post will be aimed at ${opts.audience}.` : ""
-      } The article must be genuinely new — published today or yesterday. Include: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`
-    : `Find the 3 most relevant, genuinely distinct news articles published in the last 48 hours for a ${persona}. Each must be genuinely new — published today or yesterday. For each: the exact headline, the publication name, the publication date/time, and a 2-3 sentence summary of the key finding.`;
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const searchQuery = [
+    `Today is ${now.toISOString()}.`,
+    `Find up to 5 genuinely relevant news reports published from ${cutoff.toISOString()} through now for a ${persona}.`,
+    opts?.topicHint
+      ? `Prioritise reports that connect directly to this idea: "${opts.topicHint.trim().slice(0, 240)}".`
+      : "",
+    opts?.audience ? `The intended audience is ${opts.audience}.` : "",
+    "Use Google Search grounding. Do not invent or infer articles.",
+    "Only include reports with a verifiable publication date inside that seven-day window.",
+    "Return JSON only in this exact shape:",
+    '{"articles":[{"headline":"...","source":"...","url":"https://...","publishedAt":"2026-01-01T12:00:00Z","summary":"..."}]}',
+    "If no relevant report meets the date and relevance requirements, return {\"articles\":[]}.",
+  ].filter(Boolean).join("\n");
 
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      // max_uses 1: each search round adds thousands of input tokens, which
-      // starves the follow-up brief call on low rate-limit tiers.
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
-      messages: [{ role: "user", content: searchQuery }],
+    const response = await gemini.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: searchQuery,
+      config: {
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }],
+      },
     });
 
-    // Collect text output and the first cited URL from the search results.
-    let context = "";
-    let url: string | null = null;
-    for (const block of message.content) {
-      if (block.type === "text") {
-        context += block.text;
-        if (!url && Array.isArray(block.citations)) {
-          for (const c of block.citations) {
-            const u = (c as { url?: string }).url;
-            if (typeof u === "string" && u.startsWith("http")) {
-              url = u;
-              break;
-            }
-          }
+    const parsed = JSON.parse(response.text ?? "") as {
+      articles?: Array<{
+        headline?: unknown;
+        source?: unknown;
+        url?: unknown;
+        publishedAt?: unknown;
+        summary?: unknown;
+      }>;
+    };
+    const articles = (Array.isArray(parsed.articles) ? parsed.articles : [])
+      .map((article) => {
+        const headline = typeof article.headline === "string" ? article.headline.trim() : "";
+        const source = typeof article.source === "string" ? article.source.trim() : "";
+        const url = typeof article.url === "string" ? article.url.trim() : "";
+        const publishedAt = typeof article.publishedAt === "string" ? article.publishedAt.trim() : "";
+        const summary = typeof article.summary === "string" ? article.summary.trim() : "";
+        const publishedTime = Date.parse(publishedAt);
+        let validUrl = false;
+        try {
+          validUrl = new URL(url).protocol === "https:";
+        } catch {
+          validUrl = false;
         }
-      }
-    }
-    const trimmed = context.trim();
-    if (!trimmed || NO_FRESH_NEWS_MARKERS.some((marker) => marker.test(trimmed))) {
-      return { context: "", url: null };
-    }
+        if (
+          !headline
+          || !source
+          || !summary
+          || !validUrl
+          || !Number.isFinite(publishedTime)
+          || publishedTime < cutoff.getTime()
+          || publishedTime > now.getTime()
+        ) {
+          return null;
+        }
+        return { headline, source, url, publishedAt, summary };
+      })
+      .filter((article): article is {
+        headline: string;
+        source: string;
+        url: string;
+        publishedAt: string;
+        summary: string;
+      } => article !== null)
+      .slice(0, 3);
 
-    return { context: trimmed, url };
+    const context = articles
+      .map((article, index) => [
+        `Headline: ${article.headline}`,
+        `Source: ${article.source}`,
+        `Published: ${article.publishedAt}`,
+        `URL: ${article.url}`,
+        `Summary: ${article.summary}`,
+      ].join("\n"))
+      .join(`\n\nArticle ${articles.length > 1 ? "—" : ""}\n`);
+
+    if (!context || NO_FRESH_NEWS_MARKERS.some((marker) => marker.test(context))) {
+      return { context: "", url: null, articles: [] };
+    }
+    return { context, url: articles[0]?.url ?? null, articles };
   } catch (err) {
-    console.warn("News anchor fetch failed:", err);
-    return { context: "", url: null };
+    console.warn("Gemini news fetch failed:", err);
+    return { context: "", url: null, articles: [] };
   }
 }
 

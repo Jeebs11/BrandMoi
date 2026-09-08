@@ -72,8 +72,12 @@ async function fetchNewsAnchorForGenerate(
     return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
   }
 
-  const firstLine = trimmed.split("\n").map((l) => l.trim()).find((l) => l.length > 10) ?? "";
-  const headline = firstLine.replace(/^["\-*\d.)\s]+/, "").slice(0, 160);
+  const lines = trimmed.split("\n").map((l) => l.trim()).filter((l) => l.length > 10);
+  const firstLine = lines.find((line) => /^headline:\s*/i.test(line)) ?? lines[0] ?? "";
+  const headline = firstLine
+    .replace(/^headline:\s*/i, "")
+    .replace(/^["\-*\d.)\s]+/, "")
+    .slice(0, 160);
   if (!headline) {
     return { context: "", anchor: null, fallback: NEWS_FALLBACK_MESSAGE };
   }
