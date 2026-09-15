@@ -5,6 +5,7 @@ import { useListDrafts } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type BrandAngle, type AudienceAngle } from "@/lib/api";
@@ -71,6 +72,55 @@ const AUDIENCE_TAG_COLORS: Record<string, string> = {
   "Investors": "bg-emerald-50 text-emerald-700",
   "My audience": "bg-gray-100 text-gray-500",
 };
+
+const AUDIENCE_DETAILS: Record<string, { definition: string; outcome: string }> = {
+  "Clients": {
+    definition: "Prospective clients or customers deciding whether they can trust you.",
+    outcome: "Produces a practical, problem-aware angle that demonstrates how you think about their situation.",
+  },
+  "Peers": {
+    definition: "People working in the same craft, role, or industry as you.",
+    outcome: "Produces an insider observation, tradeoff, or non-obvious point of view that earns professional respect.",
+  },
+  "Recruiters & Headhunters": {
+    definition: "Recruiters, hiring managers, and search firms looking for evidence of capability.",
+    outcome: "Produces a concrete work story that signals judgment, ownership, and how you make difficult decisions.",
+  },
+  "Investors": {
+    definition: "Investors, operators, and people watching the market around your work.",
+    outcome: "Produces a market signal, pattern, or non-consensus view that shows how you connect the dots.",
+  },
+  "My audience": {
+    definition: "The people who already follow you and recognise your work or point of view.",
+    outcome: "Produces a relatable, personal angle built around a specific moment, belief, doubt, or lesson.",
+  },
+};
+
+function AudienceBadge({ audience, className = "" }: { audience: string; className?: string }) {
+  const details = AUDIENCE_DETAILS[audience] ?? AUDIENCE_DETAILS["My audience"];
+  const label = audience === "Recruiters & Headhunters" ? "Recruiters" : audience;
+
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <span
+          aria-label={`More about the ${audience} audience`}
+          className={cn(
+            "inline-flex items-center gap-1 cursor-help select-none",
+            className,
+          )}
+        >
+          {label}
+          <span aria-hidden="true" className="text-[8px] opacity-60">ⓘ</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[280px] text-[11px] leading-relaxed">
+        <p><span className="font-bold">Who: </span>{details.definition}</p>
+        <p className="mt-1"><span className="font-bold">What this angle creates: </span>{details.outcome}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function scenarioIdeaRaw(item: BrandAngle): string {
   return [
@@ -736,7 +786,7 @@ export default function Dashboard() {
                       <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
                         <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 px-3 py-2.5 min-w-0 bg-gray-50 hover:bg-gray-100 transition-colors">
                           <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
-                            {item.audience === "Recruiters & Headhunters" ? "Recruiters" : item.audience}
+                            <AudienceBadge audience={item.audience} />
                           </span>
                           <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
                           <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
@@ -806,7 +856,7 @@ export default function Dashboard() {
                       <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
                         <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 px-3 py-2.5 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
                           <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
-                            {item.audience === "Recruiters & Headhunters" ? "Recruiters" : item.audience}
+                            <AudienceBadge audience={item.audience} />
                           </span>
                           <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
                           <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
@@ -856,7 +906,9 @@ export default function Dashboard() {
                                   <div className="flex items-center gap-2 bg-orange-50/40 px-2.5 py-2">
                                     <div className="flex flex-col gap-1 flex-shrink-0">
                                       <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide">{a.label}</span>
-                                      <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full", AUDIENCE_TAG_COLORS[a.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>{a.audience === "Recruiters & Headhunters" ? "Recruiters" : a.audience}</span>
+                                      <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full", AUDIENCE_TAG_COLORS[a.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                                        <AudienceBadge audience={a.audience} />
+                                      </span>
                                     </div>
                                     <p className="flex-1 text-xs text-gray-700 leading-snug">{a.angle}</p>
                                     <button onClick={() => openLengthPicker(a.angle, `audience=${encodeURIComponent(a.audience)}`)} className="flex-shrink-0 text-[10px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
@@ -893,7 +945,9 @@ export default function Dashboard() {
                     return (
                       <div key={i} className="rounded-xl border border-rose-100 overflow-hidden">
                         <button onClick={() => setExpandedPainPoint(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 bg-rose-50/60 hover:bg-rose-100/60 px-3 py-2.5 transition-colors">
-                          <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[pp.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>{pp.audience === "Recruiters & Headhunters" ? "Recruiters" : pp.audience}</span>
+                          <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[pp.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                            <AudienceBadge audience={pp.audience} />
+                          </span>
                           <div className="flex-1 min-w-0">
                             <p className="text-gray-900 text-xs font-bold leading-snug">{pp.title}</p>
                             {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{pp.description}</p>}
@@ -952,7 +1006,9 @@ export default function Dashboard() {
                         <div key={i} className="rounded-xl border border-amber-100 overflow-hidden">
                           <button onClick={() => setExpandedSkillAngle(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-amber-50/60 hover:bg-amber-100/60 px-3 py-2.5 transition-colors">
                             <div className="flex-1 min-w-0">
-                              <span className={cn("inline-flex text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full", AUDIENCE_TAG_COLORS[sa.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>{sa.audience === "Recruiters & Headhunters" ? "Recruiters" : sa.audience}</span>
+                              <span className={cn("inline-flex text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full", AUDIENCE_TAG_COLORS[sa.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                                <AudienceBadge audience={sa.audience} />
+                              </span>
                               <p className={cn("text-gray-800 text-xs font-medium leading-snug mt-0.5", !isOpen && "line-clamp-1")}>{sa.angle}</p>
                             </div>
                             <ChevronDown className={cn("w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-1 transition-transform duration-200", isOpen && "rotate-180")} />
