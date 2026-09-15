@@ -2,3 +2,4 @@
 - [GitHub write-path blocking](github-write-path-blocking.md) — healthy GitHub reads can coexist with blocked writes; preserve the local commit and never force-update a remote branch.
 - [AI response handling](ai-response-handling.md) — Anthropic responses may put reasoning blocks before text; news search may return stale fallback prose that must not become a fresh anchor.
 - [Gemini news grounding](gemini-news-grounding.md) — grounded results need server-side date/URL validation and metadata should not depend on Claude echoing it.
+- [Idea Engine audience coverage](idea-engine-audience-coverage.md) — use one result per core audience in standalone modes; keep grouped performance suggestions compact and labeled.

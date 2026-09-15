@@ -7,7 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type BrandAngle } from "@/lib/api";
+import { thoughtsApi, momentumApi, agentApi, voiceInsightsApi, resonanceMapApi, checkinsApi, type Thought, type MomentumData, type AgentBrief, type AgentTheme, type VoiceSuggestion, type PainPoint, type SkillAngle, type SavedIdea, type TopPostSuggestion, type DareResult, type CheckinEntry, type BrandAngle, type AudienceAngle } from "@/lib/api";
 import { LengthPicker, type PostLength } from "@/components/LengthPicker";
 import { useToast } from "@/hooks/use-toast";
 
@@ -345,7 +345,7 @@ export default function Dashboard() {
   // Per-tab refreshed angles override the daily brief's set — so refreshing
   // one tab never re-runs the whole brief (or its news fetch).
   const [brandAnglesOverride, setBrandAnglesOverride] = useState<BrandAngle[] | null>(null);
-  const [teachAnglesOverride, setTeachAnglesOverride] = useState<string[] | null>(null);
+  const [teachAnglesOverride, setTeachAnglesOverride] = useState<AudienceAngle[] | null>(null);
   const [tabRefreshing, setTabRefreshing] = useState(false);
   const [brief, setBrief] = useState<AgentBrief | null>(() => loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
   const [briefLoading, setBriefLoading] = useState(false);
@@ -496,7 +496,7 @@ export default function Dashboard() {
     request
       .then((r) => {
         if (type === "brand") { setBrandAnglesOverride(r.angles as BrandAngle[]); setExpandedBriefAngle(null); }
-        else { setTeachAnglesOverride(r.angles as string[]); setExpandedTeachAngle(null); }
+        else { setTeachAnglesOverride(r.angles as AudienceAngle[]); setExpandedTeachAngle(null); }
       })
       .catch(aiErrorToast)
       .finally(() => setTabRefreshing(false));
@@ -795,22 +795,28 @@ export default function Dashboard() {
             {ideaTab === "teach" && ((teachAnglesOverride ?? brief?.teachAngles ?? []).length > 0 ? (
 
                 <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-indigo-50 pt-3">
-                  {(teachAnglesOverride ?? brief?.teachAngles ?? []).map((angle, i) => {
+                  {(teachAnglesOverride ?? brief?.teachAngles ?? []).map((rawItem, i) => {
+                    const item: AudienceAngle = typeof rawItem === "string"
+                      ? { angle: rawItem, audience: "My audience" }
+                      : rawItem;
                     const isOpen = expandedTeachAngle === i;
-                    const fbKey = `teach:${angle}`;
+                    const fbKey = `teach:${item.angle}`;
                     const fb = ideaFeedback[fbKey];
                     return (
                       <div key={i} className="rounded-xl border border-indigo-100 overflow-hidden">
-                        <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 px-3 py-2.5 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
-                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{angle}</span>
+                        <button onClick={() => setExpandedTeachAngle(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 px-3 py-2.5 bg-indigo-50/60 hover:bg-indigo-100/60 transition-colors">
+                          <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                            {item.audience === "Recruiters & Headhunters" ? "Recruiters" : item.audience}
+                          </span>
+                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
                           <ChevronDown className={cn("w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
                         </button>
                         {isOpen && (
                           <div className="px-3 pb-3 pt-2.5 bg-white border-t border-indigo-100 space-y-2">
-                            <button onClick={() => openLengthPicker(angle, "teacherMode=true")} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors">Write this →</button>
+                            <button onClick={() => openLengthPicker(item.angle, `teacherMode=true&audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors">Write this →</button>
                             <div className="flex gap-2">
-                              <button onClick={() => void handleIdeaFeedback(angle, "teach", "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
-                              <button onClick={() => void handleIdeaFeedback(angle, "teach", "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>
+                              <button onClick={() => void handleIdeaFeedback(item.angle, "teach", "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
+                              <button onClick={() => void handleIdeaFeedback(item.angle, "teach", "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>
                             </div>
                           </div>
                         )}
@@ -848,9 +854,12 @@ export default function Dashboard() {
                               {s.angles.map((a, j) => (
                                 <div key={j} className="rounded-lg border border-orange-100 overflow-hidden">
                                   <div className="flex items-center gap-2 bg-orange-50/40 px-2.5 py-2">
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide flex-shrink-0">{a.label}</span>
+                                    <div className="flex flex-col gap-1 flex-shrink-0">
+                                      <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide">{a.label}</span>
+                                      <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full", AUDIENCE_TAG_COLORS[a.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>{a.audience === "Recruiters & Headhunters" ? "Recruiters" : a.audience}</span>
+                                    </div>
                                     <p className="flex-1 text-xs text-gray-700 leading-snug">{a.angle}</p>
-                                    <button onClick={() => openLengthPicker(a.angle)} className="flex-shrink-0 text-[10px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
+                                    <button onClick={() => openLengthPicker(a.angle, `audience=${encodeURIComponent(a.audience)}`)} className="flex-shrink-0 text-[10px] font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 px-2 py-1 rounded-lg transition-colors whitespace-nowrap">Write →</button>
                                   </div>
                                 </div>
                               ))}
@@ -883,7 +892,8 @@ export default function Dashboard() {
                     const isOpen = expandedPainPoint === i;
                     return (
                       <div key={i} className="rounded-xl border border-rose-100 overflow-hidden">
-                        <button onClick={() => setExpandedPainPoint(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-rose-50/60 hover:bg-rose-100/60 px-3 py-2.5 transition-colors">
+                        <button onClick={() => setExpandedPainPoint(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 bg-rose-50/60 hover:bg-rose-100/60 px-3 py-2.5 transition-colors">
+                          <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[pp.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>{pp.audience === "Recruiters & Headhunters" ? "Recruiters" : pp.audience}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-gray-900 text-xs font-bold leading-snug">{pp.title}</p>
                             {!isOpen && <p className="text-gray-500 text-[11px] mt-0.5 line-clamp-1">{pp.description}</p>}
@@ -897,7 +907,7 @@ export default function Dashboard() {
                               <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wide mb-0.5">Post angle</p>
                               <p className="text-xs text-gray-700 font-medium">{pp.angle}</p>
                             </div>
-                            <button onClick={() => openLengthPicker(pp.angle)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors">Write about this →</button>
+                            <button onClick={() => openLengthPicker(pp.angle, `audience=${encodeURIComponent(pp.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors">Write about this →</button>
                           </div>
                         )}
                       </div>
@@ -938,12 +948,11 @@ export default function Dashboard() {
                   <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-amber-100 pt-4">
                     {skillAngles.map((sa, i) => {
                       const isOpen = expandedSkillAngle === i;
-                      const labels = ["Personal story", "Contrarian take", "Tactical how-to"];
                       return (
                         <div key={i} className="rounded-xl border border-amber-100 overflow-hidden">
                           <button onClick={() => setExpandedSkillAngle(isOpen ? null : i)} className="w-full text-left flex items-start justify-between gap-2 bg-amber-50/60 hover:bg-amber-100/60 px-3 py-2.5 transition-colors">
                             <div className="flex-1 min-w-0">
-                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">{labels[i] ?? `Angle ${i + 1}`}</span>
+                              <span className={cn("inline-flex text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full", AUDIENCE_TAG_COLORS[sa.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>{sa.audience === "Recruiters & Headhunters" ? "Recruiters" : sa.audience}</span>
                               <p className={cn("text-gray-800 text-xs font-medium leading-snug mt-0.5", !isOpen && "line-clamp-1")}>{sa.angle}</p>
                             </div>
                             <ChevronDown className={cn("w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-1 transition-transform duration-200", isOpen && "rotate-180")} />
@@ -954,7 +963,7 @@ export default function Dashboard() {
                                 <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">Opening hook</p>
                                 <p className="text-xs text-gray-700 font-medium italic">"{sa.hook}"</p>
                               </div>
-                              <button onClick={() => openLengthPicker(sa.angle, `extraInstruction=${encodeURIComponent(`Open with: "${sa.hook}"`)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-colors">Use this angle →</button>
+                              <button onClick={() => openLengthPicker(sa.angle, `audience=${encodeURIComponent(sa.audience)}&extraInstruction=${encodeURIComponent(`Open with: "${sa.hook}"`)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold transition-colors">Use this angle →</button>
                             </div>
                           )}
                         </div>

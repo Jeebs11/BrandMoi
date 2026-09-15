@@ -13,6 +13,7 @@ import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
+import { AUDIENCES, AUDIENCE_OVERLAYS } from "../lib/ai-prompts.js";
 import {
   computeEditPercent,
   computeWordChangeSummary,
@@ -43,6 +44,44 @@ type ScenarioAngle = {
   professionalTerritory?: string;
   professionalSignal?: string;
 };
+
+type AudienceAngle = {
+  angle: string;
+  audience: string;
+};
+
+const ALL_AUDIENCES = [...AUDIENCES];
+const VALID_AUDIENCES = new Set<string>(ALL_AUDIENCES);
+const AUDIENCE_GUIDANCE = ALL_AUDIENCES
+  .map((audience) => `${audience}: ${AUDIENCE_OVERLAYS[audience]}`)
+  .join("\n");
+
+function normalizeAudienceAngles(
+  value: unknown,
+  fallbacks: Record<string, string>,
+): AudienceAngle[] {
+  const raw = Array.isArray(value)
+    ? value.flatMap((item): AudienceAngle[] => {
+        if (typeof item === "string") return [{ angle: item, audience: "My audience" }];
+        if (!item || typeof item !== "object") return [];
+        const candidate = item as { angle?: unknown; audience?: unknown };
+        if (typeof candidate.angle !== "string" || !candidate.angle.trim()) return [];
+        return [{
+          angle: candidate.angle.trim(),
+          audience: typeof candidate.audience === "string" && VALID_AUDIENCES.has(candidate.audience)
+            ? candidate.audience
+            : "My audience",
+        }];
+      })
+    : [];
+
+  return ALL_AUDIENCES.map((audience) =>
+    raw.find((item) => item.audience === audience) ?? {
+      angle: fallbacks[audience],
+      audience,
+    }
+  );
+}
 
 const SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience">> = {
   "Clients": {
@@ -309,7 +348,13 @@ Return JSON only (no markdown):
     {"angle": "specific post angle (max 10 words)", "audience": "Investors", "scenarioType": "Market signal", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"},
     {"angle": "specific post angle (max 10 words)", "audience": "My audience", "scenarioType": "Vulnerable moment", "scenario": "specific recognisable moment (max 18 words)", "tension": "the decision or conflict (max 12 words)", "whyItResonates": "why this audience cares (max 16 words)", "professionalTerritory": "one supplied content pillar", "professionalSignal": "what credible capability this demonstrates (max 18 words)"}
   ],
-  "teachAngles": ["FAQ or analogy seed 1 (max 12 words)", "FAQ or analogy seed 2 (max 12 words)", "FAQ or analogy seed 3 (max 12 words)"],
+  "teachAngles": [
+    {"angle": "FAQ or analogy seed (max 14 words)", "audience": "Clients"},
+    {"angle": "FAQ or analogy seed (max 14 words)", "audience": "Peers"},
+    {"angle": "FAQ or analogy seed (max 14 words)", "audience": "Recruiters & Headhunters"},
+    {"angle": "FAQ or analogy seed (max 14 words)", "audience": "Investors"},
+    {"angle": "FAQ or analogy seed (max 14 words)", "audience": "My audience"}
+  ],
   "newsHeadline": "If today's news context was provided, extract the single most relevant news headline verbatim or summarised in max 12 words. Otherwise empty string.",
   "newsSourceLine": "If today's news context was provided, write one sentence max 20 words saying what this news means for their field. Otherwise empty string.",
   "newsPublishedAt": "If today's news context includes a date or time (e.g. '2 hours ago', 'April 3', 'yesterday'), convert it to an ISO 8601 datetime string (e.g. '2026-04-03T10:00:00Z'). Use today's date as the reference. If no date mentioned, empty string.",
@@ -331,7 +376,9 @@ Rules:
 - professionalSignal explains the capability a reader can infer from the evidence; do not describe the creator as job-seeking or address recruiters directly
 - use verified proof points when they fit, but never fabricate personal experience, numbers, clients, or outcomes
 - if news context is available, let it inspire whichever of the 5 angles it fits best — don't force it
-- teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Each should be a short prompt like "Why [common misconception] — an analogy for [audience]" or "The real reason [industry thing] fails (explained simply)". Never generic — always tied to their specific brand context.
+- teachAngles are "explain via analogy" or FAQ ideas grounded in their exact industry/role. Return exactly one for each of the same five audiences, in the same order. Adapt what is taught and why: solve a costly misunderstanding for Clients; teach an advanced nuance to Peers; reveal sound judgment to Recruiters & Headhunters; explain a market mechanism to Investors; clarify a recurring question for My audience. Never generic.
+- Audience guidance:
+${AUDIENCE_GUIDANCE}
 - tone: direct, peer-level, no fluff, no "great job"
 - newsHeadline, newsSourceLine, newsPublishedAt, newsSourceDomain, newsDescription, trendingTopics must only be set when real news context was provided — not invented`,
       messages: [{ role: "user", content: userMessage }],
@@ -343,19 +390,13 @@ Rules:
       const parsed = parseJson(block.text) as Record<string, unknown>;
       const role = prefs?.brandRole ?? "professional";
       const audience = prefs?.brandAudience ?? "your audience";
-      const FALLBACK_TEACH_ANGLES = [
-        `Explain a core ${role} concept via analogy for ${audience}`,
-        `Debunk a common misconception in ${role} — explained simply`,
-        `Simplify the most complex thing about ${role} for ${audience}`,
-      ];
-      const rawTeachAngles: string[] = Array.isArray(parsed.teachAngles)
-        ? (parsed.teachAngles as unknown[]).filter((a): a is string => typeof a === "string").slice(0, 3)
-        : [];
-      const teachAngles: string[] = [
-        rawTeachAngles[0] ?? FALLBACK_TEACH_ANGLES[0],
-        rawTeachAngles[1] ?? FALLBACK_TEACH_ANGLES[1],
-        rawTeachAngles[2] ?? FALLBACK_TEACH_ANGLES[2],
-      ];
+      const teachAngles = normalizeAudienceAngles(parsed.teachAngles, {
+        "Clients": `Explain the costly ${role} mistake clients should spot earlier`,
+        "Peers": `Teach the advanced ${role} nuance most practitioners skip`,
+        "Recruiters & Headhunters": `Explain the judgment behind a difficult ${role} decision`,
+        "Investors": `Make one important ${role} market mechanism easy to understand`,
+        "My audience": `Answer the recurring ${role} question ${audience} keeps asking`,
+      });
       const headline = typeof parsed.headline === "string" && parsed.headline.trim()
         ? parsed.headline.trim()
         : `What should you post today as a ${role}?`;
@@ -647,18 +688,22 @@ router.get("/agent/pain-points", requireAuth, aiRateLimit, async (req, res): Pro
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 700,
-      system: `You are a LinkedIn content strategist. Given a creator's brand profile, identify the 4 most pressing pain points their target audience faces day-to-day.
+      max_tokens: 1200,
+      system: `You are a LinkedIn content strategist. Given a creator's brand profile, identify one pressing, day-to-day pain point for each of these audiences, in this exact order: Clients, Peers, Recruiters & Headhunters, Investors, My audience.
 
 For each pain point:
+- audience: exactly one of the five audience labels
 - title: short punchy label (3-5 words, no generic words like "challenges" or "issues")
 - description: what this pain feels like in practice — visceral, specific, recognisable (max 25 words)
 - angle: a LinkedIn post angle this creator could write to address it (max 15 words, sounds like a real post premise)
 
+Audience guidance:
+${AUDIENCE_GUIDANCE}
+
 Return JSON only (no markdown):
 {
   "painPoints": [
-    { "title": "...", "description": "...", "angle": "..." }
+    { "audience": "Clients", "title": "...", "description": "...", "angle": "..." }
   ]
 }`,
       messages: [{ role: "user", content: userMessage }],
@@ -669,7 +714,27 @@ Return JSON only (no markdown):
     try {
       const data = parseJson(block.text) as { painPoints?: unknown };
       if (!Array.isArray(data.painPoints)) throw new Error("bad shape");
-      res.json({ painPoints: data.painPoints.slice(0, 4) });
+      const fallbacks = {
+        "Clients": { title: "The unclear brief", description: "They know the outcome they need, but not how to turn it into a clear first step.", angle: "What a useful client brief includes before the work begins" },
+        "Peers": { title: "Invisible tradeoffs", description: "Experienced practitioners make hard calls that outsiders reduce to simple best practices.", angle: "The tradeoff experienced people make that beginners rarely see" },
+        "Recruiters & Headhunters": { title: "Weak capability signals", description: "Profiles list responsibilities but give little evidence of judgment when the work gets difficult.", angle: "The work story that proves judgment better than a job title" },
+        "Investors": { title: "Noisy market signals", description: "Strong narratives make it difficult to separate durable changes from temporary enthusiasm.", angle: "The market signal worth watching beneath the current hype" },
+        "My audience": { title: "Advice without context", description: "Useful-looking guidance falls apart because it ignores the messy conditions people actually face.", angle: "When the standard advice stops working in real life" },
+      };
+      const raw = data.painPoints as unknown[];
+      const painPoints = ALL_AUDIENCES.map((audience) => {
+        const match = raw.find((item) =>
+          item && typeof item === "object" && (item as { audience?: unknown }).audience === audience
+        ) as { title?: unknown; description?: unknown; angle?: unknown } | undefined;
+        const fallback = fallbacks[audience];
+        return {
+          audience,
+          title: typeof match?.title === "string" ? match.title : fallback.title,
+          description: typeof match?.description === "string" ? match.description : fallback.description,
+          angle: typeof match?.angle === "string" ? match.angle : fallback.angle,
+        };
+      });
+      res.json({ painPoints });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
@@ -697,17 +762,21 @@ router.post("/agent/skill-angles", requireAuth, aiRateLimit, async (req, res): P
 
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 600,
-      system: `You are a LinkedIn content strategist. Given a professional's skill, generate 3 compelling post angles they could write.
+      max_tokens: 1200,
+      system: `You are a LinkedIn content strategist. Given a professional's skill, generate exactly 5 compelling post angles, one for each audience in this exact order: Clients, Peers, Recruiters & Headhunters, Investors, My audience.
 
 For each angle:
+- audience: exactly one of the five audience labels
 - angle: the post premise in 1-2 sentences (20-35 words) — specific enough to write from immediately, not a vague topic label
 - hook: a strong opening line (max 15 words) that would stop someone scrolling
 
-Vary the 3 angles: (1) personal story/lesson, (2) contrarian or counterintuitive take, (3) tactical how-to or framework.
+Make the skill useful in a different way for each audience. Do not simply rewrite the same premise five times.
+
+Audience guidance:
+${AUDIENCE_GUIDANCE}
 
 Return JSON only (no markdown):
-{ "angles": [{ "angle": "...", "hook": "..." }, { "angle": "...", "hook": "..." }, { "angle": "...", "hook": "..." }] }`,
+{ "angles": [{ "audience": "Clients", "angle": "...", "hook": "..." }, { "audience": "Peers", "angle": "...", "hook": "..." }, { "audience": "Recruiters & Headhunters", "angle": "...", "hook": "..." }, { "audience": "Investors", "angle": "...", "hook": "..." }, { "audience": "My audience", "angle": "...", "hook": "..." }] }`,
       messages: [{ role: "user", content: userMessage }],
     });
 
@@ -716,7 +785,22 @@ Return JSON only (no markdown):
     try {
       const data = parseJson(block.text) as { angles?: unknown };
       if (!Array.isArray(data.angles)) throw new Error("bad shape");
-      res.json({ angles: data.angles.slice(0, 3) });
+      const raw = data.angles as unknown[];
+      const angles = ALL_AUDIENCES.map((audience) => {
+        const match = raw.find((item) =>
+          item && typeof item === "object" && (item as { audience?: unknown }).audience === audience
+        ) as { angle?: unknown; hook?: unknown } | undefined;
+        return {
+          audience,
+          angle: typeof match?.angle === "string"
+            ? match.angle
+            : `Show how ${parsed.data.skill} changes a decision this audience already has to make.`,
+          hook: typeof match?.hook === "string"
+            ? match.hook
+            : `${parsed.data.skill} matters most when the obvious answer stops working.`,
+        };
+      });
+      res.json({ angles });
     } catch {
       res.status(500).json({ error: "Invalid AI response" });
     }
@@ -1363,8 +1447,6 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
       .map((d) => (d.structuredBreakdown as { topic?: string } | null)?.topic)
       .filter(Boolean).join(", ");
 
-    const ALL_AUDIENCES = ["Clients", "Peers", "Recruiters & Headhunters", "Investors", "My audience"];
-
     let topicName: string | null = null;
     if (parsed.data.topicId) {
       const [topic] = await db.select().from(topicsTable)
@@ -1375,11 +1457,15 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
     const isTeach = parsed.data.type === "teach";
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-       // Brand angles include five audience-specific objects with several
-       // evidence fields each; 700 tokens can truncate the JSON mid-object.
-       max_tokens: isTeach ? 450 : 1400,
+        // Both modes return five audience-specific objects. Brand angles also
+        // include several evidence fields and need more room.
+        max_tokens: isTeach ? 900 : 1400,
       system: isTeach
-        ? `You generate "teach your audience" LinkedIn post seeds — analogy or FAQ ideas grounded in the creator's exact field. Each max 12 words, like "Why [misconception] — an analogy for [audience]". Return JSON only: {"angles": ["...", "...", "..."]}`
+        ? `You generate "teach your audience" LinkedIn post seeds grounded in the creator's exact field. Return exactly 5 objects, one for each audience in this exact order: Clients, Peers, Recruiters & Headhunters, Investors, My audience.
+Each angle is max 14 words. Solve a costly misunderstanding for Clients; teach an advanced nuance to Peers; reveal sound judgment to Recruiters & Headhunters; explain a market mechanism to Investors; clarify a recurring question for My audience. Do not rewrite the same lesson five ways.
+Audience guidance:
+${AUDIENCE_GUIDANCE}
+Return JSON only: {"angles": [{"angle":"...","audience":"Clients"},{"angle":"...","audience":"Peers"},{"angle":"...","audience":"Recruiters & Headhunters"},{"angle":"...","audience":"Investors"},{"angle":"...","audience":"My audience"}]}`
         : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
 Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle should build a parasocial connection — surface a specific, relatable, slightly vulnerable moment from their real work (a doubt, a mistake, a moment of relief or frustration), grounded in an actual proof point or piece of their history already on file. Never a generic "we've all felt this" statement with no real anchor — the specificity is what makes it relatable, not the feeling alone.
 Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
@@ -1398,7 +1484,7 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
           recentTopics ? `Recent topics (avoid repeating): ${recentTopics}` : "",
           liked.length > 0 ? `Liked idea directions:\n${liked.map((t) => `- ${t}`).join("\n")}` : "",
           disliked.length > 0 ? `Disliked directions (avoid):\n${disliked.map((t) => `- ${t}`).join("\n")}` : "",
-          isTeach ? "Generate 3 fresh angles. JSON only." : "Generate 5 fresh angles, one per audience. JSON only.",
+          "Generate 5 fresh angles, one per audience. JSON only.",
         ].filter(Boolean).join("\n"),
       }],
     });
@@ -1409,11 +1495,18 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
     if (!Array.isArray(data.angles)) throw new Error("bad shape");
 
     if (isTeach) {
-      res.json({ angles: data.angles.filter((a): a is string => typeof a === "string").slice(0, 3) });
+      res.json({
+        angles: normalizeAudienceAngles(data.angles, {
+          "Clients": `Explain the costly mistake clients make in ${defaultTerritory}`,
+          "Peers": `Teach the advanced nuance practitioners miss in ${defaultTerritory}`,
+          "Recruiters & Headhunters": `Explain the judgment behind a difficult ${defaultTerritory} decision`,
+          "Investors": `Make an important ${defaultTerritory} market mechanism easy to understand`,
+          "My audience": `Answer the question people keep asking about ${defaultTerritory}`,
+        }),
+      });
       return;
     }
 
-    const VALID_AUDIENCES = new Set(ALL_AUDIENCES);
     const rawAngles: ScenarioAngle[] = data.angles
       .map((a) => {
         if (typeof a === "string") return { angle: a, audience: "My audience" };
@@ -1829,13 +1922,17 @@ Content preview: ${content}`;
       // Five posts can produce ten 20–35-word angles plus explanations.
       // 800 tokens can truncate the JSON before the closing array/object.
       max_tokens: 8192,
-      system: `You are a LinkedIn content strategist. Given a creator's top-performing posts, analyse what made each one resonate and generate follow-up angle suggestions.
+       system: `You are a LinkedIn content strategist. Given a creator's top-performing posts, analyse what made each one resonate and generate audience-specific follow-up angle suggestions.
 
 For each top post, generate 2 angles:
 1. A direct follow-up or deeper dive on the same topic
 2. A "different lens" — same topic viewed from a fresh angle, contrarian take, or opposite perspective
 
 Each angle must be 1-2 sentences (20-35 words), specific and immediately writable — not a topic label.
+Tag each angle with one of these audiences: Clients, Peers, Recruiters & Headhunters, Investors, My audience. The two angles for a post must target different audiences. Across all returned suggestions, spread angles across the audience mix rather than defaulting to My audience.
+
+Audience guidance:
+${AUDIENCE_GUIDANCE}
 
 Return JSON only (no markdown):
 {
@@ -1845,8 +1942,8 @@ Return JSON only (no markdown):
       "engagementScore": number,
       "why": "one sentence explaining what made this post perform well (max 20 words)",
       "angles": [
-        { "label": "Follow-up", "angle": "..." },
-        { "label": "Fresh lens", "angle": "..." }
+         { "label": "Follow-up", "angle": "...", "audience": "Clients" },
+         { "label": "Fresh lens", "angle": "...", "audience": "Peers" }
       ]
     }
   ]
@@ -1870,7 +1967,37 @@ Return JSON only (no markdown):
         console.error("[top-post-suggestions] unexpected shape. raw text:", block.text.slice(0, 500));
         throw new Error("bad shape");
       }
-      res.json({ suggestions: suggestions.slice(0, 5) });
+      const cleaned = suggestions.slice(0, 5).flatMap((item, suggestionIndex) => {
+        if (!item || typeof item !== "object") return [];
+        const suggestion = item as {
+          originalTopic?: unknown;
+          engagementScore?: unknown;
+          why?: unknown;
+          angles?: unknown;
+        };
+        const rawAngles = Array.isArray(suggestion.angles) ? suggestion.angles : [];
+        const angles = rawAngles.slice(0, 2).flatMap((angle, angleIndex) => {
+          if (!angle || typeof angle !== "object") return [];
+          const candidate = angle as { label?: unknown; angle?: unknown; audience?: unknown };
+          if (typeof candidate.angle !== "string") return [];
+          const fallbackAudience = ALL_AUDIENCES[(suggestionIndex * 2 + angleIndex) % ALL_AUDIENCES.length];
+          return [{
+            label: typeof candidate.label === "string" ? candidate.label : angleIndex === 0 ? "Follow-up" : "Fresh lens",
+            angle: candidate.angle,
+            audience: typeof candidate.audience === "string" && VALID_AUDIENCES.has(candidate.audience)
+              ? candidate.audience
+              : fallbackAudience,
+          }];
+        });
+        if (angles.length === 0) return [];
+        return [{
+          originalTopic: typeof suggestion.originalTopic === "string" ? suggestion.originalTopic : "Top-performing post",
+          engagementScore: typeof suggestion.engagementScore === "number" ? suggestion.engagementScore : 0,
+          why: typeof suggestion.why === "string" ? suggestion.why : "This topic already earned measurable engagement.",
+          angles,
+        }];
+      });
+      res.json({ suggestions: cleaned });
     } catch (parseErr) {
       console.error("[top-post-suggestions] parse failed:", parseErr);
       res.status(500).json({ error: "Invalid AI response" });

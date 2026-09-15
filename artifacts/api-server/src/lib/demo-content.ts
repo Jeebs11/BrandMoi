@@ -117,9 +117,11 @@ const DEMO_BRIEFS = [
       { angle: "The exec hire I doubted for weeks — and why I almost said no", audience: "My audience" },
     ],
     teachAngles: [
-      "Why 'move fast' quietly breaks onboarding — an analogy for new managers",
-      "The real reason standups fail (explained simply)",
-      "What a roadmap actually is, for someone who's never owned one",
+      { angle: "What clients should know before asking a team to move faster", audience: "Clients" },
+      { angle: "Why experienced teams treat standups as a diagnostic, not a ritual", audience: "Peers" },
+      { angle: "How strong managers decide when speed is worth the tradeoff", audience: "Recruiters & Headhunters" },
+      { angle: "Why onboarding quality predicts whether growth will actually hold", audience: "Investors" },
+      { angle: "What a roadmap actually is, for someone who's never owned one", audience: "My audience" },
     ],
     newsHeadline: "Remote-first companies are quietly rewriting their hiring bars",
     newsSourceLine: "Worth watching if you're hiring — the bar for 'senior' is shifting toward async communication skills.",
@@ -140,9 +142,11 @@ const DEMO_BRIEFS = [
       { angle: "The career mistake I still think about — and what it actually cost", audience: "My audience" },
     ],
     teachAngles: [
-      "Why 'data-driven' often means 'afraid to decide' — explained simply",
-      "The onboarding checklist nobody writes down, for first-time managers",
-      "What 'technical debt' actually costs, in plain English",
+      { angle: "Why more client data does not always make the brief clearer", audience: "Clients" },
+      { angle: "The decision threshold experienced data-led teams rarely document", audience: "Peers" },
+      { angle: "How leaders decide when the evidence will never be complete", audience: "Recruiters & Headhunters" },
+      { angle: "What technical debt really does to a company's growth options", audience: "Investors" },
+      { angle: "Why 'data-driven' often means 'afraid to decide' — explained simply", audience: "My audience" },
     ],
     newsHeadline: "Boards are pushing back on 'growth at all costs' roadmaps",
     newsSourceLine: "A useful signal if you're positioning a post around discipline over speed.",
@@ -224,16 +228,20 @@ const DEMO_IDEAS_BRAND: Array<{ angle: string; audience: string }>[] = [
   ],
 ];
 
-const DEMO_IDEAS_TEACH: string[][] = [
+const DEMO_IDEAS_TEACH: Array<Array<{ angle: string; audience: string }>> = [
   [
-    "Why 'move fast' quietly breaks onboarding — an analogy for new managers",
-    "The real reason standups fail (explained simply)",
-    "What a roadmap actually is, for someone who's never owned one",
+    { angle: "What clients should know before asking a team to move faster", audience: "Clients" },
+    { angle: "Why experienced teams treat standups as a diagnostic, not a ritual", audience: "Peers" },
+    { angle: "How strong managers decide when speed is worth the tradeoff", audience: "Recruiters & Headhunters" },
+    { angle: "Why onboarding quality predicts whether growth will actually hold", audience: "Investors" },
+    { angle: "What a roadmap actually is, for someone who's never owned one", audience: "My audience" },
   ],
   [
-    "Why 'data-driven' often means 'afraid to decide' — explained simply",
-    "The onboarding checklist nobody writes down, for first-time managers",
-    "What 'technical debt' actually costs, in plain English",
+    { angle: "Why more client data does not always make the brief clearer", audience: "Clients" },
+    { angle: "The decision threshold experienced data-led teams rarely document", audience: "Peers" },
+    { angle: "How leaders decide when the evidence will never be complete", audience: "Recruiters & Headhunters" },
+    { angle: "What technical debt really does to a company's growth options", audience: "Investors" },
+    { angle: "Why 'data-driven' often means 'afraid to decide' — explained simply", audience: "My audience" },
   ],
 ];
 

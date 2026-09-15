@@ -500,12 +500,14 @@ export const preferencesApi = {
 };
 
 export type PainPoint = {
+  audience: string;
   title: string;
   description: string;
   angle: string;
 };
 
 export type SkillAngle = {
+  audience: string;
   angle: string;
   hook: string;
 };
@@ -525,7 +527,7 @@ export type AgentBrief = {
   headline: string;
   insight: string;
   angles: BrandAngle[];
-  teachAngles: string[];
+  teachAngles: Array<AudienceAngle | string>;
   newsHeadline?: string;
   newsSourceLine?: string;
   newsUrl?: string;
@@ -534,6 +536,11 @@ export type AgentBrief = {
   newsDescription?: string;
   trendingTopics?: { headline: string; sourceLine?: string }[];
   seriesNudge?: { seriesId: number; title: string; nextPart: number; plannedParts: number | null };
+};
+
+export type AudienceAngle = {
+  angle: string;
+  audience: string;
 };
 
 export type AgentCoach = {
@@ -596,7 +603,7 @@ export type TopPostSuggestion = {
   originalTopic: string;
   engagementScore: number;
   why: string;
-  angles: { label: string; angle: string }[];
+  angles: { label: string; angle: string; audience: string }[];
 };
 
 export type BrandReviewRecommendation = {
@@ -636,7 +643,7 @@ export const agentApi = {
   brandIdeas: (topicId?: number | null) =>
     apiFetch<{ angles: BrandAngle[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "brand", topicId: topicId ?? undefined }) }),
   teachIdeas: () =>
-    apiFetch<{ angles: string[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "teach" }) }),
+    apiFetch<{ angles: AudienceAngle[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "teach" }) }),
   coach: (postText: string) =>
     apiFetch<AgentCoach>("/agent/coach", {
       method: "POST",
