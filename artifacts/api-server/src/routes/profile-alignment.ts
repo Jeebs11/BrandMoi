@@ -86,6 +86,12 @@ export type ProfileFacts = {
   currentRoleDates: string | null;
   achievements: string[];
   skills: string[];
+  experience: Array<{
+    role: string;
+    employer: string | null;
+    dates: string | null;
+    bullets: string[];
+  }>;
 };
 
 type ApplicableSource = "cv" | "brandmoi" | "linkedin";
@@ -161,6 +167,47 @@ export type StoredRecommendations = {
   narrativeSummary: string;
   fieldRewrites: FieldRewrite[];
   pairedFactSuggestions: PairedFactSuggestion[];
+  scorecard: ProfileScorecard;
+};
+
+export type ScorecardCheck = {
+  key: string;
+  label: string;
+  score: number;
+  detail: string;
+};
+
+export type ScorecardDimension = {
+  key: "headline" | "about" | "experience" | "skills";
+  label: string;
+  score: number;
+  summary: string;
+  checks: ScorecardCheck[];
+};
+
+export type ExperienceBulletAudit = {
+  role: string;
+  bullet: string;
+  impactScore: number;
+  classification: "impact" | "mixed" | "responsibility";
+  whatChanged: string;
+  missing: string[];
+  suggestedRewrite: string;
+};
+
+export type ProfileScorecard = {
+  overallScore: number;
+  overallVerdict: string;
+  dimensions: ScorecardDimension[];
+  experienceBullets: ExperienceBulletAudit[];
+  skills: {
+    score: number;
+    summary: string;
+    keep: string[];
+    add: string[];
+    review: string[];
+  };
+  priorities: string[];
 };
 
 // ---------------------------------------------------------------------------
@@ -190,13 +237,22 @@ Return this exact JSON:
   "currentEmployer": "their current/most recent employer name, verbatim, or null",
   "currentRoleDates": "the date range for that role as written (e.g. '2022 - Present'), or null",
   "achievements": ["quantified achievement 1 (must contain a real number, name, or scale from the document)", "..."],
-  "skills": ["skill 1", "skill 2", "..."]
+  "skills": ["skill 1", "skill 2", "..."],
+  "experience": [
+    {
+      "role": "role title as written",
+      "employer": "employer as written, or null",
+      "dates": "date range as written, or null",
+      "bullets": ["each experience bullet exactly or nearly as written", "..."]
+    }
+  ]
 }
 
 Rules:
 - ${sourceType === "cv" ? "This is a CV — headline and about MUST be null, a CV does not have those sections." : "Extract headline/about only if this document actually has those LinkedIn sections."}
 - achievements: up to 8, each one sentence, max 140 characters, must contain a real number/name/scale taken from the document. Never invent one.
 - skills: up to 12, short phrases as written in the document.`,
+ - experience: up to 8 roles, with up to 6 bullets per role. Preserve bullets from the document; do not turn responsibilities into achievements and do not invent missing outcomes.`,
       },
     ],
   });
@@ -216,6 +272,17 @@ Rules:
     currentRoleDates: typeof parsed.currentRoleDates === "string" && parsed.currentRoleDates.trim() ? parsed.currentRoleDates.trim() : null,
     achievements: asStringArray(parsed.achievements, 8),
     skills: asStringArray(parsed.skills, 12),
+    experience: Array.isArray(parsed.experience)
+      ? parsed.experience.slice(0, 8).map((entry) => {
+        const item = entry as Record<string, unknown>;
+        return {
+          role: typeof item.role === "string" ? item.role.trim().slice(0, 160) : "",
+          employer: typeof item.employer === "string" && item.employer.trim() ? item.employer.trim().slice(0, 160) : null,
+          dates: typeof item.dates === "string" && item.dates.trim() ? item.dates.trim().slice(0, 100) : null,
+          bullets: asStringArray(item.bullets, 6).map((bullet) => bullet.slice(0, 500)),
+        };
+      }).filter((entry) => entry.role && entry.bullets.length > 0)
+      : [],
   };
 }
 
