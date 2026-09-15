@@ -42,7 +42,7 @@ export const AUDIENCE_OVERLAYS: Record<string, string> = {
 // founder chasing clients, and someone building authority need different
 // content strategies and CTAs even from the same raw idea.
 export const OBJECTIVE_OVERLAYS: Record<string, string> = {
-  "Job": "Goal — Land a new role: every post is indirect evidence of hireability. Showcase judgment calls, tradeoffs navigated, and results owned — the things interviews try to surface. Never say 'open to work' or sound like an application; let competence speak. End with a question that invites senior people to engage (their comments put the author in front of their networks).",
+  "Job": "Goal — Land a new role: every post is indirect evidence of hireability. Showcase judgment calls, tradeoffs navigated, and results owned — the things interviews try to surface. Never say 'open to work' or sound like an application; let competence speak. Only ask a closing question when it follows naturally from the story and the author would genuinely want the answer.",
   "Clients": "Goal — Win clients: the post should make a prospective buyer feel understood before being impressed. Lead with the client's pain in their words, then demonstrate the author's way of thinking about it. Soft CTA at most — credibility converts, pitching repels.",
   "Authority": "Goal — Build authority: stake out a clear, defensible position the author can own over time. Consistency of theme matters more than reach on any single post. Prefer depth over breadth; one sharpened insight beats three shallow ones.",
   "Documenting": "Goal — Document the journey: write like a builder's log, not a press release. Real numbers, real setbacks, what changed this week. The compounding asset is trust through transparency.",
@@ -59,15 +59,15 @@ export const FORMAT_INSTRUCTIONS: Record<string, string> = {
   "dialogue": "Format — Dialogue: write as an actual back-and-forth exchange between two named voices (e.g. 'Me at 22:' / 'Me now:'), alternating short lines. No narrator framing, no scene description — just the exchange itself, each line earning its place. The turn from one voice to the other should carry the tension, not stage directions.",
   "letter": "Format — Letter: direct second-person address written as an actual letter. Open with a salutation ('Dear ___,') and close with a sign-off. No bullet lists, no headers — it should read like something handwritten, not a business memo.",
   "qa": "Format — Q&A: explicit question-then-answer beats. Each question is its own short line (can stand alone, bolded in spirit), followed immediately by a direct answer. No preamble before the first question.",
-  "story_arc": "Format — Story arc: structure the post as five unnumbered chapter-beats — Scene, Struggle, Turn, Lesson, CTA — each a short paragraph. This is the shape regardless of feeling; do not default back to a standard post structure.",
+  "story_arc": "Format — Story arc: move through a concrete scene, the pressure inside it, what changed, what the author now understands, and one final specific beat. Do not label or number those stages. A neat lesson or CTA is optional; the story may end on the moment that carries the meaning.",
 };
 
 export const FEELING_INSTRUCTIONS: Record<string, string> = {
-  "Direct": "Feeling — Direct: short sentences, no warm-up, no caveats. Say the thing on line 1. No 'I think' or 'arguably'. Land each paragraph like a verdict.",
+  "Direct": "Feeling — Direct: no warm-up and no unnecessary caveats. Say the specific thing early, then explain it in the author's natural rhythm. Confidence should come from clarity and evidence, not a sequence of artificial mic-drop lines.",
   "Witty": "Feeling — Witty: dry, observational humour. The hook should make the reader exhale a small laugh before they realise it's also true. No exclamation marks, no setup-punchline jokes — wit comes from the angle, not the delivery.",
   "Vulnerable": "Feeling — Vulnerable: name something the author got wrong, was scared of, or kept quiet about for too long. Stay in the discomfort for at least one paragraph before any insight arrives. No false modesty, no humble-brags.",
   "Story": "Feeling — Story: tell it as a real story — open in a specific scene, name the moment of tension exactly, land the turn, then leave the reader with what it meant. Use first person past tense for the lived part. No bullet points, no labels in the post text. The shape can flex — what matters is that it reads like a story, not a framework.",
-  "Contrarian": "Feeling — Contrarian: open by naming the conventional wisdom, then break it on line 2. The whole post must defend the counter-position with concrete evidence, not vibes. Avoid 'unpopular opinion:' — show, don't announce.",
+  "Contrarian": "Feeling — Contrarian: challenge a real assumption the supplied evidence can support. The whole post must defend the counter-position with a concrete example or reasoning, not attitude. Do not force a two-line 'conventional wisdom / actually' template, and avoid 'unpopular opinion:' — show, don't announce.",
 };
 
 // Shared with the rule-based publish-time authenticity checker
@@ -87,6 +87,26 @@ export const STOCK_OPENERS = [
   "i want to share something",
 ];
 
+export const NATURAL_HOOK_RULES = `NATURAL HOOK STANDARD:
+- A hook should create recognition, tension, or curiosity through a specific detail or defensible observation — not through hype.
+- Prefer a concrete moment, consequence, candid admission, useful contradiction, or precise question that the body immediately earns.
+- Keep factual claims, numbers, outcomes, predictions, and personal experience strictly inside the supplied evidence. Never invent a statistic, timeframe, client result, or story to strengthen a hook.
+- Do not use bait phrases such as "Nobody talks about this", "This changed everything", "Read that again", "Let that sink in", "Here's the truth", or "You need to hear this".
+- Do not use templated list openings such as "3 lessons", "5 things", or "Here are the rules" unless the source is explicitly a real list and that structure is essential.
+- Avoid "not X, but Y", "X wasn't the problem. Y was.", sweeping superlatives, and vague rhetorical questions.
+- Do not make every hook ultra-short. Match the author's observed sentence rhythm; a natural 12–20 word sentence can be stronger than a manufactured fragment.
+- The hook must lead honestly into the existing body. It cannot promise a story, result, or level of certainty the post does not contain.`;
+
+export const NATURAL_WRITING_STANDARD = `NATURAL WRITING STANDARD:
+- Preserve the author's supplied wording, specificity, uncertainty, and sentence rhythm before applying generic platform conventions.
+- Direct writing does not mean every sentence is a one-line verdict. Mix sentence lengths and allow connected thoughts to remain connected.
+- Keep the rough edge that makes the thought believable: a concrete tradeoff, awkward detail, unresolved tension, or qualified belief. Do not manufacture vulnerability.
+- Do not convert one observation into a tidy three-part framework unless the raw input genuinely contains three distinct parts.
+- Do not add a moral, inspirational lesson, summary paragraph, or engagement question merely because the post is ending.
+- Use contractions and ordinary professional language when they fit the author's evidence. Avoid corporate abstraction and creator jargon.
+- Every personal claim, number, client detail, outcome, and quotation must come from supplied context. If evidence is missing, write the premise without pretending the author lived it.
+- Read the result as spoken language before returning it: remove any line that sounds impressive in isolation but unnatural for this person to say.`;
+
 // Model for the two calls that produce actual post prose (generate + the
 // plain-text branch of refine) — kept as one named constant so switching
 // back to claude-sonnet-4-6 is a one-line rollback, not a multi-file hunt.
@@ -102,6 +122,10 @@ Stay close to the author's exact words and rhythm from the raw input. Do NOT san
 Apply the AUDIENCE overlay to decide what to say.
 Apply the FEELING overlay to decide how it lands.
 Both overlays are mandatory — they must shape the hook, the body, and the CTA.
+
+${NATURAL_WRITING_STANDARD}
+
+${NATURAL_HOOK_RULES}
 
 VOICE DNA (when provided in context): Let those signals shape register, rhythm, and sentence length — NOT topic choice. The author's voice fingerprint is how they write, not what they've already written about.
 
@@ -136,6 +160,7 @@ POST RULES:
 - alternativeHooks: TWO swap-in opening lines that open the same post from a sharply different angle (different feeling-flavour, different image, different first move). Each under 140 characters. They must work as a drop-in replacement for the first line of "post".
 - End with a natural CTA only if the post needs one — strong final lines can stand alone.
 - Bullet lists are allowed for framework or breakdown posts. Avoid for personal, story, or opinion posts.
+- Before returning JSON, silently read the post and all alternative hooks once as spoken language. Rewrite formulaic openings, forced lessons, invented certainty, repeated rhetorical patterns, and any sentence that could fit an unrelated professional's post without changing its meaning.
 
 HASHTAG RULES — exactly 3, in this order:
 - Tier 1 (broad reach, 500K+): a tag the target audience genuinely follows. Match audience: Clients → industry tag the buyer follows; Peers → craft tag; Recruiters → role/skill tag; Investors → category tag; My audience → the creator's established niche tag.
@@ -157,4 +182,10 @@ SHORT POST RULES: voice-first, 80–120 words, no lists, two paragraph blocks ma
 
 NEWS-TIE RULE (only when news context is provided): weave the headline naturally — never paste the URL, never say "I just read…". The hook should feel like the author was already thinking this and the news confirmed it. The angle must connect the news to the audience's actual situation.`;
 
-export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely. Maintain the same formatting discipline as the original: mostly short paragraphs separated by blank lines, no dense walls of text — but keep natural sentence-length variation rather than a monotone run of identical-length lines, which reads as AI-generated. Return only valid JSON, no markdown fences.`;
+export const REFINE_SYSTEM_PROMPT = `You are a LinkedIn content editor. Apply the given instruction precisely without sanding away the author's existing voice, specific details, uncertainty, or natural rhythm.
+
+${NATURAL_WRITING_STANDARD}
+
+${NATURAL_HOOK_RULES}
+
+Maintain the same formatting discipline as the original: mostly short paragraphs separated by blank lines, no dense walls of text. Do not turn the result into a monotone run of one-line sentences. Preserve strong lines that the instruction does not require you to change. Return only the requested content with no preamble or explanation.`;

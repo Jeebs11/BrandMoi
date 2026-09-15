@@ -13,7 +13,7 @@ import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
-import { AUDIENCES, AUDIENCE_OVERLAYS } from "../lib/ai-prompts.js";
+import { AUDIENCES, AUDIENCE_OVERLAYS, NATURAL_HOOK_RULES } from "../lib/ai-prompts.js";
 import {
   computeEditPercent,
   computeWordChangeSummary,
@@ -597,15 +597,15 @@ Return JSON only (no markdown):
 });
 
 const ALL_HOOK_TYPES = [
-  { key: "how-i",        instruction: 'A personal "How I [achieved X]" opener. Doesn\'t start with "I". Implies you\'ve done it.' },
-  { key: "contrarian",   instruction: 'A bold claim challenging conventional wisdom. No question mark. Doesn\'t start with "I" or "You".' },
-  { key: "number",       instruction: 'Starts with a specific number, percentage, or timeframe. E.g. "After 3 years…" or "47% of…".' },
-  { key: "question",     instruction: 'A specific, uncomfortable question that makes the reader stop and reconsider. Must end with "?".' },
-  { key: "scene-setter", instruction: 'Drops the reader into a specific moment using concrete sensory detail. Past or present tense. No question mark.' },
-  { key: "prediction",   instruction: 'A bold, specific claim about what will happen. Must start with a timeframe or "By [year]".' },
+  { key: "how-i",        instruction: 'Open on how the author approached or learned something, but only if the draft contains that personal evidence. Do not imply an unsupported achievement.' },
+  { key: "contrarian",   instruction: 'Challenge a real assumption using the post\'s own evidence. No "unpopular opinion", fake certainty, or generic provocation.' },
+  { key: "number",       instruction: 'Lead with a number, percentage, or timeframe only when that exact figure appears in the draft or verified context. Otherwise use a different concrete detail.' },
+  { key: "question",     instruction: 'Ask a precise question the intended reader genuinely faces and the body directly answers. Avoid broad engagement-bait questions.' },
+  { key: "scene-setter", instruction: 'Open inside a specific moment already present in the draft. Use only details the author supplied; do not decorate it with invented sensory detail.' },
+  { key: "prediction",   instruction: 'Make a bounded, defensible prediction only when the draft contains evidence for it. Do not invent a year or timeframe.' },
   { key: "analogy",      instruction: 'Uses a surprising comparison or metaphor to reframe the topic in an unexpected way.' },
-  { key: "story",        instruction: 'Opens with a vivid first-person scene or specific moment. Past tense. Drops the reader into the action immediately — no preamble, no "I want to tell you about".' },
-  { key: "picture-this", instruction: 'Starts with "Picture this:" followed by an immersive scenario or analogy that makes the reader visualise something very specific and relatable.' },
+  { key: "story",        instruction: 'Open with a first-person moment only when the draft contains a real one. Preserve its plain language instead of making it cinematic.' },
+  { key: "picture-this", instruction: 'Make the existing situation easy to picture without using the stock phrase "Picture this:" and without inventing a hypothetical success story.' },
 ];
 
 const HookAlternativesBody = z.object({
@@ -621,6 +621,7 @@ router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, re
   try {
     const { draftText, tone, hookTypes } = parsed.data;
     const toneContext = tone ? `The post was written in a "${tone}" tone — the alternatives should match that energy.` : "";
+    const brandContext = await buildCanonicalBrandContext(req.user!.userId);
 
     const filteredTypes = hookTypes && hookTypes.length > 0
       ? ALL_HOOK_TYPES.filter(t => hookTypes.includes(t.key))
@@ -635,21 +636,32 @@ router.post("/agent/hook-alternatives", requireAuth, aiRateLimit, async (req, re
       `  Hook ${i + 1} (${t.key}): ${t.instruction}`
     ).join("\n");
 
-    const userMessage = `LinkedIn post draft:\n\n${draftText}\n\n${toneContext}`;
+    const userMessage = `${brandContext.context}
+
+LinkedIn post draft (the factual boundary for every hook):
+
+${draftText}
+
+${toneContext}`;
 
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 400,
-      system: `You are a LinkedIn hook specialist. Given a draft post, generate exactly 3 alternative opening lines — each a stronger replacement for the current first line.
+      model: "claude-sonnet-5",
+      max_tokens: 600,
+      system: `You are an editor helping one specific person find a more natural opening for an existing LinkedIn post. Generate exactly 3 alternative opening lines that can honestly replace the current first line.
 
 STRICT REQUIREMENTS:
 - Return exactly 3 hooks — no more, no fewer
 - Each hook must be maximum 200 characters (count carefully)
 - Each hook uses a DIFFERENT structure as defined below:
 ${hookInstructions}
-- Each must be specific, punchy, and human — not generic
-- Match the topic and ${toneContext ? "tone" : "energy"} of the original post
+- Each must be specific and human, but "stronger" does not mean louder, shorter, or more dramatic
+- Match the topic, ${toneContext ? "tone" : "energy"}, and observed voice of the original post
+- At least one hook should preserve some of the author's original wording
+- Never add a personal experience, result, number, client, quotation, or certainty that is absent from the draft and verified context
+- Each hook must lead naturally into the unchanged second line and body
 - Do NOT explain or label the hooks
+
+${NATURAL_HOOK_RULES}
 
 Return JSON only (no markdown):
 { "hooks": ["hook 1", "hook 2", "hook 3"] }`,

@@ -17,6 +17,21 @@ const HIGH_CONFIDENCE_GENERIC_PHRASES = [
   "move the needle",
   "bleeding edge",
 ];
+const CLICKBAIT_OPENERS = [
+  "nobody talks about this",
+  "this changed everything",
+  "read that again",
+  "let that sink in",
+  "here's the truth",
+  "you need to hear this",
+];
+const GENERIC_MIC_DROP_ENDINGS = [
+  "that's the job",
+  "that's it",
+  "let that sink in",
+  "agree?",
+  "thoughts?",
+];
 
 export type AuthenticitySeverity = "low" | "medium" | "high";
 
@@ -171,6 +186,15 @@ export function checkGenericPatterns(text: string): string[] {
 
   if (/^(?:here are|the)\s+\d+\s+(?:lessons|things|ways|rules|tips)\b/i.test(firstLine)) {
     flags.push("a templated list hook");
+  }
+  if (CLICKBAIT_OPENERS.some((opener) => firstLineLower.startsWith(opener))) {
+    flags.push("a clickbait opening line");
+  }
+
+  const nonEmptyLines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const finalLine = (nonEmptyLines.at(-1) ?? "").toLowerCase().replace(/[.!]+$/, "");
+  if (GENERIC_MIC_DROP_ENDINGS.includes(finalLine)) {
+    flags.push("a generic mic-drop ending");
   }
 
   const sentences = splitSentences(text);

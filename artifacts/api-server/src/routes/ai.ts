@@ -19,6 +19,7 @@ import {
   OBJECTIVE_OVERLAYS,
   REFINE_SYSTEM_PROMPT,
   CONTENT_GENERATION_MODEL,
+  NATURAL_HOOK_RULES,
 } from "../lib/ai-prompts.js";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
@@ -752,12 +753,15 @@ router.post("/ai/explore-directions", requireAuth, aiRateLimit, async (req, res)
     return;
   }
 
-  const recentDrafts = await db
-    .select({ postOutput: draftsTable.postOutput })
-    .from(draftsTable)
-    .where(eq(draftsTable.userId, userId))
-    .orderBy(desc(draftsTable.updatedAt))
-    .limit(6);
+  const [recentDrafts, brandContext] = await Promise.all([
+    db
+      .select({ postOutput: draftsTable.postOutput })
+      .from(draftsTable)
+      .where(eq(draftsTable.userId, userId))
+      .orderBy(desc(draftsTable.updatedAt))
+      .limit(6),
+    buildCanonicalBrandContext(userId),
+  ]);
 
   const recentHooks = recentDrafts
     .map((d) => {
@@ -786,9 +790,17 @@ RULES:
 - Each hook must open from a completely different angle — different first move, different image, different tension
 - Points are the 3 raw supporting ideas for that angle (brief, not polished LinkedIn copy)
 - Keep every hook under 120 characters
-- Banned words in hooks: game-changer, passionate, excited to share, leverage, synergy, groundbreaking`;
+- Banned words in hooks: game-changer, passionate, excited to share, leverage, synergy, groundbreaking
+- Keep all personal claims, numbers, outcomes, and scenes inside the supplied evidence. A direction can suggest a premise, but it must never imply the author experienced something that is not on file.
 
-  const userMsg = `Raw idea: ${rawInput}${audienceHint ? `\nTarget audience: ${audienceHint}` : ""}${avoidNote}\n\nGenerate 3 directions. Return JSON only.`;
+${NATURAL_HOOK_RULES}`;
+
+  const userMsg = `${brandContext.context}
+
+Raw idea (primary source): ${rawInput}
+${audienceHint ? `Target audience: ${audienceHint}` : ""}${avoidNote}
+
+Generate 3 directions. Stay close to the author's words and voice evidence. Return JSON only.`;
 
   try {
     const message = await anthropic.messages.create({
