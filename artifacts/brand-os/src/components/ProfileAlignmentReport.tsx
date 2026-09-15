@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Copy, Edit3, RotateCcw, ShieldAlert, Target, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, Copy, Edit3, RotateCcw, ShieldAlert, Target, X, ChevronDown, ChevronUp, Search, BriefcaseBusiness } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -40,10 +40,18 @@ function isProofPointRow(row: ComparisonRow | ProofPointComparisonRow): row is P
   return row.rowKey === "proof_points";
 }
 
+function scoreTone(score: number): { text: string; bar: string; bg: string; label: string } {
+  if (score >= 80) return { text: "text-emerald-700", bar: "bg-emerald-500", bg: "bg-emerald-50 border-emerald-100", label: "Strong" };
+  if (score >= 60) return { text: "text-amber-700", bar: "bg-amber-500", bg: "bg-amber-50 border-amber-100", label: "Solid foundation" };
+  if (score >= 40) return { text: "text-orange-700", bar: "bg-orange-500", bg: "bg-orange-50 border-orange-100", label: "Needs work" };
+  return { text: "text-rose-700", bar: "bg-rose-500", bg: "bg-rose-50 border-rose-100", label: "Priority fix" };
+}
+
 export function ProfileAlignmentReport({ analysis: initial, onClose }: Props) {
   const { toast } = useToast();
   const [analysis, setAnalysis] = useState(initial);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [expandedScore, setExpandedScore] = useState<string | null>("headline");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -142,7 +150,10 @@ export function ProfileAlignmentReport({ analysis: initial, onClose }: Props) {
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-violet-600" />
-              <h3 className="font-extrabold text-gray-900">Profile Alignment</h3>
+              <div>
+                <h3 className="font-extrabold text-gray-900">LinkedIn Profile Score</h3>
+                <p className="text-[10px] font-semibold text-gray-400">Optimised for {analysis.targetAudience}</p>
+              </div>
             </div>
             <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors" aria-label="Close">
               <X className="w-4 h-4" />
@@ -150,6 +161,149 @@ export function ProfileAlignmentReport({ analysis: initial, onClose }: Props) {
           </div>
 
           <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+            {analysis.scorecard && (() => {
+              const overallTone = scoreTone(analysis.scorecard.overallScore);
+              return (
+                <>
+                  <div className={cn("rounded-3xl border p-4", overallTone.bg)}>
+                    <div className="flex items-start gap-4">
+                      <div className="w-20 h-20 rounded-full bg-white border-4 border-current flex flex-col items-center justify-center flex-shrink-0 shadow-sm">
+                        <span className={cn("text-2xl font-black leading-none", overallTone.text)}>{analysis.scorecard.overallScore}</span>
+                        <span className="text-[9px] font-bold text-gray-400">out of 100</span>
+                      </div>
+                      <div className="min-w-0 pt-1">
+                        <p className={cn("text-[10px] font-black uppercase tracking-wider mb-1", overallTone.text)}>{overallTone.label}</p>
+                        <p className="text-sm font-bold text-gray-900 leading-snug">{analysis.scorecard.overallVerdict}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {analysis.scorecard.priorities.length > 0 && (
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-500 mb-3">Start here</p>
+                      <div className="space-y-2.5">
+                        {analysis.scorecard.priorities.map((priority, index) => (
+                          <div key={priority} className="flex items-start gap-2.5">
+                            <span className="w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0">{index + 1}</span>
+                            <p className="text-xs font-semibold text-gray-700 leading-relaxed">{priority}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Section scores</p>
+                    <div className="space-y-2">
+                      {analysis.scorecard.dimensions.map((dimension) => {
+                        const tone = scoreTone(dimension.score);
+                        const isOpen = expandedScore === dimension.key;
+                        return (
+                          <button
+                            key={dimension.key}
+                            type="button"
+                            onClick={() => setExpandedScore(isOpen ? null : dimension.key)}
+                            className="w-full rounded-2xl border border-gray-100 bg-white p-3.5 text-left shadow-sm"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black", tone.bg, tone.text)}>{dimension.score}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-sm font-extrabold text-gray-900">{dimension.label}</p>
+                                  {isOpen ? <ChevronUp className="h-3.5 w-3.5 text-gray-400" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-400" />}
+                                </div>
+                                <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden mt-1.5">
+                                  <div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${dimension.score}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 leading-relaxed mt-2">{dimension.summary}</p>
+                            {isOpen && dimension.checks.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                                {dimension.checks.map((check) => {
+                                  const checkTone = scoreTone(check.score);
+                                  return (
+                                    <div key={check.key}>
+                                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                                        <p className="text-xs font-bold text-gray-800">{check.label}</p>
+                                        <span className={cn("text-[11px] font-black", checkTone.text)}>{check.score}</span>
+                                      </div>
+                                      <p className="text-[11px] text-gray-500 leading-relaxed">{check.detail}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {analysis.scorecard.experienceBullets.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <BriefcaseBusiness className="w-3.5 h-3.5 text-violet-500" />
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Experience impact audit</p>
+                      </div>
+                      <div className="space-y-3">
+                        {analysis.scorecard.experienceBullets.map((audit, index) => {
+                          const tone = scoreTone(audit.impactScore);
+                          return (
+                            <div key={`${audit.role}-${index}`} className="rounded-2xl border border-gray-100 bg-white p-4">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <p className="text-xs font-extrabold text-gray-900">{audit.role}</p>
+                                <span className={cn("px-2 py-1 rounded-full text-[10px] font-black capitalize", tone.bg, tone.text)}>
+                                  {audit.classification} · {audit.impactScore}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-700 leading-relaxed">“{audit.bullet}”</p>
+                              <div className="mt-2 rounded-xl bg-gray-50 p-2.5">
+                                <p className="text-[9px] font-black uppercase tracking-wide text-gray-400 mb-0.5">What changed?</p>
+                                <p className="text-[11px] text-gray-600 leading-relaxed">{audit.whatChanged}</p>
+                              </div>
+                              {audit.missing.length > 0 && (
+                                <p className="mt-2 text-[10px] font-semibold text-orange-700">Missing: {audit.missing.join(" · ")}</p>
+                              )}
+                              {audit.suggestedRewrite && (
+                                <div className="mt-3 border-t border-gray-100 pt-3">
+                                  <p className="text-[9px] font-black uppercase tracking-wide text-violet-500 mb-1">Stronger version</p>
+                                  <p className="text-xs text-gray-800 leading-relaxed">{audit.suggestedRewrite}</p>
+                                  <button onClick={() => copyText(audit.suggestedRewrite)} className="mt-2 flex items-center gap-1 text-[10px] font-bold text-violet-600">
+                                    <Copy className="w-3 h-3" /> Copy
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50/40 p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Search className="w-3.5 h-3.5 text-sky-600" />
+                      <p className="text-xs font-extrabold text-gray-900">Skills audit · {analysis.scorecard.skills.score}</p>
+                    </div>
+                    <p className="text-xs text-gray-600 leading-relaxed">{analysis.scorecard.skills.summary}</p>
+                    {([
+                      ["Keep", analysis.scorecard.skills.keep, "text-emerald-700"],
+                      ["Add", analysis.scorecard.skills.add, "text-violet-700"],
+                      ["Review", analysis.scorecard.skills.review, "text-orange-700"],
+                    ] as const).map(([label, skills, className]) => skills.length > 0 && (
+                      <div key={label} className="mt-3">
+                        <p className={cn("text-[9px] font-black uppercase tracking-wide mb-1.5", className)}>{label}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {skills.map((skill) => <span key={skill} className="px-2 py-1 rounded-lg bg-white border border-gray-100 text-[10px] font-semibold text-gray-700">{skill}</span>)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+
             {analysis.narrativeSummary && (
               <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
                 <p className="text-[10px] font-black uppercase tracking-wider text-violet-600 mb-1">Summary</p>
@@ -158,7 +312,7 @@ export function ProfileAlignmentReport({ analysis: initial, onClose }: Props) {
             )}
 
             <div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">CV vs BrandMoi vs LinkedIn</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Alignment details</p>
               <div className="space-y-2">
                 {analysis.comparisonTable.rows.map((row) => {
                   const status = STATUS_COPY[row.status];

@@ -10,7 +10,16 @@ import { ProfileAlignmentReport } from "@/components/ProfileAlignmentReport";
 import { usePageTour } from "@/components/tour/usePageTour";
 import { PROFILE_ALIGNMENT_TOUR_STEPS } from "@/components/tour/page-tours";
 
-const TARGET_AUDIENCES: TargetAudience[] = ["Recruiters", "Hiring managers", "Clients", "Peers", "Investors", "General"];
+const TARGET_AUDIENCES: TargetAudience[] = [
+  "Recruiters",
+  "Hiring managers",
+  "Clients",
+  "Founders & operators",
+  "Personal brand audience",
+  "Peers",
+  "Investors",
+  "General",
+];
 
 export default function ProfileAlignment() {
   const [, navigate] = useLocation();
@@ -73,7 +82,7 @@ export default function ProfileAlignment() {
               <Target className="w-5 h-5 text-violet-500 flex-shrink-0" />
               Profile Alignment
             </h1>
-            <p className="text-xs text-gray-400">CV, BrandMoi, and LinkedIn — make sure they all say the same thing.</p>
+              <p className="text-xs text-gray-400">Score your LinkedIn profile and make every section prove your value.</p>
           </div>
         </div>
 
@@ -87,16 +96,18 @@ export default function ProfileAlignment() {
             <ProfileAlignmentUpload kind="linkedin" onSuccess={() => setHasLinkedinFacts(true)} />
           </div>
 
-          {hasCvFacts && hasLinkedinFacts && (
+          {hasLinkedinFacts && (
             <div className="pt-3 border-t border-gray-100 space-y-3">
-              <button
-                onClick={() => void handleViewComparison()}
-                disabled={comparisonLoading}
-                className="w-full flex items-center justify-center gap-1.5 h-9 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:border-gray-300 disabled:opacity-50 transition-colors"
-              >
-                {comparisonLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                {comparisonLoading ? "Loading…" : "View CV vs BrandMoi vs LinkedIn (no AI cost)"}
-              </button>
+              {hasCvFacts && (
+                <button
+                  onClick={() => void handleViewComparison()}
+                  disabled={comparisonLoading}
+                  className="w-full flex items-center justify-center gap-1.5 h-9 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:border-gray-300 disabled:opacity-50 transition-colors"
+                >
+                  {comparisonLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                  {comparisonLoading ? "Loading…" : "View CV vs BrandMoi vs LinkedIn (no AI cost)"}
+                </button>
+              )}
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Who should this profile speak to?</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -121,7 +132,7 @@ export default function ProfileAlignment() {
                   className="flex-1 flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold disabled:opacity-50 transition-colors"
                 >
                   {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
-                  {analyzing ? "Analysing…" : "Run analysis (3/day)"}
+                  {analyzing ? "Scoring profile…" : "Score my profile (3/day)"}
                 </button>
                 {analysis && (
                   <button
@@ -132,12 +143,17 @@ export default function ProfileAlignment() {
                   </button>
                 )}
               </div>
+              {!hasCvFacts && (
+                <p className="text-[10px] text-gray-400 leading-relaxed">
+                  You can score LinkedIn now. Add your CV first if you want stronger proof-point and experience comparisons.
+                </p>
+              )}
             </div>
           )}
         </div>
 
         <p className="text-[11px] text-gray-400 leading-relaxed px-1">
-          Nothing is ever published automatically. Upload your CV and LinkedIn export (or paste your profile text), review where they disagree with your BrandMoi positioning, then accept, edit, or reject each suggestion yourself.
+          Nothing is ever published automatically. Your score explains the evidence behind every result, and suggested rewrites never invent missing outcomes.
         </p>
       </div>
 

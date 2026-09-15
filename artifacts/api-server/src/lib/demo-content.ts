@@ -281,6 +281,17 @@ const DEMO_CV_FACTS = {
     "Ran 40+ customer interviews that reshaped the 2024 product roadmap",
   ],
   skills: ["Product discovery", "Customer research", "Roadmapping", "Stakeholder alignment"],
+  experience: [
+    {
+      role: "Senior Product Manager",
+      employer: "Northwind Analytics",
+      dates: "2022 - Present",
+      bullets: [
+        "Led discovery research that cut onboarding drop-off by 23% in 6 months",
+        "Grew activation from 41% to 58% across a 12-person cross-functional team",
+      ],
+    },
+  ],
 };
 
 const DEMO_LINKEDIN_FACTS = {
@@ -291,13 +302,24 @@ const DEMO_LINKEDIN_FACTS = {
   currentRoleDates: "2021 - Present",
   achievements: [],
   skills: ["Leadership", "Product Management", "Strategy"],
+  experience: [
+    {
+      role: "Product Lead",
+      employer: "Northwind Analytics",
+      dates: "2021 - Present",
+      bullets: [
+        "Responsible for the product roadmap and stakeholder management",
+        "Led a cross-functional product team",
+      ],
+    },
+  ],
 };
 
 export function getDemoProfileFacts(kind: "cv" | "linkedin") {
   return kind === "cv" ? DEMO_CV_FACTS : DEMO_LINKEDIN_FACTS;
 }
 
-export function getDemoProfileAlignment() {
+export function getDemoProfileAlignment(targetAudience = "Recruiters") {
   const comparisonTable = {
     generatedAt: new Date().toISOString(),
     rows: [
@@ -331,8 +353,88 @@ export function getDemoProfileAlignment() {
 
   return {
     id: 0,
-    targetAudience: "Recruiters",
+    targetAudience,
     comparisonTable,
+    scorecard: {
+      overallScore: 43,
+      overallVerdict: `Your experience is credible, but LinkedIn makes ${targetAudience.toLowerCase()} work too hard to understand your specific value.`,
+      dimensions: [
+        {
+          key: "headline", label: "Headline", score: 34,
+          summary: "The headline gives a broad function but no specific claim about expertise or value.",
+          checks: [
+            { key: "claim", label: "Specific claim", score: 20, detail: "\"Business professional\" could describe thousands of profiles and makes no defensible claim." },
+            { key: "expertise", label: "Expertise", score: 45, detail: "Product and strategy are named, but customer research and product discovery are missing." },
+            { key: "value", label: "Value delivered", score: 15, detail: "The headline does not say what becomes better because of this person's work." },
+            { key: "audience", label: "Audience fit", score: 35, detail: `The field is visible, but ${targetAudience.toLowerCase()} cannot quickly see the problems this person is best placed to solve.` },
+            { key: "search", label: "Search clarity", score: 55, detail: "Product and strategy are relevant terms, though still too broad." },
+          ],
+        },
+        {
+          key: "about", label: "About", score: 31,
+          summary: "The opening uses generic professional language instead of answering why someone should contact this person.",
+          checks: [
+            { key: "opening", label: "First two sentences", score: 15, detail: "They describe background and enthusiasm, not a specific reason to call this person." },
+            { key: "audience", label: "Who they help", score: 20, detail: "No reader, team, or business problem is named." },
+            { key: "proof", label: "Proof", score: 10, detail: "None of the three quantified CV outcomes appear here." },
+            { key: "difference", label: "Differentiation", score: 30, detail: "The wording could fit most product managers." },
+            { key: "next_step", label: "Next step", score: 80, detail: "A natural contact line can be added once the value proposition is clear." },
+          ],
+        },
+        {
+          key: "experience", label: "Experience", score: 42,
+          summary: "The bullets describe ownership, but not what changed because the work was done.",
+          checks: [
+            { key: "outcomes", label: "What changed", score: 20, detail: "Neither LinkedIn bullet names an outcome." },
+            { key: "scope", label: "Scope", score: 35, detail: "A cross-functional team is mentioned, but team size and remit are absent." },
+            { key: "evidence", label: "Evidence", score: 15, detail: "The stronger metrics from the CV are missing from LinkedIn." },
+            { key: "ownership", label: "Ownership", score: 70, detail: "The verbs show ownership, but \"responsible for\" weakens the signal." },
+          ],
+        },
+        {
+          key: "skills", label: "Skills", score: 65,
+          summary: "The skills are relevant but broad; the strongest demonstrated specialisms are missing.",
+          checks: [
+            { key: "relevance", label: "Audience relevance", score: 70, detail: "The current skills are recognisable to recruiters." },
+            { key: "evidence", label: "Supported by experience", score: 75, detail: "Product management and strategy are reflected in the role." },
+            { key: "specificity", label: "Specificity", score: 45, detail: "Leadership and strategy are generic without sharper craft skills." },
+            { key: "coverage", label: "Coverage", score: 70, detail: "Product discovery and customer research are evidenced in the CV but missing here." },
+          ],
+        },
+      ],
+      experienceBullets: [
+        {
+          role: "Product Lead",
+          bullet: "Responsible for the product roadmap and stakeholder management",
+          impactScore: 24,
+          classification: "responsibility",
+          whatChanged: "No outcome is stated; the bullet only names areas of responsibility.",
+          missing: ["outcome", "scope", "evidence"],
+          suggestedRewrite: "Owned the product roadmap and stakeholder alignment, contributing to [add the product or business result].",
+        },
+        {
+          role: "Product Lead",
+          bullet: "Led a cross-functional product team",
+          impactScore: 38,
+          classification: "mixed",
+          whatChanged: "Leadership is clear, but the team size, objective, and outcome are not.",
+          missing: ["team size", "outcome"],
+          suggestedRewrite: "Led a cross-functional product team of [add team size] to [add the outcome delivered].",
+        },
+      ],
+      skills: {
+        score: 65,
+        summary: "Keep the core product terms, then replace generic labels with specialisms your experience already proves.",
+        keep: ["Product Management", "Strategy"],
+        add: ["Product discovery", "Customer research", "Roadmapping"],
+        review: ["Leadership"],
+      },
+      priorities: [
+        "Replace the generic headline with a specific product-discovery claim and the value it creates.",
+        `Use the first two About sentences to explain why ${targetAudience.toLowerCase()} should contact you specifically.`,
+        "Move the quantified CV outcomes into the matching LinkedIn experience bullets.",
+      ],
+    },
     narrativeSummary: "Your LinkedIn headline reads as generic (\"Business professional\") while your CV and BrandMoi positioning both point to product discovery and customer research — that gap is the main thing costing you recognisability.",
     fieldRewrites: [
       {

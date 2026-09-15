@@ -323,6 +323,12 @@ export type ProfileFacts = {
   currentRoleDates: string | null;
   achievements: string[];
   skills: string[];
+  experience: Array<{
+    role: string;
+    employer: string | null;
+    dates: string | null;
+    bullets: string[];
+  }>;
 };
 
 export type ApplicableSource = "cv" | "brandmoi" | "linkedin";
@@ -363,7 +369,7 @@ export type ComparisonTable = {
   rows: Array<ComparisonRow | ProofPointComparisonRow>;
 };
 
-export type TargetAudience = "Recruiters" | "Hiring managers" | "Clients" | "Peers" | "Investors" | "General";
+export type TargetAudience = "Recruiters" | "Hiring managers" | "Clients" | "Founders & operators" | "Personal brand audience" | "Peers" | "Investors" | "General";
 
 export type RecommendationStatus = "pending" | "accepted" | "edited" | "rejected";
 
@@ -402,7 +408,48 @@ export type ProfileAlignmentAnalysis = {
   narrativeSummary: string;
   fieldRewrites: FieldRewrite[];
   pairedFactSuggestions: PairedFactSuggestion[];
+  scorecard?: ProfileScorecard;
   createdAt: string;
+};
+
+export type ScorecardCheck = {
+  key: string;
+  label: string;
+  score: number;
+  detail: string;
+};
+
+export type ScorecardDimension = {
+  key: "headline" | "about" | "experience" | "skills";
+  label: string;
+  score: number;
+  summary: string;
+  checks: ScorecardCheck[];
+};
+
+export type ExperienceBulletAudit = {
+  role: string;
+  bullet: string;
+  impactScore: number;
+  classification: "impact" | "mixed" | "responsibility";
+  whatChanged: string;
+  missing: string[];
+  suggestedRewrite: string;
+};
+
+export type ProfileScorecard = {
+  overallScore: number;
+  overallVerdict: string;
+  dimensions: ScorecardDimension[];
+  experienceBullets: ExperienceBulletAudit[];
+  skills: {
+    score: number;
+    summary: string;
+    keep: string[];
+    add: string[];
+    review: string[];
+  };
+  priorities: string[];
 };
 
 async function postForm<T>(path: string, form: FormData): Promise<T> {

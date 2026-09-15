@@ -132,8 +132,8 @@ export type ComparisonTable = {
   rows: Array<ComparisonRow | ProofPointComparisonRow>;
 };
 
-export type TargetAudience = "Recruiters" | "Hiring managers" | "Clients" | "Peers" | "Investors" | "General";
-const TARGET_AUDIENCES: TargetAudience[] = ["Recruiters", "Hiring managers", "Clients", "Peers", "Investors", "General"];
+export type TargetAudience = "Recruiters" | "Hiring managers" | "Clients" | "Founders & operators" | "Personal brand audience" | "Peers" | "Investors" | "General";
+const TARGET_AUDIENCES: TargetAudience[] = ["Recruiters", "Hiring managers", "Clients", "Founders & operators", "Personal brand audience", "Peers", "Investors", "General"];
 
 export type FieldRewrite = {
   id: string;
@@ -210,6 +210,90 @@ export type ProfileScorecard = {
   priorities: string[];
 };
 
+const SCORECARD_DIMENSIONS: Array<{ key: ScorecardDimension["key"]; label: string }> = [
+  { key: "headline", label: "Headline" },
+  { key: "about", label: "About" },
+  { key: "experience", label: "Experience" },
+  { key: "skills", label: "Skills" },
+];
+
+function clampScore(value: unknown): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 0;
+}
+
+function shortString(value: unknown, max: number): string {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function shortStringArray(value: unknown, maxItems: number, maxLength = 180): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .slice(0, maxItems)
+      .map((item) => item.trim().slice(0, maxLength))
+    : [];
+}
+
+function parseScorecard(value: unknown): ProfileScorecard {
+  const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawDimensions = Array.isArray(source.dimensions) ? source.dimensions as Array<Record<string, unknown>> : [];
+  const dimensions = SCORECARD_DIMENSIONS.map(({ key, label }) => {
+    const match = rawDimensions.find((dimension) => dimension.key === key);
+    const rawChecks = Array.isArray(match?.checks) ? match.checks as Array<Record<string, unknown>> : [];
+    return {
+      key,
+      label,
+      score: clampScore(match?.score),
+      summary: shortString(match?.summary, 360) || "Not enough profile evidence to assess this section.",
+      checks: rawChecks.slice(0, 5).map((check, index) => ({
+        key: shortString(check.key, 60) || `${key}-${index + 1}`,
+        label: shortString(check.label, 100) || "Profile check",
+        score: clampScore(check.score),
+        detail: shortString(check.detail, 300) || "No explanation provided.",
+      })),
+    };
+  });
+
+  const rawBullets = Array.isArray(source.experienceBullets)
+    ? source.experienceBullets as Array<Record<string, unknown>>
+    : [];
+  const experienceBullets: ExperienceBulletAudit[] = rawBullets.slice(0, 18).map((bullet) => {
+    const classification: ExperienceBulletAudit["classification"] = bullet.classification === "impact" || bullet.classification === "mixed"
+      ? bullet.classification
+      : "responsibility";
+    return {
+      role: shortString(bullet.role, 160) || "Experience",
+      bullet: shortString(bullet.bullet, 500),
+      impactScore: clampScore(bullet.impactScore),
+      classification,
+      whatChanged: shortString(bullet.whatChanged, 300) || "The outcome is not clear from this bullet.",
+      missing: shortStringArray(bullet.missing, 4, 80),
+      suggestedRewrite: shortString(bullet.suggestedRewrite, 500),
+    };
+  }).filter((bullet) => bullet.bullet);
+
+  const rawSkills = source.skills && typeof source.skills === "object"
+    ? source.skills as Record<string, unknown>
+    : {};
+  const overallScore = Math.round(dimensions.reduce((sum, dimension) => sum + dimension.score, 0) / dimensions.length);
+  const skillsScore = dimensions.find((dimension) => dimension.key === "skills")?.score ?? 0;
+
+  return {
+    overallScore,
+    overallVerdict: shortString(source.overallVerdict, 360) || "Your profile needs more specific evidence of the value you create.",
+    dimensions,
+    experienceBullets,
+    skills: {
+      score: skillsScore,
+      summary: shortString(rawSkills.summary, 360) || "Not enough skills evidence to assess this section.",
+      keep: shortStringArray(rawSkills.keep, 8, 100),
+      add: shortStringArray(rawSkills.add, 8, 100),
+      review: shortStringArray(rawSkills.review, 8, 100),
+    },
+    priorities: shortStringArray(source.priorities, 5, 220),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Upload + normalize (one small AI call each, mirrors smart-import.ts)
 // ---------------------------------------------------------------------------
@@ -219,7 +303,7 @@ async function normalizeProfileFacts(rawText: string, sourceType: "cv" | "linked
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1200,
+      max_tokens: 3000,
     system: `You extract structured professional facts from a ${sourceType === "cv" ? "CV/resume" : "LinkedIn profile export"}. Return valid JSON only — no markdown, no commentary. Never invent a fact that isn't in the document — use null or an empty array when something isn't present.`,
     messages: [
       {
@@ -251,8 +335,8 @@ Return this exact JSON:
 Rules:
 - ${sourceType === "cv" ? "This is a CV — headline and about MUST be null, a CV does not have those sections." : "Extract headline/about only if this document actually has those LinkedIn sections."}
 - achievements: up to 8, each one sentence, max 140 characters, must contain a real number/name/scale taken from the document. Never invent one.
-- skills: up to 12, short phrases as written in the document.`,
- - experience: up to 8 roles, with up to 6 bullets per role. Preserve bullets from the document; do not turn responsibilities into achievements and do not invent missing outcomes.`,
+- skills: up to 12, short phrases as written in the document.
+- experience: up to 8 roles, with up to 6 bullets per role. Preserve bullets from the document; do not turn responsibilities into achievements and do not invent missing outcomes.`,
       },
     ],
   });
@@ -537,19 +621,19 @@ router.get("/profile-alignment/comparison", requireAuth, async (req, res): Promi
 const AnalyzeBody = z.object({ targetAudience: z.enum(TARGET_AUDIENCES as [TargetAudience, ...TargetAudience[]]) });
 
 router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
-  if (isDemoUser(req.user!.email)) {
-    res.json(getDemoProfileAlignment());
-    return;
-  }
-
   const parsed = AnalyzeBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Choose a target audience first." }); return; }
   const { targetAudience } = parsed.data;
+  if (isDemoUser(req.user!.email)) {
+    res.json(getDemoProfileAlignment(targetAudience));
+    return;
+  }
+
   const userId = req.user!.userId;
 
   const [snapshot] = await db.select().from(profileSnapshotsTable).where(eq(profileSnapshotsTable.userId, userId)).limit(1);
-  if (!snapshot?.cvFacts || !snapshot?.linkedinFacts) {
-    res.status(400).json({ error: "Upload both your CV and LinkedIn profile before running an analysis." });
+  if (!snapshot?.linkedinFacts) {
+    res.status(400).json({ error: "Upload or paste your LinkedIn profile before running an analysis." });
     return;
   }
 
@@ -570,7 +654,16 @@ router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, 
   try {
     const comparisonTable = await computeComparisonTable(userId);
     const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
-    const cvFacts = snapshot.cvFacts as ProfileFacts;
+    const cvFacts = (snapshot.cvFacts ?? {
+      headline: null,
+      about: null,
+      currentTitle: null,
+      currentEmployer: null,
+      currentRoleDates: null,
+      achievements: [],
+      skills: [],
+      experience: [],
+    }) as ProfileFacts;
     const linkedinFacts = snapshot.linkedinFacts as ProfileFacts;
 
     const disagreements = comparisonTable.rows.filter(
@@ -581,8 +674,8 @@ router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, 
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 2000,
-      system: `You are a LinkedIn profile alignment assistant. You NEVER invent facts — every claim you write must come from the CV facts, LinkedIn facts, or BrandMoi context provided. If something is uncertain, say so instead of guessing.
+      max_tokens: 4800,
+      system: `You are a LinkedIn profile alignment and optimisation assistant. You NEVER invent facts — every claim you write must come from the CV facts, LinkedIn facts, or BrandMoi context provided. If something is uncertain, say so instead of guessing.
 
 Ground rule: the CV is the source of truth for anything it actually states (title, employer, dates, achievements). BrandMoi's own stored positioning (audience, belief, tone) is authoritative for anything the CV has no opinion on — a CV cannot be "wrong" about something it never addresses.
 
@@ -596,13 +689,89 @@ Return JSON only (no markdown):
   ],
   "pairedFactSuggestions": [
     {"rowKey": "role_title", "claim": "the CV's stated fact, near-verbatim", "brandmoiSuggestion": "what BrandMoi's relevant field should say instead, grounded in the CV", "linkedinSuggestion": "what LinkedIn's wording should say instead, grounded in the CV"}
-  ]
+  ],
+  "scorecard": {
+    "overallScore": 0,
+    "overallVerdict": "one plain-language verdict explaining the score",
+    "dimensions": [
+      {
+        "key": "headline", "label": "Headline", "score": 0,
+        "summary": "what is working and the main gap",
+        "checks": [
+          {"key": "claim", "label": "Specific claim", "score": 0, "detail": "does it make a specific claim beyond a job title?"},
+          {"key": "expertise", "label": "Expertise", "score": 0, "detail": "is the expertise clear?"},
+          {"key": "value", "label": "Value delivered", "score": 0, "detail": "does it say what changes for the audience?"},
+          {"key": "audience", "label": "Audience fit", "score": 0, "detail": "does it speak to the selected audience?"},
+          {"key": "search", "label": "Search clarity", "score": 0, "detail": "does it use credible, relevant search terms?"}
+        ]
+      },
+      {
+        "key": "about", "label": "About", "score": 0,
+        "summary": "what is working and the main gap",
+        "checks": [
+          {"key": "opening", "label": "First two sentences", "score": 0, "detail": "do they answer why someone should contact this person specifically?"},
+          {"key": "audience", "label": "Who they help", "score": 0, "detail": "is the intended audience recognisable?"},
+          {"key": "proof", "label": "Proof", "score": 0, "detail": "are claims supported by supplied evidence?"},
+          {"key": "difference", "label": "Differentiation", "score": 0, "detail": "is the approach or point of view distinctive?"},
+          {"key": "next_step", "label": "Next step", "score": 0, "detail": "is there a natural reason to continue the conversation?"}
+        ]
+      },
+      {
+        "key": "experience", "label": "Experience", "score": 0,
+        "summary": "whether the bullets show impact or mostly list responsibilities",
+        "checks": [
+          {"key": "outcomes", "label": "What changed", "score": 0, "detail": "do bullets state the change created?"},
+          {"key": "scope", "label": "Scope", "score": 0, "detail": "is scale or context visible?"},
+          {"key": "evidence", "label": "Evidence", "score": 0, "detail": "are outcomes supported by numbers, names, or concrete facts?"},
+          {"key": "ownership", "label": "Ownership", "score": 0, "detail": "is the person's contribution clear?"}
+        ]
+      },
+      {
+        "key": "skills", "label": "Skills", "score": 0,
+        "summary": "whether the skills support the intended positioning",
+        "checks": [
+          {"key": "relevance", "label": "Audience relevance", "score": 0, "detail": "do the skills match the selected audience and positioning?"},
+          {"key": "evidence", "label": "Supported by experience", "score": 0, "detail": "are the skills evidenced elsewhere in the profile?"},
+          {"key": "specificity", "label": "Specificity", "score": 0, "detail": "are they more useful than generic labels?"},
+          {"key": "coverage", "label": "Coverage", "score": 0, "detail": "are important demonstrated skills missing?"}
+        ]
+      }
+    ],
+    "experienceBullets": [
+      {
+        "role": "role title",
+        "bullet": "original bullet verbatim",
+        "impactScore": 0,
+        "classification": "impact|mixed|responsibility",
+        "whatChanged": "the concrete change visible in the bullet, or say it is not stated",
+        "missing": ["outcome", "scale"],
+        "suggestedRewrite": "a stronger rewrite using only supplied facts; use [add the result] or [add scale] instead of inventing missing evidence"
+      }
+    ],
+    "skills": {
+      "score": 0,
+      "summary": "plain-language skills verdict",
+      "keep": ["skills that support the positioning"],
+      "add": ["skills already evidenced by supplied material but missing from LinkedIn"],
+      "review": ["generic, duplicated, or weakly evidenced skills"]
+    },
+    "priorities": ["the highest-value change first", "second priority", "third priority"]
+  }
 }
 
 Rules:
 - fieldRewrites must contain exactly 3 entries, one per field, in this order: headline, about, current_role.
 - pairedFactSuggestions: only include a row here if the deterministic findings show CV disagreeing with BrandMoi and/or LinkedIn on a factual matter (role_title, territories). Do not include audience or recent_content_themes here — CV has no opinion on those. Omit entirely if there's nothing to reconcile.
-- Never invent an employer, date, metric, or achievement not present in the CV or LinkedIn facts provided.`,
+- Never invent an employer, date, metric, or achievement not present in the CV or LinkedIn facts provided.
+- All scores are integers from 0-100. Score only what is actually present. Missing content scores 0; uncertainty must be explained.
+- overallScore must be the rounded average of the four dimension scores. Do not use hidden weighting.
+- A headline should make a specific, defensible claim about expertise and value, not merely repeat a role title.
+- Judge the first two About sentences against one question: "Why should I contact this person specifically?"
+- Experience scoring is about impact, not seniority or role prestige. Audit every supplied LinkedIn experience bullet, up to 18 total.
+- For each experience bullet ask: "What changed because this person was there?" A responsibility without an outcome, scope, or evidence must not score as impact.
+- Never invent a result in suggestedRewrite. When a result is absent, retain a visible [add the result] or [add scale] prompt.
+- Only recommend adding a skill when it is evidenced in the supplied CV, LinkedIn experience, achievements, or BrandMoi proof points.
+- Keep explanations specific and plain. Quote supplied wording or state exactly what is missing.`,
       messages: [{ role: "user", content: userMessage }],
     });
 
@@ -612,6 +781,7 @@ Rules:
       narrativeSummary?: unknown;
       fieldRewrites?: unknown;
       pairedFactSuggestions?: unknown;
+      scorecard?: unknown;
     };
 
     const FIELD_ORDER: FieldRewrite["field"][] = ["headline", "about", "current_role"];
@@ -653,6 +823,7 @@ Rules:
       narrativeSummary: typeof raw.narrativeSummary === "string" ? raw.narrativeSummary.slice(0, 600) : "",
       fieldRewrites,
       pairedFactSuggestions,
+      scorecard: parseScorecard(raw.scorecard),
     };
 
     const [analysis] = await db

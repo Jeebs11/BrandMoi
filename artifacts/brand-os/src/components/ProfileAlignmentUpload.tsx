@@ -82,7 +82,7 @@ export function ProfileAlignmentUpload({ kind, onSuccess }: Props) {
           <textarea
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
-            placeholder="Paste your Headline, About, and current role text from your LinkedIn profile…"
+            placeholder="Paste your Headline, About, Experience bullets, and Skills from your LinkedIn profile…"
             className="w-full h-32 rounded-2xl border-2 border-primary/20 p-3 text-sm text-gray-800 focus:outline-none focus:border-primary/50"
           />
           <div className="flex gap-2">
