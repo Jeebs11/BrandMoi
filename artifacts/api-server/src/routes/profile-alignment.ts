@@ -192,10 +192,11 @@ function profilePositioningFingerprint(prefs: Record<string, unknown> | undefine
 
 function buildProfileAnalysisCacheKey(
   snapshotId: number,
+  snapshotCapturedAt: Date,
   targetAudience: string,
   prefs: Record<string, unknown> | undefined,
 ): string {
-  return `${PROFILE_ANALYSIS_VERSION}:${snapshotId}:${targetAudience}:${profilePositioningFingerprint(prefs)}`;
+  return `${PROFILE_ANALYSIS_VERSION}:${snapshotId}:${snapshotCapturedAt.toISOString()}:${targetAudience}:${profilePositioningFingerprint(prefs)}`;
 }
 
 function analysisResponse(analysis: typeof profileAnalysesTable.$inferSelect): ProfileAlignmentResponse {
@@ -689,7 +690,7 @@ router.get("/profile-alignment/latest", requireAuth, async (req, res): Promise<v
   const prefsRow = prefs[0] as Record<string, unknown> | undefined;
   const savedRecommendations = saved?.recommendations as StoredRecommendations | undefined;
   const currentKey = snapshotRow && saved
-    ? buildProfileAnalysisCacheKey(snapshotRow.id, saved.targetAudience, prefsRow)
+    ? buildProfileAnalysisCacheKey(snapshotRow.id, snapshotRow.capturedAt, saved.targetAudience, prefsRow)
     : null;
 
   res.json({
@@ -718,7 +719,7 @@ router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, 
   }
 
   const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
-  const cacheKey = buildProfileAnalysisCacheKey(snapshot.id, targetAudience, prefs as Record<string, unknown> | undefined);
+  const cacheKey = buildProfileAnalysisCacheKey(snapshot.id, snapshot.capturedAt, targetAudience, prefs as Record<string, unknown> | undefined);
   if (!forceFresh) {
     const [latest] = await db.select().from(profileAnalysesTable)
       .where(eq(profileAnalysesTable.userId, userId))

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, Target, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -30,9 +30,34 @@ export default function ProfileAlignment() {
   const [targetAudience, setTargetAudience] = useState<TargetAudience>("Recruiters");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<ProfileAlignmentAnalysis | null>(null);
+  const [analysisIsCurrent, setAnalysisIsCurrent] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const pageTour = usePageTour("profile-alignment-tour", PROFILE_ALIGNMENT_TOUR_STEPS);
+
+  useEffect(() => {
+    let active = true;
+    profileAlignmentApi.latest()
+      .then((result) => {
+        if (!active) return;
+        setHasCvFacts(result.hasCvFacts);
+        setHasLinkedinFacts(result.hasLinkedinFacts);
+        if (result.analysis) {
+          setAnalysis(result.analysis);
+          setAnalysisIsCurrent(result.isCurrent);
+          setTargetAudience(result.analysis.targetAudience);
+        }
+      })
+      .catch(() => {
+        // A saved report is optional; the upload flow remains available if
+        // the user has no prior profile snapshot yet.
+      })
+      .finally(() => {
+        if (active) setRestoring(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const handleViewComparison = async () => {
     if (comparisonLoading) return;
@@ -48,6 +73,7 @@ export default function ProfileAlignment() {
         pairedFactSuggestions: [],
         createdAt: new Date().toISOString(),
       });
+      setAnalysisIsCurrent(false);
       setReportOpen(true);
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Couldn't load the comparison.", variant: "destructive" });
@@ -60,8 +86,11 @@ export default function ProfileAlignment() {
     if (analyzing) return;
     setAnalyzing(true);
     try {
-      const result = await profileAlignmentApi.analyze(targetAudience);
+      const result = await profileAlignmentApi.analyze(targetAudience, {
+        forceFresh: Boolean(analysis && analysisIsCurrent),
+      });
       setAnalysis(result);
+      setAnalysisIsCurrent(true);
       setReportOpen(true);
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : "Couldn't run the analysis.", variant: "destructive" });
@@ -89,11 +118,11 @@ export default function ProfileAlignment() {
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 space-y-4">
           <div data-tour="align-cv">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Your CV</p>
-            <ProfileAlignmentUpload kind="cv" onSuccess={() => setHasCvFacts(true)} />
+            <ProfileAlignmentUpload kind="cv" onSuccess={() => { setHasCvFacts(true); setAnalysisIsCurrent(false); }} />
           </div>
           <div data-tour="align-linkedin">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Your LinkedIn profile</p>
-            <ProfileAlignmentUpload kind="linkedin" onSuccess={() => setHasLinkedinFacts(true)} />
+            <ProfileAlignmentUpload kind="linkedin" onSuccess={() => { setHasLinkedinFacts(true); setAnalysisIsCurrent(false); }} />
           </div>
 
           {hasLinkedinFacts && (
@@ -114,7 +143,10 @@ export default function ProfileAlignment() {
                   {TARGET_AUDIENCES.map((aud) => (
                     <button
                       key={aud}
-                      onClick={() => setTargetAudience(aud)}
+                      onClick={() => {
+                        setTargetAudience(aud);
+                        if (analysis && analysis.targetAudience !== aud) setAnalysisIsCurrent(false);
+                      }}
                       className={cn(
                         "px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all",
                         targetAudience === aud ? "bg-violet-600 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100",
@@ -125,14 +157,30 @@ export default function ProfileAlignment() {
                   ))}
                 </div>
               </div>
+              {analysis && (
+                <div className={cn(
+                  "rounded-xl px-3 py-2 text-[10px] leading-relaxed",
+                  analysisIsCurrent ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+                )}>
+                  {analysisIsCurrent
+                    ? "Saved analysis loaded. Your profile and audience have not changed, so returning here will not run AI again."
+                    : "This saved report is from an older profile or audience selection. Score again to refresh it."}
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => void handleRunAnalysis()}
-                  disabled={analyzing}
+                  disabled={analyzing || restoring}
                   className="flex-1 flex items-center justify-center gap-1.5 h-11 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold disabled:opacity-50 transition-colors"
                 >
                   {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
-                  {analyzing ? "Scoring profile…" : "Score my profile (3/day)"}
+                  {analyzing
+                    ? "Scoring profile…"
+                    : analysisIsCurrent
+                      ? "Run fresh analysis"
+                      : analysis
+                        ? "Score updated profile"
+                        : "Score my profile (3/day)"}
                 </button>
                 {analysis && (
                   <button

@@ -410,6 +410,14 @@ export type ProfileAlignmentAnalysis = {
   pairedFactSuggestions: PairedFactSuggestion[];
   scorecard?: ProfileScorecard;
   createdAt: string;
+  cached?: boolean;
+};
+
+export type LatestProfileAlignmentResponse = {
+  analysis: ProfileAlignmentAnalysis | null;
+  isCurrent: boolean;
+  hasCvFacts: boolean;
+  hasLinkedinFacts: boolean;
 };
 
 export type ScorecardCheck = {
@@ -480,9 +488,13 @@ export const profileAlignmentApi = {
     form.append("pastedText", pastedText);
     return postForm<ProfileFacts>("/profile-alignment/linkedin", form);
   },
+  latest: () => apiFetch<LatestProfileAlignmentResponse>("/profile-alignment/latest"),
   comparison: () => apiFetch<ComparisonTable>("/profile-alignment/comparison"),
-  analyze: (targetAudience: TargetAudience) =>
-    apiFetch<ProfileAlignmentAnalysis>("/profile-alignment/analyze", { method: "POST", body: JSON.stringify({ targetAudience }) }),
+  analyze: (targetAudience: TargetAudience, options?: { forceFresh?: boolean }) =>
+    apiFetch<ProfileAlignmentAnalysis>("/profile-alignment/analyze", {
+      method: "POST",
+      body: JSON.stringify({ targetAudience, forceFresh: options?.forceFresh ?? false }),
+    }),
   reviewRecommendation: (
     analysisId: number,
     recId: string,
