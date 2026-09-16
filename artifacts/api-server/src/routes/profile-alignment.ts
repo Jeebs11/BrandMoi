@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { createHash } from "node:crypto";
 import multer from "multer";
 import { z } from "zod";
 import { eq, desc, and } from "drizzle-orm";
@@ -168,6 +169,56 @@ export type StoredRecommendations = {
   fieldRewrites: FieldRewrite[];
   pairedFactSuggestions: PairedFactSuggestion[];
   scorecard: ProfileScorecard;
+  cacheKey?: string;
+  analysisVersion?: number;
+};
+
+const PROFILE_ANALYSIS_VERSION = 1;
+
+function profilePositioningFingerprint(prefs: Record<string, unknown> | undefined): string {
+  return createHash("sha256").update(JSON.stringify({
+    version: PROFILE_ANALYSIS_VERSION,
+    aboutMe: prefs?.aboutMe ?? "",
+    brandRole: prefs?.brandRole ?? "",
+    brandAudience: prefs?.brandAudience ?? "",
+    brandBelief: prefs?.brandBelief ?? "",
+    contentPillars: prefs?.contentPillars ?? [],
+    proofPoints: prefs?.proofPoints ?? [],
+    objective: prefs?.objective ?? "",
+    persona: prefs?.persona ?? "",
+    tone: prefs?.tone ?? "",
+  })).digest("hex").slice(0, 24);
+}
+
+function buildProfileAnalysisCacheKey(
+  snapshotId: number,
+  targetAudience: string,
+  prefs: Record<string, unknown> | undefined,
+): string {
+  return `${PROFILE_ANALYSIS_VERSION}:${snapshotId}:${targetAudience}:${profilePositioningFingerprint(prefs)}`;
+}
+
+function analysisResponse(analysis: typeof profileAnalysesTable.$inferSelect): ProfileAlignmentResponse {
+  const recommendations = analysis.recommendations as StoredRecommendations;
+  return {
+    id: analysis.id,
+    targetAudience: analysis.targetAudience as TargetAudience,
+    comparisonTable: analysis.comparisonTable as ComparisonTable,
+    ...recommendations,
+    createdAt: analysis.createdAt.toISOString(),
+  };
+}
+
+export type ProfileAlignmentResponse = {
+  id: number;
+  targetAudience: TargetAudience;
+  comparisonTable: ComparisonTable;
+  narrativeSummary: string;
+  fieldRewrites: FieldRewrite[];
+  pairedFactSuggestions: PairedFactSuggestion[];
+  scorecard: ProfileScorecard;
+  createdAt: string;
+  cached?: boolean;
 };
 
 export type ScorecardCheck = {
@@ -618,12 +669,41 @@ router.get("/profile-alignment/comparison", requireAuth, async (req, res): Promi
 // The single AI analysis call
 // ---------------------------------------------------------------------------
 
-const AnalyzeBody = z.object({ targetAudience: z.enum(TARGET_AUDIENCES as [TargetAudience, ...TargetAudience[]]) });
+const AnalyzeBody = z.object({
+  targetAudience: z.enum(TARGET_AUDIENCES as [TargetAudience, ...TargetAudience[]]),
+  forceFresh: z.boolean().optional().default(false),
+});
+
+router.get("/profile-alignment/latest", requireAuth, async (req, res): Promise<void> => {
+  const [snapshot, prefs, latest] = await Promise.all([
+    db.select().from(profileSnapshotsTable).where(eq(profileSnapshotsTable.userId, req.user!.userId)).limit(1),
+    db.select().from(preferencesTable).where(eq(preferencesTable.userId, req.user!.userId)).limit(1),
+    db.select().from(profileAnalysesTable)
+      .where(eq(profileAnalysesTable.userId, req.user!.userId))
+      .orderBy(desc(profileAnalysesTable.createdAt))
+      .limit(1),
+  ]);
+
+  const saved = latest[0];
+  const snapshotRow = snapshot[0];
+  const prefsRow = prefs[0] as Record<string, unknown> | undefined;
+  const savedRecommendations = saved?.recommendations as StoredRecommendations | undefined;
+  const currentKey = snapshotRow && saved
+    ? buildProfileAnalysisCacheKey(snapshotRow.id, saved.targetAudience, prefsRow)
+    : null;
+
+  res.json({
+    analysis: saved ? analysisResponse(saved) : null,
+    isCurrent: Boolean(saved && currentKey && savedRecommendations?.cacheKey === currentKey),
+    hasCvFacts: Boolean(snapshotRow?.cvFacts),
+    hasLinkedinFacts: Boolean(snapshotRow?.linkedinFacts),
+  });
+});
 
 router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = AnalyzeBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Choose a target audience first." }); return; }
-  const { targetAudience } = parsed.data;
+  const { targetAudience, forceFresh } = parsed.data;
   if (isDemoUser(req.user!.email)) {
     res.json(getDemoProfileAlignment(targetAudience));
     return;
@@ -635,6 +715,20 @@ router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, 
   if (!snapshot?.linkedinFacts) {
     res.status(400).json({ error: "Upload or paste your LinkedIn profile before running an analysis." });
     return;
+  }
+
+  const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
+  const cacheKey = buildProfileAnalysisCacheKey(snapshot.id, targetAudience, prefs as Record<string, unknown> | undefined);
+  if (!forceFresh) {
+    const [latest] = await db.select().from(profileAnalysesTable)
+      .where(eq(profileAnalysesTable.userId, userId))
+      .orderBy(desc(profileAnalysesTable.createdAt))
+      .limit(1);
+    const latestRecommendations = latest?.recommendations as StoredRecommendations | undefined;
+    if (latest && latestRecommendations?.cacheKey === cacheKey) {
+      res.json({ ...analysisResponse(latest), cached: true });
+      return;
+    }
   }
 
   const brandContext = await buildCanonicalBrandContext(userId);
@@ -653,7 +747,6 @@ router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, 
 
   try {
     const comparisonTable = await computeComparisonTable(userId);
-    const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
     const cvFacts = (snapshot.cvFacts ?? {
       headline: null,
       about: null,
@@ -824,6 +917,8 @@ Rules:
       fieldRewrites,
       pairedFactSuggestions,
       scorecard: parseScorecard(raw.scorecard),
+      cacheKey,
+      analysisVersion: PROFILE_ANALYSIS_VERSION,
     };
 
     const [analysis] = await db
@@ -837,7 +932,7 @@ Rules:
       })
       .returning();
 
-    res.json({ id: analysis.id, targetAudience, comparisonTable, ...recommendations, createdAt: analysis.createdAt });
+    res.json({ ...analysisResponse(analysis), cached: false });
   } catch (err) {
     console.error("[profile-alignment-analyze]", err);
     respondAiError(res, err, "Failed to run profile alignment analysis.");
