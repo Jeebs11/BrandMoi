@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, Copy, Edit3, RotateCcw, ShieldAlert, Target, X, ChevronDown, ChevronUp, Search, BriefcaseBusiness } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { ProfileAlignmentAnnotatedView } from "@/components/ProfileAlignmentAnnotatedView";
 import {
   profileAlignmentApi,
   preferencesApi,
@@ -161,6 +162,15 @@ export function ProfileAlignmentReport({ analysis: initial, onClose }: Props) {
           </div>
 
           <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+            <ProfileAlignmentAnnotatedView
+              analysis={analysis}
+              onCopy={copyText}
+            />
+
+            <div className="border-t border-gray-100 pt-1">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Detailed analysis</p>
+            </div>
+
             {analysis.scorecard && (() => {
               const overallTone = scoreTone(analysis.scorecard.overallScore);
               return (
