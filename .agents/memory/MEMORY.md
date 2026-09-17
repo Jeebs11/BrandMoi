@@ -3,3 +3,4 @@
 - [AI response handling](ai-response-handling.md) — Anthropic responses may put reasoning blocks before text; news search may return stale fallback prose that must not become a fresh anchor.
 - [Gemini news grounding](gemini-news-grounding.md) — grounded results need server-side date/URL validation and metadata should not depend on Claude echoing it.
 - [Idea Engine audience coverage](idea-engine-audience-coverage.md) — use one result per core audience in standalone modes; keep grouped performance suggestions compact and labeled.
+- [Profile annotation experience](profile-annotation-experience.md) — make the LinkedIn-style reconstruction primary; use the private original PDF as supporting evidence with anchored annotations.
