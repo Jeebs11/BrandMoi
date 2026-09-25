@@ -93,7 +93,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     return;
   }
 
-  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction, format, continuityContext } = parsed.data;
+  const { rawInput, audience, feeling, tieToNews, objective, persona, tone, newsUrl, extraInstruction, format, slayStyle, continuityContext } = parsed.data;
   const userId = req.user!.userId;
 
   // Demo account: return pre-written content, no AI call
@@ -143,6 +143,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     feelingOverlay,
     "## FORMAT OVERLAY (mandatory):",
     formatOverlay,
+    slayStyle ? `\n## SLAY WRITING STRUCTURE (mandatory for this draft only):\nShape the post through these four beats, but do not label them or make it feel like a formula:\n1. STORY — open with a specific moment, observation, or credible scene grounded in the author's input. Never invent a personal event, result, or client story. If no personal story was provided, use a clearly general observation or scenario instead.\n2. LESSON — explain the insight or shift in perspective that comes from the story.\n3. ACTION — give one concrete, useful piece of advice the reader can apply.\n4. YOU — end by turning the lesson toward the reader with a direct, natural line or question using "you". Avoid generic engagement bait and do not force the literal final word to be "you".\nKeep the author's voice, audience, feeling, and core idea intact. The four beats should read as one coherent LinkedIn post.` : "",
     objectiveOverlay ? `\n## GOAL OVERLAY (mandatory — shape strategy and CTA around this):\n${objectiveOverlay}` : "",
     newsContext ? `\n## TODAY'S NEWS CONTEXT (weave the headline naturally — never paste a URL):\n${newsContext}` : "",
     continuityContext ? `\n## SERIES CONTINUITY (this post is one part of a planned series — build on these prior parts, don't repeat their exact beats, keep voice/thread consistent):\n${continuityContext}` : "",

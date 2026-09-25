@@ -22,6 +22,7 @@ import type {
   CreateDraftBodyContentSource, DirectionConcept,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { GenerationLoader } from "@/components/ui/skeleton";
 import { AppShell } from "@/components/AppShell";
 import { usePageTour } from "@/components/tour/usePageTour";
@@ -238,16 +239,18 @@ export default function Capture() {
   const [brandClosingStyle, setBrandClosingStyle] = useState<BrandClosingStyle>("expert");
   const [brandClosingText, setBrandClosingText] = useState<string>("");
   const [brandClosingApplied, setBrandClosingApplied] = useState(false);
+  const [slayStyle, setSlayStyle] = useState(false);
+  const [generatedWithSlay, setGeneratedWithSlay] = useState(false);
   // Version history — every AI-produced version of the Post is snapshotted so
   // the user can flip back to a different tone / opener / length. In-memory
   // for the editing session; manual typing isn't snapshotted (too noisy).
-  const [versions, setVersions] = useState<Array<{ id: number; label: string; post: string; hashtags: string }>>([]);
+  const [versions, setVersions] = useState<Array<{ id: number; label: string; post: string; hashtags: string; slayStyle: boolean }>>([]);
   const versionSeq = useRef(0);
-  const addVersion = (label: string, post: string, tags: string) => {
+  const addVersion = (label: string, post: string, tags: string, isSlayStyle: boolean) => {
     if (!post.trim()) return;
     setVersions((prev) => {
       if (prev.some((v) => v.post === post)) return prev; // skip exact dupes
-      const next = [...prev, { id: ++versionSeq.current, label, post, hashtags: tags }];
+      const next = [...prev, { id: ++versionSeq.current, label, post, hashtags: tags, slayStyle: isSlayStyle }];
       return next.slice(-12); // keep the last 12
     });
   };
@@ -309,10 +312,12 @@ export default function Capture() {
 
   useEffect(() => {
     if (existingDraft && !initialized) {
-      const sb = existingDraft.structuredBreakdown as StructuredBreakdown & { audience?: string; feeling?: string; storyMode?: boolean };
+      const sb = existingDraft.structuredBreakdown as StructuredBreakdown & { audience?: string; feeling?: string; storyMode?: boolean; slayStyle?: boolean };
       setRawInput(existingDraft.rawInput);
       setAudience(sb?.audience ?? audienceFromObjective(existingDraft.objective));
       setFeeling(sb?.feeling ?? feelingFromTone(existingDraft.tone, sb?.storyMode));
+      setSlayStyle(sb?.slayStyle === true);
+      setGeneratedWithSlay(sb?.slayStyle === true);
       if (existingDraft.postOutput || existingDraft.carouselOutput || existingDraft.visualOutput) {
         const carousel: CarouselSlide[] = existingDraft.carouselOutput
           ? (JSON.parse(existingDraft.carouselOutput) as CarouselSlide[])
@@ -372,6 +377,7 @@ export default function Capture() {
     audience?: string;
     rawInput?: string;
     moment?: MomentDetails;
+    slayStyle?: boolean;
   }) => {
     const effectiveRawInput = overrides?.rawInput ?? rawInput;
     if (!effectiveRawInput.trim()) {
@@ -380,10 +386,12 @@ export default function Capture() {
     }
     const effectiveAudience = overrides?.audience ?? audience;
     const effectiveFeeling = overrides?.feeling ?? feeling;
+    const effectiveSlayStyle = overrides?.slayStyle ?? slayStyle;
     if (overrides?.moment) setMomentDetails(overrides.moment);
     trackEvent("content_generation_started", {
       audience: effectiveAudience,
       feeling: effectiveFeeling,
+      slay_style: effectiveSlayStyle,
       tie_to_news: tieToNews,
       has_series: Boolean(seriesDetail),
     });
@@ -393,6 +401,7 @@ export default function Capture() {
           rawInput: effectiveRawInput,
           audience: effectiveAudience,
           feeling: effectiveFeeling,
+          slayStyle: effectiveSlayStyle,
           tieToNews,
           ...(newsUrlParam ? { newsUrl: newsUrlParam } : {}),
           ...(overrides?.extraInstruction ? { extraInstruction: overrides.extraInstruction } : {}),
@@ -413,9 +422,18 @@ export default function Capture() {
           setAiOriginalPost(hookedPost);
           setBrandClosingApplied(withClosing.applied);
           setContent({ ...data, post: withClosing.post, hashtags: hookedHashtags });
+          setSlayStyle(effectiveSlayStyle);
+          setGeneratedWithSlay(effectiveSlayStyle);
           setEditedPost(withClosing.post);
           setHashtags(hookedHashtags);
-          addVersion(versions.length === 0 ? `${effectiveFeeling} · original` : effectiveFeeling, withClosing.post, hookedHashtags);
+          addVersion(
+            versions.length === 0
+              ? `${effectiveFeeling} · ${effectiveSlayStyle ? "SLAY" : "original"}`
+              : `${effectiveFeeling} · ${effectiveSlayStyle ? "SLAY" : "standard"}`,
+            withClosing.post,
+            hookedHashtags,
+            effectiveSlayStyle,
+          );
           setActiveTab("post");
           setVisualImage(null);
           setIllustrationImage(null);
@@ -425,6 +443,7 @@ export default function Capture() {
            trackEvent("content_generated", {
              audience: effectiveAudience,
              feeling: effectiveFeeling,
+              slay_style: effectiveSlayStyle,
              tie_to_news: tieToNews,
              has_series: Boolean(seriesDetail),
            });
@@ -433,6 +452,7 @@ export default function Capture() {
            trackEvent("content_generation_failed", {
              audience: effectiveAudience,
              feeling: effectiveFeeling,
+              slay_style: effectiveSlayStyle,
              tie_to_news: tieToNews,
            });
           toast({ title: "Couldn't generate", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
@@ -461,7 +481,7 @@ export default function Capture() {
               : refined;
             setEditedPost(refinedPost);
             setContent((c) => c ? { ...c, post: refinedPost } : c);
-            addVersion(label ?? "Refined", refinedPost, hashtags);
+            addVersion(label ?? "Refined", refinedPost, hashtags, generatedWithSlay);
           } else if (tab === "short") {
             setContent((c) => c ? { ...c, shortPost: refined } : c);
           } else if (tab === "visual") {
@@ -495,7 +515,7 @@ export default function Capture() {
     const updated = lines.join("\n");
     setEditedPost(updated);
     setContent((c) => c ? { ...c, post: updated } : c);
-    addVersion("New opener", updated, hashtags);
+    addVersion("New opener", updated, hashtags, generatedWithSlay);
   };
 
   // ── Save / update draft ───────────────────────────────────────────────
@@ -527,6 +547,7 @@ export default function Capture() {
       proofPoints: [],
       audience,
       feeling,
+      slayStyle: generatedWithSlay,
       hashtags,
       objective: objectiveFromAudience(audience),
       persona: preferences?.persona ?? "Founder",
@@ -898,7 +919,7 @@ export default function Capture() {
     const { recommendation, content: revisedPost } = pendingBrandChange;
     setEditedPost(revisedPost);
     setContent((current) => current ? { ...current, post: revisedPost } : current);
-    addVersion(`Brand review · ${recommendation.title}`, revisedPost, hashtags);
+    addVersion(`Brand review · ${recommendation.title}`, revisedPost, hashtags, generatedWithSlay);
     setBrandReviewResult((current) => current
       ? { ...current, recommendations: current.recommendations.filter((item) => item.id !== recommendation.id) }
       : current);
@@ -954,6 +975,7 @@ export default function Capture() {
             momentDetails={momentDetails} setMomentDetails={setMomentDetails}
             audience={audience} setAudience={setAudience}
             feeling={feeling} setFeeling={setFeeling}
+            slayStyle={slayStyle} setSlayStyle={setSlayStyle}
             tieToNews={tieToNews} setTieToNews={setTieToNews}
             isGenerating={isGenerating}
             onMakeIt={(overrides) => runGenerate(overrides)}
@@ -974,7 +996,20 @@ export default function Capture() {
             editedPost={editedPost} setEditedPost={setEditedPost}
             hashtags={hashtags} setHashtags={setHashtags}
             versions={versions}
-            onRestoreVersion={(v) => { setEditedPost(v.post); setHashtags(v.hashtags); setContent((c) => c ? { ...c, post: v.post } : c); }}
+            onRestoreVersion={(v) => {
+              setEditedPost(v.post);
+              setHashtags(v.hashtags);
+              setSlayStyle(v.slayStyle ?? false);
+              setGeneratedWithSlay(v.slayStyle ?? false);
+              setContent((c) => c ? { ...c, post: v.post } : c);
+            }}
+            slayStyle={slayStyle}
+            setSlayStyle={setSlayStyle}
+            generatedWithSlay={generatedWithSlay}
+            onRegenerateSelectedStructure={() => runGenerate({
+              slayStyle,
+              extraInstruction: "Create a fresh version of the same core idea in the selected writing structure.",
+            })}
             activeTab={activeTab} setActiveTab={setActiveTab}
             visualStyle={visualStyle} setVisualStyle={setVisualStyle}
             visualImage={visualImage} isLoadingVisual={isLoadingVisual}
@@ -988,6 +1023,7 @@ export default function Capture() {
             brandClosingApplied={brandClosingApplied}
             onToggleBrandClosing={handleBrandClosingToggle}
             audience={audience} feeling={feeling}
+            isGenerating={isGenerating}
             isRefining={isRefining}
             isSaving={isSaving}
             isCheckingAuthenticity={isCheckingAuthenticity}
@@ -1127,9 +1163,10 @@ interface CaptureFormProps {
   momentDetails: MomentDetails; setMomentDetails: (v: MomentDetails) => void;
   audience: string; setAudience: (v: string) => void;
   feeling: string; setFeeling: (v: string) => void;
+  slayStyle?: boolean; setSlayStyle?: (v: boolean) => void;
   tieToNews: boolean; setTieToNews: (v: boolean) => void;
   isGenerating: boolean;
-  onMakeIt: (overrides?: { rawInput?: string; extraInstruction?: string; moment?: MomentDetails }) => void;
+  onMakeIt: (overrides?: { rawInput?: string; extraInstruction?: string; moment?: MomentDetails; slayStyle?: boolean }) => void;
   onSelectDirection: (d: { feeling: string; hook: string }) => void;
   error: string | null;
 }
@@ -1137,7 +1174,7 @@ interface CaptureFormProps {
 export function CaptureForm(props: CaptureFormProps) {
   const {
     rawInput, setRawInput, audience, setAudience,
-    feeling, setFeeling, tieToNews, setTieToNews,
+    feeling, setFeeling, slayStyle = false, setSlayStyle = () => {}, tieToNews, setTieToNews,
     momentDetails, setMomentDetails,
     isGenerating, onMakeIt, onSelectDirection, error,
   } = props;
@@ -1172,10 +1209,11 @@ export function CaptureForm(props: CaptureFormProps) {
         extraInstruction:
           "Structure this as a Pain Point Post: open with an uncomfortable question or bold observation that surfaces the pain, use the analogy/hook to make it vivid and concrete, describe the real-world consequences people feel, then close with the key insight or reframe. Direct and conversational.",
         moment: momentDetails,
+          slayStyle,
       });
     } else {
       const composedRawInput = composeGenerationInput(rawInput, momentDetails);
-      onMakeIt({ rawInput: composedRawInput, moment: momentDetails });
+      onMakeIt({ rawInput: composedRawInput, moment: momentDetails, slayStyle });
     }
   };
 
@@ -1483,6 +1521,32 @@ export function CaptureForm(props: CaptureFormProps) {
         </button>
       )}
 
+      <div className={cn(
+        "rounded-2xl border p-3 transition-colors",
+        slayStyle ? "border-violet-200 bg-violet-50/70" : "border-gray-200 bg-white",
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+            <BookOpen className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-extrabold text-gray-900">Try SLAY structure</p>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500">Story → Lesson → Actionable advice → a direct ending for “you”.</p>
+          </div>
+          <Switch
+            checked={slayStyle}
+            onCheckedChange={setSlayStyle}
+            aria-label="Use SLAY writing structure"
+            disabled={isGenerating}
+          />
+        </div>
+        {slayStyle && (
+          <p className="mt-2 border-t border-violet-100 pt-2 text-[10px] leading-relaxed text-violet-700">
+            On for the next draft. BrandMoi will not invent personal stories or outcomes if you haven’t provided them.
+          </p>
+        )}
+      </div>
+
       {showDirections && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -1538,8 +1602,12 @@ interface ResultViewProps {
   content: GeneratedContent;
   editedPost: string; setEditedPost: (v: string) => void;
   hashtags: string; setHashtags: (v: string) => void;
-  versions: Array<{ id: number; label: string; post: string; hashtags: string }>;
-  onRestoreVersion: (v: { id: number; label: string; post: string; hashtags: string }) => void;
+  versions: Array<{ id: number; label: string; post: string; hashtags: string; slayStyle?: boolean }>;
+  onRestoreVersion: (v: { id: number; label: string; post: string; hashtags: string; slayStyle?: boolean }) => void;
+  slayStyle?: boolean;
+  setSlayStyle?: (value: boolean) => void;
+  generatedWithSlay?: boolean;
+  onRegenerateSelectedStructure?: () => void;
   activeTab: TabType; setActiveTab: (t: TabType) => void;
   visualStyle: string; setVisualStyle: (s: string) => void;
   visualImage: string | null; isLoadingVisual: boolean;
@@ -1553,6 +1621,7 @@ interface ResultViewProps {
   brandClosingApplied: boolean;
   onToggleBrandClosing: (enabled: boolean) => void;
   audience: string; feeling: string;
+  isGenerating?: boolean;
   isRefining: boolean;
   isSaving: boolean;
   isCheckingAuthenticity: boolean;
@@ -1579,11 +1648,11 @@ interface ResultViewProps {
 export function ResultView(props: ResultViewProps) {
   const {
     content, editedPost, setEditedPost, hashtags, setHashtags,
-    versions, onRestoreVersion,
+    versions, onRestoreVersion, slayStyle = false, setSlayStyle = () => {}, generatedWithSlay = false, onRegenerateSelectedStructure = () => {},
     activeTab, setActiveTab, visualStyle, setVisualStyle,
     visualImage, isLoadingVisual,
     illustrationImage, illustrationCaption, illustrationScene, isLoadingIllustration,
-    fullPost, rawIdea, momentDetails, audience, feeling, isRefining, isSaving, isCheckingAuthenticity, isDemo,
+    fullPost, rawIdea, momentDetails, audience, feeling, isGenerating = false, isRefining, isSaving, isCheckingAuthenticity, isDemo,
     brandClosingMode, brandClosingText, brandClosingApplied, onToggleBrandClosing,
     onSwapHook, onRefine, onTryAgain, onChangeFeeling, onChangeVisualStyle,
     setIllustrationCaption, setIllustrationScene, onGenerateIllustration, onRegenIllustration, onGenerateVisual,
@@ -1620,11 +1689,49 @@ export function ResultView(props: ResultViewProps) {
       {/* Audience badge + News pill */}
       <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
         <span className="px-2 py-1 bg-gray-100 rounded-full">{audience}</span>
+        <span className={cn(
+          "px-2 py-1 rounded-full",
+          generatedWithSlay ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-500",
+        )}>
+          {generatedWithSlay ? "SLAY structure" : "Standard structure"}
+        </span>
         {content.newsAnchor && (
           <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full flex items-center gap-1">
             <Newspaper className="w-3 h-3" />News
           </span>
         )}
+      </div>
+
+      <div className={cn(
+        "rounded-2xl border p-3",
+        slayStyle ? "border-violet-200 bg-violet-50/70" : "border-gray-200 bg-white",
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+            <BookOpen className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-extrabold text-gray-900">Compare the SLAY structure</p>
+            <p className="mt-0.5 text-[10px] leading-relaxed text-gray-500">Switch on for Story → Lesson → Action → “you”, or off for the usual format.</p>
+          </div>
+          <Switch
+            checked={slayStyle}
+            onCheckedChange={setSlayStyle}
+            aria-label="Use SLAY writing structure for the next draft"
+            disabled={isGenerating || isRefining}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onRegenerateSelectedStructure}
+          disabled={isGenerating || isRefining}
+          className="mt-3 h-9 w-full rounded-xl text-xs font-bold"
+        >
+          {isGenerating ? "Writing…" : generatedWithSlay === slayStyle
+            ? `Generate another ${slayStyle ? "SLAY" : "standard"} version`
+            : `Try ${slayStyle ? "SLAY" : "standard"} version`}
+        </Button>
       </div>
 
       {/* Feeling chips — tap to re-generate the post in a different feeling */}

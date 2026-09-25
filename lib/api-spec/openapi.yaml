@@ -909,6 +909,9 @@ components:
         feeling:
           type: string
           description: New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)
+        slayStyle:
+          type: boolean
+          description: Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure
         hashtags:
           type: string
           description: 3-tier hashtag block (newline- or space-separated; user-editable as one string)
