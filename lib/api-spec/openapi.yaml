@@ -1018,6 +1018,9 @@ components:
         format:
           type: string
           description: Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts
+        slayStyle:
+          type: boolean
+          description: When true, structure the post as Story, Lesson, Actionable advice, and a direct reader-focused ending
         continuityContext:
           type: string
           description: Prior series parts' excerpts, woven in as continuity context when writing a later part of a series
