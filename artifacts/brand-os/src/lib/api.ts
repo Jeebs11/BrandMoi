@@ -703,6 +703,8 @@ export const agentApi = {
     apiFetch<{ angles: BrandAngle[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "brand", topicId: topicId ?? undefined }) }),
   teachIdeas: () =>
     apiFetch<{ angles: AudienceAngle[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "teach" }) }),
+  roleClarityIdeas: (topicId?: number | null) =>
+    apiFetch<{ angles: BrandAngle[] }>("/agent/ideas", { method: "POST", body: JSON.stringify({ type: "role_clarity", topicId: topicId ?? undefined }) }),
   coach: (postText: string) =>
     apiFetch<AgentCoach>("/agent/coach", {
       method: "POST",
@@ -733,7 +735,7 @@ export const agentApi = {
     }),
   stressTestScores: () =>
     apiFetch<Record<string, StressTestScoreEntry>>("/agent/stress-test/scores"),
-  ideaFeedback: (ideaText: string, ideaType: "brand" | "teach", signal: "like" | "dislike") =>
+  ideaFeedback: (ideaText: string, ideaType: "brand" | "teach" | "role_clarity", signal: "like" | "dislike") =>
     apiFetch<{ id: number }>("/agent/idea-feedback", {
       method: "POST",
       body: JSON.stringify({ ideaText, ideaType, signal }),

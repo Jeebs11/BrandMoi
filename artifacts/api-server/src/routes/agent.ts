@@ -119,13 +119,47 @@ const SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience
 function completeScenarioAngle(
   angle: ScenarioAngle,
   positioning?: Pick<ScenarioAngle, "professionalTerritory" | "professionalSignal">,
+  scenarioDefaults?: Omit<ScenarioAngle, "angle" | "audience">,
 ): ScenarioAngle {
   return {
-    ...SCENARIO_FALLBACKS[angle.audience],
+    ...(scenarioDefaults ?? SCENARIO_FALLBACKS[angle.audience]),
     ...positioning,
     ...angle,
   };
 }
+
+const ROLE_CLARITY_SCENARIO_FALLBACKS: Record<string, Omit<ScenarioAngle, "angle" | "audience">> = {
+  "Clients": {
+    scenarioType: "Expertise gap",
+    scenario: "A complex client problem is reduced to a routine task",
+    tension: "The visible task hides the specialist judgment needed to solve it well",
+    whyItResonates: "Clients can see the difference between activity and expertise",
+  },
+  "Peers": {
+    scenarioType: "Role distinction",
+    scenario: "Two adjacent roles share tasks but require different depth of expertise",
+    tension: "Similar tasks can obscure distinct professional disciplines",
+    whyItResonates: "Peers recognise the craft behind a role's hardest work",
+  },
+  "Recruiters & Headhunters": {
+    scenarioType: "Scope mismatch",
+    scenario: "A senior role is described as routine coordination",
+    tension: "The title understates the level of judgment the role requires",
+    whyItResonates: "Hiring teams need to recognise capability, not just task lists",
+  },
+  "Investors": {
+    scenarioType: "Capability leverage",
+    scenario: "A growing organization treats specialist expertise as interchangeable",
+    tension: "Short-term simplicity can create costly capability gaps",
+    whyItResonates: "Investors value the capabilities that let an organization scale",
+  },
+  "My audience": {
+    scenarioType: "Invisible expertise",
+    scenario: "Difficult work looks simple because an expert made it look routine",
+    tension: "The result is visible while the skill behind it goes unnoticed",
+    whyItResonates: "People who do the work recognise the effort others overlook",
+  },
+};
 
 function parseJson(text: string): unknown {
   const cleaned = text
@@ -1433,14 +1467,14 @@ Return JSON only (no markdown):
   }
 });
 
-const IdeasBody = z.object({ type: z.enum(["brand", "teach"]), topicId: z.number().int().nullish() });
+const IdeasBody = z.object({ type: z.enum(["brand", "teach", "role_clarity"]), topicId: z.number().int().nullish() });
 
 // Per-tab idea refresh: regenerates ONLY brand angles or teach angles, on
 // Haiku — much cheaper than re-running the whole daily brief (which also
 // re-fetches news). Used by the Idea Engine's per-tab refresh buttons.
 router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<void> => {
   const parsed = IdeasBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "type must be brand or teach." }); return; }
+  if (!parsed.success) { res.status(400).json({ error: "type must be brand, teach, or role_clarity." }); return; }
 
   if (isDemoUser(req.user!.email)) {
     await demoDelay();
@@ -1450,8 +1484,13 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
 
   try {
     const { prefs, recentDrafts, ideaFeedback } = await getUserAgentContext(req.user!.userId);
-    const liked = ideaFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText).slice(0, 8);
-    const disliked = ideaFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText).slice(0, 8);
+    const isTeach = parsed.data.type === "teach";
+    const isRoleClarity = parsed.data.type === "role_clarity";
+    const relevantFeedback = isRoleClarity
+      ? ideaFeedback.filter((f) => f.ideaType === "role_clarity")
+      : ideaFeedback;
+    const liked = relevantFeedback.filter((f) => f.signal === "like").map((f) => f.ideaText).slice(0, 8);
+    const disliked = relevantFeedback.filter((f) => f.signal === "dislike").map((f) => f.ideaText).slice(0, 8);
     const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
     const proofPoints = Array.isArray(prefs?.proofPoints) ? (prefs.proofPoints as string[]) : [];
     const defaultTerritory = pillars[0] || prefs?.brandRole || "Professional expertise";
@@ -1466,25 +1505,11 @@ router.post("/agent/ideas", requireAuth, aiRateLimit, async (req, res): Promise<
       topicName = topic?.name ?? null;
     }
 
-    const isTeach = parsed.data.type === "teach";
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-        // Both modes return five audience-specific objects. Brand angles also
+        // All modes return five audience-specific objects. Brand angles also
         // include several evidence fields and need more room.
         max_tokens: isTeach ? 900 : 1400,
-      system: isTeach
-        ? `You generate "teach your audience" LinkedIn post seeds grounded in the creator's exact field. Return exactly 5 objects, one for each audience in this exact order: Clients, Peers, Recruiters & Headhunters, Investors, My audience.
-Each angle is max 14 words. Solve a costly misunderstanding for Clients; teach an advanced nuance to Peers; reveal sound judgment to Recruiters & Headhunters; explain a market mechanism to Investors; clarify a recurring question for My audience. Do not rewrite the same lesson five ways.
-Audience guidance:
-${AUDIENCE_GUIDANCE}
-Return JSON only: {"angles": [{"angle":"...","audience":"Clients"},{"angle":"...","audience":"Peers"},{"angle":"...","audience":"Recruiters & Headhunters"},{"angle":"...","audience":"Investors"},{"angle":"...","audience":"My audience"}]}`
-        : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
-Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle should build a parasocial connection — surface a specific, relatable, slightly vulnerable moment from their real work (a doubt, a mistake, a moment of relief or frustration), grounded in an actual proof point or piece of their history already on file. Never a generic "we've all felt this" statement with no real anchor — the specificity is what makes it relatable, not the feeling alone.
-Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
-Every angle must be grounded in a recognisable real-life work scenario, not an abstract topic. The scenario is a writing prompt, not a claim that the creator personally experienced it — never invent names, metrics, clients, or outcomes.
-For each angle include: scenarioType (2–3 words), scenario (a specific moment, max 18 words), tension (the conflict, max 12 words), whyItResonates (why that audience cares, max 16 words), professionalTerritory (the closest supplied content pillar), and professionalSignal (what credible capability the evidence demonstrates, max 18 words).
-Use verified proof points when relevant, but never invent personal experience, names, metrics, clients, or outcomes. Professional positioning should be inferred from useful proof, never sound like a job application or address recruiters directly.
-Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Peers", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Recruiters & Headhunters", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Investors", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "My audience", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}]}`,
       messages: [{
         role: "user",
         content: [
@@ -1499,6 +1524,28 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
           "Generate 5 fresh angles, one per audience. JSON only.",
         ].filter(Boolean).join("\n"),
       }],
+      system: isTeach
+        ? `You generate "teach your audience" LinkedIn post seeds grounded in the creator's exact field. Return exactly 5 objects, one for each audience in this exact order: Clients, Peers, Recruiters & Headhunters, Investors, My audience.
+Each angle is max 14 words. Solve a costly misunderstanding for Clients; teach an advanced nuance to Peers; reveal sound judgment to Recruiters & Headhunters; explain a market mechanism to Investors; clarify a recurring question for My audience. Do not rewrite the same lesson five ways.
+Audience guidance:
+${AUDIENCE_GUIDANCE}
+Return JSON only: {"angles": [{"angle":"...","audience":"Clients"},{"angle":"...","audience":"Peers"},{"angle":"...","audience":"Recruiters & Headhunters"},{"angle":"...","audience":"Investors"},{"angle":"...","audience":"My audience"}]}`
+        : isRoleClarity
+          ? `You generate confident, evidence-grounded LinkedIn post angles that clarify the creator's professional role and make the expertise behind excellent work visible.
+Return EXACTLY 5 angles, one for EACH audience in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip or duplicate an audience.
+The core subject is role clarity: what a role exists to do, the distinctive skill and level of judgment it requires, how excellent work in it differs from adjacent roles, and why that expertise deserves respect. Be confident and specific, not self-congratulatory.
+Roles can share visible tasks without being interchangeable. State the real distinction in skill, scope, complexity, or outcomes; do not default to decision-rights, RACI, governance, or generic coordination.
+Create distinct angles for each audience: Clients should see the expertise needed to solve their problem; Peers should recognise a precise craft distinction; Recruiters & Headhunters should see the level of capability the role requires without making the creator sound job-seeking; Investors should understand how specialist capability affects organizational performance; My audience should recognise a real, often overlooked part of the work.
+Ground the angle in the creator's supplied role, content pillars, verified proof points, and prior work. Never invent personal experiences, credentials, names, clients, metrics, or outcomes. If there is no evidence for a personal claim, frame it as a general work scenario, not something the creator personally did.
+Each angle must be max 12 words and focus on one clear insight. For each include scenarioType (2–3 words), scenario (specific general work moment, max 18 words), tension (the role misunderstanding or skill distinction, max 14 words), whyItResonates (why that audience cares, max 16 words), professionalTerritory (closest supplied content pillar or role), and professionalSignal (the specialized skill or level of judgment the idea makes visible, max 18 words).
+Return JSON only: {"angles": [{"angle":"...","audience":"Clients","scenarioType":"...","scenario":"...","tension":"...","whyItResonates":"...","professionalTerritory":"...","professionalSignal":"..."},{"angle":"...","audience":"Peers","scenarioType":"...","scenario":"...","tension":"...","whyItResonates":"...","professionalTerritory":"...","professionalSignal":"..."},{"angle":"...","audience":"Recruiters & Headhunters","scenarioType":"...","scenario":"...","tension":"...","whyItResonates":"...","professionalTerritory":"...","professionalSignal":"..."},{"angle":"...","audience":"Investors","scenarioType":"...","scenario":"...","tension":"...","whyItResonates":"...","professionalTerritory":"...","professionalSignal":"..."},{"angle":"...","audience":"My audience","scenarioType":"...","scenario":"...","tension":"...","whyItResonates":"...","professionalTerritory":"...","professionalSignal":"..."}]}`
+          : `You generate sharp LinkedIn post angles for a creator's brand, each tagged with the audience it targets. Each angle max 10 words, specific to their field — real post ideas, not generic topics.
+Each angle must genuinely fit its tagged audience — e.g. the Recruiters & Headhunters angle should read as evidence of capability/judgment (an outcome, a hard call made well), NOT a craft debate; the Peers angle can be more insider/contrarian; the Investors angle should reframe a market or show pattern-matching; the Clients angle should demonstrate you understand their problem; the My audience angle should build a parasocial connection — surface a specific, relatable, slightly vulnerable moment from their real work (a doubt, a mistake, a moment of relief or frustration), grounded in an actual proof point or piece of their history already on file. Never a generic "we've all felt this" statement with no real anchor — the specificity is what makes it relatable, not the feeling alone.
+Return EXACTLY 5 angles, one for EACH of these 5 audiences, in this order: Clients, Peers, Recruiters & Headhunters, Investors, My audience. Never skip one, never give two angles to the same audience.
+Every angle must be grounded in a recognisable real-life work scenario, not an abstract topic. The scenario is a writing prompt, not a claim that the creator personally experienced it — never invent names, metrics, clients, or outcomes.
+For each angle include: scenarioType (2–3 words), scenario (a specific moment, max 18 words), tension (the conflict, max 12 words), whyItResonates (why that audience cares, max 16 words), professionalTerritory (the closest supplied content pillar), and professionalSignal (what credible capability the evidence demonstrates, max 18 words).
+Use verified proof points when relevant, but never invent personal experience, names, metrics, clients, or outcomes. Professional positioning should be inferred from useful proof, never sound like a job application or address recruiters directly.
+Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Peers", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Recruiters & Headhunters", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "Investors", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}, {"angle": "...", "audience": "My audience", "scenarioType": "...", "scenario": "...", "tension": "...", "whyItResonates": "...", "professionalTerritory": "...", "professionalSignal": "..."}]}`
     });
 
     const block = getAiTextBlock(msg);
@@ -1551,7 +1598,13 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
 
     // Guarantee exactly one angle per audience — fill any the model missed
     // or duplicated from a per-audience fallback.
-    const FALLBACK_BY_AUDIENCE: Record<string, string> = {
+    const FALLBACK_BY_AUDIENCE: Record<string, string> = isRoleClarity ? {
+      "Clients": `Show the specialist expertise needed to solve a costly ${defaultTerritory} problem`,
+      "Peers": `Explain the skill that separates strong ${defaultTerritory} practice from task completion`,
+      "Recruiters & Headhunters": `Make the level of expertise behind excellent ${defaultTerritory} work visible`,
+      "Investors": `Show how specialist ${defaultTerritory} capability changes organizational performance`,
+      "My audience": `Reveal the difficult ${defaultTerritory} work that experts make look simple`,
+    } : {
       "Clients": `Show a prospective client how you think about their exact problem`,
       "Peers": `Challenge the most common assumption in your field`,
       "Recruiters & Headhunters": `Share a hard call you made under pressure at work`,
@@ -1563,10 +1616,13 @@ Return JSON only: {"angles": [{"angle": "...", "audience": "Clients", "scenarioT
         rawAngles.find((a) => a.audience === aud) ?? { angle: FALLBACK_BY_AUDIENCE[aud], audience: aud },
         {
           professionalTerritory: defaultTerritory,
-          professionalSignal: aud === "Recruiters & Headhunters"
+          professionalSignal: isRoleClarity
+            ? `Makes the specialized skill behind ${defaultTerritory} work visible`
+            : aud === "Recruiters & Headhunters"
             ? `Shows credible judgment and capability in ${defaultTerritory}`
             : `Reinforces practical expertise in ${defaultTerritory}`,
         },
+        isRoleClarity ? ROLE_CLARITY_SCENARIO_FALLBACKS[aud] : undefined,
       )
     );
     res.json({ angles });
@@ -1823,7 +1879,7 @@ Rules:
 
 const IdeaFeedbackBody = z.object({
   ideaText: z.string().min(1).max(500),
-  ideaType: z.enum(["brand", "teach"]),
+  ideaType: z.enum(["brand", "teach", "role_clarity"]),
   signal: z.enum(["like", "dislike"]),
 });
 

@@ -391,11 +391,12 @@ export default function Dashboard() {
   const [momentum, setMomentum] = useState<MomentumData | null>(null);
   const [checkins, setCheckins] = useState<CheckinEntry[]>([]);
   const [momOpen, setMomOpen] = useState(false);
-  const [ideaTab, setIdeaTab] = useState<"brand" | "teach" | "best" | "pain" | "skills">("brand");
+  const [ideaTab, setIdeaTab] = useState<"brand" | "teach" | "role_clarity" | "best" | "pain" | "skills">("brand");
   // Per-tab refreshed angles override the daily brief's set — so refreshing
   // one tab never re-runs the whole brief (or its news fetch).
   const [brandAnglesOverride, setBrandAnglesOverride] = useState<BrandAngle[] | null>(null);
   const [teachAnglesOverride, setTeachAnglesOverride] = useState<AudienceAngle[] | null>(null);
+  const [roleClarityAnglesOverride, setRoleClarityAnglesOverride] = useState<BrandAngle[] | null>(null);
   const [tabRefreshing, setTabRefreshing] = useState(false);
   const [brief, setBrief] = useState<AgentBrief | null>(() => loadDayCache<AgentBrief>("brief", user?.id ?? "anon"));
   const [briefLoading, setBriefLoading] = useState(false);
@@ -470,7 +471,7 @@ export default function Dashboard() {
 
   }, []);
 
-  const handleIdeaFeedback = async (ideaText: string, ideaType: "brand" | "teach", signal: "like" | "dislike") => {
+  const handleIdeaFeedback = async (ideaText: string, ideaType: "brand" | "teach" | "role_clarity", signal: "like" | "dislike") => {
     const key = `${ideaType}:${ideaText}`;
     const prev = ideaFeedback[key];
     if (prev === signal) return;
@@ -539,14 +540,19 @@ export default function Dashboard() {
       .finally(() => setPainPointsLoading(false));
   };
 
-  const refreshTabIdeas = (type: "brand" | "teach") => {
+  const refreshTabIdeas = (type: "brand" | "teach" | "role_clarity") => {
     if (tabRefreshing) return;
     setTabRefreshing(true);
-    const request = type === "brand" ? agentApi.brandIdeas() : agentApi.teachIdeas();
+    const request = type === "brand"
+      ? agentApi.brandIdeas()
+      : type === "teach"
+        ? agentApi.teachIdeas()
+        : agentApi.roleClarityIdeas();
     request
       .then((r) => {
         if (type === "brand") { setBrandAnglesOverride(r.angles as BrandAngle[]); setExpandedBriefAngle(null); }
-        else { setTeachAnglesOverride(r.angles as AudienceAngle[]); setExpandedTeachAngle(null); }
+        else if (type === "teach") { setTeachAnglesOverride(r.angles as AudienceAngle[]); setExpandedTeachAngle(null); }
+        else { setRoleClarityAnglesOverride(r.angles as BrandAngle[]); setExpandedBriefAngle(null); }
       })
       .catch(aiErrorToast)
       .finally(() => setTabRefreshing(false));
@@ -741,7 +747,7 @@ export default function Dashboard() {
             </div>
           </button>
 
-          {/* ── Idea Engine — one card, four lenses ── */}
+          {/* ── Idea Engine — one card, audience-specific angles ── */}
           <div data-tour="idea-engine" className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -756,12 +762,12 @@ export default function Dashboard() {
                   title="Regenerates only this tab — other tabs are untouched"
                 >
                   <RefreshCw className={cn("w-3 h-3", (tabRefreshing || (ideaTab === "pain" && painPointsLoading) || (ideaTab === "best" && topSuggestionsLoading)) && "animate-spin")} />
-                  {ideaTab === "brand" ? "New brand ideas" : ideaTab === "teach" ? "New teach ideas" : ideaTab === "best" ? "New angles from best posts" : "New pain points"}
+                  {ideaTab === "brand" ? "New brand ideas" : ideaTab === "teach" ? "New teach ideas" : ideaTab === "role_clarity" ? "New role clarity ideas" : ideaTab === "best" ? "New angles from best posts" : "New pain points"}
                 </button>
               )}
             </div>
             <div className="px-5 pb-3 flex gap-1.5 overflow-x-auto no-scrollbar">
-              {([["brand", "For your brand"], ["teach", "Teach"], ["best", "Best posts"], ["pain", "Pain points"], ["skills", "Skills"]] as const).map(([key, label]) => (
+              {([["brand", "For your brand"], ["teach", "Teach"], ["role_clarity", "Role clarity"], ["best", "Best posts"], ["pain", "Pain points"], ["skills", "Skills"]] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setIdeaTab(key)}
@@ -775,72 +781,92 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {ideaTab === "brand" && ((brandAnglesOverride ?? brief?.angles ?? []).length > 0 ? (
-
-                <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-gray-50 pt-3">
-                  {(brandAnglesOverride ?? brief?.angles ?? []).map((item, i) => {
-                    const isOpen = expandedBriefAngle === i;
-                    const fbKey = `brand:${item.angle}`;
-                    const fb = ideaFeedback[fbKey];
-                    return (
-                      <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
-                        <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 px-3 py-2.5 min-w-0 bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
-                            <AudienceBadge audience={item.audience} />
-                          </span>
-                          <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
-                          <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
-                        </button>
-                        {isOpen && (
-                          <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100 space-y-2">
-                            {(item.scenario || item.tension || item.whyItResonates) && (
-                              <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2.5 space-y-2">
-                                {item.scenarioType && (
-                                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
-                                    {item.scenarioType}
-                                  </span>
-                                )}
-                                {item.scenario && (
-                                  <div>
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">The moment</p>
-                                    <p className="text-xs font-semibold leading-snug text-gray-800">{item.scenario}</p>
-                                  </div>
-                                )}
-                                {item.tension && (
-                                  <div>
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">The tension</p>
-                                    <p className="text-[11px] leading-snug text-gray-600">{item.tension}</p>
-                                  </div>
-                                )}
-                                {item.whyItResonates && (
-                                  <p className="text-[10px] leading-snug text-gray-500 border-t border-amber-100 pt-1.5">
-                                    <span className="font-bold text-gray-700">Why it resonates: </span>{item.whyItResonates}
-                                  </p>
-                                )}
-                                {(item.professionalTerritory || item.professionalSignal) && (
-                                  <div className="rounded-lg border border-sky-100 bg-sky-50/70 px-3 py-2">
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-sky-600 mb-1">Professional positioning</p>
-                                    {item.professionalTerritory && <p className="text-xs font-bold text-gray-800">{item.professionalTerritory}</p>}
-                                    {item.professionalSignal && <p className="text-[10px] leading-snug text-gray-600 mt-0.5">{item.professionalSignal}</p>}
-                                  </div>
-                                )}
+            {(ideaTab === "brand" || ideaTab === "role_clarity") && (() => {
+              const isRoleClarity = ideaTab === "role_clarity";
+              const angleList = isRoleClarity
+                ? roleClarityAnglesOverride ?? []
+                : brandAnglesOverride ?? brief?.angles ?? [];
+              const feedbackType: "brand" | "role_clarity" = isRoleClarity ? "role_clarity" : "brand";
+              if (angleList.length === 0) {
+                return (
+                  <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">
+                    Tap "{isRoleClarity ? "New role clarity ideas" : "New brand ideas"}" above to get started.
+                  </p>
+                );
+              }
+              return (
+                <>
+                  {isRoleClarity && (
+                    <div className="mx-5 mb-3 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-violet-700">Role clarity & expertise</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-gray-600">
+                        Make the skill and judgment behind excellent work visible—and show why it deserves respect.
+                      </p>
+                    </div>
+                  )}
+                  <div className="px-5 pb-5 flex flex-col gap-1.5 border-t border-gray-50 pt-3">
+                    {angleList.map((item, i) => {
+                      const isOpen = expandedBriefAngle === i;
+                      const fbKey = `${feedbackType}:${item.angle}`;
+                      const fb = ideaFeedback[fbKey];
+                      return (
+                        <div key={i} className="rounded-xl border border-gray-100 overflow-hidden">
+                          <button onClick={() => setExpandedBriefAngle(isOpen ? null : i)} className="w-full text-left flex items-start gap-2 px-3 py-2.5 min-w-0 bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <span className={cn("text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5", AUDIENCE_TAG_COLORS[item.audience] ?? AUDIENCE_TAG_COLORS["My audience"])}>
+                              <AudienceBadge audience={item.audience} />
+                            </span>
+                            <span className={cn("text-gray-800 text-xs font-medium leading-snug flex-1", !isOpen && "line-clamp-1")}>{item.angle}</span>
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5 transition-transform duration-200", isOpen && "rotate-180")} />
+                          </button>
+                          {isOpen && (
+                            <div className="px-3 pb-3 pt-2.5 bg-white border-t border-gray-100 space-y-2">
+                              {(item.scenario || item.tension || item.whyItResonates) && (
+                                <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2.5 space-y-2">
+                                  {item.scenarioType && (
+                                    <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                                      {item.scenarioType}
+                                    </span>
+                                  )}
+                                  {item.scenario && (
+                                    <div>
+                                      <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">The moment</p>
+                                      <p className="text-xs font-semibold leading-snug text-gray-800">{item.scenario}</p>
+                                    </div>
+                                  )}
+                                  {item.tension && (
+                                    <div>
+                                      <p className="text-[9px] font-black uppercase tracking-wider text-amber-600 mb-0.5">{isRoleClarity ? "The role distinction" : "The tension"}</p>
+                                      <p className="text-[11px] leading-snug text-gray-600">{item.tension}</p>
+                                    </div>
+                                  )}
+                                  {item.whyItResonates && (
+                                    <p className="text-[10px] leading-snug text-gray-500 border-t border-amber-100 pt-1.5">
+                                      <span className="font-bold text-gray-700">Why it resonates: </span>{item.whyItResonates}
+                                    </p>
+                                  )}
+                                  {(item.professionalTerritory || item.professionalSignal) && (
+                                    <div className="rounded-lg border border-sky-100 bg-sky-50/70 px-3 py-2">
+                                      <p className="text-[9px] font-black uppercase tracking-wider text-sky-600 mb-1">Professional positioning</p>
+                                      {item.professionalTerritory && <p className="text-xs font-bold text-gray-800">{item.professionalTerritory}</p>}
+                                      {item.professionalSignal && <p className="text-[10px] leading-snug text-gray-600 mt-0.5">{item.professionalSignal}</p>}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <button onClick={() => openLengthPicker(scenarioIdeaRaw(item), `audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
+                              <div className="flex gap-2">
+                                <button onClick={() => void handleIdeaFeedback(item.angle, feedbackType, "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
+                                <button onClick={() => void handleIdeaFeedback(item.angle, feedbackType, "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>
                               </div>
-                            )}
-                            <button onClick={() => openLengthPicker(scenarioIdeaRaw(item), `audience=${encodeURIComponent(item.audience)}`)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary hover:bg-primary/80 text-white text-xs font-bold transition-colors">Write this →</button>
-                            <div className="flex gap-2">
-                              <button onClick={() => void handleIdeaFeedback(item.angle, "brand", "like")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "like" ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-emerald-500 hover:bg-emerald-50")}><ThumbsUp className="w-3.5 h-3.5" /> Good idea</button>
-                              <button onClick={() => void handleIdeaFeedback(item.angle, "brand", "dislike")} className={cn("flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors", fb === "dislike" ? "bg-rose-50 text-rose-500 border border-rose-200" : "bg-gray-50 text-gray-400 border border-gray-100 hover:text-rose-400 hover:bg-rose-50")}><ThumbsDown className="w-3.5 h-3.5" /> Not for me</button>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-            ) : (
-              <p className="text-xs text-gray-400 text-center px-5 pb-5 pt-2">Tap "New brand ideas" above to get started.</p>
-            ))}
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
 
             {ideaTab === "teach" && ((teachAnglesOverride ?? brief?.teachAngles ?? []).length > 0 ? (
 

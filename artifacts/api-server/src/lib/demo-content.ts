@@ -245,9 +245,63 @@ const DEMO_IDEAS_TEACH: Array<Array<{ angle: string; audience: string }>> = [
   ],
 ];
 
-export function getDemoIdeas(type: "brand" | "teach") {
+const DEMO_IDEAS_ROLE_CLARITY = [
+  {
+    angle: "Product management is the craft of choosing the right problem",
+    audience: "Clients",
+    scenarioType: "Expertise gap",
+    scenario: "A feature request arrives before anyone has confirmed the customer problem",
+    tension: "Fast delivery can still create the wrong outcome",
+    whyItResonates: "Clients need someone who can challenge the brief, not just execute it",
+    professionalTerritory: "Product discovery",
+    professionalSignal: "Shows judgment in separating customer needs from requested features",
+  },
+  {
+    angle: "Senior product judgment starts before the roadmap",
+    audience: "Peers",
+    scenarioType: "Role distinction",
+    scenario: "Two PMs receive the same request but ask very different first questions",
+    tension: "Experience changes how a problem is framed, not just how quickly it ships",
+    whyItResonates: "Peers recognise the expertise behind a well-chosen problem",
+    professionalTerritory: "Product discovery",
+    professionalSignal: "Makes problem framing and prioritization skill visible",
+  },
+  {
+    angle: "What a senior Product Manager is trusted to see",
+    audience: "Recruiters & Headhunters",
+    scenarioType: "Scope mismatch",
+    scenario: "A senior role is described as writing tickets and maintaining a roadmap",
+    tension: "The task list hides the judgment and influence the role requires",
+    whyItResonates: "Hiring teams need to distinguish senior capability from activity",
+    professionalTerritory: "Product leadership",
+    professionalSignal: "Clarifies the strategic judgment expected at senior level",
+  },
+  {
+    angle: "Discovery is a growth capability, not a research phase",
+    audience: "Investors",
+    scenarioType: "Capability leverage",
+    scenario: "A team scales acquisition before validating why customers stay",
+    tension: "More growth spend can amplify a weak product assumption",
+    whyItResonates: "Investors care whether product capability compounds growth",
+    professionalTerritory: "Customer research",
+    professionalSignal: "Connects discovery expertise to better growth decisions",
+  },
+  {
+    angle: "The product work no one sees is often the hardest",
+    audience: "My audience",
+    scenarioType: "Invisible expertise",
+    scenario: "A launch looks obvious after someone has resolved the hard questions",
+    tension: "The clean result can make the expertise behind it disappear",
+    whyItResonates: "Practitioners recognise the work hidden behind a simple launch",
+    professionalTerritory: "Product management",
+    professionalSignal: "Makes the judgment behind clear product outcomes visible",
+  },
+];
+
+export function getDemoIdeas(type: "brand" | "teach" | "role_clarity") {
   const idx = Math.floor(Date.now() / 3600000) % 2;
   if (type === "teach") return { angles: DEMO_IDEAS_TEACH[idx] };
+  if (type === "role_clarity") return { angles: DEMO_IDEAS_ROLE_CLARITY };
   return { angles: addDemoScenarios(DEMO_IDEAS_BRAND[idx]!) };
 }
 
