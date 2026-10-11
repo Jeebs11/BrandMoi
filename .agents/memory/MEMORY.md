@@ -5,3 +5,4 @@
 - [Idea Engine audience coverage](idea-engine-audience-coverage.md) — use one result per core audience in standalone modes; keep grouped performance suggestions compact and labeled.
 - [Profile annotation experience](profile-annotation-experience.md) — make the LinkedIn-style reconstruction primary; use the private original PDF as supporting evidence with anchored annotations.
 - [AI prompt branching](ai-prompt-branching.md) — keep mode-specific instructions separate from the shared provider request contract.
+- [Content quality feedback](content-quality-feedback.md) — generated content feels robotic and flat; prioritize human specificity over a provider swap alone.
