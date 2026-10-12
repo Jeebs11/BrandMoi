@@ -593,7 +593,7 @@ export type AgentBrief = {
   newsPublishedAt?: string;
   newsSourceDomain?: string;
   newsDescription?: string;
-  trendingTopics?: { headline: string; sourceLine?: string }[];
+  trendingTopics?: { headline: string; sourceLine?: string; url?: string; description?: string }[];
   seriesNudge?: { seriesId: number; title: string; nextPart: number; plannedParts: number | null };
 };
 

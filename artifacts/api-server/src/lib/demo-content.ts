@@ -126,7 +126,6 @@ const DEMO_BRIEFS = [
     newsHeadline: "Remote-first companies are quietly rewriting their hiring bars",
     newsSourceLine: "Worth watching if you're hiring — the bar for 'senior' is shifting toward async communication skills.",
     trendingTopics: [
-      { headline: "Remote-first companies are quietly rewriting their hiring bars", sourceLine: "The bar for 'senior' is shifting toward async communication skills." },
       { headline: "LinkedIn's algorithm now favors dwell time over reactions", sourceLine: "Longer, slower-reading posts are starting to outperform quick-hit ones." },
       { headline: "Layoff-driven job searches are getting more public, not less", sourceLine: "Openly documenting a search is becoming normalized rather than stigmatized." },
     ],
@@ -151,7 +150,6 @@ const DEMO_BRIEFS = [
     newsHeadline: "Boards are pushing back on 'growth at all costs' roadmaps",
     newsSourceLine: "A useful signal if you're positioning a post around discipline over speed.",
     trendingTopics: [
-      { headline: "Boards are pushing back on 'growth at all costs' roadmaps", sourceLine: "Discipline-over-speed narratives are landing better with investors right now." },
       { headline: "AI-generated LinkedIn posts are getting easier to spot", sourceLine: "Generic structure and stock phrasing are the biggest tells reported so far." },
       { headline: "Mid-level hiring is quietly picking back up", sourceLine: "A good moment for a capability-proof post aimed at recruiters." },
     ],

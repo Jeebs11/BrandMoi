@@ -1303,7 +1303,7 @@ export default function Dashboard() {
                             e.stopPropagation();
                             if (newsAnglesLoading) return;
                             setNewsAnglesLoading(true);
-                            agentApi.newsAngles({ newsHeadline: topic.headline, newsSourceLine: topic.sourceLine })
+                            agentApi.newsAngles({ newsHeadline: topic.headline, newsSourceLine: topic.sourceLine, newsUrl: topic.url, newsDescription: topic.description })
                               .then((r) => setNewsAngles(r.angles)).catch(() => {}).finally(() => setNewsAnglesLoading(false));
                           }}
                           className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 flex items-start gap-2 text-left hover:bg-white/10 transition-colors"

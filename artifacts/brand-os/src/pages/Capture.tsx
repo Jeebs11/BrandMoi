@@ -319,9 +319,14 @@ export default function Capture() {
       setSlayStyle(sb?.slayStyle === true);
       setGeneratedWithSlay(sb?.slayStyle === true);
       if (existingDraft.postOutput || existingDraft.carouselOutput || existingDraft.visualOutput) {
-        const carousel: CarouselSlide[] = existingDraft.carouselOutput
-          ? (JSON.parse(existingDraft.carouselOutput) as CarouselSlide[])
-          : [];
+        let carousel: CarouselSlide[] = [];
+        if (existingDraft.carouselOutput) {
+          try {
+            carousel = JSON.parse(existingDraft.carouselOutput) as CarouselSlide[];
+          } catch {
+            carousel = [];
+          }
+        }
         const persistedHashtags = (sb as { hashtags?: string })?.hashtags ?? "";
         const restored: GeneratedContent = {
           post: existingDraft.postOutput ?? "",
@@ -1209,7 +1214,7 @@ export function CaptureForm(props: CaptureFormProps) {
         extraInstruction:
           "Structure this as a Pain Point Post: open with an uncomfortable question or bold observation that surfaces the pain, use the analogy/hook to make it vivid and concrete, describe the real-world consequences people feel, then close with the key insight or reframe. Direct and conversational.",
         moment: momentDetails,
-          slayStyle,
+        slayStyle,
       });
     } else {
       const composedRawInput = composeGenerationInput(rawInput, momentDetails);

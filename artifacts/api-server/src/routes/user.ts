@@ -10,7 +10,7 @@ import { signToken } from "../lib/jwt.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
 import { extractVoiceDNA } from "./ai.js";
-import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
+import { checkAndIncrementDailyLimit, refundIfFailed } from "../lib/daily-limit.js";
 import { buildCanonicalBrandContext } from "../lib/brand-context.js";
 
 const ANALYSIS_LIMIT_PER_DAY = 2;
@@ -265,6 +265,7 @@ router.post("/user/voice-refresh", requireAuth, async (req, res): Promise<void> 
     res.status(429).json({ error: "You've used your 2 analyses for today. Come back tomorrow.", remaining: 0 });
     return;
   }
+  refundIfFailed(res, limit);
 
   try {
     const result = await runVoiceAnalysis(userId);

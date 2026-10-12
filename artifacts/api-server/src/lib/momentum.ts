@@ -80,6 +80,7 @@ export async function fetchMomentumNewsAnchor(
         maxOutputTokens: 8192,
         responseMimeType: "application/json",
         tools: [{ googleSearch: {} }],
+        abortSignal: AbortSignal.timeout(20_000),
       },
     });
 
@@ -130,13 +131,14 @@ export async function fetchMomentumNewsAnchor(
 
     const context = articles
       .map((article, index) => [
+        `Article ${index + 1}:`,
         `Headline: ${article.headline}`,
         `Source: ${article.source}`,
         `Published: ${article.publishedAt}`,
         `URL: ${article.url}`,
         `Summary: ${article.summary}`,
       ].join("\n"))
-      .join(`\n\nArticle ${articles.length > 1 ? "—" : ""}\n`);
+      .join("\n\n");
 
     if (!context || NO_FRESH_NEWS_MARKERS.some((marker) => marker.test(context))) {
       return { context: "", url: null, articles: [] };

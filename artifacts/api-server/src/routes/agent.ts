@@ -9,7 +9,7 @@ import { aiRateLimit } from "../middleware/rate-limit.js";
 import { fetchMomentumNewsAnchor, type MomentumNewsArticle } from "../lib/momentum.js";
 import { buildLearnedPatterns, resonanceScore } from "../lib/learning.js";
 import { buildCanonicalBrandContext } from "../lib/brand-context.js";
-import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
+import { checkAndIncrementDailyLimit, refundIfFailed } from "../lib/daily-limit.js";
 import { isDemoUser, demoDelay, getDemoBrief, getDemoIdeas, getDemoDare } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
@@ -23,6 +23,14 @@ import {
 
 // Legacy-objective → modern-audience fallback for drafts saved before the
 // audience taxonomy existed. Mirrors momentum.ts's deriveAudience.
+// First sentence of a news summary, capped so it fits a one-line UI slot.
+function firstSentence(text: string, max = 160): string {
+  const trimmed = text.trim();
+  const end = trimmed.search(/[.!?](\s|$)/);
+  const sentence = end === -1 ? trimmed : trimmed.slice(0, end + 1);
+  return sentence.length > max ? `${sentence.slice(0, max - 1).trimEnd()}…` : sentence;
+}
+
 function deriveAudienceFallback(objective: unknown): string {
   if (typeof objective !== "string") return "My audience";
   const o = objective.toLowerCase();
@@ -314,7 +322,7 @@ router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<v
     let newsPublishedAt = "";
     let newsSourceDomain = "";
     let newsDescription = "";
-    let trendingTopics: Array<{ headline: string; sourceLine: string }> = [];
+    let trendingTopics: Array<{ headline: string; sourceLine: string; url?: string; description?: string }> = [];
     let newsArticles: MomentumNewsArticle[] = [];
     try {
       const news = await fetchMomentumNewsAnchor(req.user!.userId);
@@ -324,13 +332,16 @@ router.get("/agent/brief", requireAuth, aiRateLimit, async (req, res): Promise<v
       const primary = newsArticles[0];
       if (primary) {
         newsHeadline = primary.headline;
-        newsSourceLine = `${primary.source} · Published ${primary.publishedAt}`;
+        newsSourceLine = firstSentence(primary.summary);
         newsPublishedAt = primary.publishedAt;
         newsSourceDomain = primary.source;
         newsDescription = primary.summary;
-        trendingTopics = newsArticles.map((article) => ({
+        // The primary story already has its own card; "also trending" is the rest.
+        trendingTopics = newsArticles.slice(1).map((article) => ({
           headline: article.headline,
-          sourceLine: article.source,
+          sourceLine: firstSentence(article.summary),
+          url: article.url,
+          description: article.summary,
         }));
       }
     } catch {
@@ -1418,6 +1429,7 @@ router.post("/agent/dare", requireAuth, aiRateLimit, async (req, res): Promise<v
       res.status(429).json({ error: "You've used your 3 dares for today. The algorithm gets a day off." });
       return;
     }
+    refundIfFailed(res, limit);
 
     const { prefs, dna } = await getUserAgentContext(userId);
     const pillars = Array.isArray(prefs?.contentPillars) ? (prefs.contentPillars as string[]) : [];
@@ -1777,6 +1789,7 @@ router.post("/agent/brand-analysis", requireAuth, aiRateLimit, async (req, res):
       res.status(429).json({ error: "You've used both brand analyses for today. Come back tomorrow." });
       return;
     }
+    refundIfFailed(res, limit);
 
     const [prefs] = await db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1);
     const drafts = await db

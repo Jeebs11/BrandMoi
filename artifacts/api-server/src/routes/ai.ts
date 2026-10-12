@@ -141,6 +141,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "",
     "## FEELING OVERLAY (mandatory):",
     feelingOverlay,
+    "",
     "## FORMAT OVERLAY (mandatory):",
     formatOverlay,
     slayStyle ? `\n## SLAY WRITING STRUCTURE (mandatory for this draft only):\nShape the post through these four beats, but do not label them or make it feel like a formula:\n1. STORY — open with a specific moment, observation, or credible scene grounded in the author's input. Never invent a personal event, result, or client story. If no personal story was provided, use a clearly general observation or scenario instead.\n2. LESSON — explain the insight or shift in perspective that comes from the story.\n3. ACTION — give one concrete, useful piece of advice the reader can apply.\n4. YOU — end by turning the lesson toward the reader with a direct, natural line or question using "you". Avoid generic engagement bait and do not force the literal final word to be "you".\nKeep the author's voice, audience, feeling, and core idea intact. The four beats should read as one coherent LinkedIn post.` : "",

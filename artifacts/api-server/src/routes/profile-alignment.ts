@@ -7,7 +7,7 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db, preferencesTable, draftsTable, profileSnapshotsTable, profileAnalysesTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth.js";
 import { aiRateLimit } from "../middleware/rate-limit.js";
-import { checkAndIncrementDailyLimit } from "../lib/daily-limit.js";
+import { checkAndIncrementDailyLimit, refundIfFailed } from "../lib/daily-limit.js";
 import { respondAiError } from "../lib/ai-errors.js";
 import { isDemoUser } from "../lib/demo-content.js";
 import { getDemoProfileAlignment, getDemoProfileFacts } from "../lib/demo-content.js";
@@ -745,6 +745,7 @@ router.post("/profile-alignment/analyze", requireAuth, aiRateLimit, async (req, 
     res.status(429).json({ error: "You've used today's profile alignment runs (3/day) — try again tomorrow." });
     return;
   }
+  refundIfFailed(res, limit);
 
   try {
     const comparisonTable = await computeComparisonTable(userId);
