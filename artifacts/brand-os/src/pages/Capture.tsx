@@ -44,11 +44,20 @@ import {
 import {
   EMPTY_MOMENT_DETAILS,
   HUMANISE_ACTIONS,
+  IDEA_MODES,
+  IDEA_TERRITORIES,
+  analyzeIdeaQuality,
   composeGenerationInput,
   composeHumanDetailBlock,
+  composeIdeaEngineContext,
   getDetailsUsed,
+  getIdeaMode,
+  getIdeaTerritory,
   getSpecificityQuestion,
   shouldShowSpecificityPrompt,
+  type IdeaModeKey,
+  type IdeaQuality,
+  type IdeaTerritoryKey,
   type MomentDetails,
 } from "@/lib/humanisation";
 
@@ -328,10 +337,11 @@ export default function Capture() {
           shortPost: existingDraft.shortPost ?? "",
           carousel,
           visual: existingDraft.visualOutput ?? "",
-          infographic: (sb as { infographic?: InfographicData })?.infographic ?? null,
-          hashtags: persistedHashtags,
-          alternativeHooks: (sb as { alternativeHooks?: string[] })?.alternativeHooks ?? [],
-        };
+	          infographic: (sb as { infographic?: InfographicData })?.infographic ?? null,
+	          hashtags: persistedHashtags,
+	          alternativeHooks: (sb as { alternativeHooks?: string[] })?.alternativeHooks ?? [],
+	          qualityNotes: (sb as { qualityNotes?: GeneratedContent["qualityNotes"] })?.qualityNotes ?? null,
+	        };
         setContent(restored);
         setEditedPost(restored.post);
         setHashtags(persistedHashtags);
@@ -552,10 +562,11 @@ export default function Capture() {
       objective: objectiveFromAudience(audience),
       persona: preferences?.persona ?? "Founder",
       tone: toneFromFeeling(feeling),
-      alternativeHooks: content?.alternativeHooks ?? [],
-      newsAnchor: cleanAnchor,
-      infographic: content?.infographic ?? null,
-      brandClosing: {
+	      alternativeHooks: content?.alternativeHooks ?? [],
+	      newsAnchor: cleanAnchor,
+	      infographic: content?.infographic ?? null,
+	      qualityNotes: content?.qualityNotes ?? null,
+	      brandClosing: {
         enabled: brandClosingApplied && !!brandClosingText.trim() && editedPost.toLocaleLowerCase().endsWith(brandClosingText.trim().toLocaleLowerCase()),
         mode: brandClosingMode,
         style: brandClosingStyle,
@@ -825,6 +836,10 @@ export default function Capture() {
   };
 
   const handleViewBrandReview = (forPublish = false) => {
+    if (forPublish && brandReviewResult && brandReviewIsStale) {
+      void handleBrandReview(fullPost, true, true);
+      return;
+    }
     if (brandReviewResult) {
       setBrandReviewIsForPublish(forPublish);
       setBrandReviewOpen(true);
@@ -979,11 +994,13 @@ export default function Capture() {
             tieToNews={tieToNews} setTieToNews={setTieToNews}
             isGenerating={isGenerating}
             onMakeIt={(overrides) => runGenerate(overrides)}
-            onSelectDirection={(d) => {
+            onSelectDirection={(d, context) => {
               setFeeling(d.feeling);
               runGenerate({
                 feeling: d.feeling,
-                extraInstruction: `Open with a hook in this direction (make it your own voice): "${d.hook}"`,
+                rawInput: context.rawInput,
+                slayStyle: context.slayStyle,
+                extraInstruction: context.extraInstruction,
               });
             }}
             error={generateError instanceof Error ? generateError.message : null}
@@ -1126,7 +1143,7 @@ export default function Capture() {
             feedback={authenticityFeedback}
             isSavingFeedback={isSavingAuthenticityFeedback}
             onFeedback={handleAuthenticityFeedback}
-            onSaveAndPublish={brandReviewIsForPublish ? completePublish : undefined}
+            onSaveAndPublish={brandReviewIsForPublish && !brandReviewIsStale ? completePublish : undefined}
             isPublishing={isSaving}
           />
         )}
@@ -1167,7 +1184,7 @@ interface CaptureFormProps {
   tieToNews: boolean; setTieToNews: (v: boolean) => void;
   isGenerating: boolean;
   onMakeIt: (overrides?: { rawInput?: string; extraInstruction?: string; moment?: MomentDetails; slayStyle?: boolean }) => void;
-  onSelectDirection: (d: { feeling: string; hook: string }) => void;
+  onSelectDirection: (d: DirectionConcept, context: { rawInput: string; extraInstruction: string; slayStyle: boolean }) => void;
   error: string | null;
 }
 
@@ -1186,8 +1203,20 @@ export function CaptureForm(props: CaptureFormProps) {
   const [ppConcept, setPpConcept] = useState("");
   const [ppWentWrong, setPpWentWrong] = useState("");
   const [ppAnalogy, setPpAnalogy] = useState("");
+  const [ideaTerritory, setIdeaTerritory] = useState<IdeaTerritoryKey>("hard_won_lesson");
+  const [ideaMode, setIdeaMode] = useState<IdeaModeKey>("messy_thought");
 
   const needsSpecificityCheck = shouldShowSpecificityPrompt(rawInput, momentDetails);
+  const ideaQuality = useMemo(
+    () => analyzeIdeaQuality(rawInput, momentDetails, audience, ideaTerritory),
+    [rawInput, momentDetails, audience, ideaTerritory],
+  );
+  const ideaEngineContext = useMemo(
+    () => composeIdeaEngineContext(ideaTerritory, ideaMode, ideaQuality),
+    [ideaTerritory, ideaMode, ideaQuality],
+  );
+  const selectedTerritory = getIdeaTerritory(ideaTerritory);
+  const selectedMode = getIdeaMode(ideaMode);
 
   const updateMomentDetail = (key: keyof MomentDetails, value: string) => {
     setMomentDetails({ ...momentDetails, [key]: value });
@@ -1202,6 +1231,7 @@ export function CaptureForm(props: CaptureFormProps) {
         `Topic: ${ppConcept}`,
         ppWentWrong ? `What goes wrong: ${ppWentWrong}` : "",
         ppAnalogy ? `Analogy or hook: ${ppAnalogy}` : "",
+        ideaEngineContext,
         humanDetailBlock,
       ].filter(Boolean).join("\n");
       onMakeIt({
@@ -1212,7 +1242,10 @@ export function CaptureForm(props: CaptureFormProps) {
           slayStyle,
       });
     } else {
-      const composedRawInput = composeGenerationInput(rawInput, momentDetails);
+      const composedRawInput = [
+        composeGenerationInput(rawInput, momentDetails),
+        ideaEngineContext,
+      ].filter(Boolean).join("\n\n");
       onMakeIt({ rawInput: composedRawInput, moment: momentDetails, slayStyle });
     }
   };
@@ -1224,8 +1257,12 @@ export function CaptureForm(props: CaptureFormProps) {
     if (!rawInput.trim()) return;
     setShowDirections(true);
     setDirections([]);
+    const composedRawInput = [
+      composeGenerationInput(rawInput, momentDetails),
+      ideaEngineContext,
+    ].filter(Boolean).join("\n\n");
     exploreDirs(
-      { data: { rawInput, audience: audience || undefined } },
+      { data: { rawInput: composedRawInput, audience: audience || undefined, territory: selectedTerritory.label, mode: selectedMode.label } },
       {
         onSuccess: (data) => setDirections(data.directions),
         onError: () => setShowDirections(false),
@@ -1259,6 +1296,95 @@ export function CaptureForm(props: CaptureFormProps) {
           data-testid="input-raw-idea"
         />
       )}
+
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4" data-testid="section-idea-engine">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+            <Layers className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-gray-900">Idea engine</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+              Pick the lane and source material before BrandMoi writes.
+            </p>
+          </div>
+          <span className={cn(
+            "rounded-full px-2 py-1 text-[10px] font-bold",
+            ideaQuality.score >= 4
+              ? "bg-emerald-50 text-emerald-700"
+              : ideaQuality.score >= 2
+              ? "bg-amber-50 text-amber-700"
+              : "bg-rose-50 text-rose-700",
+          )}>
+            {ideaQuality.label} {ideaQuality.score}/5
+          </span>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">Territory</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {IDEA_TERRITORIES.map((territory) => (
+              <button
+                key={territory.key}
+                type="button"
+                onClick={() => setIdeaTerritory(territory.key)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                  ideaTerritory === territory.key
+                    ? "border-violet-500 bg-violet-600 text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-violet-300",
+                )}
+                title={territory.description}
+              >
+                {territory.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-gray-400">Idea mode</p>
+          <div className="grid grid-cols-2 gap-2">
+            {IDEA_MODES.map((mode) => (
+              <button
+                key={mode.key}
+                type="button"
+                onClick={() => setIdeaMode(mode.key)}
+                className={cn(
+                  "rounded-xl border px-3 py-2 text-left text-xs font-semibold transition",
+                  ideaMode === mode.key
+                    ? "border-slate-800 bg-slate-900 text-white"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-slate-300",
+                )}
+                title={mode.prompt}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+          <p className="text-xs font-semibold text-gray-800">{ideaQuality.summary}</p>
+          {ideaQuality.missingPrompt && (
+            <p className="mt-1 text-xs leading-relaxed text-gray-500">{ideaQuality.missingPrompt}</p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {ideaQuality.signals.map((signal) => (
+              <span
+                key={signal.key}
+                className={cn(
+                  "rounded-full px-2 py-1 text-[10px] font-semibold",
+                  signal.passed ? "bg-emerald-50 text-emerald-700" : "bg-white text-gray-500 border border-gray-200",
+                )}
+                title={signal.detail}
+              >
+                {signal.passed ? "✓ " : ""}{signal.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {needsSpecificityCheck && (
         <div
@@ -1560,20 +1686,50 @@ export function CaptureForm(props: CaptureFormProps) {
             </div>
           ) : (
             directions.map((d, i) => (
-              <button
-                key={i}
-                onClick={() => onSelectDirection(d)}
-                disabled={isGenerating}
-                className="w-full text-left p-4 rounded-2xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50/30 transition space-y-2 disabled:opacity-50"
-              >
-                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
-                  {d.feeling}
-                </span>
-                <p className="font-semibold text-sm text-gray-900 leading-snug">"{d.hook}"</p>
-                <ul className="text-xs text-gray-500 space-y-0.5">
-                  {d.points.map((pt, j) => <li key={j}>· {pt}</li>)}
-                </ul>
-              </button>
+	              <button
+	                key={i}
+	                onClick={() => onSelectDirection(d, {
+	                  rawInput: [
+	                    composeGenerationInput(rawInput, momentDetails),
+	                    ideaEngineContext,
+	                  ].filter(Boolean).join("\n\n"),
+	                  extraInstruction: [
+	                    `Open with this direction, but make it sound native to the author's voice: "${d.hook}"`,
+	                    d.tension ? `Core tension to preserve: ${d.tension}` : "",
+	                    d.audiencePain ? `Audience pain to address: ${d.audiencePain}` : "",
+	                    d.whyItWorks ? `Why this angle works: ${d.whyItWorks}` : "",
+	                    "Use the points as raw material, not as a visible list unless the idea naturally needs one.",
+	                  ].filter(Boolean).join("\n"),
+	                  slayStyle,
+	                })}
+	                disabled={isGenerating}
+	                className="w-full text-left p-4 rounded-2xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50/30 transition space-y-2 disabled:opacity-50"
+	              >
+	                <div className="flex flex-wrap gap-1.5">
+	                  <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+	                    {d.feeling}
+	                  </span>
+	                  {d.territory && (
+	                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+	                      {d.territory}
+	                    </span>
+	                  )}
+	                  {typeof d.qualityScore === "number" && (
+	                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+	                      {d.qualityScore}/5 signal
+	                    </span>
+	                  )}
+	                </div>
+	                <p className="font-semibold text-sm text-gray-900 leading-snug">"{d.hook}"</p>
+	                {(d.tension || d.audiencePain) && (
+	                  <p className="text-xs leading-relaxed text-gray-600">
+	                    {d.tension ?? d.audiencePain}
+	                  </p>
+	                )}
+	                <ul className="text-xs text-gray-500 space-y-0.5">
+	                  {d.points.map((pt: string, j: number) => <li key={j}>· {pt}</li>)}
+	                </ul>
+	              </button>
             ))
           )}
         </div>
@@ -1768,18 +1924,59 @@ export function ResultView(props: ResultViewProps) {
       )}
 
       {/* News anchor (if tied) */}
-      {content.newsAnchor && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+	      {content.newsAnchor && (
+	        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs">
           <p className="font-medium text-amber-900">{content.newsAnchor.headline}</p>
           {content.newsAnchor.url && (
             <a href={content.newsAnchor.url} target="_blank" rel="noopener noreferrer" className="text-amber-700 underline">
               source
             </a>
           )}
-        </div>
-      )}
+	        </div>
+	      )}
 
-      {/* Tab strip */}
+	      {content.qualityNotes && (
+	        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4" data-testid="panel-quality-notes">
+	          <div className="flex items-start gap-2.5">
+	            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 shadow-sm">
+	              <Target className="h-4 w-4" />
+	            </span>
+	            <div className="min-w-0">
+	              <p className="text-sm font-semibold text-emerald-900">Quality check</p>
+	              <p className="mt-0.5 text-xs leading-relaxed text-emerald-700">
+	                BrandMoi checked the draft for evidence, audience tension, and human specificity.
+	              </p>
+	            </div>
+	          </div>
+	          {content.qualityNotes.evidenceUsed?.length > 0 && (
+	            <div className="mt-3 border-t border-emerald-100 pt-3">
+	              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Evidence used</p>
+	              <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-emerald-800">
+	                {content.qualityNotes.evidenceUsed.slice(0, 4).map((item: string, index: number) => (
+	                  <li key={index}>· {item}</li>
+	                ))}
+	              </ul>
+	            </div>
+	          )}
+	          {content.qualityNotes.diagnosis?.length > 0 && (
+	            <div className="mt-3 border-t border-emerald-100 pt-3">
+	              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Diagnosis</p>
+	              <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-emerald-800">
+	                {content.qualityNotes.diagnosis.slice(0, 3).map((item: string, index: number) => (
+	                  <li key={index}>· {item}</li>
+	                ))}
+	              </ul>
+	            </div>
+	          )}
+	          {content.qualityNotes.missingHumanDetail && (
+	            <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs leading-relaxed text-emerald-800">
+	              {content.qualityNotes.missingHumanDetail}
+	            </p>
+	          )}
+	        </div>
+	      )}
+
+	      {/* Tab strip */}
       <div className="flex overflow-x-auto -mx-4 px-4 gap-1 no-scrollbar">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
@@ -1947,10 +2144,10 @@ export function ResultView(props: ResultViewProps) {
             <Button variant="outline" onClick={() => onRefine("Make this shorter and punchier.", "post", "Shorter")} disabled={isRefining}>
               <ArrowUp className="w-3.5 h-3.5 mr-1" />Shorter
             </Button>
-            <Button variant="outline" onClick={() => onRefine("Add more depth and a personal example.", "post", "Longer")} disabled={isRefining}>
+            <Button variant="outline" onClick={() => onRefine("Add more depth using only supplied details. Do not invent a personal example; if there is not enough source material, deepen the reasoning instead.", "post", "Longer")} disabled={isRefining}>
               <ArrowDown className="w-3.5 h-3.5 mr-1" />Longer
             </Button>
-            <Button variant="outline" onClick={() => onRefine("Reframe this as a personal story with a vivid opening scene.", "post", "Story")} disabled={isRefining}>
+            <Button variant="outline" onClick={() => onRefine("Reframe this as a story only from details already supplied. If no real scene exists, use a grounded observation rather than inventing one.", "post", "Story")} disabled={isRefining}>
               <BookOpen className="w-3.5 h-3.5 mr-1" />Story
             </Button>
             <Button variant="outline" onClick={onTryAgain} disabled={isRefining}>

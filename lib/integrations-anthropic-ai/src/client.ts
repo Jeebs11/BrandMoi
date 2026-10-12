@@ -1,18 +1,31 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-if (!process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL) {
-  throw new Error(
-    "AI_INTEGRATIONS_ANTHROPIC_BASE_URL must be set. Did you forget to provision the Anthropic AI integration?",
+const baseURL = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+const apiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+
+const missingConfig = [
+  !baseURL ? "AI_INTEGRATIONS_ANTHROPIC_BASE_URL" : null,
+  !apiKey ? "AI_INTEGRATIONS_ANTHROPIC_API_KEY" : null,
+].filter(Boolean);
+
+function throwMissingAnthropicConfig(): never {
+  const error = new Error(
+    `Anthropic AI is not configured. Missing: ${missingConfig.join(", ")}.`,
   );
+  (error as Error & { status?: number }).status = 503;
+  throw error;
 }
 
-if (!process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY) {
-  throw new Error(
-    "AI_INTEGRATIONS_ANTHROPIC_API_KEY must be set. Did you forget to provision the Anthropic AI integration?",
-  );
-}
+export const isAnthropicConfigured = missingConfig.length === 0;
 
-export const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-});
+export const anthropic: Anthropic = isAnthropicConfigured
+  ? new Anthropic({
+      apiKey: apiKey!,
+      baseURL: baseURL!,
+    })
+  : ({
+      messages: {
+        create: async () => throwMissingAnthropicConfig(),
+        stream: () => throwMissingAnthropicConfig(),
+      },
+    } as unknown as Anthropic);

@@ -97,11 +97,11 @@ export function PostMeter({ post, hashtags }: { post: string; hashtags: string }
 
       {/* Live chips */}
       <div className="flex flex-wrap gap-1.5">
-        <Chip tone={m.charTone} label={m.charLabel} title="LinkedIn's engagement sweet spot is ~800–2,000 characters." />
-        <Chip tone={m.hookTone} label={`hook ${m.hookLen}/${FOLD}`} title="Everything before ~210 chars is your hook — it must earn the 'see more' click." />
-        <Chip tone={m.wallOfText ? "warn" : "good"} label={`${m.paragraphs} paragraph${m.paragraphs !== 1 ? "s" : ""}`} title={m.wallOfText ? "A paragraph is 5+ lines — break it up. Whitespace boosts dwell time." : "Good — short paragraphs lift dwell time."} />
-        <Chip tone={m.tagTone} label={`${m.totalTags} hashtag${m.totalTags !== 1 ? "s" : ""}`} title="1–3 hashtags is optimal; more than 5 hurts reach." />
-        {m.hasLink && <Chip tone="bad" label="link in body" title="External links in the post body carry a ~25–40% reach penalty. Put it in the first comment." />}
+        <Chip tone={m.charTone} label={m.charLabel} title="Often a strong range for a complete but skimmable LinkedIn post." />
+        <Chip tone={m.hookTone} label={`hook ${m.hookLen}/${FOLD}`} title="This opening stretch is what readers see before expanding the post." />
+        <Chip tone={m.wallOfText ? "warn" : "good"} label={`${m.paragraphs} paragraph${m.paragraphs !== 1 ? "s" : ""}`} title={m.wallOfText ? "A paragraph is 5+ lines — consider adding whitespace." : "Good — short paragraphs are easier to scan."} />
+        <Chip tone={m.tagTone} label={`${m.totalTags} hashtag${m.totalTags !== 1 ? "s" : ""}`} title="A small number of precise hashtags usually reads cleaner than a long tag block." />
+        {m.hasLink && <Chip tone="bad" label="link in body" title="Consider moving external links out of the main post when the post should stand on its own." />}
         {m.weakOpener && <Chip tone="warn" label="weak opener" title="Starting with 'I'm excited…' / 'Today…' buries the hook. Lead with tension or a bold claim." />}
       </div>
     </div>

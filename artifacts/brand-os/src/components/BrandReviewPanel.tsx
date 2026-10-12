@@ -51,6 +51,16 @@ const VERDICT_COPY = {
   },
 } as const;
 
+const FEEDBACK_OPTIONS: Array<{
+  value: Exclude<AuthenticityFeedback, null>;
+  label: string;
+}> = [
+  { value: "sounds_like_me", label: "Sounds like me" },
+  { value: "too_generic", label: "Too generic" },
+  { value: "needs_specificity", label: "Needs specifics" },
+  { value: "too_polished", label: "Too polished" },
+];
+
 export function BrandReviewPanel({
   result,
   isLoading,
@@ -382,20 +392,28 @@ export function BrandReviewPanel({
                       {onFeedback && (
                         <div className="mt-3 border-t border-gray-200 pt-3">
                           <p className="text-[11px] text-gray-500">Optional: this helps guide future drafts you request.</p>
-                          <button
-                            type="button"
-                            disabled={isSavingFeedback}
-                            onClick={() => onFeedback(feedback === "sounds_like_me" ? null : "sounds_like_me")}
-                            className={cn(
-                              "mt-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50",
-                              feedback === "sounds_like_me"
-                                ? "border-violet-500 bg-violet-600 text-white"
-                                : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:text-violet-700",
-                            )}
-                          >
-                            {feedback === "sounds_like_me" && <Check className="mr-1 inline h-3 w-3" />}
-                            Sounds like me
-                          </button>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {FEEDBACK_OPTIONS.map((option) => {
+                              const selected = feedback === option.value;
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  disabled={isSavingFeedback}
+                                  onClick={() => onFeedback(selected ? null : option.value)}
+                                  className={cn(
+                                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50",
+                                    selected
+                                      ? "border-violet-500 bg-violet-600 text-white"
+                                      : "border-gray-200 bg-white text-gray-600 hover:border-violet-300 hover:text-violet-700",
+                                  )}
+                                >
+                                  {selected && <Check className="mr-1 inline h-3 w-3" />}
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>

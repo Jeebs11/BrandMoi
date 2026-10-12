@@ -19,6 +19,13 @@ export function respondAiError(
     return;
   }
 
+  if (status === 503 && err instanceof Error && /not configured/i.test(err.message)) {
+    res.status(503).json({
+      error: "AI features are not configured yet. The rest of BrandMoi can still run, but this action needs the Anthropic AI integration keys.",
+    });
+    return;
+  }
+
   const anthMsg = anthropicMessage(err);
   if (anthMsg && /credit balance/i.test(anthMsg)) {
     res.status(503).json({

@@ -741,10 +741,12 @@ router.post("/ai/explore-directions", requireAuth, aiRateLimit, async (req, res)
   const body = z.object({
     rawInput: z.string().min(1),
     audience: z.string().nullish(),
+    territory: z.string().nullish(),
+    mode: z.string().nullish(),
   }).safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
 
-  const { rawInput, audience: audienceHint } = body.data;
+  const { rawInput, audience: audienceHint, territory, mode } = body.data;
   const userId = req.user!.userId;
 
   // Demo account: return pre-written directions, no AI call
@@ -775,14 +777,22 @@ router.post("/ai/explore-directions", requireAuth, aiRateLimit, async (req, res)
     ? `\nDo NOT open with an angle similar to these recent posts the author has already published:\n${recentHooks.map((h) => `  - "${h}"`).join("\n")}`
     : "";
 
-  const systemPrompt = `You are a creative director. Given a raw idea, generate exactly 3 distinct post concepts — each using a DIFFERENT feeling and a completely different opening strategy.
+  const systemPrompt = `You are a creative director and idea editor. Given a raw idea, generate exactly 3 distinct post concepts — each using a DIFFERENT feeling and a completely different opening strategy.
 
 Return only valid JSON (no markdown fences, no explanation):
 {
   "directions": [
-    { "feeling": "Direct", "hook": "opening line under 120 chars", "points": ["key idea 1", "key idea 2", "key idea 3"] },
-    { "feeling": "Story", "hook": "opening line under 120 chars", "points": ["key idea 1", "key idea 2", "key idea 3"] },
-    { "feeling": "Contrarian", "hook": "opening line under 120 chars", "points": ["key idea 1", "key idea 2", "key idea 3"] }
+    {
+      "feeling": "Direct",
+      "territory": "Hard-won lesson",
+      "hook": "opening line under 120 chars",
+      "points": ["key idea 1", "key idea 2", "key idea 3"],
+      "audiencePain": "the reader problem this angle names",
+      "tension": "the friction, tradeoff, or contradiction that makes it worth reading",
+      "whyItWorks": "why this angle fits the author's brand and reader",
+      "qualityScore": 4,
+      "missingDetailPrompt": "one real detail that would make this stronger, or null"
+    }
   ]
 }
 
@@ -790,6 +800,9 @@ RULES:
 - Each of the 3 directions must use a DIFFERENT feeling — pick from: Direct, Witty, Vulnerable, Story, Contrarian
 - Each hook must open from a completely different angle — different first move, different image, different tension
 - Points are the 3 raw supporting ideas for that angle (brief, not polished LinkedIn copy)
+- Each direction must fit the requested territory/mode when provided, but use a different angle within that lane
+- qualityScore is 1–5 based on specificity, tension, audience fit, author proof, and freshness
+- missingDetailPrompt should be null for a strong direction, otherwise ask for the single most useful missing human detail
 - Keep every hook under 120 characters
 - Banned words in hooks: game-changer, passionate, excited to share, leverage, synergy, groundbreaking
 - Keep all personal claims, numbers, outcomes, and scenes inside the supplied evidence. A direction can suggest a premise, but it must never imply the author experienced something that is not on file.
@@ -799,7 +812,9 @@ ${NATURAL_HOOK_RULES}`;
   const userMsg = `${brandContext.context}
 
 Raw idea (primary source): ${rawInput}
-${audienceHint ? `Target audience: ${audienceHint}` : ""}${avoidNote}
+${audienceHint ? `Target audience: ${audienceHint}` : ""}
+${territory ? `Requested content territory: ${territory}` : ""}
+${mode ? `Requested idea mode: ${mode}` : ""}${avoidNote}
 
 Generate 3 directions. Stay close to the author's words and voice evidence. Return JSON only.`;
 
@@ -821,8 +836,14 @@ Generate 3 directions. Stay close to the author's words and voice evidence. Retu
     const validated = z.object({
       directions: z.array(z.object({
         feeling: z.string(),
+        territory: z.string().nullish(),
         hook: z.string(),
         points: z.array(z.string()),
+        audiencePain: z.string().nullish(),
+        tension: z.string().nullish(),
+        whyItWorks: z.string().nullish(),
+        qualityScore: z.number().nullish(),
+        missingDetailPrompt: z.string().nullish(),
       })).min(1).max(5),
     }).safeParse(parsed);
     if (!validated.success) { res.status(500).json({ error: "AI response shape mismatch" }); return; }

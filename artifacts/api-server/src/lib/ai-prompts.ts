@@ -150,7 +150,12 @@ OUTPUT — return only valid JSON, no markdown fences, with these fields:
   "shortPost": "a tighter 80–120 word version (string)",
   "carousel": [{"slide": 1, "title": "...", "description": "..."}, ...],
   "visual": "a 15–30 word screenshot-worthy quote pulled from the post",
-  "infographic": {"headline": "bold stat or claim", "bullets": ["...", "..."]}
+  "infographic": {"headline": "bold stat or claim", "bullets": ["...", "..."]},
+  "qualityNotes": {
+    "evidenceUsed": ["specific source detail used", "another real detail used"],
+    "diagnosis": ["one concise reason this draft feels specific or what still needs work"],
+    "missingHumanDetail": "one missing real-world detail that would improve the post, or null"
+  }
 }
 
 POST RULES:
@@ -179,6 +184,8 @@ VISUAL RULES: a single direct statement pulled or distilled from the post. 15–
 INFOGRAPHIC RULES: headline must be a bold stat or bold claim, never a topic label. 3–5 sharp bullets the reader would screenshot.
 
 SHORT POST RULES: voice-first, 80–120 words, no lists, two paragraph blocks max. Lead with the same idea as the main post but compressed to its core.
+
+QUALITY NOTES RULES: Be honest and specific. evidenceUsed must only list details actually supplied in the prompt or brand context. diagnosis should identify whether the post has a concrete moment, audience tension, author proof, and a non-generic point of view. missingHumanDetail should be null when the draft already has enough real evidence; otherwise ask for the single highest-leverage detail that would make the post more human.
 
 NEWS-TIE RULE (only when news context is provided): weave the headline naturally — never paste the URL, never say "I just read…". The hook should feel like the author was already thinking this and the news confirmed it. The angle must connect the news to the audience's actual situation.`;
 

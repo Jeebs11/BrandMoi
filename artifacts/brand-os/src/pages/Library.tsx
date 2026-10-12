@@ -437,8 +437,16 @@ export default function Library() {
                             const sb = (draft.structuredBreakdown ?? {}) as { feeling?: string; audience?: string };
                             const draftFeeling = sb.feeling ?? TONE_TO_FEELING[draft.tone] ?? "Direct";
                             const draftAudience = sb.audience ?? OBJECTIVE_TO_AUDIENCE[draft.objective] ?? draft.objective ?? "My audience";
-                            const hook = draft.postOutput?.split("\n").map(l => l.trim()).find(l => l.length > 10)?.slice(0, 100) ?? topic;
-                            navigate(`/capture?audience=${encodeURIComponent(draftAudience)}&feeling=${encodeURIComponent(draftFeeling)}&raw=${encodeURIComponent(`More like: ${hook}`)}`);
+                            const hook = draft.postOutput?.split("\n").map((line: string) => line.trim()).find((line: string) => line.length > 10)?.slice(0, 100) ?? topic;
+                            const sourcePost = draft.postOutput?.slice(0, 900);
+                            const raw = [
+                              "Create a fresh post inspired by this previous post's strategy, not a copy of its wording.",
+                              `Original topic: ${topic}`,
+                              `Opening move that worked: ${hook}`,
+                              sourcePost ? `Source post excerpt:\n${sourcePost}` : "",
+                              "Keep the audience and feeling similar, but find a new angle and fresh specifics.",
+                            ].filter(Boolean).join("\n\n");
+                            navigate(`/capture?audience=${encodeURIComponent(draftAudience)}&feeling=${encodeURIComponent(draftFeeling)}&raw=${encodeURIComponent(raw)}`);
                           }}>
                             <Sparkles className="w-4 h-4 mr-2 text-violet-500" /> More like this
                           </DropdownMenuItem>

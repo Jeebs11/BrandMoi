@@ -449,6 +449,13 @@ export const GenerateContentResponse = zod.object({
     ),
   audience: zod.string().nullish(),
   feeling: zod.string().nullish(),
+  qualityNotes: zod
+    .object({
+      evidenceUsed: zod.array(zod.string()),
+      diagnosis: zod.array(zod.string()),
+      missingHumanDetail: zod.string().nullish(),
+    })
+    .nullish(),
 });
 
 /**
@@ -477,16 +484,24 @@ export const RefineContentResponse = zod.object({
 export const ExploreDirectionsBody = zod.object({
   rawInput: zod.string(),
   audience: zod.string().nullish(),
+  territory: zod.string().nullish(),
+  mode: zod.string().nullish(),
 });
 
 export const ExploreDirectionsResponse = zod.object({
   directions: zod.array(
     zod.object({
       feeling: zod.string(),
+      territory: zod.string().nullish(),
       hook: zod.string().describe("Opening line under 120 characters"),
       points: zod
         .array(zod.string())
         .describe("3 key supporting ideas for this angle"),
+      audiencePain: zod.string().nullish(),
+      tension: zod.string().nullish(),
+      whyItWorks: zod.string().nullish(),
+      qualityScore: zod.number().nullish(),
+      missingDetailPrompt: zod.string().nullish(),
     }),
   ),
 });

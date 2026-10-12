@@ -1088,11 +1088,26 @@ components:
         audience:
           type: string
           nullable: true
-        feeling:
-          type: string
-          nullable: true
-      required:
-        - post
+	        feeling:
+	          type: string
+	          nullable: true
+	        qualityNotes:
+	          type: object
+	          nullable: true
+	          properties:
+	            evidenceUsed:
+	              type: array
+	              items:
+	                type: string
+	            diagnosis:
+	              type: array
+	              items:
+	                type: string
+	            missingHumanDetail:
+	              type: string
+	              nullable: true
+	      required:
+	        - post
         - carousel
         - visual
 
@@ -1124,25 +1139,49 @@ components:
       properties:
         rawInput:
           type: string
-        audience:
-          type: string
-          nullable: true
-      required:
-        - rawInput
+	        audience:
+	          type: string
+	          nullable: true
+	        territory:
+	          type: string
+	          nullable: true
+	        mode:
+	          type: string
+	          nullable: true
+	      required:
+	        - rawInput
 
     DirectionConcept:
       type: object
       properties:
-        feeling:
-          type: string
-        hook:
-          type: string
-          description: Opening line under 120 characters
+	        feeling:
+	          type: string
+	        territory:
+	          type: string
+	          nullable: true
+	        hook:
+	          type: string
+	          description: Opening line under 120 characters
         points:
           type: array
-          items:
-            type: string
-          description: 3 key supporting ideas for this angle
+	          items:
+	            type: string
+	          description: 3 key supporting ideas for this angle
+	        audiencePain:
+	          type: string
+	          nullable: true
+	        tension:
+	          type: string
+	          nullable: true
+	        whyItWorks:
+	          type: string
+	          nullable: true
+	        qualityScore:
+	          type: number
+	          nullable: true
+	        missingDetailPrompt:
+	          type: string
+	          nullable: true
       required:
         - feeling
         - hook

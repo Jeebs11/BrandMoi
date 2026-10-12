@@ -342,6 +342,11 @@ export interface GeneratedContent {
   newsFallback?: string | null;
   audience?: string | null;
   feeling?: string | null;
+  qualityNotes?: {
+    evidenceUsed: string[];
+    diagnosis: string[];
+    missingHumanDetail?: string | null;
+  } | null;
 }
 
 export type RefineContentBodyTab =
@@ -369,14 +374,22 @@ export interface RefinedContent {
 export interface ExploreDirectionsBody {
   rawInput: string;
   audience?: string | null;
+  territory?: string | null;
+  mode?: string | null;
 }
 
 export interface DirectionConcept {
   feeling: string;
+  territory?: string | null;
   /** Opening line under 120 characters */
   hook: string;
   /** 3 key supporting ideas for this angle */
   points: string[];
+  audiencePain?: string | null;
+  tension?: string | null;
+  whyItWorks?: string | null;
+  qualityScore?: number | null;
+  missingDetailPrompt?: string | null;
 }
 
 export interface ExploreDirectionsResponse {
