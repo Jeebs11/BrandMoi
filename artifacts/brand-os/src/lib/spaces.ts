@@ -1,9 +1,9 @@
-import { Home, PenSquare, BarChart2, FlaskConical, BookOpen, type LucideIcon } from "lucide-react";
+import { Home, PenSquare, BarChart2, FlaskConical, BookOpen, PenLine, Lightbulb, Layers, Target, type LucideIcon } from "lucide-react";
 
 // Nine pages, four working spaces (plus Today). The nav shows spaces; pages
 // that belong together get a small tab strip inside the space instead of a
 // nav item each.
-export type SpacePage = { href: string; label: string };
+export type SpacePage = { href: string; label: string; icon?: LucideIcon };
 export type Space = {
   key: "today" | "write" | "signals" | "you" | "library";
   href: string;
@@ -19,17 +19,17 @@ export const SPACES: Space[] = [
   {
     key: "write", href: "/capture", label: "Write", icon: PenSquare,
     pages: [
-      { href: "/capture", label: "Write" },
-      { href: "/vault", label: "Thought Vault" },
-      { href: "/series", label: "Series" },
+      { href: "/capture", label: "Write", icon: PenLine },
+      { href: "/vault", label: "Thought Vault", icon: Lightbulb },
+      { href: "/series", label: "Series", icon: Layers },
     ],
   },
   { key: "signals", href: "/analytics", label: "Signals", icon: BarChart2, needsPublished: true, pages: [{ href: "/analytics", label: "Signals" }] },
   {
     key: "you", href: "/studio", label: "You", icon: FlaskConical,
     pages: [
-      { href: "/studio", label: "Brand Studio" },
-      { href: "/profile-alignment", label: "Profile Alignment" },
+      { href: "/studio", label: "Brand Studio", icon: FlaskConical },
+      { href: "/profile-alignment", label: "Profile Alignment", icon: Target },
     ],
   },
   { key: "library", href: "/library", label: "Library", icon: BookOpen, pages: [{ href: "/library", label: "Library" }] },
