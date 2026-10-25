@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { BottomNav } from "@/components/BottomNav";
 import { SideNav } from "@/components/SideNav";
 import { HelpTourButton } from "@/components/HelpTourButton";
+import { SpaceTabs } from "@/components/SpaceTabs";
 import { useBackgroundTheme, PANEL_OPACITY_ALPHA } from "@/lib/background-context";
 import { getBackground } from "@/lib/backgrounds";
 
@@ -33,7 +34,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
 
   if (auth) {
     return (
-      <div className="min-h-screen bg-[#EDEDEE] flex justify-center items-center px-4">
+      <div className="min-h-screen bg-gray-100 flex justify-center items-center px-4">
         {children}
       </div>
     );
@@ -53,7 +54,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
   );
 
   return (
-    <div className="min-h-screen bg-[#EDEDEE] relative">
+    <div className="min-h-screen bg-gray-100 relative">
       {BgComponent && (
         <div
           className="fixed inset-0 z-0"
@@ -112,9 +113,9 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
             // that child is a flex item with the default min-width:auto, so any
             // unwrapped content inside it (a wide row, long badge, etc.) can force
             // the whole shell wider than the viewport instead of shrinking/wrapping.
-            "w-full min-w-0 min-h-screen shadow-2xl flex flex-col [&>*]:min-w-0",
+            "w-full min-w-0 min-h-screen flex flex-col [&>*]:min-w-0",
             "max-w-[430px]",
-            !noNav && "pb-20 md:pb-8 md:max-w-[700px] lg:max-w-[900px] md:shadow-xl",
+            !noNav && "pb-20 md:pb-8 md:max-w-[700px] lg:max-w-[900px]",
             hasFrost
               ? "relative z-[1] bg-transparent border-x"
               : "bg-gray-50 border-x border-gray-200",
@@ -124,6 +125,7 @@ export function AppShell({ children, noNav = false, auth = false, contentClassNa
             borderColor: `rgba(229,231,235,${Math.min(1, alpha + 0.1)})`,
           } : undefined}
         >
+          {!noNav && <SpaceTabs />}
           {children}
         </div>
       </div>

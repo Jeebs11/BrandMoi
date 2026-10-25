@@ -1,16 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { Home, PenSquare, BookOpen, Lightbulb, Settings, BarChart2, ChevronLeft, ChevronRight, Shield, FlaskConical, Layers, Target } from "lucide-react";
+import { Settings, ChevronLeft, ChevronRight, Shield } from "lucide-react";
+import { SPACES, spaceForLocation } from "@/lib/spaces";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useListDrafts } from "@workspace/api-client-react";
-
-const BASE_NAV_ITEMS = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/capture", label: "Capture", icon: PenSquare },
-  { href: "/vault", label: "Vault", icon: Lightbulb },
-  { href: "/library", label: "Library", icon: BookOpen },
-  { href: "/series", label: "Series", icon: Layers },
-];
 
 interface SideNavProps {
   collapsed: boolean;
@@ -22,12 +15,10 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
   const { user } = useAuth();
   const { data: drafts } = useListDrafts();
   const hasPublished = (drafts ?? []).some(d => d.status === "published");
-  const NAV_ITEMS = [
-    ...BASE_NAV_ITEMS,
-    ...(hasPublished ? [{ href: "/analytics", label: "Analytics", icon: BarChart2 }] : []),
-    { href: "/studio", label: "Brand Studio", icon: FlaskConical },
-    { href: "/profile-alignment", label: "Profile Alignment", icon: Target },
-  ];
+  const activeSpace = spaceForLocation(location);
+  const NAV_ITEMS = SPACES
+    .filter((space) => !space.needsPublished || hasPublished)
+    .map((space) => ({ href: space.href, label: space.label, icon: space.icon, key: space.key }));
 
   return (
     <aside className={cn(
@@ -49,14 +40,14 @@ export function SideNav({ collapsed, onToggle }: SideNavProps) {
 
       {/* Nav items */}
       <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto", collapsed ? "px-1" : "px-3")}>
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? location === "/" : location.startsWith(href);
+        {NAV_ITEMS.map(({ href, label, icon: Icon, key }) => {
+          const active = activeSpace?.key === key;
           return (
             <Link
               key={href}
               href={href}
               title={collapsed ? label : undefined}
-              data-tour={href === "/profile-alignment" ? "profile-alignment" : undefined}
+              data-tour={key === "you" ? "profile-alignment" : undefined}
               className={cn(
                 "flex items-center rounded-xl transition-all text-sm font-semibold",
                 collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",

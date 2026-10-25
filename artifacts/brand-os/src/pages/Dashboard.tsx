@@ -665,10 +665,13 @@ export default function Dashboard() {
             <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
             <div className="relative flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase mb-1">
-                  {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"}
+                <p className="text-[10px] font-bold text-white/40 tracking-[0.25em] uppercase mb-2">
+                  {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
                 </p>
-                <h1 className="text-2xl font-extrabold text-white tracking-tight truncate">{firstName ?? "Creator"}</h1>
+                <h1 className="font-display text-[34px] leading-[1.05] font-semibold text-white truncate">
+                  {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"},{" "}
+                  <span className="italic text-white/70">{firstName ?? "Creator"}</span>
+                </h1>
                 <p className="text-xs text-white/55 mt-1.5 font-medium">
                   {momentum ? WEEK_STREAK_LINES(momentum.weekStreak) : "Loading your week…"}
                 </p>

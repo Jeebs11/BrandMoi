@@ -380,12 +380,6 @@ export const GenerateContentBody = zod.object({
     .describe(
       "Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts",
     ),
-  slayStyle: zod
-    .boolean()
-    .optional()
-    .describe(
-      "When true, structure the post as Story, Lesson, Actionable advice, and a direct reader-focused ending",
-    ),
   continuityContext: zod
     .string()
     .optional()
@@ -951,12 +945,6 @@ export const ListDraftsResponseItem = zod.object({
       .describe(
         "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
       ),
-    slayStyle: zod
-      .boolean()
-      .optional()
-      .describe(
-        "Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure",
-      ),
     hashtags: zod
       .string()
       .optional()
@@ -1215,12 +1203,6 @@ export const CreateDraftBody = zod.object({
       .describe(
         "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
       ),
-    slayStyle: zod
-      .boolean()
-      .optional()
-      .describe(
-        "Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure",
-      ),
     hashtags: zod
       .string()
       .optional()
@@ -1377,12 +1359,6 @@ export const GetDraftResponse = zod.object({
       .optional()
       .describe(
         "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
-      ),
-    slayStyle: zod
-      .boolean()
-      .optional()
-      .describe(
-        "Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure",
       ),
     hashtags: zod
       .string()
@@ -1646,12 +1622,6 @@ export const UpdateDraftBody = zod.object({
         .describe(
           "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
         ),
-      slayStyle: zod
-        .boolean()
-        .optional()
-        .describe(
-          "Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure",
-        ),
       hashtags: zod
         .string()
         .optional()
@@ -1775,12 +1745,6 @@ export const UpdateDraftResponse = zod.object({
       .optional()
       .describe(
         "New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)",
-      ),
-    slayStyle: zod
-      .boolean()
-      .optional()
-      .describe(
-        "Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure",
       ),
     hashtags: zod
       .string()

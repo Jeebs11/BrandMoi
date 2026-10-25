@@ -909,9 +909,6 @@ components:
         feeling:
           type: string
           description: New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian)
-        slayStyle:
-          type: boolean
-          description: Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure
         hashtags:
           type: string
           description: 3-tier hashtag block (newline- or space-separated; user-editable as one string)
@@ -1021,9 +1018,6 @@ components:
         format:
           type: string
           description: Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts
-        slayStyle:
-          type: boolean
-          description: When true, structure the post as Story, Lesson, Actionable advice, and a direct reader-focused ending
         continuityContext:
           type: string
           description: Prior series parts' excerpts, woven in as continuity context when writing a later part of a series

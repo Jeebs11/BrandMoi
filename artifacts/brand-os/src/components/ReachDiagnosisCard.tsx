@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Stethoscope } from "lucide-react";
 import { reachDiagnosisApi, type ReachDiagnosis } from "@/lib/api";
+import { ReachTimeline } from "@/components/ReachTimeline";
 
 const fmt = (n: number) => n.toLocaleString("en-GB");
 
@@ -22,8 +23,10 @@ export function ReachDiagnosisCard() {
     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Stethoscope className="w-3.5 h-3.5 text-violet-500" />
-        <h2 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest">What changed in your reach</h2>
+        <h2 className="font-display text-lg font-semibold text-gray-900">What changed in your reach</h2>
       </div>
+
+      <ReachTimeline data={data} />
 
       <ul className="space-y-1.5">
         {data.findings.map((finding) => (

@@ -124,7 +124,6 @@ describe("Capture humanisation flow", () => {
     expect(onMakeIt).toHaveBeenCalledWith({
       rawInput: "Our difficult client conversation changed our approach.",
       moment: EMPTY_MOMENT_DETAILS,
-      slayStyle: false,
     });
   });
 

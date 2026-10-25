@@ -52,8 +52,18 @@ export interface SplitSummary {
   liftPct: number;
 }
 
+export interface TimelinePoint {
+  id: number;
+  date: string;
+  impressions: number;
+  hasNumber: boolean;
+  flagged: boolean;
+}
+
 export interface PerformanceDiagnosis {
   postCount: number;
+  points: TimelinePoint[];
+  events: Array<{ date: string; label: string }>;
   eras: EraSummary[];
   recent: { posts: number; median: number; earlierPosts: number; earlierMedian: number; changePct: number } | null;
   splits: SplitSummary[];
@@ -190,5 +200,13 @@ export function diagnosePerformance(allPosts: DiagnosisPost[]): PerformanceDiagn
     findings.push("No clear step change or standout pattern in your measured posts yet.");
   }
 
-  return { postCount: posts.length, eras, recent, splits, conversation, findings };
+  const points: TimelinePoint[] = posts.map((p) => ({
+    id: p.id,
+    date: p.postedAt.toISOString(),
+    impressions: p.impressions,
+    hasNumber: !!p.text && CONCRETE_NUMBER.test(p.text),
+    flagged: !!p.text && checkGenericPatterns(p.text).length > 0,
+  }));
+
+  return { postCount: posts.length, points, events: PLATFORM_EVENTS, eras, recent, splits, conversation, findings };
 }

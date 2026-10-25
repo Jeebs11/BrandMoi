@@ -27,9 +27,9 @@ export const WELCOME_TOUR_STEPS: TourStep[] = [
   {
     id: "profile-alignment",
     selector: '[data-tour="profile-alignment"]',
-    mobileSelector: '[data-tour="more-menu"]',
+    mobileSelector: '[data-tour="profile-alignment"]',
     title: "Keep your profile aligned",
-    description: "Compare your CV, BrandMoi profile, and LinkedIn to spot gaps before you post.",
+    description: "Open You to compare your CV, BrandMoi profile, and LinkedIn and spot gaps before you post.",
     placement: "right",
   },
   {

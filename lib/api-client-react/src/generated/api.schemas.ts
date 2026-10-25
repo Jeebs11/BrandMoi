@@ -265,8 +265,6 @@ export interface StructuredBreakdown {
   audience?: string;
   /** New 3-input flow feeling (Direct, Witty, Vulnerable, Story, Contrarian) */
   feeling?: string;
-  /** Whether this draft used the optional Story, Lesson, Action, reader-focused writing structure */
-  slayStyle?: boolean;
   /** 3-tier hashtag block (newline- or space-separated; user-editable as one string) */
   hashtags?: string;
   /** Alternative opener lines the user can swap into the post */
@@ -310,8 +308,6 @@ export interface GenerateContentBody {
   extraInstruction?: string;
   /** Structural format (standard, dialogue, letter, qa, story_arc) — orthogonal to feeling, used for series parts */
   format?: string;
-  /** When true, structure the post as Story, Lesson, Actionable advice, and a direct reader-focused ending */
-  slayStyle?: boolean;
   /** Prior series parts' excerpts, woven in as continuity context when writing a later part of a series */
   continuityContext?: string;
   /** Legacy back-compat — derivable from audience; the server prefers `audience` when both are set */

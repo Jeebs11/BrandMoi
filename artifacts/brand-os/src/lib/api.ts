@@ -871,6 +871,8 @@ export const resonanceMapApi = {
 
 export type ReachDiagnosis = {
   postCount: number;
+  points: { id: number; date: string; impressions: number; hasNumber: boolean; flagged: boolean }[];
+  events: { date: string; label: string }[];
   eras: { label: string; from: string | null; to: string | null; posts: number; medianImpressions: number }[];
   recent: { posts: number; median: number; earlierPosts: number; earlierMedian: number; changePct: number } | null;
   splits: { key: string; label: string; withLabel: string; withoutLabel: string; withPosts: number; withoutPosts: number; withMedian: number; withoutMedian: number; liftPct: number }[];
