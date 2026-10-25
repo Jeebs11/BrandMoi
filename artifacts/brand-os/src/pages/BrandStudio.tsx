@@ -1,3 +1,4 @@
+import { VoiceFingerprintCard } from "@/components/VoiceFingerprint";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, Sparkles, Loader2, Check, X, FlaskConical, TrendingUp, Quote } from "lucide-react";
@@ -185,6 +186,8 @@ export default function BrandStudio() {
             <Skeleton className="h-12 bg-white/10 rounded-xl" />
           )}
         </section>
+
+        <VoiceFingerprintCard />
 
         {/* ── Zone 2: Top-post analysis ── */}
         <section data-tour="studio-analyze">

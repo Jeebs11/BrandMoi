@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, preferencesTable } from "@workspace/db";
-import { buildFeedbackContext, buildLearnedPatterns, buildPerformanceContext, buildTopHashtags } from "./learning.js";
+import { buildAuthenticityLearning, buildFeedbackContext, buildLearnedPatterns, buildPerformanceContext, buildTopHashtags } from "./learning.js";
 import { buildVoiceDNA } from "./voice-dna.js";
 
 export type BrandContextConfidence = "starting" | "developing" | "grounded";
@@ -35,13 +35,14 @@ function cleanList(value: unknown): string[] {
  * after this context rather than rebuilding the profile independently.
  */
 export async function buildCanonicalBrandContext(userId: number): Promise<CanonicalBrandContext> {
-  const [[prefs], voiceDNA, feedbackContext, performanceContext, learnedPatterns, topHashtags] = await Promise.all([
+  const [[prefs], voiceDNA, feedbackContext, performanceContext, learnedPatterns, topHashtags, authenticityLearning] = await Promise.all([
     db.select().from(preferencesTable).where(eq(preferencesTable.userId, userId)).limit(1),
     buildVoiceDNA(userId),
     buildFeedbackContext(userId),
     buildPerformanceContext(userId),
     buildLearnedPatterns(userId),
     buildTopHashtags(userId),
+    buildAuthenticityLearning(userId),
   ]);
 
   const writingSamples = cleanList(prefs?.writingSamples);
@@ -95,7 +96,7 @@ export async function buildCanonicalBrandContext(userId: number): Promise<Canoni
   }
 
   if (voiceDNA) parts.push(voiceDNA);
-  const strategySignals = [performanceContext, learnedPatterns, topHashtags].filter(Boolean);
+  const strategySignals = [performanceContext, learnedPatterns, authenticityLearning, topHashtags].filter(Boolean);
   if (strategySignals.length > 0) {
     parts.push([
       "## STRATEGY & RESONANCE SIGNALS",

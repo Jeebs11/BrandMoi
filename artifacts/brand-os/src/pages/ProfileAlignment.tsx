@@ -1,3 +1,4 @@
+import { ProfileMirror } from "@/components/ProfileMirror";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, Target, Loader2 } from "lucide-react";
@@ -33,7 +34,7 @@ export default function ProfileAlignment() {
   const [analysisIsCurrent, setAnalysisIsCurrent] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
-  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [mirrorKey, setMirrorKey] = useState(0);
   const pageTour = usePageTour("profile-alignment-tour", PROFILE_ALIGNMENT_TOUR_STEPS);
 
   useEffect(() => {
@@ -58,29 +59,6 @@ export default function ProfileAlignment() {
       });
     return () => { active = false; };
   }, []);
-
-  const handleViewComparison = async () => {
-    if (comparisonLoading) return;
-    setComparisonLoading(true);
-    try {
-      const comparisonTable = await profileAlignmentApi.comparison();
-      setAnalysis({
-        id: 0,
-        targetAudience,
-        comparisonTable,
-        narrativeSummary: "",
-        fieldRewrites: [],
-        pairedFactSuggestions: [],
-        createdAt: new Date().toISOString(),
-      });
-      setAnalysisIsCurrent(false);
-      setReportOpen(true);
-    } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Couldn't load the comparison.", variant: "destructive" });
-    } finally {
-      setComparisonLoading(false);
-    }
-  };
 
   const handleRunAnalysis = async () => {
     if (analyzing) return;
@@ -118,25 +96,15 @@ export default function ProfileAlignment() {
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-4 space-y-4">
           <div data-tour="align-cv">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Your CV</p>
-            <ProfileAlignmentUpload kind="cv" onSuccess={() => { setHasCvFacts(true); setAnalysisIsCurrent(false); }} />
+            <ProfileAlignmentUpload kind="cv" onSuccess={() => { setHasCvFacts(true); setAnalysisIsCurrent(false); setMirrorKey((k) => k + 1); }} />
           </div>
           <div data-tour="align-linkedin">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Your LinkedIn profile</p>
-            <ProfileAlignmentUpload kind="linkedin" onSuccess={() => { setHasLinkedinFacts(true); setAnalysisIsCurrent(false); }} />
+            <ProfileAlignmentUpload kind="linkedin" onSuccess={() => { setHasLinkedinFacts(true); setAnalysisIsCurrent(false); setMirrorKey((k) => k + 1); }} />
           </div>
 
           {hasLinkedinFacts && (
             <div className="pt-3 border-t border-gray-100 space-y-3">
-              {hasCvFacts && (
-                <button
-                  onClick={() => void handleViewComparison()}
-                  disabled={comparisonLoading}
-                  className="w-full flex items-center justify-center gap-1.5 h-9 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:border-gray-300 disabled:opacity-50 transition-colors"
-                >
-                  {comparisonLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  {comparisonLoading ? "Loading…" : "View CV vs BrandMoi vs LinkedIn (no AI cost)"}
-                </button>
-              )}
               <div>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Who should this profile speak to?</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -199,6 +167,8 @@ export default function ProfileAlignment() {
             </div>
           )}
         </div>
+
+        <ProfileMirror enabled={hasLinkedinFacts} refreshKey={mirrorKey} />
 
         <p className="text-[11px] text-gray-400 leading-relaxed px-1">
           Nothing is ever published automatically. Your score explains the evidence behind every result, and suggested rewrites never invent missing outcomes.

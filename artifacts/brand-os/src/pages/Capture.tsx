@@ -1,3 +1,5 @@
+import { VoiceMatch, useVoiceFingerprint } from "@/components/VoiceFingerprint";
+import type { Fingerprint } from "@/lib/voice-fingerprint";
 import { ProvenanceInk } from "@/components/ProvenanceInk";
 import { isOffTerritory, territoryLabel, type TerritoryProfile } from "@/lib/pillar-fit";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -219,6 +221,7 @@ export default function Capture() {
   const seriesHookParam = params.get("seriesHook") ?? "";
 
   const { user, preferences } = useAuth();
+  const { fingerprint: voiceFingerprint } = useVoiceFingerprint();
   const isDemo = user?.email === "demo@brandos.app";
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -986,6 +989,7 @@ export default function Capture() {
           <ResultView
             content={content}
             aiOriginalPost={aiOriginalPost}
+            voiceFingerprint={voiceFingerprint}
             editedPost={editedPost} setEditedPost={setEditedPost}
             hashtags={hashtags} setHashtags={setHashtags}
             versions={versions}
@@ -1576,6 +1580,7 @@ interface ResultViewProps {
   editedPost: string; setEditedPost: (v: string) => void;
   hashtags: string; setHashtags: (v: string) => void;
   aiOriginalPost?: string | null;
+  voiceFingerprint?: Fingerprint | null;
   versions: Array<{ id: number; label: string; post: string; hashtags: string }>;
   onRestoreVersion: (v: { id: number; label: string; post: string; hashtags: string }) => void;
   activeTab: TabType; setActiveTab: (t: TabType) => void;
@@ -1617,7 +1622,7 @@ interface ResultViewProps {
 
 export function ResultView(props: ResultViewProps) {
   const {
-    content, editedPost, setEditedPost, hashtags, setHashtags, aiOriginalPost,
+    content, editedPost, setEditedPost, hashtags, setHashtags, aiOriginalPost, voiceFingerprint,
     versions, onRestoreVersion,
     activeTab, setActiveTab, visualStyle, setVisualStyle,
     visualImage, isLoadingVisual,
@@ -1773,6 +1778,7 @@ export function ResultView(props: ResultViewProps) {
           </div>
 
           {postView === "ink" && <ProvenanceInk original={aiOriginalPost} text={editedPost} />}
+          <VoiceMatch text={editedPost} fingerprint={voiceFingerprint} onRefine={onRefine} isRefining={isRefining} />
           <textarea
             id="draft-post-editor"
             value={editedPost}

@@ -66,7 +66,7 @@ export function ReachDiagnosisCard() {
       )}
 
       <p className="text-[10px] text-gray-400 leading-relaxed">
-        Based on your own measured posts. These are patterns, not proof — LinkedIn does not publish how it ranks posts.
+        Based on your own measured posts. These are patterns, not proof — LinkedIn does not publish how it ranks posts. The “Impact” score elsewhere uses BrandMoi's own weighting of reactions, comments, reposts and saves, not LinkedIn's.
       </p>
     </div>
   );

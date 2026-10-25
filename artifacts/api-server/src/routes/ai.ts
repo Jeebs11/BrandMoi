@@ -26,6 +26,7 @@ import { aiRateLimit } from "../middleware/rate-limit.js";
 import { isDemoUser, demoDelay, getDemoGenerateResponse, DEMO_EXPLORE_DIRECTIONS } from "../lib/demo-content.js";
 import { respondAiError } from "../lib/ai-errors.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
+import { getStyleTargetsPrompt } from "../lib/voice-profile.js";
 import { computeJaccard } from "../lib/voice-dna.js";
 import { resonanceScore } from "../lib/learning.js";
 import { fetchMomentumNewsAnchor } from "../lib/momentum.js";
@@ -129,6 +130,8 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     newsContext = `News URL the author is reacting to: ${newsUrl}`;
   }
 
+  const styleTargets = await getStyleTargetsPrompt(userId);
+
   const userMessage = [
     "## RAW THOUGHT (primary source — write from this, stay close to the words):",
     rawInput,
@@ -136,6 +139,7 @@ router.post("/ai/generate", requireAuth, aiRateLimit, async (req, res): Promise<
     "## WHO THIS PERSON IS:",
     voiceContext || fallbackBrand,
     "",
+    styleTargets,
     "## AUDIENCE OVERLAY (mandatory):",
     audienceOverlay,
     "",

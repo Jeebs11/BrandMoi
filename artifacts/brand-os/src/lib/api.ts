@@ -884,6 +884,47 @@ export const reachDiagnosisApi = {
   get: () => apiFetch<ReachDiagnosis>("/analytics/diagnosis"),
 };
 
+export type VoiceRawMetrics = Record<"sentenceLength" | "rhythm" | "lineBreaks" | "firstPerson" | "questions" | "numbers" | "contractions", number>;
+
+export type VoiceProfile = {
+  samples: number;
+  words: number;
+  average: VoiceRawMetrics | null;
+  winners: VoiceRawMetrics | null;
+  rest: VoiceRawMetrics | null;
+  insights: { key: keyof VoiceRawMetrics; label: string; top: number; rest: number; direction: "higher" | "lower" }[];
+  measuredPosts: number;
+  target: { basis: "best-performing" | "published"; raw: VoiceRawMetrics } | null;
+  baseline: { kind: "hand-written" | "earliest"; posts: number; raw: VoiceRawMetrics } | null;
+  drift: {
+    points: { id: number; date: string; match: number; aiAssisted: boolean }[];
+    assistedAvg: number | null;
+    handwrittenAvg: number | null;
+    assistedCount: number;
+    handwrittenCount: number;
+  } | null;
+};
+
+export const voiceProfileApi = {
+  get: () => apiFetch<VoiceProfile>("/user/voice-profile"),
+};
+
+export type GuidanceStage = {
+  key: "performance_history" | "learned_patterns" | "style_targets";
+  label: string;
+  status: "inactive" | "undatable" | "too_early" | "tracking";
+  minMeasuredPosts: number;
+  activatedAt: string | null;
+  before: { posts: number; medianImpressions: number } | null;
+  after: { posts: number; medianImpressions: number } | null;
+  changePct: number | null;
+  caveats: string[];
+};
+
+export const guidanceApi = {
+  get: () => apiFetch<{ measuredPosts: number; stages: GuidanceStage[] }>("/analytics/guidance"),
+};
+
 export type LinkedinStatus =
   | { configured: false; connected: false }
   | { configured: true; connected: false }

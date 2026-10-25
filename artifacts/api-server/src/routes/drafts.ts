@@ -25,6 +25,7 @@ import { upsertDailyActivity } from "../lib/momentum.js";
 import { computeEditPercent, computeWordChangeSummary, runAuthenticityCheck } from "../lib/authenticity-check.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
 import { diagnosePerformance, type DiagnosisPost } from "../lib/performance-diagnosis.js";
+import { trackGuidance, type TrackedPost } from "../lib/guidance-tracker.js";
 
 const router: IRouter = Router();
 
@@ -1092,6 +1093,24 @@ router.get("/analytics/diagnosis", requireAuth, async (req, res): Promise<void> 
   });
 
   res.json(diagnosePerformance(posts));
+});
+
+router.get("/analytics/guidance", requireAuth, async (req, res): Promise<void> => {
+  const rows = await db
+    .select({ draft: draftsTable, signal: performanceSignalsTable })
+    .from(draftsTable)
+    .innerJoin(performanceSignalsTable, eq(performanceSignalsTable.draftId, draftsTable.id))
+    .where(and(eq(draftsTable.userId, req.user!.userId), eq(draftsTable.status, "published")));
+
+  const posts: TrackedPost[] = rows.map(({ draft, signal }) => {
+    const exportDate = signal.linkedinPostDate ? new Date(signal.linkedinPostDate) : null;
+    return {
+      postedAt: exportDate && !Number.isNaN(exportDate.getTime()) ? exportDate : draft.createdAt,
+      loggedAt: signal.loggedAt,
+      impressions: signal.impressions,
+    };
+  });
+  res.json({ measuredPosts: posts.length, stages: trackGuidance(posts) });
 });
 
 router.get("/analytics/resonance-map", requireAuth, async (req, res): Promise<void> => {
