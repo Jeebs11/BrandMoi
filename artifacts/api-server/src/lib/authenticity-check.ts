@@ -33,6 +33,30 @@ const GENERIC_MIC_DROP_ENDINGS = [
   "thoughts?",
 ];
 
+const NEGATION_REFRAME_PATTERN = /\b(?:(?:it'?s|it is|this is|that'?s|that is)\s+not|\w+\s+(?:isn'?t|is not|wasn'?t|was not|aren'?t))\s+(?:just\s+|only\s+)?[^.!?\n]{2,60}?[,;—–-]\s*(?:it'?s|it is|but)\b|\b(?:wasn'?t|isn'?t|aren'?t|weren'?t)\s+the\s+(?:problem|issue)\.\s+\w/i;
+const SWEEPING_SUPERLATIVE_HOOK = /^the\s+(?:worst|hardest|bravest|biggest|best|most\s+\w+)\s+(?:thing|mistake|lesson)\b/i;
+const SPECIFICS_MIN_WORDS = 60;
+const SHORT_LINE_MAX_WORDS = 7;
+
+function hasShortLineRun(lines: string[]): boolean {
+  let run = 0;
+  for (const line of lines) {
+    const words = line.split(/\s+/).filter(Boolean).length;
+    run = words > 0 && words <= SHORT_LINE_MAX_WORDS ? run + 1 : 0;
+    if (run >= 3) return true;
+  }
+  return false;
+}
+
+// A digit, a quoted phrase, or a capitalised word that isn't a sentence opener
+// (a name, product or place). "I" doesn't count.
+function hasNumberNameOrQuote(text: string): boolean {
+  if (/\d/.test(text) || /["“][^"”]{3,}["”]/.test(text)) return true;
+  return text.split(/[.!?\n]+/).some((sentence) =>
+    sentence.trim().split(/\s+/).slice(1).some((word) => /^[A-Z][a-z]{2,}/.test(word)),
+  );
+}
+
 export type AuthenticitySeverity = "low" | "medium" | "high";
 
 export type WordChangeSummary = {
@@ -212,6 +236,21 @@ export function checkGenericPatterns(text: string): string[] {
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   if (wordCount >= 90 && !CONCRETE_DETAIL_PATTERN.test(text)) {
     flags.push("few concrete personal details or evidence");
+  }
+
+  // Patterns the generation prompt bans as recognisable AI tells. A human can
+  // write any of these, so they are coaching flags, not a verdict.
+  if (NEGATION_REFRAME_PATTERN.test(text)) {
+    flags.push('a "not X, it\'s Y" reframe');
+  }
+  if (SWEEPING_SUPERLATIVE_HOOK.test(firstLine)) {
+    flags.push("a sweeping-superlative hook");
+  }
+  if (hasShortLineRun(nonEmptyLines.length > 1 ? nonEmptyLines : sentences)) {
+    flags.push("a run of three short parallel lines");
+  }
+  if (wordCount >= SPECIFICS_MIN_WORDS && !hasNumberNameOrQuote(text)) {
+    flags.push("no numbers, names or quotes to anchor it");
   }
 
   return flags;

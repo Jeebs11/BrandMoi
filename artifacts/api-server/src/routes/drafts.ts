@@ -24,6 +24,7 @@ import { isDemoUser } from "../lib/demo-content.js";
 import { upsertDailyActivity } from "../lib/momentum.js";
 import { computeEditPercent, computeWordChangeSummary, runAuthenticityCheck } from "../lib/authenticity-check.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
+import { diagnosePerformance, type DiagnosisPost } from "../lib/performance-diagnosis.js";
 
 const router: IRouter = Router();
 
@@ -1061,6 +1062,36 @@ router.get("/drafts/:id/performance", requireAuth, async (req, res): Promise<voi
     .where(eq(performanceSignalsTable.draftId, params.data.id));
 
   res.json(signal ?? null);
+});
+
+router.get("/analytics/diagnosis", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.userId;
+
+  const rows = await db
+    .select({ draft: draftsTable, signal: performanceSignalsTable })
+    .from(draftsTable)
+    .innerJoin(performanceSignalsTable, eq(performanceSignalsTable.draftId, draftsTable.id))
+    .where(and(eq(draftsTable.userId, userId), eq(draftsTable.status, "published")));
+
+  const posts: DiagnosisPost[] = rows.map(({ draft, signal }) => {
+    const exportDate = signal.linkedinPostDate ? new Date(signal.linkedinPostDate) : null;
+    const visualType = (draft.visualType as string | null) ?? "none";
+    return {
+      id: draft.id,
+      postedAt: exportDate && !Number.isNaN(exportDate.getTime()) ? exportDate : draft.createdAt,
+      impressions: signal.impressions,
+      reactions: signal.reactions,
+      comments: signal.comments,
+      reposts: signal.reposts,
+      saves: signal.saves,
+      sends: signal.sends,
+      text: draft.postOutput,
+      aiOriginalText: draft.aiOriginalPost,
+      hasVisual: visualType !== "none" || (!!draft.mediaFormat && draft.mediaFormat !== "NONE"),
+    };
+  });
+
+  res.json(diagnosePerformance(posts));
 });
 
 router.get("/analytics/resonance-map", requireAuth, async (req, res): Promise<void> => {

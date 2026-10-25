@@ -1,3 +1,4 @@
+import { isOffTerritory, territoryLabel, type TerritoryProfile } from "@/lib/pillar-fit";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1193,6 +1194,8 @@ export function CaptureForm(props: CaptureFormProps) {
   const [ppAnalogy, setPpAnalogy] = useState("");
 
   const needsSpecificityCheck = shouldShowSpecificityPrompt(rawInput, momentDetails);
+  const { preferences: authPreferences } = useAuth();
+  const offTerritory = authPreferences ? isOffTerritory(rawInput, authPreferences as TerritoryProfile) : false;
 
   const updateMomentDetail = (key: keyof MomentDetails, value: string) => {
     setMomentDetails({ ...momentDetails, [key]: value });
@@ -1275,6 +1278,21 @@ export function CaptureForm(props: CaptureFormProps) {
             <p className="font-semibold">A little more detail could make this feel like you.</p>
             <p className="mt-1 leading-relaxed text-amber-800">
               If you remember it, consider: <span className="font-medium">{getSpecificityQuestion(rawInput)}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {offTerritory && authPreferences && (
+        <div
+          className="flex items-start gap-2.5 rounded-2xl border border-sky-200 bg-sky-50/70 px-3.5 py-3 text-xs text-sky-900"
+          data-testid="prompt-off-territory"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+          <div>
+            <p className="font-semibold">This sits a long way from your usual territory.</p>
+            <p className="mt-1 leading-relaxed text-sky-800">
+              LinkedIn reads your profile alongside each post{territoryLabel(authPreferences as TerritoryProfile).length > 0 ? `, and yours is about ${territoryLabel(authPreferences as TerritoryProfile).join(", ")}` : ""}. If it's worth posting, tie it back to that work.
             </p>
           </div>
         </div>

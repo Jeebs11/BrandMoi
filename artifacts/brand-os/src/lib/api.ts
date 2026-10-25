@@ -869,6 +869,19 @@ export const resonanceMapApi = {
   get: () => apiFetch<Record<string, ResonanceMapEntry>>("/analytics/resonance-map"),
 };
 
+export type ReachDiagnosis = {
+  postCount: number;
+  eras: { label: string; from: string | null; to: string | null; posts: number; medianImpressions: number }[];
+  recent: { posts: number; median: number; earlierPosts: number; earlierMedian: number; changePct: number } | null;
+  splits: { key: string; label: string; withLabel: string; withoutLabel: string; withPosts: number; withoutPosts: number; withMedian: number; withoutMedian: number; liftPct: number }[];
+  conversation: { commentsPer1000: number; savesPer1000: number; sendsPer1000: number; repostsPer1000: number } | null;
+  findings: string[];
+};
+
+export const reachDiagnosisApi = {
+  get: () => apiFetch<ReachDiagnosis>("/analytics/diagnosis"),
+};
+
 export type LinkedinStatus =
   | { configured: false; connected: false }
   | { configured: true; connected: false }

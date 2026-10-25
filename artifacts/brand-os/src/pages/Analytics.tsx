@@ -1,3 +1,4 @@
+import { ReachDiagnosisCard } from "@/components/ReachDiagnosisCard";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -342,6 +343,8 @@ function Content({ data, trendWindow, seriesList, topicsList }: { data: Analytic
           )}
         </div>
       </section>
+
+      <ReachDiagnosisCard />
 
       {/* Performance CTA */}
       {data.loggedPerformanceCount < 5 && (

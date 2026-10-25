@@ -1,3 +1,4 @@
+import { FirstHourReminder } from "@/components/FirstHourReminder";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Settings, ArrowRight, Clock, Flame, ChevronDown, X, Zap, Bot, Layers, RefreshCw, Newspaper, Sparkles, GraduationCap, PenLine, Lightbulb, Check, ChevronRight, Brain, Wrench, Plus, ThumbsUp, ThumbsDown, Bookmark, TrendingUp, Loader2 } from "lucide-react";
@@ -681,6 +682,7 @@ export default function Dashboard() {
           </section>
           {momOpen && momentum && <MomentumCard data={momentum} />}
 
+          <FirstHourReminder drafts={drafts} />
           <ProfileStrengthCard preferences={preferences} onComplete={() => navigate("/settings")} />
 
           {/* Performance check-in nudges — published posts with no logged stats */}

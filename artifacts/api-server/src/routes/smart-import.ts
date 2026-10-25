@@ -3,6 +3,7 @@ import multer from "multer";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { requireAuth } from "../middleware/auth.js";
 import { getAiTextBlock } from "../lib/ai-response.js";
+import { respondAiError } from "../lib/ai-errors.js";
 import { extractText } from "../lib/extract-text.js";
 
 const router: IRouter = Router();
@@ -104,7 +105,12 @@ Rules:
 - firstPostAngles: 3 ready-to-write LinkedIn post angles drawn from real moments in this document — a specific decision, turnaround, client result, lesson, or contrarian observation their experience supports. Each max 15 words, phrased as the seed of a post (e.g. "The governance mistake that nearly sank a $30m programme"). Not generic topics.`,
         },
       ],
+    }).catch((err: unknown) => {
+      console.error("[smart-import] AI call failed:", err);
+      respondAiError(res, err, "Couldn't analyse that document. Please try again.");
+      return null;
     });
+    if (!message) return;
 
     const text = getAiTextBlock(message);
     if (!text) {
